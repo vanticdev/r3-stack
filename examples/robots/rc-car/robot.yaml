@@ -39,9 +39,10 @@ components:
     type: upper-deck-petg
     params:
       # Rear-right notch clears the transmission's gear cover.
-      # Rear-left tab carries the so_rl standoff behind the motor terminals (3 mm clear of the gear case at y < 30 mm).
-      outline: [[-66 mm, -55 mm], [85 mm, -55 mm], [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm],
-                [-85 mm, -28 mm], [-66 mm, -28 mm]]
+      # Rear-left tab carries the so_rl standoff behind the motor terminals (3 mm clear of the gear case at y < 30 mm);
+      # the right-edge tab carries the lead post's screw (edge distance) beside the lead slot.
+      outline: [[-66 mm, -55 mm], [-28 mm, -55 mm], [-28 mm, -59 mm], [-16 mm, -59 mm], [-16 mm, -55 mm], [85 mm, -55 mm],
+                [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
   standoff_rl: {type: standoff-m3-47}
   standoff_rr: {type: standoff-m3-47}
   standoff_fl: {type: standoff-m3-47}
@@ -270,7 +271,7 @@ assembly:
     - {id: battery_strap_loop, a: battery.strap_path, b: battery_strap.top,
        verify: {strap: battery_strap, around: battery, through: [chassis]}}
     - {id: battery_strap_slots, a: chassis.strap_slots, b: battery_strap.bottom}
-    - {id: fuse_seat, a: chassis.fuse_seat, b: fuse.bottom, clock: 0 deg}
+    - {id: fuse_seat, a: chassis.fuse_seat, b: fuse.bottom, clock: 180 deg}
     - {id: fuse_tie_loop, a: fuse.tie_path, b: fuse_tie.top, clock: 90 deg, verify: {strap: fuse_tie, around: fuse, through: [chassis]}}
     - {id: fuse_tie_slots, a: chassis.tie_slots, b: fuse_tie.bottom}
 
@@ -318,8 +319,10 @@ electrical:
         F1: {type: integral, mates: fuse.J1}
         F2: {type: integral, mates: fuse.J2}
       splices:
-        SP: {position: [75 mm, 21 mm, 39 mm]}   # 6 mm off the fuse holder input (J1): the fuse sits at the splice
-        SN: {position: [85 mm, -10 mm, 40 mm]}
+        # SP 7 mm off the fuse holder input (J1, its front end on the right of the battery): the fuse sits at the
+        # splice. The fused output (J2, aft) turns back under the deck to the deck's power slot below the HAT's XT30.
+        SP: {position: [188 mm, -37 mm, 40 mm]}
+        SN: {position: [188 mm, -25 mm, 47 mm]}
       wires:
         - {id: W_Y_P_IN, from: P1.1, to: SP, awg: 12, color: red, signal: VBAT}
         - {id: W_Y_P_ESC, from: SP, to: P2.1, awg: 12, color: red, signal: VBAT}
@@ -367,7 +370,7 @@ electrical:
       # Through servo post B's lead pocket, aft along the plate under the linkage, under the deck and up through
       # the deck's lead slot beside the HAT.
       route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr],
-              via: [[150 mm, -40 mm, 68 mm], [98 mm, -39 mm, 76.5 mm]]}
+              via: [[150 mm, -42 mm, 68 mm], [98 mm, -42 mm, 76.5 mm]]}
     - id: rx_lead
       connectors:
         A: {type: integral, mates: receiver.J1}

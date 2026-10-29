@@ -43,9 +43,10 @@ components:
       # Battery 17 mm aft of the servo posts' line: its 12 AWG lead (16 mm bend radius) turns back clear of post A.
       battery_seat: {kind: face_mount, origin: [11 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       strap_slots: {kind: strap_slot, origin: [11 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {width: 22 mm, slots: [[-11 mm, -25.5 mm, 11 mm, -23 mm], [-11 mm, 23 mm, 11 mm, 25.5 mm]]}, description: "Two 22 x 2.5 mm slots either side of the battery for the hook-and-loop strap"}
-      # Fuse holder on the right of the battery, along x: input (J1) aft, output (J2) forward to the HAT feed slot.
+      # Fuse holder on the right of the battery, along x: input (J1) forward from the splices, output (J2) aft,
+      # turning back under the deck to the HAT feed slot.
       fuse_seat: {kind: face_mount, origin: [36 mm, -37 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      tie_slots: {kind: strap_slot, origin: [36 mm, -37 mm, 0], z: [0, 0, -1], x: [0, 1, 0], params: {width: 4 mm, slots: [[-7.5 mm, -2 mm, -5.5 mm, 2 mm], [5.5 mm, -2 mm, 7.5 mm, 2 mm]]}, description: "Cable-tie slots that retain the fuse holder"}
+      tie_slots: {kind: strap_slot, origin: [36 mm, -37 mm, 0], z: [0, 0, -1], x: [0, -1, 0], params: {width: 4 mm, slots: [[-7.5 mm, -2 mm, -5.5 mm, 2 mm], [5.5 mm, -2 mm, 7.5 mm, 2 mm]]}, description: "Cable-tie slots that retain the fuse holder"}
   - id: upper-deck-petg
     kind: structure
     cad_name: Electronics deck
@@ -63,7 +64,11 @@ components:
       features:
         # Lead slot (grommet edge strip) beside the HAT's top-entry ESC/servo headers: the leads run under the deck
         # and come up next to the HAT instead of looping around the deck edge.
-        - {id: lead_slot, kind: slot, position: [-22 mm, -39 mm, 3 mm], axis: [0, 0, -1], diameter: 10 mm, length: 14 mm,
+        - {id: lead_slot, kind: slot, position: [-22 mm, -42 mm, 3 mm], axis: [0, 0, -1], diameter: 9 mm, length: 14 mm,
+           slot_dir: [1, 0, 0], depth: 3 mm, provenance: {status: estimated, source: "R3 deck layout"}}
+        # HAT power feed: the fused 18 AWG pair comes up between the Pi's USB end and the antenna mast, in line
+        # with the HAT's XT30 input.
+        - {id: power_slot, kind: slot, position: [48 mm, -22 mm, 3 mm], axis: [0, 0, -1], diameter: 10 mm, length: 6 mm,
            slot_dir: [1, 0, 0], depth: 3 mm, provenance: {status: estimated, source: "R3 deck layout"}}
     interfaces:
     # Deck frame: bottom center; top face z = 3 mm. PETG: hole clearances from the FDM print-fit table.
@@ -81,7 +86,7 @@ components:
       pi_4: {kind: hole_pattern, origin: [9 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       rx_pad: {kind: adhesive_pad, origin: [70 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       gps_pad: {kind: adhesive_pad, origin: [-65 mm, 30 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      lead_post: {kind: hole_pattern, origin: [-22 mm, -48.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      lead_post: {kind: hole_pattern, origin: [-22 mm, -51.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       mast: {kind: hole_pattern, origin: [55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
   - id: standoff-m3-47
     kind: structure
@@ -926,7 +931,7 @@ components:
   - id: lead-post-petg
     kind: structure
     cad_name: Lead post
-    name: Printed cable tie post, PETG, 8 mm x 38 mm
+    name: Printed cable tie post, PETG, 7 mm x 38 mm
     description: >
       Tie post beside the deck's lead slot. The ESC and servo leads plug into the HAT's top-entry headers, so they
       climb ~45 mm above the deck; a cable tie around this post holds them halfway up (the climb alone exceeds
@@ -934,14 +939,14 @@ components:
     mechanical:
       shape: cylinder
       axis: z
-      size: [8 mm, 38 mm]
-      mass: 0.0024
+      size: [7 mm, 38 mm]
+      mass: 0.0019
       material: PETG
       density: 1270
       color: "#2c6e9e"
       fabricated: true
       solids:
-        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 8 mm, length: 38 mm}
+        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 38 mm}
     interfaces:
       base: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 9 mm]]}}
   - id: servo-horn-al7075
