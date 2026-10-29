@@ -33,3 +33,14 @@ All are read today with defaults (recorded as `estimated_parameters` in
 - `requirements.extra.duty_cycle: {cruise: 0.85, full_throttle: 0.05, idle: 0.10}`
   for the runtime estimate (that default is used now). A first-class
   `Requirements.duty_cycle` field would be cleaner.
+
+## ngspice (r3/ngspice branch)
+- **Worker image: ngspice shared library.** `r3_sim.electrical` now runs ngspice through
+   `libngspice` (ctypes, official shared API). The R3 worker Docker image needs it installed:
+   Debian bookworm `apt-get install libngspice0` (provides `/usr/lib/<arch>-linux-gnu/libngspice.so.0`,
+   which is probed automatically; any other path via `R3_NGSPICE_LIBRARY`). Developed and tested
+   against ngspice 47 (Homebrew `libngspice`). Without the library `ElectricalSystem(...)` raises
+   `FileNotFoundError` and the kernel selects its labeled fallback.
+- **Sim requests 1-2 are implemented** (`initial={"battery_soc": ...}` accepted by the
+   constructor; `pulse_us <= 0` is signal loss for the ESC and the servo). Item 3: servo outputs
+   now also carry `voltage`.

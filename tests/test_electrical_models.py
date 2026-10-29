@@ -1,4 +1,4 @@
-"""Unit tests of electrical behavior models in minimal circuits."""
+"""Unit tests of electrical behavior models (ngspice subcircuits) in minimal circuits."""
 
 import math
 
@@ -6,45 +6,38 @@ import numpy as np
 import pytest
 from r3_catalog import default_catalog
 
-from r3_sim.electrical.mna import Circuit, VoltageSource
-from r3_sim.electrical.models.base import BuildContext, SupplyLoad, constant_current
+from r3_sim.electrical.bench import Bench
+from r3_sim.electrical.models.base import BuildContext
 from r3_sim.electrical.models.battery import BatteryLipo
 from r3_sim.electrical.models.fuse import FuseBlade
 from r3_sim.electrical.models.motor import DcBrushedMotor
+from r3_sim.electrical.ngspice import find_library
+
+pytestmark = pytest.mark.skipif(find_library() is None, reason="libngspice not installed")
 
 
 def _model(cls, type_id: str, cid: str, reference: str):
     catalog = default_catalog()
     ctype = catalog.component(type_id)
-    circuit = Circuit()
-    circuit.set_reference(reference)
-    model = cls(cid, ctype, dict(ctype.behavior.params), BuildContext(circuit, None, 25.0))
-    model.build(circuit)
-    return circuit, model
-
-
-def _step(circuit, models, dt, x):
-    for m in models:
-        m.begin_step(dt, {}, 0.0)
-    x, info = circuit.solve(x)
-    assert info.converged
-    for m in models:
-        m.end_step(dt, x, 0.0)
-    return x
+    return cls(cid, ctype, dict(ctype.behavior.params), BuildContext(None, 25.0, reference))
 
 
 @pytest.mark.parametrize("c_rate", [1.0, 2.0])
 def test_battery_discharge_delivers_rated_capacity(c_rate):
-    circuit, battery = _model(BatteryLipo, "lipo-2s-5000-25c", "bat", "C:bat.NEG")
+    battery = _model(BatteryLipo, "lipo-2s-5000-25c", "bat", "C:bat.NEG")
     current = c_rate * 5.0
-    fn, expr = constant_current(current, 1.0)
-    circuit.add(SupplyLoad("load", battery.pos.node, -1, fn, expr))
-    dt, delivered, x = 1.0, 0.0, None
+    # Constant-current load (resistive collapse below 1 V keeps the deck well posed after empty).
+    bench = Bench([battery], [f"bload {battery.pos.node} 0 i = (v({battery.pos.node}) >= 1 ? {current} : {current}*v({battery.pos.node}))"],
+                  max_step=1.0)
+    dt, delivered = 1.0, 0.0
     samples = {}
-    while battery.s_soc > 0.0:
-        x = _step(circuit, [battery], dt, x)
-        delivered += battery.last_current * dt
-        samples.setdefault(round(battery.s_soc, 2), (x[battery.pos.node], battery.s_soc, battery.r0, battery.r1))
+    try:
+        while battery.s_soc > 0.0:
+            sol = bench.step(dt)
+            delivered += battery.last_current * dt
+            samples.setdefault(round(battery.s_soc, 2), (sol.v(battery.pos.node), battery.s_soc, battery.r0, battery.r1))
+    finally:
+        bench.close()
     capacity_ah = delivered / 3600.0
     v_mid, soc_mid, r0, r1 = samples[0.5]
     print(f"{c_rate:.0f}C: delivered {capacity_ah:.4f} Ah, V(SOC 0.5) = {v_mid:.4f} V, T = {battery.s_temperature:.1f} C")
@@ -58,12 +51,13 @@ def test_battery_discharge_delivers_rated_capacity(c_rate):
 
 
 def test_motor_stall_current_is_v_over_r():
-    circuit, motor = _model(DcBrushedMotor, "motor-540-brushed", "motor", "C:motor.M_NEG")
-    supply_branch = circuit.branch("src")
-    circuit.add(VoltageSource("src", motor.pos.node, -1, supply_branch, emf=7.4, resistance=0.0))
-    motor.begin_step(None, {"omega": 0.0}, 0.0)
-    x, _ = circuit.solve()
-    out = motor.outputs(x)
+    motor = _model(DcBrushedMotor, "motor-540-brushed", "motor", "C:motor.M_NEG")
+    bench = Bench([motor], [f"vsrc {motor.pos.node} 0 dc 7.4"])
+    try:
+        sol = bench.operating_point({"motor": {"omega": 0.0}})
+    finally:
+        bench.close()
+    out = motor.outputs(sol)
     expected = (7.4 - 0.2) / 0.11  # (V - V_brush) / R
     print(f"stall current {out['current']:.2f} A (V/R = {7.4 / 0.11:.2f} A, (V-Vb)/R = {expected:.2f} A), torque {out['torque']:.4f} N m")
     assert out["current"] == pytest.approx(expected, rel=1e-3)
@@ -71,43 +65,42 @@ def test_motor_stall_current_is_v_over_r():
     assert out["torque"] == pytest.approx(60 / (2 * math.pi * 2100) * out["current"], rel=1e-9)
 
 
-def test_motor_inductive_rise_backward_euler():
-    circuit, motor = _model(DcBrushedMotor, "motor-540-brushed", "motor", "C:motor.M_NEG")
-    supply_branch = circuit.branch("src")
-    circuit.add(VoltageSource("src", motor.pos.node, -1, supply_branch, emf=7.4, resistance=0.0))
-    x, currents = None, []
-    for _ in range(10):
-        motor.begin_step(1e-4, {"omega": 0.0}, 0.0)
-        x, _ = circuit.solve(x)
-        motor.end_step(1e-4, x, 0.0)
-        currents.append(motor.s_current)
+def test_motor_inductive_rise_matches_rl_exponential():
+    motor = _model(DcBrushedMotor, "motor-540-brushed", "motor", "C:motor.M_NEG")
+    bench = Bench([motor], [f"vsrc {motor.pos.node} 0 pwl(0 0 1n 7.4)"], max_step=1e-4)
+    currents = []
+    try:
+        for _ in range(10):
+            bench.step(1e-4, {"motor": {"omega": 0.0}})
+            currents.append(motor.s_current)
+    finally:
+        bench.close()
     steady = (7.4 - 0.2) / 0.11
     tau = 60e-6 / 0.11
-    # Backward Euler of L di/dt = V - R i: i1 = (V - Vb) / (R + L/dt) (brush drop saturated).
-    assert currents[0] == pytest.approx((7.4 - 0.2) / (0.11 + 60e-6 / 1e-4), rel=0.01)
-    assert currents[-1] == pytest.approx(steady * (1 - math.exp(-1e-3 / tau)), rel=0.05)
+    # L di/dt = V - V_brush - R i: i(t) = (V - V_b) / R (1 - exp(-t / tau)) once the brush drop has saturated (> 0.3 A).
+    for k, current in enumerate(currents, start=1):
+        analytic = steady * (1 - math.exp(-k * 1e-4 / tau))
+        assert current == pytest.approx(analytic, rel=0.01), (k, current, analytic)
     assert all(np.diff(currents) > 0)
 
 
 def test_fuse_blows_on_overcurrent_not_on_rated_load():
-    circuit, fuse = _model(FuseBlade, "fuse-atc-10a", "fuse", "C:fuse.B")
+    fuse = _model(FuseBlade, "fuse-atc-10a", "fuse", "C:fuse.B")
 
     class _Branch:
-        a, b = fuse.pins["A"].node, -1
-        index = circuit.resistor(fuse.pins["A"].node, -1, 0.007, "fuse:A-B")
+        node_a, node_b = "C:fuse.A", "C:fuse.B"
 
-    fuse.attach(_Branch, circuit)
-    source = circuit.branch("src")
-    src = circuit.add(VoltageSource("src", fuse.pins["A"].node, -1, source, emf=0.0, resistance=0.0))
+    fuse.attach(_Branch)
     for amps, expect_blow in ((10.0, False), (20.0, True), (100.0, True)):
         fuse.reset()
-        src.emf = amps * 0.007
-        t, dt, x = 0.0, 1e-3, None
-        while t < 5.0 and not fuse.s_blown:
-            fuse.begin_step(dt, {}, t)
-            x, _ = circuit.solve(x)
-            fuse.end_step(dt, x, t)
-            t += dt
+        bench = Bench([fuse], [f"vsrc {fuse.pins['A'].node} 0 dc {amps * 0.007}"])
+        t, dt = 0.0, 1e-3
+        try:
+            while t < 5.0 and not fuse.s_blown:
+                bench.step(dt)
+                t += dt
+        finally:
+            bench.close()
         analytic = fuse.time_to_blow(amps)
         print(f"{amps:5.1f} A: blown={fuse.s_blown} after {t:.3f} s (analytic {analytic:.3f} s)")
         assert fuse.s_blown is expect_blow

@@ -1,6 +1,6 @@
 """Passive conductor network derived from ``project.graph``.
 
-Every graph node (component pin, cable-side contact, splice) is an MNA node.
+Every graph node (component pin, cable-side contact, splice) is a SPICE node.
 Branches:
 
 * ``wire`` — harness conductor, R = R'_20(AWG) * length * (1 + alpha (T - 20 C)).
@@ -15,6 +15,13 @@ Thermal model per conductor (first order): C dT/dt = I^2 R(T) - dT / R_th.
 For wires R_th is calibrated so that the catalog ampacity produces the catalog's
 rated rise (30 K, see wires.yaml notes); for contacts so that the per-pin rating
 produces a 30 K rise (the usual connector rating criterion, e.g. UL 1977).
+
+In ngspice (``emit_conductors``) every conductor of a power net is
+electrothermal: a B-source resistor R(T) whose temperature is the voltage of
+its own thermal RC node, heated by a B current source V^2 / R(T). Conductors
+of pure signal nets (PWM, UART, I2C, GPIO; micro- to milliamps) are linear
+resistors at ambient. The ``Branch`` methods below are the closed-form
+solutions of the same thermal ODE, used by the stage's analytic checks.
 """
 
 from __future__ import annotations
@@ -27,6 +34,8 @@ import numpy as np
 
 from r3_model.diagnostics import Diagnostic
 
+from .netlist import Netlist, fmt, temperature
+
 COPPER_ALPHA = 0.00393  # 1/K, resistance temperature coefficient of annealed copper at 20 C
 COPPER_VOLUMETRIC_HEAT = 8960.0 * 385.0  # J/(m^3 K)
 SILICONE_VOLUMETRIC_HEAT = 1200.0 * 1250.0  # J/(m^3 K), estimate for silicone rubber insulation
@@ -38,13 +47,16 @@ CONNECTOR_BURST_FACTOR = 2.0  # XT60 30/60 A and XT30 15/30 A datasheet ratio, a
 CONTACT_HEAT_CAPACITY_PER_AMP = 0.02  # J/K per A of rating; ~0.6 J/K for an XT60 contact (estimate)
 
 LINK_DEFAULTS = {"switch": 0.005, "wire": 1e-4}
+SIGNAL_ROLES = {"gpio", "pwm_in", "pwm_out", "i2c_sda", "i2c_scl", "spi_mosi", "spi_miso", "spi_sck", "spi_cs",
+                "uart_tx", "uart_rx", "analog", "rf", "nc"}
+OPEN_RESISTANCE = 1e9  # ohm, an opened conductor (fault injection)
 
 
 @dataclass
 class Branch:
     key: str
     kind: str  # wire | contact | internal
-    a: int
+    a: int  # unused (kept for compatibility of the dataclass layout)
     b: int
     node_a: str
     node_b: str
@@ -55,12 +67,17 @@ class Branch:
     rating: float | None = None  # A continuous
     burst_rating: float | None = None  # A short-time
     meta: dict[str, Any] = field(default_factory=dict)
-    index: int = -1  # into the resistor bank
-    temperature_rise: float = 0.0  # K above ambient (state)
+    temperature_rise: float = 0.0  # K above ambient (last solved state)
+    electrothermal: bool = False  # SPICE model includes self-heating (power-net conductor)
+    spice: str = ""  # SPICE element name
+    thermal_node: str = ""  # SPICE node of the conductor temperature (C), if electrothermal
 
     def resistance(self, ambient_c: float) -> float:
         temperature = ambient_c + self.temperature_rise
         return self.resistance_ref * (1.0 + self.temperature_coefficient * (temperature - 20.0))
+
+    def resistance_at(self, temperature_c: float) -> float:
+        return self.resistance_ref * (1.0 + self.temperature_coefficient * (temperature_c - 20.0))
 
     def steady_rise(self, current: float, ambient_c: float) -> float:
         """Steady-state rise including R(T): dT = I^2 R(T) Rth, solved in closed form."""
@@ -72,14 +89,6 @@ class Branch:
         if denominator <= 1e-6:
             return math.inf  # thermal runaway: the conductor fuses
         return k * (1.0 + alpha * (ambient_c - 20.0)) / denominator
-
-    def advance_temperature(self, current: float, dt: float, ambient_c: float) -> None:
-        if not math.isfinite(self.thermal_resistance) or self.heat_capacity <= 0.0:
-            return
-        power = current * current * self.resistance(ambient_c)
-        tau = self.thermal_resistance * self.heat_capacity
-        target = power * self.thermal_resistance
-        self.temperature_rise = target + (self.temperature_rise - target) * math.exp(-dt / tau)
 
     def transient_rise(self, current: float, duration: float, ambient_c: float, initial_rise: float = 0.0) -> float:
         """Rise after ``duration`` s at constant ``current`` starting from ``initial_rise``."""
@@ -179,7 +188,7 @@ def _behavior_params(project: Any, component_id: str) -> dict[str, Any]:
     return params
 
 
-def build_passive_network(project: Any, circuit: Any, routes: dict[str, Any] | None) -> PassiveNetwork:
+def build_passive_network(project: Any, routes: dict[str, Any] | None) -> PassiveNetwork:
     from r3_model.units import to_si
 
     graph, catalog = project.graph, project.catalog
@@ -192,11 +201,9 @@ def build_passive_network(project: Any, circuit: Any, routes: dict[str, Any] | N
     estimated_by_harness: dict[str, dict[str, float]] = {}
     diagnostics: list[Diagnostic] = []
 
-    for node in sorted(graph.nodes):
-        circuit.node(node)
-
+    power_nets = _power_nets(project)
     for edge in graph.edges:
-        a, b = circuit.node(edge.a), circuit.node(edge.b)
+        a = b = 0
         if edge.kind == "wire":
             harness, wire = harness_of_wire[edge.ref]
             gauge = catalog.wire(wire.awg)
@@ -258,7 +265,7 @@ def build_passive_network(project: Any, circuit: Any, routes: dict[str, Any] | N
                             rating=value if link_kind == "fuse" else None,
                             meta={"component": edge.ref, "link_kind": link_kind, "value": value})
             internal.setdefault(edge.ref, []).append(branch)
-        branch.index = circuit.resistor(a, b, branch.resistance_ref, branch.key)
+        branch.electrothermal = graph.net_of(edge.a) in power_nets and math.isfinite(branch.thermal_resistance)
         branches[branch.key] = branch
 
     for harness_id, wires in estimated_by_harness.items():
@@ -283,3 +290,58 @@ def _connector_type(project: Any, ref: str) -> str | None:
         if harness.id == owner and name in harness.connectors:
             return harness.connectors[name].type
     return None
+
+
+def _power_nets(project: Any) -> set[str]:
+    """Graph nets that contain at least one non-signal pin (power, ground, motor, passive)."""
+    graph, catalog = project.graph, project.catalog
+    nets: set[str] = set()
+    for cid, inst in project.spec.components.items():
+        try:
+            ctype = catalog.component(inst.type)
+        except KeyError:
+            continue
+        for name, pin in ctype.pins.items():
+            label = f"C:{cid}.{name}"
+            if pin.role not in SIGNAL_ROLES and label in graph.nodes:
+                nets.add(graph.net_of(label))
+    return nets
+
+
+def emit_conductors(net: Netlist, network: PassiveNetwork, node: Any, ambient_c: float, *, skip: set[str],
+                    opened: set[str], states: dict[str, float], thermal_gain: str | None) -> None:
+    """Conductor elements of the passive network.
+
+    ``node`` maps graph labels to SPICE nodes; ``skip`` are branches emitted by
+    a behavior model (fuses); ``opened`` are fault-opened branches;
+    ``states`` holds conductor temperatures (initial conditions);
+    ``thermal_gain`` (operating points) is the node of an EXTERNAL 0/1 factor on
+    self-heating: 0 = conductors at ambient, 1 = steady-state temperatures."""
+    net.comment("conductors: wires (copper tempco), mated contacts, internal links")
+    for index, (key, branch) in enumerate(network.branches.items()):
+        if key in skip:
+            continue
+        a, b = node(branch.node_a), node(branch.node_b)
+        tag = f"{branch.kind[0]}{index}"
+        branch.spice = f"r{tag}" if not branch.electrothermal or key in opened else f"b{tag}"
+        if key in opened:
+            net.add(f"{branch.spice} {a} {b} {fmt(OPEN_RESISTANCE)}")
+            continue
+        if not branch.electrothermal:
+            net.add(f"{branch.spice} {a} {b} {fmt(branch.resistance(ambient_c))}")
+            continue
+        t = branch.thermal_node = f"t_{tag}"
+        alpha = branch.temperature_coefficient
+        net.add(f"* {key}")
+        if alpha:  # copper: R(T) as a B-source resistor
+            resistance = f"({fmt(branch.resistance_ref)}*(1+{fmt(alpha)}*({temperature(t)}-20)))"
+            net.add(f"{branch.spice} {a} {b} i = v({a},{b})/{resistance}")
+        else:  # temperature-independent (contacts, links): linear resistor, behavioral heat only
+            branch.spice = f"r{tag}"
+            resistance = fmt(branch.resistance_ref)
+            net.add(f"{branch.spice} {a} {b} {resistance}")
+        heat = f"v({a},{b})*v({a},{b})/{resistance}" + (f"*v({thermal_gain})" if thermal_gain else "")
+        net.add(f"bq{tag} 0 {t} i = {heat}", f"rth{tag} {t} tamb {fmt(branch.thermal_resistance)}")
+        if net.transient:
+            net.add(f"cth{tag} {t} 0 {fmt(branch.heat_capacity)}")
+            net.state(t, states.get(key, ambient_c))
