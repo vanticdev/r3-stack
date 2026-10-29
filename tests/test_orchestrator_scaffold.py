@@ -53,7 +53,7 @@ def test_generated_deploy_keeps_blitz_hooks(tmp_path):
 
 def test_blank_template_and_errors(tmp_path):
     scaffold.create_project(tmp_path / "blank-bot", template="blank", platform_ref="main")
-    assert Project.load(tmp_path / "blank-bot").spec.components.keys() == {"pi"}
+    assert Project.load(tmp_path / "blank-bot").spec.components == {}  # blank starts from nothing
     with pytest.raises(FileExistsError):
         scaffold.create_project(tmp_path / "blank-bot", template="blank")
     with pytest.raises(KeyError):

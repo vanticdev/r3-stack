@@ -96,7 +96,10 @@ fabrication: {printer: bambu-x1c}              # section 6
   1. Declare the slot by requirements instead of by `type`:
      `gps: {source: {requires: {kind: sensor, protocol: nmea-0183, supply_voltage: 3.3 V}, prefer: {price: low}}}`
   2. Search with `r3_source_search(component="gps")` (CLI: `r3 source gps`). This ranks real candidates
-     with twin checks.
+     with twin checks. The `catalog` provider offers the bought parts R3 already models (with their
+     datasheet provenance). Choosing one of those pins the existing entry; nothing is generated. The
+     other providers (Raspberry Pi, ExpressLRS, Nexar, DigiKey, Mouser, agent research) build a new
+     entry.
   3. Pin a candidate with `r3_source_choose(component="gps", candidate="1")` (CLI:
      `r3 source gps --choose 1`). This writes `catalog/components/sourced_*.yaml` and `r3.lock.yaml`.
 - **Your own parts.** Write them with `r3_put_catalog_component(entry)`, which validates the schema and
