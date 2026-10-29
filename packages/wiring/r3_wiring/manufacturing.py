@@ -264,6 +264,10 @@ def bom_rows(project: Any, routing: Any, cuts: dict[str, CutLength], supports: A
             add("fastener", None, "", t.fastener["nut"], 1, "pcs", s.id)
             add("machining", None, "", f"Drill {t.fastener['hole']} hole in {s.host}", 1, "pcs", s.id)
     for hole in routing.holes:
+        if getattr(hole, "kind", "drilled") == "cad_slot":
+            add("grommet", None, "", f"Grommet edge strip for the {hole.label} lead slot in {hole.plate}", 1, "pcs",
+                f"hole{hole.id}")
+            continue
         add("grommet", None, "", f"Grommet / edge strip for a {hole.diameter * 1e3:.1f} mm pass-through in {hole.plate}",
             1, "pcs", f"hole{hole.id}")
         add("machining", None, "", f"Drill {hole.diameter * 1e3 + 2:.1f} mm hole in {hole.plate} (grommet seat)", 1,

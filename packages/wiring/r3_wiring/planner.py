@@ -1200,6 +1200,16 @@ def _split_at_supports(points: np.ndarray, cuts: list[dict[str, Any]], wires: se
         return [(points, None, None)]
     hits.sort(key=lambda h: h[0])
     arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))])
+    # Blend each support's pull (support centre - routed point) into the neighbouring points with a
+    # cosine window, so the planner starts from a smooth curve through the support instead of a kink
+    # it would have to iron out (the window spans a few pull lengths, at least 15 mm each side).
+    points = points.copy()
+    for s, support in hits:
+        offset = np.asarray(support["position"], float) - _at(points, arc, s)
+        window = max(0.015, 4.0 * float(np.linalg.norm(offset)))
+        near = np.abs(arc - s) < window
+        weight = 0.5 * (1.0 + np.cos(np.pi * np.abs(arc[near] - s) / window))
+        points[near] += weight[:, None] * offset[None]
     out: list[tuple[np.ndarray, str | None, str | None]] = []
     prev_s, prev_key = 0.0, None
     for s, support in hits:

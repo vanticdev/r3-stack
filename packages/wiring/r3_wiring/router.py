@@ -132,6 +132,8 @@ class PassThrough:
     harnesses: set[str] = field(default_factory=set)
     wires: set[str] = field(default_factory=set)
     diameter: float = 0.0
+    kind: str = "drilled"  # drilled by the router | cad_slot: an opening already in the part (r3_wiring.passthroughs)
+    label: str = ""
 
 
 @dataclass
@@ -395,7 +397,9 @@ class HarnessRouter:
 
     def _lead(self, node: NodePoint, awgs: list[int]) -> None:
         """Straight strain-relief run out of a connector, long enough for a
-        target-radius 90 deg turn, shortened if it would hit something."""
+        target-radius 90 deg turn, shortened if it would hit something or enter
+        a moving part's clearance band (``min_wire_clearance_moving``): the checks
+        hold a lead to that band too, so the turn has to start before it."""
         if node.direction is None or node.exit is None:
             node.lead_end = None if node.exit is None else node.exit.copy()
             return
@@ -406,7 +410,9 @@ class HarnessRouter:
         points = node.exit + node.direction[None] * ts[:, None]
         static, _ = self.obstacles.min_distance(points, self.obstacles.static, keepout=True, exclude=node.exempt)
         moving, _ = self.obstacles.min_distance(points, self.obstacles.moving, swept=True, keepout=True, exclude=node.exempt)
-        bad = np.nonzero(np.minimum(static, moving) < r)[0]
+        from .planner import MOVING_MARGIN
+
+        bad = np.nonzero((static < r) | (moving < r + self.c_req + MOVING_MARGIN))[0]
         length = target if not len(bad) else (ts[bad[0] - 1] if bad[0] > 0 else 0.0)
         length = max(length, self.opt.voxel)
         node.lead_length = float(length)

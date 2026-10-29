@@ -56,16 +56,23 @@ DATA = Path(__file__).with_name("data") / "supports.yaml"
 CANDIDATE_STEP = 0.003  # m between candidate points along a segment
 END_KEEPOUT = 0.008  # m: no support this close to a connector / junction end
 MIN_SPACING = 0.015  # m between supports
-CANDIDATE_TILT = math.radians(10.0)  # bundle within this of parallel to the face (planner allows 15 deg)
-MAX_PULL = 0.010  # m: how far the second planning pass may pull the bundle onto a support
+# First-pass bundle within this of parallel to the face. The second planning pass routes the bundle
+# through the support centre parallel to the face (support_constraints), so a candidate where the
+# first pass still climbs is fine; a support that makes its route infeasible is dropped (stage retry).
+CANDIDATE_TILT = math.radians(35.0)
+# m: how far the second planning pass may pull the bundle onto a support (it re-plans the bundle through
+# the support centre; a pull that makes the route infeasible gets the support re-placed or dropped).
+MAX_PULL = 0.020
 POST_MAX_DIAMETER = 0.012  # m: posts / standoffs a tie can loop around
 FLATNESS = 0.0003  # m: footprint corners must lie this close to the face
-STRUCTURE_REACH = 0.015  # m: candidate structure within this of the bundle surface
+STRUCTURE_REACH = 0.022  # m: candidate structure within this of the bundle surface (MAX_PULL + mount height)
 SPAN_DEFLECTION = 0.003  # m allowed sag of a span (estimate: well inside the 8 mm moving clearance)
 PEAK_ACCEL_G = 4.0  # 1 g + the 3 g bump of the slack drive
 SPAN_CAP = 0.10  # m, practical cap for small robots (estimate; SAE AS50881 caps aircraft spans at 24 in)
 SAFETY_FACTOR = 3.0
 SPAN_PLACEMENT_FRACTION = 0.9  # place for 90 % of the limit: the second planning pass changes span lengths
+EXCLUDE_RADIUS = 0.010  # m: a re-placement keeps candidates this far from a support that made its route infeasible
+STRAIGHT_WINDOW = 0.015  # m: among the farthest reachable candidates within this window, take the straightest
 HANDLING_PULL = 10.0  # N a support next to a connector takes off the terminals (estimate, service handling)
 STRAIN_RELIEF_REACH = 0.06  # m from a connector exit
 G = 9.80665
@@ -201,7 +208,8 @@ def _envelope(points: np.ndarray, obstacles: ObstacleSet, exclude: set[str], rad
 
 
 def _access(stype: SupportType, host: Obstacle, mount: np.ndarray, normal: np.ndarray, t: np.ndarray,
-            b: np.ndarray, bundle: set[str], obstacles: ObstacleSet, r: float) -> tuple[bool, dict[str, Any]]:
+            b: np.ndarray, bundle: set[str], obstacles: ObstacleSet, r: float,
+            post: Post | None = None) -> tuple[bool, dict[str, Any]]:
     diameter, height = stype.access
     exclude = {host.component} | bundle
     checks: dict[str, Any] = {}
@@ -225,10 +233,12 @@ def _access(stype: SupportType, host: Obstacle, mount: np.ndarray, normal: np.nd
         return ok, checks
     if stype.kind == "post_tie":
         # The tie loops around the post and the bundle: its path must be free of other parts.
-        loop = []
-        for angle in np.linspace(0, 2 * math.pi, 16, endpoint=False):
-            loop.append(mount + normal * r + (normal * math.cos(angle) + b * math.sin(angle)) * (2 * r + 0.004))
-        ok, blocker = _envelope(np.asarray(loop), obstacles, exclude, 0.0)
+        if post is not None:
+            loop = _tie_loop(post, mount, normal, r)
+        else:
+            loop = np.asarray([mount + normal * r + (normal * math.cos(a) + b * math.sin(a)) * (2 * r + 0.004)
+                               for a in np.linspace(0, 2 * math.pi, 16, endpoint=False)])
+        ok, blocker = _envelope(loop, obstacles, exclude, 0.0)
         checks["tie_loop"] = {"ok": ok, "blocked_by": blocker}
         return ok, checks
     # Adhesive: finger press over the footprint, and room to thread and cinch the tie.
@@ -263,17 +273,88 @@ def support_hosts(project: Any, obstacles: ObstacleSet) -> list[Obstacle]:
     return hosts
 
 
-def post_hosts(project: Any, hosts: list[Obstacle]) -> set[str]:
-    """Slender cylindrical structure (standoffs, spacers) a cable tie can loop around."""
-    out = set()
+@dataclass(frozen=True)
+class Post:
+    """A slender cylinder of a host (robot frame) that a cable tie can loop around."""
+
+    component: str
+    base: np.ndarray
+    axis: np.ndarray
+    radius: float
+    length: float  # math.inf: the whole part (a cylindrical standoff)
+
+    def holds(self, point: np.ndarray, tolerance: float = 3e-4) -> bool:
+        """Is ``point`` (a surface point of the host) on this cylinder's side face?"""
+        rel = np.asarray(point, float) - self.base
+        t = float(rel @ self.axis)
+        radial = float(np.linalg.norm(rel - t * self.axis))
+        inside = math.isinf(self.length) or -tolerance <= t <= self.length + tolerance
+        # Standoffs (infinite length) are posts over their whole side face, whatever their end chamfers.
+        return inside and (math.isinf(self.length) or abs(radial - self.radius) <= tolerance)
+
+
+def post_hosts(project: Any, hosts: list[Obstacle]) -> dict[str, list[Post]]:
+    """Slender cylindrical structure a cable tie can loop around: cylindrical standoffs and
+    spacers, and slender cylinder solids of other parts (an antenna-mast tube above its flange)."""
+    from r3_model.assembly import pose_matrix
+
+    out: dict[str, list[Post]] = {}
     for o in hosts:
-        mech = project.catalog.component(project.spec.components[o.component].type).mechanical
+        comp = project.spec.components[o.component]
+        mech = project.catalog.component(comp.type).mechanical
+        pose = pose_matrix(comp.pose.xyz, comp.pose.rpy)
         if mech.shape == "cylinder" and float(mech.size[0]) <= POST_MAX_DIAMETER:
-            out.add(o.component)
+            local = {"x": [1.0, 0, 0], "y": [0, 1.0, 0], "z": [0, 0, 1.0]}.get(str(mech.axis or "z"), [0, 0, 1.0])
+            axis = pose[:3, :3] @ np.asarray(local, float)
+            out[o.component] = [Post(o.component, pose[:3, 3].copy(), axis / np.linalg.norm(axis),
+                                     float(mech.size[0]) / 2, math.inf)]
+            continue
+        for solid in getattr(mech, "solids", None) or []:
+            diameter = float(solid.diameter or 0.0)
+            if solid.kind != "cylinder" or solid.op != "add" or not 0 < diameter <= POST_MAX_DIAMETER:
+                continue
+            axis = pose[:3, :3] @ np.asarray(solid.axis, float)
+            axis = axis / np.linalg.norm(axis)
+            base = pose[:3, :3] @ np.asarray(solid.position, float) + pose[:3, 3]
+            out.setdefault(o.component, []).append(Post(o.component, base, axis, diameter / 2, float(solid.length)))
     return out
 
 
-def place_supports(project: Any, obstacles: ObstacleSet, routing: Any) -> SupportReport:
+def _post_at(posts: dict[str, list[Post]], component: str, point: np.ndarray) -> Post | None:
+    return next((p for p in posts.get(component, []) if p.holds(point)), None)
+
+
+def _is_post(posts: dict[str, list[Post]], component: str, point: np.ndarray) -> bool:
+    return _post_at(posts, component, point) is not None
+
+
+def _tie_loop(post: Post, mount: np.ndarray, normal: np.ndarray, r: float, thickness: float = 0.001) -> np.ndarray:
+    """Centre line of a tie hugging a post and the bundle lying against it: the convex hull of the
+    two circles (post radius and bundle radius plus half the tie thickness) in the plane normal to
+    the post axis. It runs outside both, so parts inside a hollow post (a coax in a mast) do not block it."""
+    axis = post.axis
+    n = normal - (normal @ axis) * axis
+    if np.linalg.norm(n) < 1e-6:  # the bundle sits on the post's end face: no loop around the side
+        return np.asarray([mount + normal * (post.radius + r) * 4])
+    n = n / np.linalg.norm(n)
+    b = np.cross(axis, n)
+    big, small = post.radius + thickness / 2, r + thickness / 2
+    c_post, c_bundle = mount - n * post.radius, mount + n * r
+    distance = float(np.linalg.norm(c_bundle - c_post))
+    tangent = math.acos(float(np.clip((big - small) / max(distance, 1e-9), -1.0, 1.0)))  # external tangent angle
+    points = []
+    for angle in np.linspace(tangent, 2 * math.pi - tangent, 24):  # far side of the post
+        points.append(c_post + big * (-math.cos(angle) * n + math.sin(angle) * b))
+    for angle in np.linspace(-(math.pi - tangent), math.pi - tangent, 12):  # far side of the bundle
+        points.append(c_bundle + small * (math.cos(angle) * n + math.sin(angle) * b))
+    return np.asarray(points)
+
+
+def place_supports(project: Any, obstacles: ObstacleSet, routing: Any,
+                   exclude: list[tuple[str, np.ndarray]] | None = None) -> SupportReport:
+    """Supports on the first-pass routes. ``exclude`` holds (harness, position) of supports
+    that made their route infeasible in the second pass; candidates near them are skipped,
+    so the placement moves to the next feasible spot instead of leaving the span open."""
     catalog = project.catalog
     types, _ = load_catalog()
     structures = support_hosts(project, obstacles)
@@ -303,7 +384,13 @@ def place_supports(project: Any, obstacles: ObstacleSet, routing: Any) -> Suppor
             r = float(seg["od"]) / 2
             candidates = _candidates(pts, total, r, structures, obstacles, types, float(seg["od"]), mass,
                                      limit, connector_exits.get(harness_id, []), posts)
-            for c in _greedy(candidates, total, SPAN_PLACEMENT_FRACTION * limit):
+            banned = [p for h, p in (exclude or []) if h == harness_id]
+            candidates = [c for c in candidates
+                          if all(np.linalg.norm(c["path"] - p) > EXCLUDE_RADIUS for p in banned)]
+            # Ends at a connector, splice or mated pair (fan-out breakouts) hold the bundle; a via or branch
+            # junction does not, so the span through it continues into the next segment.
+            held = [b is not None for b in (seg.get("breakouts") or [None, None])]
+            for c in _greedy(candidates, total, SPAN_PLACEMENT_FRACTION * limit, held[0], held[-1]):
                 support = Support(f"{harness_id}.S{len([s for s in supports if s.harness == harness_id]) + 1}",
                                   harness_id, c["type"], c["position"], c["path"], c["mount"], c["normal"], c["t"],
                                   c["host"], [w.wire_id for w in seg_wires], float(seg["od"]), index, c["arc"],
@@ -318,9 +405,39 @@ def check_spans(project: Any, routing: Any, report: SupportReport) -> None:
     report.spans = _span_check(routing, report.supports, report.limits, report.diagnostics, project.catalog)
 
 
+_RAYS: dict[int, Any] = {}
+FACE_DIRECTIONS = np.array([[0, 0, 1.0], [0, 0, -1.0], [1.0, 0, 0], [-1.0, 0, 0], [0, 1.0, 0], [0, -1.0, 0]])
+
+
+def _face_mounts(host: Obstacle, p: np.ndarray, reach: float) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Mount points on flat faces of ``host`` facing ``p`` along the robot axes. The nearest point
+    of a plate is often its edge (a bundle running beside a tapered plate edge), where no footprint
+    is flat; the face straight below or beside the bundle may still carry a mount."""
+    vertices = getattr(host.shape, "vertices", None)
+    if vertices is None:
+        return []
+    key = id(host.shape)
+    if key not in _RAYS:
+        import trimesh
+
+        mesh = trimesh.Trimesh(np.asarray(vertices, float), np.asarray(host.shape.faces, int), process=False)
+        _RAYS[key] = (mesh, trimesh.ray.ray_triangle.RayMeshIntersector(mesh))
+    mesh, rays = _RAYS[key]
+    hits, ray_index, tri = rays.intersects_location(np.repeat(p[None], len(FACE_DIRECTIONS), axis=0), -FACE_DIRECTIONS)
+    out = []
+    for direction_index, (q, t_index) in sorted(zip(ray_index, zip(hits, tri)), key=lambda x: np.linalg.norm(x[1][0] - p)):
+        d = FACE_DIRECTIONS[direction_index]
+        distance = float(np.linalg.norm(q - p))
+        if distance > reach or any(np.allclose(m[1], d) for m in out):
+            continue
+        if float(mesh.face_normals[t_index] @ d) > 0.999:  # an outward face looking at the bundle
+            out.append((np.asarray(q, float), d.copy()))
+    return out
+
+
 def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstacle], obstacles: ObstacleSet,
                 types: tuple[SupportType, ...], od: float, mass_per_m: float, limit: float,
-                exits: list[np.ndarray], posts: set[str]) -> list[dict[str, Any]]:
+                exits: list[np.ndarray], posts: dict[str, list[Post]]) -> list[dict[str, Any]]:
     dense, arc = resample_polyline(pts, CANDIDATE_STEP)
     keep = (arc >= END_KEEPOUT) & (arc <= total - END_KEEPOUT)
     dense, arc = dense[keep], arc[keep]
@@ -333,6 +450,13 @@ def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstac
         if float(d.min()) <= STRUCTURE_REACH:
             near_hosts.append((host, d))
     for i, (p, s) in enumerate(zip(dense, arc)):
+        k = min(max(int(np.searchsorted(arc, s)), 1), len(dense) - 1)
+        tangent = dense[k] - dense[k - 1]
+        tangent = tangent / max(float(np.linalg.norm(tangent)), 1e-12)
+        near_connector = any(np.linalg.norm(p - e) <= STRAIN_RELIEF_REACH for e in exits)
+        load = SAFETY_FACTOR * mass_per_m * limit * PEAK_ACCEL_G * G + (HANDLING_PULL if near_connector else 0.0)
+        # Mount options: the nearest point of the nearest host, then flat faces of every host in reach.
+        options: list[tuple[Obstacle, np.ndarray, np.ndarray]] = []
         best = None
         for host, d in near_hosts:
             if d[i] > STRUCTURE_REACH or d[i] < -0.0005:
@@ -344,50 +468,59 @@ def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstac
                 best = (host, closest)
         if best is None:
             continue
-        host, closest = best
-        normal = (p - closest.point) / closest.distance
-        k = min(max(int(np.searchsorted(arc, s)), 1), len(dense) - 1)
-        tangent = dense[k] - dense[k - 1]
-        tangent = tangent / max(float(np.linalg.norm(tangent)), 1e-12)
-        if abs(tangent @ normal) > math.sin(CANDIDATE_TILT):
-            continue  # the bundle climbs away from the face here, not along it
-        t, b = _frame(normal, tangent)
-        near_connector = any(np.linalg.norm(p - e) <= STRAIN_RELIEF_REACH for e in exits)
-        load = SAFETY_FACTOR * mass_per_m * limit * PEAK_ACCEL_G * G + (HANDLING_PULL if near_connector else 0.0)
-        for stype in types:
-            if not stype.od_range[0] <= od <= stype.od_range[1] or stype.retention < load:
-                continue
-            if (stype.kind == "post_tie") != (host.component in posts):
-                continue  # ties loop around posts; mounts and clips need a face
-            centre = closest.point + normal * (stype.height + r)
-            pull = float(np.linalg.norm(centre - p))
-            if pull > MAX_PULL:
-                continue
-            if stype.kind == "post_tie":
-                flat, error = True, 0.0
-            else:
-                flat, error = _flat(host, closest.point, normal, t, b, stype.footprint)
-            if not flat:
-                continue
-            ok, checks = _access(stype, host, closest.point, normal, t, b, set(), obstacles, r)
-            if not ok:
-                continue
-            clear, blocker = _envelope(centre[None], obstacles, {host.component}, r)
-            if not clear:
-                continue
-            checks.update(flatness_error=error, strain_relief=near_connector)
-            out.append({"arc": float(s), "type": stype, "position": centre, "path": p.copy(),
-                        "mount": closest.point.copy(), "normal": normal, "t": t, "host": host.component,
-                        "required": load, "pull": pull, "checks": checks})
-            break
+        options.append((best[0], best[1].point, (p - best[1].point) / best[1].distance))
+        for host, d in near_hosts:
+            if d[i] <= STRUCTURE_REACH and d[i] >= -0.0005:
+                options += [(host, q, n) for q, n in _face_mounts(host, p, STRUCTURE_REACH + r)]
+        found = None
+        for host, mount, normal in options:
+            if abs(tangent @ normal) > math.sin(CANDIDATE_TILT):
+                continue  # the bundle climbs away from the face here, not along it
+            t, b = _frame(normal, tangent)
+            post = _post_at(posts, host.component, mount)
+            on_post = post is not None
+            for stype in types:
+                if not stype.od_range[0] <= od <= stype.od_range[1] or stype.retention < load:
+                    continue
+                if (stype.kind == "post_tie") != on_post:
+                    continue  # ties loop around posts; mounts and clips need a face
+                centre = mount + normal * (stype.height + r)
+                pull = float(np.linalg.norm(centre - p))
+                if pull > MAX_PULL:
+                    continue
+                if stype.kind == "post_tie":
+                    flat, error = True, 0.0
+                else:
+                    flat, error = _flat(host, mount, normal, t, b, stype.footprint)
+                if not flat:
+                    continue
+                ok, checks = _access(stype, host, mount, normal, t, b, set(), obstacles, r, post)
+                if not ok:
+                    continue
+                clear, blocker = _envelope(centre[None], obstacles, {host.component}, r)
+                if not clear:
+                    continue
+                checks.update(flatness_error=error, strain_relief=near_connector)
+                option = {"arc": float(s), "type": stype, "position": centre, "path": p.copy(),
+                          "tilt": abs(float(tangent @ normal)), "mount": mount.copy(), "normal": normal, "t": t,
+                          "host": host.component, "required": load, "pull": pull, "checks": checks}
+                # The support type and mount that move the routed bundle least (saddle heights differ).
+                if found is None or pull < found["pull"]:
+                    found = option
+        if found:
+            out.append(found)
     return out
 
 
-def _greedy(candidates: list[dict[str, Any]], total: float, limit: float) -> list[dict[str, Any]]:
-    """Fewest supports keeping every span <= ``limit`` (segment ends count as held)."""
+def _greedy(candidates: list[dict[str, Any]], total: float, limit: float, head_held: bool = True,
+            tail_held: bool = True) -> list[dict[str, Any]]:
+    """Fewest supports keeping every span <= ``limit``. A held segment end counts as a support;
+    an unheld one (a junction the span runs through) leaves only half the limit to this segment,
+    so the span across the junction stays within the limit whatever the next segment does."""
     chosen: list[dict[str, Any]] = []
-    current = 0.0
-    while total - current > limit:
+    current = 0.0 if head_held else -limit / 2
+    end = total + (0.0 if tail_held else limit / 2)
+    while end - current > limit:
         reachable = [c for c in candidates if current + MIN_SPACING <= c["arc"] <= current + limit]
         if not reachable:
             later = [c for c in candidates if c["arc"] > current + limit]
@@ -395,7 +528,10 @@ def _greedy(candidates: list[dict[str, Any]], total: float, limit: float) -> lis
                 break
             nxt = min(later, key=lambda c: c["arc"])  # leave a gap, report it in the span check
         else:
-            nxt = max(reachable, key=lambda c: c["arc"])
+            # The farthest reach, but at the straightest spot near it: the second pass routes the bundle
+            # through the support parallel to its face, which a first-pass curve may not allow.
+            far = max(c["arc"] for c in reachable)
+            nxt = min((c for c in reachable if c["arc"] >= far - STRAIGHT_WINDOW), key=lambda c: (c["tilt"], -c["arc"]))
         chosen.append(nxt)
         current = nxt["arc"]
     return chosen

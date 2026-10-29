@@ -48,6 +48,7 @@ from .driver import DriveProfile, run_drive
 from .export import detail_json, routes_json
 from .manufacturing import release_status, write_package
 from .obstacles import build_obstacles, describe
+from .passthroughs import add_cad_pass_throughs
 from .planner import plan_routing
 from .render import render_routes, render_slack
 from .router import HarnessRouter, RouterOptions
@@ -58,7 +59,7 @@ STAGE = "wiring"
 #: Router surface weight used by the stage: routes that hug structure can be supported
 #: (the router's own default, 0.6, lets signal leads float mid-air between parts).
 SUPPORTABLE_SURFACE_WEIGHT = 3.0
-SUPPORT_RETRIES = 2
+SUPPORT_RETRIES = 3
 
 
 def route_and_check(project: Project, options: RouterOptions | None = None, *, plan: bool = True,
@@ -76,14 +77,22 @@ def route_and_check(project: Project, options: RouterOptions | None = None, *, p
         snapshot = copy.deepcopy(routing)
         supports = place_supports(project, obstacles, routing)
         planning = plan_routing(project, router, routing, supports=support_constraints(supports), obstacles=obstacles)
-        # A support whose fixed point / face-parallel axis makes a route infeasible is dropped
-        # and its group re-planned from the unsupported plan (the span check then reports the gap).
-        for _ in range(SUPPORT_RETRIES):
+        # A support whose fixed point / face-parallel axis makes a route infeasible is re-placed away
+        # from that spot (placement is deterministic, so other harnesses keep theirs); after the last
+        # retry it is dropped and its group re-planned without it (the span check reports the gap).
+        excluded: list[tuple[str, np.ndarray]] = []
+        for attempt in range(SUPPORT_RETRIES):
             blamed = _blamed_supports(supports, planning, first)
             if not blamed:
                 break
-            supports.supports = [s for s in supports.supports if s.id not in blamed]
             supports.dropped.extend(sorted(blamed))
+            if attempt < SUPPORT_RETRIES - 1:
+                excluded += [(s.harness, s.path_position.copy()) for s in supports.supports if s.id in blamed]
+                dropped = supports.dropped
+                supports = place_supports(project, obstacles, copy.deepcopy(snapshot), exclude=excluded)
+                supports.dropped = dropped
+            else:
+                supports.supports = [s for s in supports.supports if s.id not in blamed]
             routing = copy.deepcopy(snapshot)
             planning = plan_routing(project, router, routing, supports=support_constraints(supports),
                                     obstacles=obstacles)
@@ -93,6 +102,7 @@ def route_and_check(project: Project, options: RouterOptions | None = None, *, p
             hints = [np.asarray(t, float) for h in project.spec.electrical.harnesses if h.id == harness_id
                      for t in h.route.tie_points]
             harness.tie_points = [s.position.copy() for s in supports.supports if s.harness == harness_id] + hints
+        add_cad_pass_throughs(project, routing)  # grommeted slots in the CAD hold the bundles passing through
         check_spans(project, routing, supports)
         cuts = compute_cut_lengths(project, routing, supports.spans, obstacles.kinematics)
     else:

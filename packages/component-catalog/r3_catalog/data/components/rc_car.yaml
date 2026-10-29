@@ -29,7 +29,8 @@ components:
       gearbox: {kind: hole_pattern, origin: [-130 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[18 mm, 22 mm, 3.4 mm, clearance, 3 mm], [-18 mm, 22 mm, 3.4 mm, clearance, 3 mm], [18 mm, -22 mm, 3.4 mm, clearance, 3 mm], [-18 mm, -22 mm, 3.4 mm, clearance, 3 mm]]}}
       hub_rl: {kind: hole_pattern, origin: [-130 mm, 53 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 6 mm, 3.4 mm, clearance, 3 mm], [-7 mm, 6 mm, 3.4 mm, clearance, 3 mm], [7 mm, -6 mm, 3.4 mm, clearance, 3 mm], [-7 mm, -6 mm, 3.4 mm, clearance, 3 mm]]}}
       hub_rr: {kind: hole_pattern, origin: [-130 mm, -53 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 6 mm, 3.4 mm, clearance, 3 mm], [-7 mm, 6 mm, 3.4 mm, clearance, 3 mm], [7 mm, -6 mm, 3.4 mm, clearance, 3 mm], [-7 mm, -6 mm, 3.4 mm, clearance, 3 mm]]}}
-      so_rl: {kind: hole_pattern, origin: [-90 mm, 45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      # so_rl sits behind the motor's bullet terminals, out of the motor-lead corridor (x 40-100 mm, y 37-60 mm robot frame).
+      so_rl: {kind: hole_pattern, origin: [-99 mm, 47 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_rr: {kind: hole_pattern, origin: [-52 mm, -45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_fl: {kind: hole_pattern, origin: [65 mm, 28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_fr: {kind: hole_pattern, origin: [65 mm, -28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
@@ -37,11 +38,14 @@ components:
       arm_fr: {kind: hole_pattern, origin: [130 mm, -31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
       post_a: {kind: hole_pattern, origin: [110.05 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
       post_b: {kind: hole_pattern, origin: [159.55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
-      esc_pad: {kind: adhesive_pad, origin: [-60 mm, 42 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {area: 1408 mm^2}}
-      battery_seat: {kind: face_mount, origin: [28 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      strap_slots: {kind: strap_slot, origin: [28 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {width: 22 mm, slots: [[-11 mm, -25.5 mm, 11 mm, -23 mm], [-11 mm, 23 mm, 11 mm, 25.5 mm]]}, description: "Two 22 x 2.5 mm slots either side of the battery for the hook-and-loop strap"}
-      fuse_seat: {kind: face_mount, origin: [-55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      tie_slots: {kind: strap_slot, origin: [-55 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {width: 4 mm, slots: [[-7.5 mm, -2 mm, -5.5 mm, 2 mm], [5.5 mm, -2 mm, 7.5 mm, 2 mm]]}, description: "Cable-tie slots that retain the fuse holder"}
+      # ESC beside the battery (left), clear of the motor's bullet terminals, which point +y off the end bell.
+      esc_pad: {kind: adhesive_pad, origin: [-7 mm, 47 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {area: 1408 mm^2}}
+      # Battery 17 mm aft of the servo posts' line: its 12 AWG lead (16 mm bend radius) turns back clear of post A.
+      battery_seat: {kind: face_mount, origin: [11 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      strap_slots: {kind: strap_slot, origin: [11 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {width: 22 mm, slots: [[-11 mm, -25.5 mm, 11 mm, -23 mm], [-11 mm, 23 mm, 11 mm, 25.5 mm]]}, description: "Two 22 x 2.5 mm slots either side of the battery for the hook-and-loop strap"}
+      # Fuse holder on the right of the battery, along x: input (J1) aft, output (J2) forward to the HAT feed slot.
+      fuse_seat: {kind: face_mount, origin: [36 mm, -37 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      tie_slots: {kind: strap_slot, origin: [36 mm, -37 mm, 0], z: [0, 0, -1], x: [0, 1, 0], params: {width: 4 mm, slots: [[-7.5 mm, -2 mm, -5.5 mm, 2 mm], [5.5 mm, -2 mm, 7.5 mm, 2 mm]]}, description: "Cable-tie slots that retain the fuse holder"}
   - id: upper-deck-petg
     kind: structure
     cad_name: Electronics deck
@@ -56,13 +60,18 @@ components:
       fabricated: true
       solids:
         - {kind: prism, name: deck, position: [0, 0, 0], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 3 mm, profile: "@outline"}
+      features:
+        # Lead slot (grommet edge strip) beside the HAT's top-entry ESC/servo headers: the leads run under the deck
+        # and come up next to the HAT instead of looping around the deck edge.
+        - {id: lead_slot, kind: slot, position: [-22 mm, -39 mm, 3 mm], axis: [0, 0, -1], diameter: 10 mm, length: 14 mm,
+           slot_dir: [1, 0, 0], depth: 3 mm, provenance: {status: estimated, source: "R3 deck layout"}}
     interfaces:
     # Deck frame: bottom center; top face z = 3 mm. PETG: hole clearances from the FDM print-fit table.
-      so_rl: {kind: hole_pattern, origin: [-80 mm, 45 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      so_rl: {kind: hole_pattern, origin: [-89 mm, 47 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_rr: {kind: hole_pattern, origin: [-42 mm, -45 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_fl: {kind: hole_pattern, origin: [75 mm, 28 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_fr: {kind: hole_pattern, origin: [75 mm, -28 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
-      cap_so_rl: {kind: adhesive_pad, origin: [-80 mm, 45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_so_rl: {kind: adhesive_pad, origin: [-89 mm, 47 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       cap_so_rr: {kind: adhesive_pad, origin: [-42 mm, -45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       cap_so_fl: {kind: adhesive_pad, origin: [75 mm, 28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       cap_so_fr: {kind: adhesive_pad, origin: [75 mm, -28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
@@ -612,23 +621,27 @@ components:
     kind: sensor
     cad_name: Hall encoder board
     name: Hall-effect drivetrain encoder (Allegro A1120 + magnets on the spur shaft)
-    description: Frame at the board's bottom center; the sensor die faces +z, 0.5 mm below the top face.
+    description: >
+      Frame at the board's bottom center; the sensor die faces +z, 0.5 mm below the top face. The board hangs
+      10 mm below its mount so the 3-pin lead leaves the outward face (+y, away from the gear cover) at the lower
+      edge, 15 mm from the spinning magnet carrier (a lead under the ring would sit 4 mm from it).
     mechanical:
       shape: box
-      size: [12 mm, 8 mm, 6 mm]
-      mass: 0.003
+      size: [12 mm, 8 mm, 16 mm]
+      mass: 0.004
       features:
-        - {id: mount_a, kind: clearance_hole, position: [-3.5 mm, 4 mm, 3 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
-        - {id: mount_b, kind: clearance_hole, position: [3.5 mm, 4 mm, 3 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
-        - {id: sensor_face, kind: face, position: [0, 0, 6 mm], axis: [0, 0, 1]}
+        - {id: mount_a, kind: clearance_hole, position: [-3.5 mm, 4 mm, 13 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
+        - {id: mount_b, kind: clearance_hole, position: [3.5 mm, 4 mm, 13 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
+        - {id: sensor_face, kind: face, position: [0, 0, 16 mm], axis: [0, 0, 1]}
+      provenance: {status: estimated, source: "R3 Hall board layout: A1120 at the top edge, 3-pin lead exit on the outward face 2 mm above the bottom edge"}
     interfaces:
-      mount: {kind: hole_pattern, origin: [0, -4 mm, 3 mm], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[3.5 mm, 0, 2.4 mm, clearance, 8 mm], [-3.5 mm, 0, 2.4 mm, clearance, 8 mm]]}}
+      mount: {kind: hole_pattern, origin: [0, -4 mm, 13 mm], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[3.5 mm, 0, 2.4 mm, clearance, 8 mm], [-3.5 mm, 0, 2.4 mm, clearance, 8 mm]]}}
     pins:
       VCC: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.0, voltage_max: 24.0, current_max: 0.004}
       OUT: {role: gpio, logic_level: 3.3}
       GND: {role: ground}
     connectors:
-      J1: {type: integral, position: [-6 mm, 0, 3 mm], direction: [-1, 0, 0], pins: {"1": VCC, "2": OUT, "3": GND}}
+      J1: {type: integral, position: [0, 4 mm, 2 mm], direction: [0, 1, 0], pins: {"1": VCC, "2": OUT, "3": GND}}
     behavior:
       model: encoder.hall
       params: {pulses_per_wheel_rev: 4, output: open_drain_active_low, jitter: 20 us, die_depth: 0.5 mm, b_op_max: 0.0175,
@@ -885,6 +898,29 @@ components:
       fabricated: true
     interfaces:
       base: {kind: hole_pattern, origin: [0.25 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
+      top: {kind: hole_pattern, origin: [0.25 mm, 0, 27.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
+  - id: servo-post-al6061-cable
+    kind: structure
+    cad_name: Servo post B
+    name: Servo mounting post with servo-lead pocket, 6061 aluminum, 9 x 20 x 27.5 mm
+    description: >
+      Front servo post. The DS3218 lead leaves the case end 0.5 mm in front of this post, so a 9 mm pocket between the
+      bottom and top threads runs through the post and opens on its +y side: the lead turns inside the post's
+      footprint and runs aft below the linkage. The 7 x 9 mm web left beside the pocket carries the ear load
+      (~40 N per ear at servo stall: ~10 MPa bending). Base threads 6 mm (M3 x 8 through the 3 mm plate engages 5 mm).
+    mechanical:
+      shape: custom
+      size: [9 mm, 20 mm, 27.5 mm]
+      mass: 0.011
+      material: Aluminum 6061-T6
+      density: 2700
+      color: "#a9b0b8"
+      fabricated: true
+      solids:
+        - {kind: box, name: post, position: [0, 0, 13.75 mm], size: [9 mm, 20 mm, 27.5 mm]}
+        - {kind: box, op: remove, name: lead pocket, position: [0, 4 mm, 12 mm], size: [10 mm, 14 mm, 9 mm]}
+    interfaces:
+      base: {kind: hole_pattern, origin: [0.25 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 6 mm], [0, -5 mm, 3 mm, tapped, 6 mm]]}}
       top: {kind: hole_pattern, origin: [0.25 mm, 0, 27.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
   - id: servo-horn-al7075
     kind: structure
