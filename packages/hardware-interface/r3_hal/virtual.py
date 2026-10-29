@@ -7,7 +7,7 @@ import socket
 from typing import Any
 from urllib.parse import urlparse
 
-from .api import Clock, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart
+from .api import Clock, Edge, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart
 
 PROTOCOL = "r3-hal/1"
 
@@ -38,10 +38,11 @@ class _Connection:
         return reply
 
     def close(self) -> None:
-        try:
-            self._sock.close()
-        except OSError:
-            pass
+        for closable in (self._file, self._sock):
+            try:
+                closable.close()
+            except OSError:
+                pass
 
 
 class _Clock(Clock):
@@ -68,6 +69,10 @@ class _Gpio(GpioLine):
     def count_edges(self) -> tuple[int, float]:
         reply = self._conn.call("gpio.count_edges", chip=self._chip, line=self._line)
         return int(reply["count"]), float(reply.get("last_t", 0.0))
+
+    def wait_edge(self, timeout: float) -> list[Edge]:
+        reply = self._conn.call("gpio.wait_edge", chip=self._chip, line=self._line, timeout=timeout)
+        return [Edge(float(e["t"]), bool(e["rising"])) for e in reply.get("edges", [])]
 
 
 class _Pwm(PwmChannel):
@@ -112,6 +117,7 @@ class VirtualHal(Hal):
         self._conn = _Connection(endpoint)
         hello = self._conn.call("hello", protocol=PROTOCOL, module=module)
         self._bindings: dict[str, dict] = hello.get("bindings", {})
+        self._config: dict = hello.get("config", {}) or {}
         self.computer: str = hello.get("computer", "")
         self.clock = _Clock(self._conn)
 
@@ -137,6 +143,9 @@ class VirtualHal(Hal):
 
     def bindings(self) -> dict[str, dict]:
         return dict(self._bindings)
+
+    def config(self) -> dict:
+        return dict(self._config)
 
     def close(self) -> None:
         try:

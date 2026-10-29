@@ -209,6 +209,7 @@ software:
     wheel_radius_m: 0.055
     encoder_pulses_per_rev: 4
     arm_channel: 5              # CRSF AUX channel that arms autonomy (>1700 us)
+    crsf_channels: {steering: 1, throttle: 2, arm: 5}
 
 simulation:
   timestep: 1 ms
@@ -219,7 +220,7 @@ simulation:
     ambient_temperature_c: 25
     terrain: flat-grass
     radio_transmitter: {position: [-2 m, 0, 1.2 m], power_dbm: 20, antenna_gain_dbi: 2.0}
-    radio_environment: {model: two_ray_ground_log_normal, shadowing_sigma_db: 4.0, ground_permittivity: 15, interference_dbm: -100}
+    radio_environment: {model: two_ray_ground_log_normal, shadowing_sigma_db: 4.0, ground_permittivity: 15, interference_dbm: -100, gps_origin: [37.4275, -122.1697, 30.0]}
     obstacles:
       - {id: cone_a, center: [12 m, 6 m, 0.15 m], size: [0.3 m, 0.3 m, 0.3 m]}
   scenarios:
@@ -234,7 +235,7 @@ simulation:
       description: Manual mode, full throttle from rest for 6 s straight, then neutral.
       duration: 10 s
       initial: {battery_soc: 1.0, mode: manual}
-      pilot: {throttle: [[0, 0.0], [1.0, 1.0], [7.0, 0.0]], steering: [[0, 0.0]]}
+      pilot: {arm_at: 0.5 s, throttle: [[0, 0.0], [1.0, 1.0], [7.0, 0.0]], steering: [[0, 0.0]]}
       expect: {min_top_speed_mps: 8.0, brownouts: 0}
     - id: range_failsafe
       description: Autonomous straight run away from the transmitter until the radio link is lost; car must brake.
@@ -246,7 +247,7 @@ simulation:
     - id: low_battery
       description: Start nearly empty; firmware must cut throttle before cells drop below 3.0 V and the Pi must not brown out.
       duration: 120 s
-      initial: {battery_soc: 0.08}
+      initial: {battery_soc: 0.02}
       pilot: {arm_at: 1.0 s}
       mission: {type: waypoints, laps: 5, speed: 4.0, waypoints: [[5, 0], [35, 0], [35, 15], [5, 15]]}
       expect: {min_cell_voltage_v: 3.0, low_voltage_cutoff_engaged: true, brownouts: 0}
@@ -254,5 +255,5 @@ simulation:
       description: Manual lock-to-lock steering at standstill and at 2 m/s to exercise wire slack near the front wheels.
       duration: 12 s
       initial: {battery_soc: 0.9, mode: manual}
-      pilot: {throttle: [[0, 0.0], [6.0, 0.25]], steering: [[0, 0.0], [1, 1.0], [2, -1.0], [3, 1.0], [4, -1.0], [5, 0.0], [7, 1.0], [8, -1.0], [9, 1.0], [10, -1.0], [11, 0.0]]}
+      pilot: {arm_at: 0.5 s, throttle: [[0, 0.0], [6.0, 0.25]], steering: [[0, 0.0], [1, 1.0], [2, -1.0], [3, 1.0], [4, -1.0], [5, 0.0], [7, 1.0], [8, -1.0], [9, 1.0], [10, -1.0], [11, 0.0]]}
       expect: {min_wire_clearance_m: 0.008}

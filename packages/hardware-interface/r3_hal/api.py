@@ -40,6 +40,10 @@ class GpioLine(abc.ABC):
     def count_edges(self) -> tuple[int, float]:
         """Total rising edges since configure and time of the last one."""
 
+    def wait_edge(self, timeout: float) -> list[Edge]:
+        """Edges since the last call, blocking up to ``timeout`` for at least one."""
+        raise HalError("not_supported", "wait_edge is not implemented by this backend")
+
 
 class PwmChannel(abc.ABC):
     @abc.abstractmethod
@@ -99,6 +103,11 @@ class Hal(abc.ABC):
 
     def bindings(self) -> dict[str, dict]:
         """Hardware bindings for this computer (from robot.yaml); may be empty on linux."""
+        return {}
+
+    def config(self) -> dict:
+        """Runtime configuration offered by the platform (the twin's ``hello``
+        reply in simulation); empty when the program must read its own config."""
         return {}
 
     def close(self) -> None:
