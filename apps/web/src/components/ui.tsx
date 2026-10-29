@@ -5,6 +5,7 @@ import { ApiError } from "../api/client.ts";
 import type { EvidenceStatus, Severity } from "../api/types.ts";
 import { ratio } from "../lib/domain.ts";
 import { fmt, pct, timeAgo } from "../lib/units.ts";
+import { Markdown } from "./Markdown.tsx";
 import { Icon, type IconName } from "./icons.tsx";
 
 export function Card({ title, subtitle, actions, children, flush, className = "" }: {
@@ -77,7 +78,7 @@ export function ErrorBox({ error }: { error: unknown }) {
   const api = error instanceof ApiError ? error : null;
   return (
     <div className="error-box" role="alert">
-      <strong>{api ? api.message : String((error as Error)?.message ?? error)}</strong>
+      <Markdown>{api ? api.message : String((error as Error)?.message ?? error)}</Markdown>
       {api && <div className="small"><code>{api.code}</code>{api.status ? ` · HTTP ${api.status}` : ""}</div>}
     </div>
   );

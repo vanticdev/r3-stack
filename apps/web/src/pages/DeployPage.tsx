@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError, api } from "../api/client.ts";
 import { useProject, useSoftware } from "../api/hooks.ts";
 import type { ProjectDetail } from "../api/types.ts";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { Card, CheckRow, ConfirmDialog, Details, ErrorBox } from "../components/ui.tsx";
 import { partLabel, plural, stagePage } from "../lib/labels.ts";
@@ -105,7 +106,7 @@ export function DeployPage() {
           <dt>Destination</dt><dd>{target === "sim" ? "Digital twin" : `Robots discovered on the network`}</dd>
           {modules.map((m) => <div key={m.name} style={{ display: "contents" }}><dt>Module</dt><dd>{m.name} · {m.language} on {partLabel(m.runs_on ?? "?")}</dd></div>)}
         </dl>
-        <Details summary="How this deploy works"><span className="small">{TARGETS[target].tech}</span></Details>
+        <Details summary="How this deploy works"><Markdown className="small">{TARGETS[target].tech}</Markdown></Details>
       </Card>
 
       {deploy.isError && <ErrorBox error={deploy.error} />}

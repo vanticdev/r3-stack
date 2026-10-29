@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { useProject } from "../api/hooks.ts";
 import type { Diagnostic, Severity } from "../api/types.ts";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { Details, ErrorBox, Tabs } from "../components/ui.tsx";
 import { diagnosticFacts, diagnosticHeadline, diagnosticType, plural, stageLabel } from "../lib/labels.ts";
@@ -51,13 +52,13 @@ function Row({ d, selected, onSelect, onLocate }: { d: Diagnostic; selected: boo
             <span className="fact">{facts.amount}</span>
             <span className="fact muted time">{facts.time !== null ? `${facts.time.toFixed(3)} s` : ""}</span>
           </>
-        ) : <span className="headline">{diagnosticHeadline(d)}</span>}
+        ) : <Markdown inline className="headline">{diagnosticHeadline(d)}</Markdown>}
       </button>
       {d.subjects.length > 0 && <button className="small ghost locate" onClick={onLocate} aria-label="Locate in 3D"><span className="long">Locate in 3D</span><span className="short">3D</span></button>}
       {selected && (
         <div className="diag-detail">
-          <span>{diagnosticHeadline(d)}</span>
-          {d.hint ? <span><strong>Fix:</strong> {d.hint}</span> : <span className="muted">The stage gives no suggested fix for this finding.</span>}
+          <Markdown>{diagnosticHeadline(d)}</Markdown>
+          {d.hint ? <Markdown>{`**Fix:** ${d.hint}`}</Markdown> : <span className="muted">The stage gives no suggested fix for this finding.</span>}
           <Details rows={[["Code", d.code], ["Subjects", d.subjects.join(", ")], ["Data", JSON.stringify(d.data)]]} />
         </div>
       )}

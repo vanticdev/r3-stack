@@ -1,11 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { agentProviders, api } from "../api/client.ts";
 import { invalidateProject, keys, useAgentSessions, useDiagnostics, useDoctor, useSpec } from "../api/hooks.ts";
 import { streamEvents, type StreamHandle } from "../api/sse.ts";
 import type { AgentEvent, AgentProvider, AgentStatus } from "../api/types.ts";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { Details, ErrorBox, Segmented, Tabs } from "../components/ui.tsx";
 import { AGENT_NAMES } from "../lib/environment.ts";
@@ -60,7 +61,7 @@ function text(value: unknown): string {
   try { return JSON.stringify(value, null, 2); } catch { return String(value); }
 }
 
-function ToolEntry({ call, result }: { call: AgentEvent; result: AgentEvent | null }) {
+const ToolEntry = memo(function ToolEntry({ call, result }: { call: AgentEvent; result: AgentEvent | null }) {
   return (
     <details className="tool">
       <summary>
@@ -69,18 +70,20 @@ function ToolEntry({ call, result }: { call: AgentEvent; result: AgentEvent | nu
         {result && result.ok === false && <strong style={{ color: "var(--critical)" }}>failed</strong>}
       </summary>
       <pre className="code">{text(call.input)}</pre>
-      {result && <pre className="code" style={{ borderTop: "1px solid var(--line)" }}>{text(result.content)}</pre>}
+      {result && <Markdown className="tool-result">{result.content ?? ""}</Markdown>}
     </details>
   );
-}
+});
 
-function EventEntry({ event }: { event: AgentEvent }) {
+const EventEntry = memo(function EventEntry({ event }: { event: AgentEvent }) {
   switch (event.type) {
     case "message":
-      if (event.role === "thinking") return <div className="small muted" style={{ whiteSpace: "pre-wrap" }}>{event.text}</div>;
+      if (event.role === "thinking") return <Markdown className="small muted">{event.text ?? ""}</Markdown>;
       if (event.role === "error") return <ErrorBox error={new Error(event.text ?? "agent error")} />;
-      if (event.role === "output" || event.role === "system") return <div className="small muted" style={{ whiteSpace: "pre-wrap" }}>{event.text}</div>;
-      return <div className={`msg-bubble ${event.role === "user" ? "user" : ""}`}>{event.text}</div>;
+      if (event.role === "output" || event.role === "system") return <Markdown className="small muted">{event.text ?? ""}</Markdown>;
+      return <Markdown className={`msg-bubble ${event.role === "user" ? "user" : ""}`}>{event.text ?? ""}</Markdown>;
+    case "tool_result":
+      return <Markdown className="tool-result">{event.content ?? ""}</Markdown>;
     case "run_started":
       return <div className="row small muted"><Icon name="play" size={12} />Running checks{event.stages?.length ? `: ${event.stages.join(", ")}` : ""}…</div>;
     case "run_finished":
@@ -98,7 +101,7 @@ function EventEntry({ event }: { event: AgentEvent }) {
     default:
       return null;
   }
-}
+});
 
 function Outcome({ session }: { session: Session }) {
   const o = sessionOutcome(session.events);
@@ -115,7 +118,7 @@ function Outcome({ session }: { session: Session }) {
         <span>{o.runs ? `${plural(o.runs, "check run")}${o.failedRuns ? `, ${o.failedRuns} failed` : ", all passed"}` : "no checks run"}</span>
         {o.errorsRemaining !== null && <span>{o.errorsRemaining ? `${plural(o.errorsRemaining, "error")} remaining` : "no errors remaining"}</span>}
       </div>
-      {finished.error && <span className="small">{finished.error}</span>}
+      {finished.error && <Markdown className="small">{finished.error}</Markdown>}
       <Details rows={[
         ["Session", session.id], ["Agent", AGENT_NAMES[session.provider] ?? session.provider], ["Model", (started?.model as string | undefined) ?? null],
         ["Command", Array.isArray(started?.command) ? started.command.join(" ") : (started?.command as string | undefined) ?? null],
@@ -289,7 +292,7 @@ export function AgentPage() {
               <span className="muted small">Suggestions from current errors</span>
               {suggestions.map((d, i) => (
                 <button key={i} className="ghost small suggestion" onClick={() => setPrompt(`Fix this ${d.stage} error: ${diagnosticHeadline(d)}${d.hint ? ` (${d.hint})` : ""}`)}>
-                  {diagnosticHeadline(d)}
+                  <Markdown inline>{diagnosticHeadline(d)}</Markdown>
                 </button>
               ))}
               <Link className="small" to={`/p/${encodeURIComponent(pid)}/diagnostics`}>All diagnostics</Link>

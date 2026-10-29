@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useElectrical, useModel, useProject, useSpec } from "../api/hooks.ts";
 import type { CurrentRow, ElectricalResponse, ElectricalTableRow, ModelGraph, OperatingPoint, RuntimeInfo } from "../api/types.ts";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { TimeChart } from "../components/TimeChart.tsx";
 import { Card, CheckRow, Details, Gallery, QueryView, RatioBar, Segmented, StaleNotice } from "../components/ui.tsx";
@@ -214,7 +215,7 @@ export function ElectricalPage() {
                     <CheckRow key={f.title} outcome="failed" title={f.title} result={f.detail}
                               action={f.point ? <button className="small" onClick={() => show(f.point)}>Show circuit</button> : null} />
                   ))}
-                  {otherErrors.map((d, i) => <CheckRow key={`${d.code}${i}`} outcome="failed" title={diagnosticHeadline(d)} result={d.hint ? `Fix: ${d.hint}` : undefined} />)}
+                  {otherErrors.map((d, i) => <CheckRow key={`${d.code}${i}`} outcome="failed" title={<Markdown inline>{diagnosticHeadline(d)}</Markdown>}>{d.hint && <Markdown>{`Fix: ${d.hint}`}</Markdown>}</CheckRow>)}
                   {!failures.length && !otherErrors.length && <CheckRow outcome="passed" title="No electrical limit is exceeded at any operating point" />}
                 </div>
                 {passes.length > 0 && (

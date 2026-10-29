@@ -378,10 +378,14 @@ export interface ModelGraph {
   diagnostics?: Diagnostic[];
 }
 /** `build/model/assembly.json` (assembly stage; absent for specs without `assembly:`). */
+export type AssemblyInterface = { component?: string; kind?: string } & (
+  { frame: number[][] } | { origin: Vec3; z: Vec3; x?: Vec3 }
+);
 export interface AssemblyJson {
   root?: string;
+  joints?: SpecJoint[];
   joins?: { id: string; a: string; b: string; kind: string; joint?: string | null }[];
-  interfaces?: Record<string, { component?: string; kind?: string; origin: Vec3; z: Vec3; x?: Vec3 }>;
+  interfaces?: Record<string, AssemblyInterface>;
   [key: string]: unknown;
 }
 export interface ModelComponent {
