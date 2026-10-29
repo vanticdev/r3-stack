@@ -1,0 +1,4504 @@
+{
+  "stage": "wiring",
+  "ok": false,
+  "started_at": 1793240017.27742,
+  "duration_s": 228.47515106201172,
+  "diagnostics": [
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "battery_lead passes -70.3 mm from moving knuckle_fl (required 8 mm)",
+      "subjects": [
+        "battery_lead",
+        "W_BAT_N",
+        "W_BAT_P",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.07025998455659073,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "position": [
+          0.21777783457752076,
+          0.002258811583005706,
+          0.061507083859273864
+        ],
+        "arc_length": 0.04529061091111349,
+        "worst_wire": "W_BAT_P",
+        "per_wire_min_distance": {
+          "W_BAT_P": -0.07025998455659073,
+          "W_BAT_N": -0.07025998455659073
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "battery_lead passes -81.2 mm from moving knuckle_fr (required 8 mm)",
+      "subjects": [
+        "battery_lead",
+        "W_BAT_N",
+        "W_BAT_P",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.08116863048791109,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "position": [
+          0.21012963292605386,
+          0.0054824497499381146,
+          0.06289810841290844
+        ],
+        "arc_length": 0.053707019711725625,
+        "worst_wire": "W_BAT_P",
+        "per_wire_min_distance": {
+          "W_BAT_P": -0.08116863048791109,
+          "W_BAT_N": -0.08116863048791109
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "power_y passes -203.0 mm from moving knuckle_fl (required 8 mm)",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_N_HAT",
+        "W_Y_N_IN",
+        "W_Y_P_ESC",
+        "W_Y_P_FUSE",
+        "W_Y_P_HAT",
+        "W_Y_P_IN",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.2030369021642036,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "position": [
+          0.0463289396244846,
+          0.05151425485934751,
+          0.06894644954948499
+        ],
+        "arc_length": 0.11318439841862438,
+        "worst_wire": "W_Y_N_ESC",
+        "per_wire_min_distance": {
+          "W_Y_P_HAT": -0.17800717874577046,
+          "W_Y_N_IN": -0.18225924241069713,
+          "W_Y_P_IN": -0.17800717874577046,
+          "W_Y_N_ESC": -0.2030369021642036,
+          "W_Y_N_HAT": -0.18225924241069713,
+          "W_Y_P_FUSE": -0.17800717874577046,
+          "W_Y_P_ESC": -0.2030369021642036
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "power_y passes -200.0 mm from moving knuckle_fr (required 8 mm)",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_N_HAT",
+        "W_Y_N_IN",
+        "W_Y_P_ESC",
+        "W_Y_P_FUSE",
+        "W_Y_P_HAT",
+        "W_Y_P_IN",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.19998735641671497,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "position": [
+          0.07256293951760204,
+          0.02985908856236888,
+          0.07011123442228268
+        ],
+        "arc_length": 0.07225090397752328,
+        "worst_wire": "W_Y_N_ESC",
+        "per_wire_min_distance": {
+          "W_Y_P_HAT": -0.19075524617452527,
+          "W_Y_N_IN": -0.1721033313711792,
+          "W_Y_P_IN": -0.18382713417077692,
+          "W_Y_N_ESC": -0.19998735641671497,
+          "W_Y_N_HAT": -0.1721033313711792,
+          "W_Y_P_FUSE": -0.18382713417077692,
+          "W_Y_P_ESC": -0.19998735641671497
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "power_y passes -162.2 mm from moving axle_rr (required 8 mm)",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_HAT",
+        "axle_rr"
+      ],
+      "data": {
+        "min_distance": -0.16224408097999657,
+        "required": 0.008,
+        "component": "axle_rr",
+        "position": [
+          0.1563870318876945,
+          -0.03001518231648414,
+          0.10075031511471347
+        ],
+        "arc_length": 0.1737757033617511,
+        "worst_wire": "W_Y_P_HAT",
+        "per_wire_min_distance": {
+          "W_Y_P_HAT": -0.16224408097999657,
+          "W_Y_N_HAT": -0.16224408097999657
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "power_y passes -127.6 mm from moving gearbox (required 8 mm)",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_HAT",
+        "gearbox"
+      ],
+      "data": {
+        "min_distance": -0.1276067652141543,
+        "required": 0.008,
+        "component": "gearbox",
+        "position": [
+          0.1483411043753498,
+          -0.05210722660835929,
+          0.08783306475372073
+        ],
+        "arc_length": 0.14632853427116907,
+        "worst_wire": "W_Y_P_HAT",
+        "per_wire_min_distance": {
+          "W_Y_P_HAT": -0.1276067652141543,
+          "W_Y_N_HAT": -0.1276067652141543
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "power_y passes -83.7 mm from moving motor (required 8 mm)",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_FUSE",
+        "W_Y_P_HAT",
+        "motor"
+      ],
+      "data": {
+        "min_distance": -0.08369657882480165,
+        "required": 0.008,
+        "component": "motor",
+        "position": [
+          0.1434815630055163,
+          -0.05933689287478162,
+          0.07975274101450756
+        ],
+        "arc_length": 0.13422944175932763,
+        "worst_wire": "W_Y_P_HAT",
+        "per_wire_min_distance": {
+          "W_Y_P_HAT": -0.08369657882480165,
+          "W_Y_N_HAT": -0.08369657882480165,
+          "W_Y_P_FUSE": 0.006811554369535582
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "esc_power passes -60.5 mm from moving motor (required 8 mm)",
+      "subjects": [
+        "esc_power",
+        "W_ESC_N",
+        "W_ESC_P",
+        "motor"
+      ],
+      "data": {
+        "min_distance": -0.060531116664001794,
+        "required": 0.008,
+        "component": "motor",
+        "position": [
+          0.03428507232430992,
+          0.046527165409516166,
+          0.038742217050461894
+        ],
+        "arc_length": 0.014192430998446554,
+        "worst_wire": "W_ESC_P",
+        "per_wire_min_distance": {
+          "W_ESC_P": -0.060531116664001794,
+          "W_ESC_N": -0.060531116664001794
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "esc_motor passes -236.7 mm from moving knuckle_fl (required 8 mm)",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.236724893599821,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "position": [
+          0.045873082406422086,
+          -0.06312691659357791,
+          0.0748730824064221
+        ],
+        "arc_length": 0.19660082062232018,
+        "worst_wire": "W_MOT_B",
+        "per_wire_min_distance": {
+          "W_MOT_B": -0.236724893599821,
+          "W_MOT_A": -0.23199657879390956
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "esc_motor passes -201.3 mm from moving knuckle_fr (required 8 mm)",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.2013354371602912,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "position": [
+          0.04531930372471683,
+          -0.06368069527528317,
+          0.07431930372471685
+        ],
+        "arc_length": 0.19755999343518219,
+        "worst_wire": "W_MOT_B",
+        "per_wire_min_distance": {
+          "W_MOT_B": -0.2013354371602912,
+          "W_MOT_A": -0.18699115504666924
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "esc_motor passes -89.2 mm from moving axle_rr (required 8 mm)",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "axle_rr"
+      ],
+      "data": {
+        "min_distance": -0.08922721952196665,
+        "required": 0.008,
+        "component": "axle_rr",
+        "position": [
+          0.08776510073698497,
+          -0.03027946060237028,
+          0.0693135882599057
+        ],
+        "arc_length": 0.1284398392156415,
+        "worst_wire": "W_MOT_B",
+        "per_wire_min_distance": {
+          "W_MOT_B": -0.08922721952196665,
+          "W_MOT_A": -0.08922721952196665
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "esc_motor passes -2.2 mm from moving wheel_rr (required 8 mm)",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "wheel_rr"
+      ],
+      "data": {
+        "min_distance": -0.0022237723385805735,
+        "required": 0.008,
+        "component": "wheel_rr",
+        "position": [
+          0.041829304387731706,
+          -0.07807377333858057,
+          0.06400000017069571
+        ],
+        "arc_length": 0.2174982124454186,
+        "worst_wire": "W_MOT_B",
+        "per_wire_min_distance": {
+          "W_MOT_B": -0.0022237723385805735,
+          "W_MOT_A": 0.0020441199753694892
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "esc_signal passes -204.9 mm from moving knuckle_fl (required 8 mm)",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.2048900203292912,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "position": [
+          0.044490409491521256,
+          0.032156241923946685,
+          0.04812499352040833
+        ],
+        "arc_length": 0.0025250852717914937,
+        "worst_wire": "W_ESC_SIG",
+        "per_wire_min_distance": {
+          "W_ESC_SIG": -0.2048900203292912,
+          "W_ESC_BEC": -0.2048900203292912,
+          "W_ESC_GND": -0.2048900203292912
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "esc_signal passes -223.9 mm from moving knuckle_fr (required 8 mm)",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.22390239565526662,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "position": [
+          0.04894234730952987,
+          0.04091861958681843,
+          0.082000001
+        ],
+        "arc_length": 0.07388375527537375,
+        "worst_wire": "W_ESC_SIG",
+        "per_wire_min_distance": {
+          "W_ESC_SIG": -0.22390239565526662,
+          "W_ESC_BEC": -0.22390239565526662,
+          "W_ESC_GND": -0.22390239565526662
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "esc_signal passes -31.8 mm from moving gearbox (required 8 mm)",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "gearbox"
+      ],
+      "data": {
+        "min_distance": -0.03181522009455622,
+        "required": 0.008,
+        "component": "gearbox",
+        "position": [
+          0.05508828176128725,
+          0.007431253303234,
+          0.087568749696766
+        ],
+        "arc_length": 0.11066132812541454,
+        "worst_wire": "W_ESC_SIG",
+        "per_wire_min_distance": {
+          "W_ESC_SIG": -0.03181522009455622,
+          "W_ESC_BEC": -0.03181522009455622,
+          "W_ESC_GND": -0.03181522009455622
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "servo_lead passes -97.8 mm from moving knuckle_fl (required 8 mm)",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.09784768897252645,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "position": [
+          0.21345049000930513,
+          -0.028999998,
+          0.06854951199069488
+        ],
+        "arc_length": 0.05482709867620468,
+        "worst_wire": "W_SRV_SIG",
+        "per_wire_min_distance": {
+          "W_SRV_SIG": -0.09784768897252645,
+          "W_SRV_VCC": -0.09784768897252645,
+          "W_SRV_GND": -0.09784768897252645
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "servo_lead passes -154.4 mm from moving knuckle_fr (required 8 mm)",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.15444355859011022,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "position": [
+          0.10220103629056469,
+          -0.030015462253120358,
+          0.11679896570943533
+        ],
+        "arc_length": 0.18837379517494926,
+        "worst_wire": "W_SRV_SIG",
+        "per_wire_min_distance": {
+          "W_SRV_SIG": -0.15444355859011022,
+          "W_SRV_VCC": -0.15444355859011022,
+          "W_SRV_GND": -0.15444355859011022
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "servo_lead passes -203.5 mm from moving axle_rr (required 8 mm)",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC",
+        "axle_rr"
+      ],
+      "data": {
+        "min_distance": -0.2034512240592059,
+        "required": 0.008,
+        "component": "axle_rr",
+        "position": [
+          0.20279392286368414,
+          -0.030068690712105287,
+          0.08306869371210529
+        ],
+        "arc_length": 0.0747372223369176,
+        "worst_wire": "W_SRV_SIG",
+        "per_wire_min_distance": {
+          "W_SRV_SIG": -0.2034512240592059,
+          "W_SRV_VCC": -0.2034512240592059,
+          "W_SRV_GND": -0.2034512240592059
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "servo_lead passes -181.1 mm from moving gearbox (required 8 mm)",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC",
+        "gearbox"
+      ],
+      "data": {
+        "min_distance": -0.1811377992582003,
+        "required": 0.008,
+        "component": "gearbox",
+        "position": [
+          0.20441332090118172,
+          -0.029528891366272764,
+          0.08252889436627275
+        ],
+        "arc_length": 0.07294691044471183,
+        "worst_wire": "W_SRV_SIG",
+        "per_wire_min_distance": {
+          "W_SRV_SIG": -0.1811377992582003,
+          "W_SRV_VCC": -0.1811377992582003,
+          "W_SRV_GND": -0.1811377992582003
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "rx_lead passes -118.9 mm from moving knuckle_fl (required 8 mm)",
+      "subjects": [
+        "rx_lead",
+        "W_RX_5V",
+        "W_RX_GND",
+        "W_RX_PI_RX",
+        "W_RX_PI_TX",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.11890172941776941,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "position": [
+          0.14294542888265532,
+          0.010125245699623617,
+          0.10006936573771506
+        ],
+        "arc_length": 0.05847601262989218,
+        "worst_wire": "W_RX_5V",
+        "per_wire_min_distance": {
+          "W_RX_5V": -0.11890172941776941,
+          "W_RX_PI_TX": -0.11890172941776941,
+          "W_RX_PI_RX": -0.11890172941776941,
+          "W_RX_GND": -0.11890172941776941
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "rx_lead passes -143.3 mm from moving gearbox (required 8 mm)",
+      "subjects": [
+        "rx_lead",
+        "W_RX_5V",
+        "W_RX_GND",
+        "W_RX_PI_RX",
+        "W_RX_PI_TX",
+        "gearbox"
+      ],
+      "data": {
+        "min_distance": -0.1432673530293646,
+        "required": 0.008,
+        "component": "gearbox",
+        "position": [
+          0.16704328149217737,
+          0.03219217724927955,
+          0.08787339737545671
+        ],
+        "arc_length": 0.022212403338866774,
+        "worst_wire": "W_RX_5V",
+        "per_wire_min_distance": {
+          "W_RX_5V": -0.1432673530293646,
+          "W_RX_PI_TX": -0.1432673530293646,
+          "W_RX_PI_RX": -0.1432673530293646,
+          "W_RX_GND": -0.1432673530293646
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "gps_lead passes -200.2 mm from moving knuckle_fr (required 8 mm)",
+      "subjects": [
+        "gps_lead",
+        "W_GPS_5V",
+        "W_GPS_GND",
+        "W_GPS_PI_RX",
+        "W_GPS_PI_TX",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.20020017411238028,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "position": [
+          0.05903506387916955,
+          0.0022820433911480815,
+          0.09928953931415825
+        ],
+        "arc_length": 0.08193595685217553,
+        "worst_wire": "W_GPS_5V",
+        "per_wire_min_distance": {
+          "W_GPS_5V": -0.20020017411238028,
+          "W_GPS_PI_TX": -0.20020017411238028,
+          "W_GPS_PI_RX": -0.20020017411238028,
+          "W_GPS_GND": -0.20020017411238028
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "gps_lead passes -9.8 mm from moving gearbox (required 8 mm)",
+      "subjects": [
+        "gps_lead",
+        "W_GPS_5V",
+        "W_GPS_GND",
+        "W_GPS_PI_RX",
+        "W_GPS_PI_TX",
+        "gearbox"
+      ],
+      "data": {
+        "min_distance": -0.009781705852033019,
+        "required": 0.008,
+        "component": "gearbox",
+        "position": [
+          0.021911505358657817,
+          -0.038558413607260644,
+          0.0875409978672253
+        ],
+        "arc_length": 0.02432925761212328,
+        "worst_wire": "W_GPS_5V",
+        "per_wire_min_distance": {
+          "W_GPS_5V": -0.009781705852033019,
+          "W_GPS_PI_TX": -0.009781705852033019,
+          "W_GPS_PI_RX": -0.009781705852033019,
+          "W_GPS_GND": -0.009781705852033019
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "encoder_lead passes -203.3 mm from moving knuckle_fl (required 8 mm)",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.2033378131121874,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "position": [
+          0.05785229545706769,
+          -0.007804533393797071,
+          0.0999405034784921
+        ],
+        "arc_length": 0.17394125665916682,
+        "worst_wire": "W_ENC_VCC",
+        "per_wire_min_distance": {
+          "W_ENC_VCC": -0.2033378131121874,
+          "W_ENC_OUT": -0.2033378131121874,
+          "W_ENC_GND": -0.2033378131121874
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "encoder_lead passes -209.1 mm from moving knuckle_fr (required 8 mm)",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.20905059829845482,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "position": [
+          0.05402074753999013,
+          0.017400320862418536,
+          0.08390855086901562
+        ],
+        "arc_length": 0.1421823184326715,
+        "worst_wire": "W_ENC_VCC",
+        "per_wire_min_distance": {
+          "W_ENC_VCC": -0.20905059829845482,
+          "W_ENC_OUT": -0.20905059829845482,
+          "W_ENC_GND": -0.20905059829845482
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_clearance_violation",
+      "severity": "error",
+      "message": "encoder_lead passes -29.8 mm from moving gearbox (required 8 mm)",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "gearbox"
+      ],
+      "data": {
+        "min_distance": -0.02981328985895595,
+        "required": 0.008,
+        "component": "gearbox",
+        "position": [
+          0.05351346161190402,
+          0.008421761310137,
+          0.08737153056518497
+        ],
+        "arc_length": 0.1519058452311433,
+        "worst_wire": "W_ENC_VCC",
+        "per_wire_min_distance": {
+          "W_ENC_VCC": -0.02981328985895595,
+          "W_ENC_OUT": -0.02981328985895595,
+          "W_ENC_GND": -0.02981328985895595
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Reroute or add a tie point to hold the bundle away from the swept volume."
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "power_y penetrates battery by 15.1 mm",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_N_HAT",
+        "W_Y_N_IN",
+        "W_Y_P_FUSE",
+        "W_Y_P_HAT",
+        "W_Y_P_IN",
+        "battery"
+      ],
+      "data": {
+        "penetration": 0.015082723787306677,
+        "component": "battery",
+        "position": [
+          0.07749558562758341,
+          0.018611637842042252,
+          0.05265778031971419
+        ],
+        "arc_length": 0.13251263560845156,
+        "per_wire_penetration": {
+          "W_Y_P_HAT": 0.015082723787306676,
+          "W_Y_N_IN": 0.009734024972132216,
+          "W_Y_P_IN": 0.015082723787306677,
+          "W_Y_N_ESC": 0.01002356787570423,
+          "W_Y_N_HAT": 0.009734024972132216,
+          "W_Y_P_FUSE": 0.015082723787306676
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "power_y penetrates fuse by 9.3 mm",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_N_HAT",
+        "W_Y_N_IN",
+        "W_Y_P_ESC",
+        "W_Y_P_FUSE",
+        "W_Y_P_HAT",
+        "W_Y_P_IN",
+        "fuse"
+      ],
+      "data": {
+        "penetration": 0.009324559722997096,
+        "component": "fuse",
+        "position": [
+          0.08291354380119692,
+          -0.02003394674354113,
+          0.049906127590721314
+        ],
+        "arc_length": 0.06756451792201786,
+        "per_wire_penetration": {
+          "W_Y_P_HAT": 0.00795029495414543,
+          "W_Y_N_IN": 0.009311542708366718,
+          "W_Y_P_IN": 0.00795029495414543,
+          "W_Y_N_ESC": 0.009311542708366718,
+          "W_Y_N_HAT": 0.009311542708366718,
+          "W_Y_P_FUSE": 0.009324559722997096,
+          "W_Y_P_ESC": 0.00795029495414543
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "power_y penetrates pi by 34.0 mm",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_HAT",
+        "pi"
+      ],
+      "data": {
+        "penetration": 0.03404442636745564,
+        "component": "pi",
+        "position": [
+          0.14275159004841775,
+          -0.05974115162763551,
+          0.07838035267189535
+        ],
+        "arc_length": 0.13262079858889167,
+        "per_wire_penetration": {
+          "W_Y_P_HAT": 0.03404442636745564,
+          "W_Y_N_HAT": 0.03404442636745564
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "power_y penetrates hat by 29.9 mm",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_HAT",
+        "hat"
+      ],
+      "data": {
+        "penetration": 0.029934996115713288,
+        "component": "hat",
+        "position": [
+          0.11987753926333287,
+          -0.028240436017048974,
+          0.06896722269504595
+        ],
+        "arc_length": 0.08785330537021682,
+        "per_wire_penetration": {
+          "W_Y_P_HAT": 0.029934996115713288,
+          "W_Y_N_HAT": 0.029934996115713288
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "power_y penetrates deck by 11.0 mm",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_P_ESC",
+        "deck"
+      ],
+      "data": {
+        "penetration": 0.010963240129458058,
+        "component": "deck",
+        "position": [
+          0.04080483718347715,
+          0.05493156640149196,
+          0.0680389394369512
+        ],
+        "arc_length": 0.12263314618475779,
+        "per_wire_penetration": {
+          "W_Y_N_ESC": 0.010963240129458058,
+          "W_Y_P_ESC": 0.010963240129458058
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "power_y penetrates esc by 24.9 mm",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_P_ESC",
+        "esc"
+      ],
+      "data": {
+        "penetration": 0.02492834941435893,
+        "component": "esc",
+        "position": [
+          0.07858288198214802,
+          0.002078660351847286,
+          0.06306158574217145
+        ],
+        "arc_length": 0.042812411261274934,
+        "per_wire_penetration": {
+          "W_Y_N_ESC": 0.02492834941435893,
+          "W_Y_P_ESC": 0.018821325352963138
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_power penetrates standoff_rl by 1.9 mm",
+      "subjects": [
+        "esc_power",
+        "W_ESC_N",
+        "W_ESC_P",
+        "standoff_rl"
+      ],
+      "data": {
+        "penetration": 0.0018887883089157577,
+        "component": "standoff_rl",
+        "position": [
+          0.03724097227020933,
+          0.04894389292428368,
+          0.038714973775311814
+        ],
+        "arc_length": 0.010374230038983651,
+        "per_wire_penetration": {
+          "W_ESC_P": 0.0018887883089157577,
+          "W_ESC_N": 0.0018887883089157577
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_motor penetrates chassis by 46.9 mm",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_B",
+        "chassis"
+      ],
+      "data": {
+        "penetration": 0.046863160081834644,
+        "component": "chassis",
+        "position": [
+          0.04421174636130632,
+          -0.06478825263869369,
+          0.07321174636130633
+        ],
+        "arc_length": 0.1994783390609062,
+        "per_wire_penetration": {
+          "W_MOT_B": 0.046863160081834644
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_motor penetrates deck by 16.0 mm",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "deck"
+      ],
+      "data": {
+        "penetration": 0.0160194014439152,
+        "component": "deck",
+        "position": [
+          0.06983310635569247,
+          -0.06936109700769266,
+          0.07776128742490332
+        ],
+        "arc_length": 0.17579863920707703,
+        "per_wire_penetration": {
+          "W_MOT_B": 0.009235734844133448,
+          "W_MOT_A": 0.0160194014439152
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_motor penetrates standoff_rr by 38.1 mm",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "standoff_rr"
+      ],
+      "data": {
+        "penetration": 0.03808342738198448,
+        "component": "standoff_rr",
+        "position": [
+          0.06410639596695202,
+          -0.08163723003840515,
+          0.07492150283140725
+        ],
+        "arc_length": 0.19075045169631072,
+        "per_wire_penetration": {
+          "W_MOT_B": 0.036550278987086925,
+          "W_MOT_A": 0.03808342738198448
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_motor penetrates wheel_rr by 2.6 mm",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_B",
+        "wheel_rr"
+      ],
+      "data": {
+        "penetration": 0.0025594938848805776,
+        "component": "wheel_rr",
+        "position": [
+          0.04191488629005848,
+          -0.07804947028687996,
+          0.06400000008511372
+        ],
+        "arc_length": 0.21758811650270152,
+        "per_wire_penetration": {
+          "W_MOT_B": 0.0025594938848805776
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_motor penetrates esc by 17.6 mm",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "esc"
+      ],
+      "data": {
+        "penetration": 0.017599425626642753,
+        "component": "esc",
+        "position": [
+          0.10754696619691242,
+          0.02523069709395724,
+          0.05475569632960176
+        ],
+        "arc_length": 0.06566040115532268,
+        "per_wire_penetration": {
+          "W_MOT_B": 0.017599425626642753,
+          "W_MOT_A": 0.017599425626642753
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_motor penetrates battery by 19.5 mm",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "battery"
+      ],
+      "data": {
+        "penetration": 0.019481582684824444,
+        "component": "battery",
+        "position": [
+          0.08915428887691637,
+          -0.013682558352692402,
+          0.06918041992174673
+        ],
+        "arc_length": 0.11176263876846226,
+        "per_wire_penetration": {
+          "W_MOT_B": 0.019481582684824444,
+          "W_MOT_A": 0.019481582684824444
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_motor penetrates gps by 29.5 mm",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "gps"
+      ],
+      "data": {
+        "penetration": 0.029485524061325652,
+        "component": "gps",
+        "position": [
+          0.06908745066645995,
+          -0.07130983438841657,
+          0.07816535517299666
+        ],
+        "arc_length": 0.17793069988278762,
+        "per_wire_penetration": {
+          "W_MOT_B": 0.015650920591091712,
+          "W_MOT_A": 0.029485524061325652
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_motor penetrates pi by 47.5 mm",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "pi"
+      ],
+      "data": {
+        "penetration": 0.047516343123156814,
+        "component": "pi",
+        "position": [
+          0.06824851384438786,
+          -0.07386148051843296,
+          0.07844117824999855
+        ],
+        "arc_length": 0.18063184979781827,
+        "per_wire_penetration": {
+          "W_MOT_A": 0.047516343123156814
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_signal penetrates standoff_rl by 13.1 mm",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "standoff_rl"
+      ],
+      "data": {
+        "penetration": 0.013071466614981611,
+        "component": "standoff_rl",
+        "position": [
+          0.03200000100000001,
+          0.056604228745671614,
+          0.07481268123701482
+        ],
+        "arc_length": 0.04510805773762342,
+        "per_wire_penetration": {
+          "W_ESC_SIG": 0.013071466614981611,
+          "W_ESC_BEC": 0.013071466614981611,
+          "W_ESC_GND": 0.013071466614981611
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_signal penetrates gearbox by 31.8 mm",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "gearbox"
+      ],
+      "data": {
+        "penetration": 0.03181522009455622,
+        "component": "gearbox",
+        "position": [
+          0.05508828176128725,
+          0.007431253303234,
+          0.087568749696766
+        ],
+        "arc_length": 0.11066132812541454,
+        "per_wire_penetration": {
+          "W_ESC_SIG": 0.03181522009455622,
+          "W_ESC_BEC": 0.03181522009455622,
+          "W_ESC_GND": 0.03181522009455622
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_signal penetrates esc by 20.2 mm",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "esc"
+      ],
+      "data": {
+        "penetration": 0.02023271452420264,
+        "component": "esc",
+        "position": [
+          0.047292687542817693,
+          0.04270731545718231,
+          0.082000001
+        ],
+        "arc_length": 0.07144925224171784,
+        "per_wire_penetration": {
+          "W_ESC_SIG": 0.02023271452420264,
+          "W_ESC_BEC": 0.02023271452420264,
+          "W_ESC_GND": 0.02023271452420264
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_signal penetrates fuse by 36.5 mm",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "fuse"
+      ],
+      "data": {
+        "penetration": 0.03654203628202946,
+        "component": "fuse",
+        "position": [
+          0.039977659643429156,
+          0.034234634673574404,
+          0.04978770747070347
+        ],
+        "arc_length": 0.007799180749436883,
+        "per_wire_penetration": {
+          "W_ESC_SIG": 0.03654203628202946,
+          "W_ESC_BEC": 0.03654203628202946,
+          "W_ESC_GND": 0.03654203628202946
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "esc_signal penetrates gps by 36.8 mm",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "gps"
+      ],
+      "data": {
+        "penetration": 0.03684823478195349,
+        "component": "gps",
+        "position": [
+          0.05407923624157805,
+          0.010122041355791858,
+          0.08487796164420813
+        ],
+        "arc_length": 0.1067244697905971,
+        "per_wire_penetration": {
+          "W_ESC_SIG": 0.03684823478195349,
+          "W_ESC_BEC": 0.03684823478195349,
+          "W_ESC_GND": 0.03684823478195349
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "servo_lead penetrates deck by 6.3 mm",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC",
+        "deck"
+      ],
+      "data": {
+        "penetration": 0.0062949077915068034,
+        "component": "deck",
+        "position": [
+          0.20441332090118172,
+          -0.029528891366272764,
+          0.08252889436627275
+        ],
+        "arc_length": 0.07294691044471183,
+        "per_wire_penetration": {
+          "W_SRV_SIG": 0.0062949077915068034,
+          "W_SRV_VCC": 0.0062949077915068034,
+          "W_SRV_GND": 0.0062949077915068034
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "servo_lead penetrates battery by 8.2 mm",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC",
+        "battery"
+      ],
+      "data": {
+        "penetration": 0.008226538169724266,
+        "component": "battery",
+        "position": [
+          0.22653607804224724,
+          -0.028999998,
+          0.0554639239577528
+        ],
+        "arc_length": 0.03632128260839092,
+        "per_wire_penetration": {
+          "W_SRV_SIG": 0.008226538169724266,
+          "W_SRV_VCC": 0.008226538169724266,
+          "W_SRV_GND": 0.008226538169724266
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "rx_lead penetrates pi by 4.9 mm",
+      "subjects": [
+        "rx_lead",
+        "W_RX_5V",
+        "W_RX_GND",
+        "W_RX_PI_RX",
+        "W_RX_PI_TX",
+        "pi"
+      ],
+      "data": {
+        "penetration": 0.0049047448467050515,
+        "component": "pi",
+        "position": [
+          0.15233268057792798,
+          0.014277290786490069,
+          0.09868713622161358
+        ],
+        "arc_length": 0.04798222605206273,
+        "per_wire_penetration": {
+          "W_RX_5V": 0.0049047448467050515,
+          "W_RX_PI_TX": 0.0049047448467050515,
+          "W_RX_PI_RX": 0.0049047448467050515,
+          "W_RX_GND": 0.0049047448467050515
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "rx_lead penetrates hat by 20.0 mm",
+      "subjects": [
+        "rx_lead",
+        "W_RX_5V",
+        "W_RX_GND",
+        "W_RX_PI_RX",
+        "W_RX_PI_TX",
+        "hat"
+      ],
+      "data": {
+        "penetration": 0.0199783429855766,
+        "component": "hat",
+        "position": [
+          0.15376889318353146,
+          0.015435251273477259,
+          0.09819949787332745
+        ],
+        "arc_length": 0.04607398856772354,
+        "per_wire_penetration": {
+          "W_RX_5V": 0.0199783429855766,
+          "W_RX_PI_TX": 0.0199783429855766,
+          "W_RX_PI_RX": 0.0199783429855766,
+          "W_RX_GND": 0.0199783429855766
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "gps_lead penetrates gearbox by 9.8 mm",
+      "subjects": [
+        "gps_lead",
+        "W_GPS_5V",
+        "W_GPS_GND",
+        "W_GPS_PI_RX",
+        "W_GPS_PI_TX",
+        "gearbox"
+      ],
+      "data": {
+        "penetration": 0.009781705852033019,
+        "component": "gearbox",
+        "position": [
+          0.021911505358657817,
+          -0.038558413607260644,
+          0.0875409978672253
+        ],
+        "arc_length": 0.02432925761212328,
+        "per_wire_penetration": {
+          "W_GPS_5V": 0.009781705852033019,
+          "W_GPS_PI_TX": 0.009781705852033019,
+          "W_GPS_PI_RX": 0.009781705852033019,
+          "W_GPS_GND": 0.009781705852033019
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "gps_lead penetrates fuse by 55.4 mm",
+      "subjects": [
+        "gps_lead",
+        "W_GPS_5V",
+        "W_GPS_GND",
+        "W_GPS_PI_RX",
+        "W_GPS_PI_TX",
+        "fuse"
+      ],
+      "data": {
+        "penetration": 0.05542027055838422,
+        "component": "fuse",
+        "position": [
+          0.03880315312916504,
+          -0.014844202176778107,
+          0.09502437383158384
+        ],
+        "arc_length": 0.054958198383318224,
+        "per_wire_penetration": {
+          "W_GPS_5V": 0.05542027055838422,
+          "W_GPS_PI_TX": 0.05542027055838422,
+          "W_GPS_PI_RX": 0.05542027055838422,
+          "W_GPS_GND": 0.05542027055838422
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "gps_lead penetrates gps by 16.8 mm",
+      "subjects": [
+        "gps_lead",
+        "W_GPS_5V",
+        "W_GPS_GND",
+        "W_GPS_PI_RX",
+        "W_GPS_PI_TX",
+        "gps"
+      ],
+      "data": {
+        "penetration": 0.016807090373315216,
+        "component": "gps",
+        "position": [
+          0.04023195717952419,
+          -0.013289391869645789,
+          0.09530376498544538
+        ],
+        "arc_length": 0.05708828842527635,
+        "per_wire_penetration": {
+          "W_GPS_5V": 0.016807090373315216,
+          "W_GPS_PI_TX": 0.016807090373315216,
+          "W_GPS_PI_RX": 0.016807090373315216,
+          "W_GPS_GND": 0.016807090373315216
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "encoder_lead penetrates standoff_rl by 32.7 mm",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "standoff_rl"
+      ],
+      "data": {
+        "penetration": 0.0326609929541151,
+        "component": "standoff_rl",
+        "position": [
+          0.007648635952458361,
+          0.055818468999893164,
+          0.07443827420428026
+        ],
+        "arc_length": 0.06642631339326481,
+        "per_wire_penetration": {
+          "W_ENC_VCC": 0.0326609929541151,
+          "W_ENC_OUT": 0.0326609929541151,
+          "W_ENC_GND": 0.0326609929541151
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "encoder_lead penetrates gearbox by 29.8 mm",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "gearbox"
+      ],
+      "data": {
+        "penetration": 0.02981328985895595,
+        "component": "gearbox",
+        "position": [
+          0.05351346161190402,
+          0.008421761310137,
+          0.08737153056518497
+        ],
+        "arc_length": 0.1519058452311433,
+        "per_wire_penetration": {
+          "W_ENC_VCC": 0.02981328985895595,
+          "W_ENC_OUT": 0.02981328985895595,
+          "W_ENC_GND": 0.02981328985895595
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "encoder_lead penetrates pi by 58.7 mm",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "pi"
+      ],
+      "data": {
+        "penetration": 0.05870880913880617,
+        "component": "pi",
+        "position": [
+          0.0184934715429265,
+          0.05791580889742056,
+          0.07958899086650888
+        ],
+        "arc_length": 0.0786326325990114,
+        "per_wire_penetration": {
+          "W_ENC_VCC": 0.05870880913880617,
+          "W_ENC_OUT": 0.05870880913880617,
+          "W_ENC_GND": 0.05870880913880617
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "encoder_lead penetrates gps by 40.2 mm",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "gps"
+      ],
+      "data": {
+        "penetration": 0.0401662540060903,
+        "component": "gps",
+        "position": [
+          0.05402979440576017,
+          0.013871082240427388,
+          0.08474819159809474
+        ],
+        "arc_length": 0.14581990703460276,
+        "per_wire_penetration": {
+          "W_ENC_VCC": 0.0401662540060903,
+          "W_ENC_OUT": 0.0401662540060903,
+          "W_ENC_GND": 0.0401662540060903
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_intersects_component",
+      "severity": "error",
+      "message": "encoder_lead penetrates encoder by 33.7 mm",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "encoder"
+      ],
+      "data": {
+        "penetration": 0.03367602435342477,
+        "component": "encoder",
+        "position": [
+          0.005737556773025154,
+          0.05522721490876309,
+          0.07341944710932632
+        ],
+        "arc_length": 0.06418136045840105,
+        "per_wire_penetration": {
+          "W_ENC_VCC": 0.03367602435342477,
+          "W_ENC_OUT": 0.03367602435342477,
+          "W_ENC_GND": 0.03367602435342477
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector battery_lead.B|power_y.P1 body is -88.2 mm from moving knuckle_fr (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "battery_lead",
+        "battery_lead.B|power_y.P1",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.08816834934465459,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "connector_type": "xt60-female",
+        "position": [
+          0.197000001,
+          0.007000002000000005,
+          0.064000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector esc_power.B|power_y.P2 body is -61.6 mm from moving motor (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "power_y",
+        "esc_power.B|power_y.P2",
+        "motor"
+      ],
+      "data": {
+        "min_distance": -0.06156690597688702,
+        "required": 0.008,
+        "component": "motor",
+        "connector_type": "xt60-female",
+        "position": [
+          0.023000001,
+          0.052000002000000003,
+          0.049000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector power_y.P3 body is -127.2 mm from moving knuckle_fr (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "power_y",
+        "power_y.P3",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.12717008469421082,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "connector_type": "xt30-female",
+        "position": [
+          0.1348,
+          -0.02,
+          0.1001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector esc_motor.BP body is -189.3 mm from moving knuckle_fr (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "esc_motor",
+        "esc_motor.BP",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.18932224084874,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "connector_type": "bullet-3.5-female",
+        "position": [
+          0.058,
+          -0.069,
+          0.064
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector esc_motor.BN body is -42.1 mm from moving axle_rr (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "esc_motor",
+        "esc_motor.BN",
+        "axle_rr"
+      ],
+      "data": {
+        "min_distance": -0.042133438287476004,
+        "required": 0.008,
+        "component": "axle_rr",
+        "connector_type": "bullet-3.5-female",
+        "position": [
+          0.042,
+          -0.069,
+          0.064
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector esc_signal.B body is -193.7 mm from moving knuckle_fl (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "esc_signal",
+        "esc_signal.B",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.19366436370261572,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "connector_type": "servo-3-female",
+        "position": [
+          0.07650000000000001,
+          -0.022,
+          0.1071
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector servo_lead.B body is -172.3 mm from moving knuckle_fr (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "servo_lead",
+        "servo_lead.B",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.17227037651902763,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "connector_type": "servo-3-female",
+        "position": [
+          0.0845,
+          -0.022,
+          0.1071
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector rx_lead.B body is -131.4 mm from moving knuckle_fl (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "rx_lead",
+        "rx_lead.B",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.13139982069596193,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "connector_type": "jst-gh-4-housing",
+        "position": [
+          0.12875,
+          0.01,
+          0.1001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector gps_lead.B body is -189.0 mm from moving knuckle_fr (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "gps_lead",
+        "gps_lead.B",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.18900780435701772,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "connector_type": "jst-gh-4-housing",
+        "position": [
+          0.07225000000000001,
+          0.005,
+          0.1001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "connector_clearance_violation",
+      "severity": "error",
+      "message": "connector encoder_lead.B body is -194.1 mm from moving knuckle_fl (required 8 mm; it intersects the swept volume)",
+      "subjects": [
+        "encoder_lead",
+        "encoder_lead.B",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.19412687877666962,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "connector_type": "jst-xh-3-housing",
+        "position": [
+          0.07200000000000001,
+          -0.008,
+          0.1001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "battery_lead bends at 0.2 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "battery_lead",
+        "W_BAT_N",
+        "W_BAT_P"
+      ],
+      "data": {
+        "radius": 0.00020699039869780212,
+        "min_radius": 0.032,
+        "ratio": 0.006468449959306316,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.233972055374226,
+          0.00955244193443017,
+          0.03857338148657173
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "battery_lead bends at 19.0 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "battery_lead",
+        "W_BAT_N",
+        "W_BAT_P"
+      ],
+      "data": {
+        "radius": 0.018957079064467856,
+        "min_radius": 0.032,
+        "ratio": 0.5924087207646205,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.23353376032775527,
+          0.003698828789620437,
+          0.04458359081953506
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "battery_lead bends at 3.2 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "battery_lead",
+        "W_BAT_N",
+        "W_BAT_P"
+      ],
+      "data": {
+        "radius": 0.0032150293627753097,
+        "min_radius": 0.032,
+        "ratio": 0.10046966758672843,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.22991785781372456,
+          -0.0003369046827597143,
+          0.058124480060965746
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 2.4 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_N_IN",
+        "W_Y_P_HAT",
+        "W_Y_P_IN"
+      ],
+      "data": {
+        "radius": 0.0024147287880960312,
+        "min_radius": 0.032,
+        "ratio": 0.07546027462800098,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.11600000100000002,
+          -0.019999998000000005,
+          0.070000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 1.9 mm radius; minimum 25.7 mm for a 3-conductor 6.4 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_P_FUSE",
+        "W_Y_P_HAT",
+        "W_Y_P_IN"
+      ],
+      "data": {
+        "radius": 0.0018916101963512126,
+        "min_radius": 0.02565450644776469,
+        "ratio": 0.0737340318825752,
+        "conductors": 3,
+        "bundle_od": 0.006413626611941173,
+        "position": [
+          0.08300000100000002,
+          0.013000001999999997,
+          0.058000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 0.0 mm radius; minimum 31.5 mm for a 4-conductor 7.9 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_P_ESC",
+        "W_Y_P_FUSE",
+        "W_Y_P_HAT",
+        "W_Y_P_IN"
+      ],
+      "data": {
+        "radius": 0.0,
+        "min_radius": 0.03150692867489308,
+        "ratio": 0.0,
+        "conductors": 4,
+        "bundle_od": 0.00787673216872327,
+        "position": [
+          0.07700000100000001,
+          0.019000002000000002,
+          0.046000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 17.1 mm radius; minimum 30.4 mm for a 3-conductor 7.6 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_P_ESC",
+        "W_Y_P_FUSE",
+        "W_Y_P_IN"
+      ],
+      "data": {
+        "radius": 0.017117669668007793,
+        "min_radius": 0.03038661807538312,
+        "ratio": 0.563329213719746,
+        "conductors": 3,
+        "bundle_od": 0.00759665451884578,
+        "position": [
+          0.08289509044246286,
+          0.014161087021148221,
+          0.04220000418784916
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 1.7 mm radius; minimum 16.0 mm for a 1-conductor 4.0 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_P_ESC"
+      ],
+      "data": {
+        "radius": 0.0016677453353575625,
+        "min_radius": 0.016,
+        "ratio": 0.10423408345984765,
+        "conductors": 1,
+        "bundle_od": 0.004,
+        "position": [
+          0.07363244082290261,
+          0.023760943022524156,
+          0.06883386375629406
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 2.5 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_P_ESC"
+      ],
+      "data": {
+        "radius": 0.0025364199879842043,
+        "min_radius": 0.032,
+        "ratio": 0.07926312462450638,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.06749126632175062,
+          0.0429304882382198,
+          0.0695360673554904
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 0.0 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_P_ESC"
+      ],
+      "data": {
+        "radius": 0.0,
+        "min_radius": 0.032,
+        "ratio": 0.0,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.05330439440171597,
+          0.050329373756503544,
+          0.06932569720056976
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 0.9 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_P_ESC"
+      ],
+      "data": {
+        "radius": 0.0009112105919840187,
+        "min_radius": 0.032,
+        "ratio": 0.028475330999500587,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.039600776915576265,
+          0.05125838235365845,
+          0.06824282404930443
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 15.2 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_P_ESC"
+      ],
+      "data": {
+        "radius": 0.015222187670395137,
+        "min_radius": 0.032,
+        "ratio": 0.475693364699848,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.032502772208416,
+          0.053578832391099535,
+          0.06367651514956182
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 3.2 mm radius; minimum 26.1 mm for a 2-conductor 6.5 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_N_HAT",
+        "W_Y_N_IN",
+        "W_Y_P_FUSE"
+      ],
+      "data": {
+        "radius": 0.003247462838483153,
+        "min_radius": 0.02610134096172072,
+        "ratio": 0.12441747124202408,
+        "conductors": 2,
+        "bundle_od": 0.00652533524043018,
+        "position": [
+          0.08517388689456207,
+          -0.0197378454529181,
+          0.05715667308187158
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 3.1 mm radius; minimum 31.5 mm for a 4-conductor 7.9 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_N_HAT",
+        "W_Y_N_IN",
+        "W_Y_P_FUSE"
+      ],
+      "data": {
+        "radius": 0.0031267007549191277,
+        "min_radius": 0.03150692867489308,
+        "ratio": 0.09923851312777118,
+        "conductors": 4,
+        "bundle_od": 0.00787673216872327,
+        "position": [
+          0.08300000100000002,
+          -0.019999998000000005,
+          0.049000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 0.3 mm radius; minimum 9.2 mm for a 1-conductor 2.3 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_P_FUSE"
+      ],
+      "data": {
+        "radius": 0.00025443003941576437,
+        "min_radius": 0.0092,
+        "ratio": 0.02765543906693091,
+        "conductors": 1,
+        "bundle_od": 0.0023,
+        "position": [
+          0.075,
+          -0.022,
+          0.039
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 1.4 mm radius; minimum 18.4 mm for a 2-conductor 4.6 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_HAT"
+      ],
+      "data": {
+        "radius": 0.0014447206863755972,
+        "min_radius": 0.0184,
+        "ratio": 0.07851742860736942,
+        "conductors": 2,
+        "bundle_od": 0.0046,
+        "position": [
+          0.1369242741078674,
+          -0.0579350753264318,
+          0.07112848081372401
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 7.2 mm radius; minimum 18.4 mm for a 2-conductor 4.6 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_HAT"
+      ],
+      "data": {
+        "radius": 0.007234095496528954,
+        "min_radius": 0.0184,
+        "ratio": 0.39315736394179096,
+        "conductors": 2,
+        "bundle_od": 0.0046,
+        "position": [
+          0.14312506049112578,
+          -0.059625809812727776,
+          0.07908759887787781
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 5.6 mm radius; minimum 18.4 mm for a 2-conductor 4.6 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_HAT"
+      ],
+      "data": {
+        "radius": 0.0055795566886003,
+        "min_radius": 0.0184,
+        "ratio": 0.30323677655436415,
+        "conductors": 2,
+        "bundle_od": 0.0046,
+        "position": [
+          0.15035337215074726,
+          -0.045039382940327,
+          0.0905303254155939
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 9.5 mm radius; minimum 18.4 mm for a 2-conductor 4.6 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_HAT"
+      ],
+      "data": {
+        "radius": 0.009463137883106792,
+        "min_radius": 0.0184,
+        "ratio": 0.5143009719079779,
+        "conductors": 2,
+        "bundle_od": 0.0046,
+        "position": [
+          0.15472095785276685,
+          -0.03655567267396604,
+          0.09537084403789817
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 2.3 mm radius; minimum 18.4 mm for a 2-conductor 4.6 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_HAT",
+        "W_Y_P_HAT"
+      ],
+      "data": {
+        "radius": 0.00229667878408005,
+        "min_radius": 0.0184,
+        "ratio": 0.12481949913478532,
+        "conductors": 2,
+        "bundle_od": 0.0046,
+        "position": [
+          0.15924356911372878,
+          -0.022845543262620963,
+          0.10375369275976183
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "warning",
+      "message": "power_y bends at 24.2 mm radius; minimum 26.1 mm for a 2-conductor 6.5 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_IN"
+      ],
+      "data": {
+        "radius": 0.024154584871977247,
+        "min_radius": 0.02610134096172072,
+        "ratio": 0.925415476063145,
+        "conductors": 2,
+        "bundle_od": 0.00652533524043018,
+        "position": [
+          0.08937205719113163,
+          -0.019643601557457594,
+          0.06090021854790242
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "power_y bends at 15.7 mm radius; minimum 30.4 mm for a 3-conductor 7.6 mm bundle",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_N_HAT",
+        "W_Y_N_IN"
+      ],
+      "data": {
+        "radius": 0.015728578463215938,
+        "min_radius": 0.030386618075383117,
+        "ratio": 0.5176153010577381,
+        "conductors": 3,
+        "bundle_od": 0.007596654518845779,
+        "position": [
+          0.08540684568355093,
+          -0.014039273198094103,
+          0.042364878103656536
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_power bends at 0.4 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "esc_power",
+        "W_ESC_N",
+        "W_ESC_P"
+      ],
+      "data": {
+        "radius": 0.00041402481913421497,
+        "min_radius": 0.032,
+        "ratio": 0.012938275597944218,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.042844718720969004,
+          0.049950848830864404,
+          0.038206210286795
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_power bends at 0.1 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "esc_power",
+        "W_ESC_N",
+        "W_ESC_P"
+      ],
+      "data": {
+        "radius": 0.0001009672510473466,
+        "min_radius": 0.032,
+        "ratio": 0.0031552265952295815,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.03253554336965353,
+          0.04578627131845097,
+          0.0388244569933469
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_power bends at 0.2 mm radius; minimum 32.0 mm for a 2-conductor 8.0 mm bundle",
+      "subjects": [
+        "esc_power",
+        "W_ESC_N",
+        "W_ESC_P"
+      ],
+      "data": {
+        "radius": 0.00016439985291707288,
+        "min_radius": 0.032,
+        "ratio": 0.005137495403658527,
+        "conductors": 2,
+        "bundle_od": 0.008,
+        "position": [
+          0.020332543111225967,
+          0.05097269370123331,
+          0.03924020067945416
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_motor bends at 0.4 mm radius; minimum 26.4 mm for a 2-conductor 6.6 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B"
+      ],
+      "data": {
+        "radius": 0.00035232508479029264,
+        "min_radius": 0.0264,
+        "ratio": 0.01334564715114745,
+        "conductors": 2,
+        "bundle_od": 0.0066,
+        "position": [
+          0.1245,
+          0.042,
+          0.038
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_motor bends at 17.4 mm radius; minimum 26.4 mm for a 2-conductor 6.6 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B"
+      ],
+      "data": {
+        "radius": 0.017351284576479775,
+        "min_radius": 0.0264,
+        "ratio": 0.6572456278969612,
+        "conductors": 2,
+        "bundle_od": 0.0066,
+        "position": [
+          0.08563399595918851,
+          -0.047707599831343143,
+          0.06841716327119478
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_motor bends at 4.1 mm radius; minimum 26.4 mm for a 2-conductor 6.6 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B"
+      ],
+      "data": {
+        "radius": 0.004086943178842491,
+        "min_radius": 0.0264,
+        "ratio": 0.15480845374403376,
+        "conductors": 2,
+        "bundle_od": 0.0066,
+        "position": [
+          0.07557416348915832,
+          -0.05847906796968756,
+          0.0719546028329769
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_motor bends at 0.7 mm radius; minimum 13.2 mm for a 1-conductor 3.3 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A"
+      ],
+      "data": {
+        "radius": 0.0006737594931234695,
+        "min_radius": 0.0132,
+        "ratio": 0.05104238584268708,
+        "conductors": 1,
+        "bundle_od": 0.0033,
+        "position": [
+          0.06956896104561247,
+          -0.07000347655030177,
+          0.07797782169143562
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_motor bends at 2.0 mm radius; minimum 13.2 mm for a 1-conductor 3.3 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A"
+      ],
+      "data": {
+        "radius": 0.0020428092090728884,
+        "min_radius": 0.0132,
+        "ratio": 0.15475827341461276,
+        "conductors": 1,
+        "bundle_od": 0.0033,
+        "position": [
+          0.06697439074817434,
+          -0.07768301954083505,
+          0.07836534290696735
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_motor bends at 0.3 mm radius; minimum 13.2 mm for a 1-conductor 3.3 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A"
+      ],
+      "data": {
+        "radius": 0.0003351071462164077,
+        "min_radius": 0.0132,
+        "ratio": 0.025386905016394522,
+        "conductors": 1,
+        "bundle_od": 0.0033,
+        "position": [
+          0.058411862029577516,
+          -0.08112059835887961,
+          0.06484560384596748
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_motor bends at 1.7 mm radius; minimum 13.2 mm for a 1-conductor 3.3 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_B"
+      ],
+      "data": {
+        "radius": 0.0016957117632174898,
+        "min_radius": 0.0132,
+        "ratio": 0.12846301236496135,
+        "conductors": 1,
+        "bundle_od": 0.0033,
+        "position": [
+          0.068000001,
+          -0.058999998,
+          0.079000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_motor bends at 8.2 mm radius; minimum 13.2 mm for a 1-conductor 3.3 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_B"
+      ],
+      "data": {
+        "radius": 0.00825,
+        "min_radius": 0.0132,
+        "ratio": 0.625,
+        "conductors": 1,
+        "bundle_od": 0.0033,
+        "position": [
+          0.050000000999999995,
+          -0.058999998,
+          0.079000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "warning",
+      "message": "esc_motor bends at 11.5 mm radius; minimum 13.2 mm for a 1-conductor 3.3 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_B"
+      ],
+      "data": {
+        "radius": 0.011466750911420694,
+        "min_radius": 0.0132,
+        "ratio": 0.8686932508652041,
+        "conductors": 1,
+        "bundle_od": 0.0033,
+        "position": [
+          0.041000001,
+          -0.067999998,
+          0.070000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_motor bends at 0.2 mm radius; minimum 13.2 mm for a 1-conductor 3.3 mm bundle",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_B"
+      ],
+      "data": {
+        "radius": 0.00017380108504433644,
+        "min_radius": 0.0132,
+        "ratio": 0.013166748866995185,
+        "conductors": 1,
+        "bundle_od": 0.0033,
+        "position": [
+          0.042,
+          -0.08000000000000002,
+          0.064
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_signal bends at 6.6 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG"
+      ],
+      "data": {
+        "radius": 0.006574172396444187,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.47673199839625197,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.044000000000000004,
+          0.032,
+          0.048
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_signal bends at 7.9 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG"
+      ],
+      "data": {
+        "radius": 0.007914951457317325,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.5739597926420531,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.035000000999999996,
+          0.037000002000000004,
+          0.052000001000000004
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_signal bends at 10.3 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG"
+      ],
+      "data": {
+        "radius": 0.010334150455737098,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.7493901743671608,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.03200000100000001,
+          0.055000002000000006,
+          0.070000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_signal bends at 0.0 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG"
+      ],
+      "data": {
+        "radius": 0.0,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.0,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.035000000999999996,
+          0.055000002000000006,
+          0.082000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_signal bends at 5.2 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG"
+      ],
+      "data": {
+        "radius": 0.00517128,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.375,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.053000001,
+          0.013000001999999997,
+          0.082000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_signal bends at 1.6 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG"
+      ],
+      "data": {
+        "radius": 0.0015747773924596237,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.11419639280262504,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.062000001000000006,
+          -0.010999997999999997,
+          0.10600000100000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "esc_signal bends at 1.2 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG"
+      ],
+      "data": {
+        "radius": 0.0011789900559518738,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.08549551967442347,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.07650000000000001,
+          -0.022,
+          0.1171
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "servo_lead bends at 0.5 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC"
+      ],
+      "data": {
+        "radius": 0.0004848465015787805,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.035159078234410564,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.248000001,
+          -0.025999998000000003,
+          0.037000001000000005
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "servo_lead bends at 0.5 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC"
+      ],
+      "data": {
+        "radius": 0.00048290948323693566,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.035018613614782194,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.236000001,
+          -0.025999998000000003,
+          0.049000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "servo_lead bends at 1.1 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC"
+      ],
+      "data": {
+        "radius": 0.0010863961030678935,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.07878098626461147,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.20900000100000002,
+          -0.028999998,
+          0.07300000100000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "servo_lead bends at 3.0 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC"
+      ],
+      "data": {
+        "radius": 0.003047547338613542,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.2209956242903262,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.20600000100000002,
+          -0.028999998,
+          0.082000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "servo_lead bends at 8.6 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC"
+      ],
+      "data": {
+        "radius": 0.008618800000000001,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.625,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.197000001,
+          -0.031999998,
+          0.08500000099999999
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "servo_lead bends at 2.6 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC"
+      ],
+      "data": {
+        "radius": 0.00258564,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.1875,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.137000001,
+          -0.031999998,
+          0.08500000099999999
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "servo_lead bends at 4.5 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC"
+      ],
+      "data": {
+        "radius": 0.0045069741895004695,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.32682726927620936,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.08900000100000002,
+          -0.028999998,
+          0.130000001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "servo_lead bends at 2.3 mm radius; minimum 13.8 mm for a 3-conductor 3.4 mm bundle",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC"
+      ],
+      "data": {
+        "radius": 0.0022534870947502348,
+        "min_radius": 0.013790080000000001,
+        "ratio": 0.16341363463810468,
+        "conductors": 3,
+        "bundle_od": 0.0034475200000000004,
+        "position": [
+          0.0845,
+          -0.022,
+          0.13478511999999998
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "rx_lead bends at 0.0 mm radius; minimum 9.7 mm for a 4-conductor 2.4 mm bundle",
+      "subjects": [
+        "rx_lead",
+        "W_RX_5V",
+        "W_RX_GND",
+        "W_RX_PI_RX",
+        "W_RX_PI_TX"
+      ],
+      "data": {
+        "radius": 0.0,
+        "min_radius": 0.0096568,
+        "ratio": 0.0,
+        "conductors": 4,
+        "bundle_od": 0.0024142,
+        "position": [
+          0.178,
+          0.04,
+          0.0795
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "gps_lead bends at 1.9 mm radius; minimum 9.7 mm for a 4-conductor 2.4 mm bundle",
+      "subjects": [
+        "gps_lead",
+        "W_GPS_5V",
+        "W_GPS_GND",
+        "W_GPS_PI_RX",
+        "W_GPS_PI_TX"
+      ],
+      "data": {
+        "radius": 0.0018858887861541887,
+        "min_radius": 0.0096568,
+        "ratio": 0.1952912751795821,
+        "conductors": 4,
+        "bundle_od": 0.0024142,
+        "position": [
+          0.0255148,
+          -0.035,
+          0.08
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "gps_lead bends at 2.6 mm radius; minimum 9.7 mm for a 4-conductor 2.4 mm bundle",
+      "subjects": [
+        "gps_lead",
+        "W_GPS_5V",
+        "W_GPS_GND",
+        "W_GPS_PI_RX",
+        "W_GPS_PI_TX"
+      ],
+      "data": {
+        "radius": 0.0026132084347866725,
+        "min_radius": 0.0096568,
+        "ratio": 0.27060811394941103,
+        "conductors": 4,
+        "bundle_od": 0.0024142,
+        "position": [
+          0.021813905587949548,
+          -0.03850311493954555,
+          0.0878809979336211
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "encoder_lead bends at 1.6 mm radius; minimum 10.3 mm for a 3-conductor 2.6 mm bundle",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC"
+      ],
+      "data": {
+        "radius": 0.0016098342711958087,
+        "min_radius": 0.010342559999999999,
+        "ratio": 0.15565143167608492,
+        "conductors": 3,
+        "bundle_od": 0.0025856399999999997,
+        "position": [
+          -0.02201463870632971,
+          0.034384413917129514,
+          0.043981725137615085
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "encoder_lead bends at 4.3 mm radius; minimum 10.3 mm for a 3-conductor 2.6 mm bundle",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC"
+      ],
+      "data": {
+        "radius": 0.004309901924002933,
+        "min_radius": 0.010342559999999999,
+        "ratio": 0.416715196624717,
+        "conductors": 3,
+        "bundle_od": 0.0025856399999999997,
+        "position": [
+          0.04926329226614741,
+          0.04120255621166148,
+          0.08303103375452797
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "encoder_lead bends at 2.3 mm radius; minimum 10.3 mm for a 3-conductor 2.6 mm bundle",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC"
+      ],
+      "data": {
+        "radius": 0.002332046954113469,
+        "min_radius": 0.010342559999999999,
+        "ratio": 0.2254806309185994,
+        "conductors": 3,
+        "bundle_od": 0.0025856399999999997,
+        "position": [
+          0.05157251687113151,
+          0.0290643727629066,
+          0.08172988371441137
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "wire_bend_radius_violation",
+      "severity": "error",
+      "message": "encoder_lead bends at 0.6 mm radius; minimum 10.3 mm for a 3-conductor 2.6 mm bundle",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC"
+      ],
+      "data": {
+        "radius": 0.0006072365187724336,
+        "min_radius": 0.010342559999999999,
+        "ratio": 0.05871239990606133,
+        "conductors": 3,
+        "bundle_od": 0.0025856399999999997,
+        "position": [
+          0.0585,
+          -0.008,
+          0.1001
+        ],
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Give the bundle more room (move the connector or rotate its exit) or split the bundle."
+    },
+    {
+      "code": "excess_slack_loop",
+      "severity": "warning",
+      "message": "battery_lead: 75 mm of cable between pins can reach moving tie_rod (excess reach 5.3 mm)",
+      "subjects": [
+        "battery_lead",
+        "W_BAT_N",
+        "W_BAT_P",
+        "tie_rod"
+      ],
+      "data": {
+        "reach_margin": 0.005290780796208261,
+        "available_length": 0.07543865946549132,
+        "routed_span": 0.05543865946549131,
+        "pins": [
+          [
+            0.227,
+            0.01,
+            0.04
+          ],
+          [
+            0.2085661398622919,
+            0.006173849224122018,
+            0.063173848224122
+          ]
+        ],
+        "pin_kinds": [
+          "end",
+          "end"
+        ],
+        "component": "tie_rod",
+        "worst_wire": "W_BAT_P",
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point in this span or reduce the slack."
+    },
+    {
+      "code": "excess_slack_loop",
+      "severity": "warning",
+      "message": "power_y: 113 mm of cable between pins can reach moving motor (excess reach 85.3 mm)",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_N_HAT",
+        "W_Y_N_IN",
+        "W_Y_P_ESC",
+        "W_Y_P_FUSE",
+        "W_Y_P_HAT",
+        "W_Y_P_IN",
+        "motor"
+      ],
+      "data": {
+        "reach_margin": 0.0852775252603951,
+        "available_length": 0.11349962052591255,
+        "routed_span": 0.08849962052591256,
+        "pins": [
+          [
+            0.085,
+            0.01,
+            0.04
+          ],
+          [
+            0.075,
+            -0.015,
+            0.039
+          ]
+        ],
+        "pin_kinds": [
+          "end",
+          "end"
+        ],
+        "component": "motor",
+        "worst_wire": "W_Y_P_FUSE",
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point in this span or reduce the slack."
+    },
+    {
+      "code": "excess_slack_loop",
+      "severity": "warning",
+      "message": "power_y: 113 mm of cable between pins can reach moving gearbox (excess reach 8.6 mm)",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_P_ESC",
+        "W_Y_P_FUSE",
+        "gearbox"
+      ],
+      "data": {
+        "reach_margin": 0.00856646265072486,
+        "available_length": 0.11349962052591255,
+        "routed_span": 0.08849962052591256,
+        "pins": [
+          [
+            0.085,
+            0.01,
+            0.04
+          ],
+          [
+            0.075,
+            -0.015,
+            0.039
+          ]
+        ],
+        "pin_kinds": [
+          "end",
+          "end"
+        ],
+        "component": "gearbox",
+        "worst_wire": "W_Y_P_FUSE",
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point in this span or reduce the slack."
+    },
+    {
+      "code": "excess_slack_loop",
+      "severity": "warning",
+      "message": "esc_motor: 88 mm of cable between pins can reach moving motor (excess reach 23.8 mm)",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "motor"
+      ],
+      "data": {
+        "reach_margin": 0.023812756080343306,
+        "available_length": 0.08757159337985293,
+        "routed_span": 0.0819500520285984,
+        "pins": [
+          [
+            0.08963620271234433,
+            -0.010796005987809278,
+            0.06887251598279556
+          ],
+          [
+            0.049632165538444156,
+            -0.06000930453575552,
+            0.07799069446424448
+          ]
+        ],
+        "pin_kinds": [
+          "tie",
+          "tie"
+        ],
+        "component": "motor",
+        "worst_wire": "W_MOT_B",
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point in this span or reduce the slack."
+    },
+    {
+      "code": "excess_slack_loop",
+      "severity": "warning",
+      "message": "esc_motor: 88 mm of cable between pins can reach moving wheel_rr (excess reach 5.4 mm)",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "wheel_rr"
+      ],
+      "data": {
+        "reach_margin": 0.005406856891874548,
+        "available_length": 0.08786616437876898,
+        "routed_span": 0.08193095659503793,
+        "pins": [
+          [
+            0.08963620271234433,
+            -0.010796005987809278,
+            0.06887251598279556
+          ],
+          [
+            0.06410639596695202,
+            -0.08163723003840515,
+            0.07492150283140725
+          ]
+        ],
+        "pin_kinds": [
+          "tie",
+          "tie"
+        ],
+        "component": "wheel_rr",
+        "worst_wire": "W_MOT_A",
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point in this span or reduce the slack."
+    },
+    {
+      "code": "excess_slack_loop",
+      "severity": "warning",
+      "message": "esc_signal: 63 mm of cable between pins can reach moving gearbox (excess reach 6.5 mm)",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "gearbox"
+      ],
+      "data": {
+        "reach_margin": 0.006536603694935167,
+        "available_length": 0.06268104902712449,
+        "routed_span": 0.0527957871597829,
+        "pins": [
+          [
+            0.04700000000000001,
+            0.032,
+            0.048
+          ],
+          [
+            0.03426735444625251,
+            0.0557326485537475,
+            0.08126735444625251
+          ]
+        ],
+        "pin_kinds": [
+          "end",
+          "tie"
+        ],
+        "component": "gearbox",
+        "worst_wire": "W_ESC_SIG",
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point in this span or reduce the slack."
+    },
+    {
+      "code": "excess_slack_loop",
+      "severity": "warning",
+      "message": "gps_lead: 113 mm of cable between pins can reach moving motor (excess reach 43.6 mm)",
+      "subjects": [
+        "gps_lead",
+        "W_GPS_5V",
+        "W_GPS_GND",
+        "W_GPS_PI_RX",
+        "W_GPS_PI_TX",
+        "motor"
+      ],
+      "data": {
+        "reach_margin": 0.043620488874079044,
+        "available_length": 0.11344273153709837,
+        "routed_span": 0.09344273153709837,
+        "pins": [
+          [
+            0.04,
+            -0.035,
+            0.08
+          ],
+          [
+            0.07,
+            0.005,
+            0.1001
+          ]
+        ],
+        "pin_kinds": [
+          "end",
+          "end"
+        ],
+        "component": "motor",
+        "worst_wire": "W_GPS_5V",
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point in this span or reduce the slack."
+    },
+    {
+      "code": "excess_slack_loop",
+      "severity": "warning",
+      "message": "encoder_lead: 105 mm of cable between pins can reach moving axle_rl (excess reach 47.4 mm)",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "axle_rl"
+      ],
+      "data": {
+        "reach_margin": 0.04743794220682578,
+        "available_length": 0.10505045008076067,
+        "routed_span": 0.09252258514069364,
+        "pins": [
+          [
+            -0.006,
+            0.034,
+            0.043000000000000003
+          ],
+          [
+            0.03137274824844821,
+            0.05666124684003569,
+            0.08436640160578204
+          ]
+        ],
+        "pin_kinds": [
+          "end",
+          "tie"
+        ],
+        "component": "axle_rl",
+        "worst_wire": "W_ENC_VCC",
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point in this span or reduce the slack."
+    },
+    {
+      "code": "excess_slack_loop",
+      "severity": "warning",
+      "message": "encoder_lead: 105 mm of cable between pins can reach moving wheel_rl (excess reach 22.4 mm)",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "wheel_rl"
+      ],
+      "data": {
+        "reach_margin": 0.02244212179233457,
+        "available_length": 0.10505045008076067,
+        "routed_span": 0.09252258514069364,
+        "pins": [
+          [
+            -0.006,
+            0.034,
+            0.043000000000000003
+          ],
+          [
+            0.03137274824844821,
+            0.05666124684003569,
+            0.08436640160578204
+          ]
+        ],
+        "pin_kinds": [
+          "end",
+          "tie"
+        ],
+        "component": "wheel_rl",
+        "worst_wire": "W_ENC_VCC",
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point in this span or reduce the slack."
+    },
+    {
+      "code": "harness_mass",
+      "severity": "info",
+      "message": "battery_lead: 9.6 g (7.8 g copper+insulation)",
+      "subjects": [
+        "battery_lead"
+      ],
+      "data": {
+        "mass": 0.009606359351894219,
+        "wire_mass": 0.0077794793518942175,
+        "connector_mass_estimated": 0.0016268799999999998,
+        "tie_count": 1,
+        "units": "kg"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "harness_mass",
+      "severity": "info",
+      "message": "power_y: 44.0 g (38.7 g copper+insulation)",
+      "subjects": [
+        "power_y"
+      ],
+      "data": {
+        "mass": 0.04404624638985139,
+        "wire_mass": 0.03874270718985139,
+        "connector_mass_estimated": 0.0037035391999999997,
+        "tie_count": 8,
+        "units": "kg"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "harness_mass",
+      "severity": "info",
+      "message": "esc_power: 8.0 g (6.2 g copper+insulation)",
+      "subjects": [
+        "esc_power"
+      ],
+      "data": {
+        "mass": 0.008016885644488667,
+        "wire_mass": 0.006190005644488667,
+        "connector_mass_estimated": 0.0016268799999999998,
+        "tie_count": 1,
+        "units": "kg"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "harness_mass",
+      "severity": "info",
+      "message": "esc_motor: 15.8 g (14.3 g copper+insulation)",
+      "subjects": [
+        "esc_motor"
+      ],
+      "data": {
+        "mass": 0.015771939968601368,
+        "wire_mass": 0.014331939968601368,
+        "connector_mass_estimated": 0.00064,
+        "tie_count": 4,
+        "units": "kg"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "harness_mass",
+      "severity": "info",
+      "message": "esc_signal: 4.2 g (3.6 g copper+insulation)",
+      "subjects": [
+        "esc_signal"
+      ],
+      "data": {
+        "mass": 0.004189375715142609,
+        "wire_mass": 0.003568063715142609,
+        "connector_mass_estimated": 0.00022131200000000007,
+        "tie_count": 2,
+        "units": "kg"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "harness_mass",
+      "severity": "info",
+      "message": "servo_lead: 5.5 g (4.9 g copper+insulation)",
+      "subjects": [
+        "servo_lead"
+      ],
+      "data": {
+        "mass": 0.005519059299345978,
+        "wire_mass": 0.004897747299345978,
+        "connector_mass_estimated": 0.00022131200000000007,
+        "tie_count": 2,
+        "units": "kg"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "harness_mass",
+      "severity": "info",
+      "message": "rx_lead: 1.1 g (0.8 g copper+insulation)",
+      "subjects": [
+        "rx_lead"
+      ],
+      "data": {
+        "mass": 0.0010830665462501392,
+        "wire_mass": 0.0007874415462501392,
+        "connector_mass_estimated": 9.562500000000002e-05,
+        "tie_count": 1,
+        "units": "kg"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "harness_mass",
+      "severity": "info",
+      "message": "gps_lead: 1.1 g (1.0 g copper+insulation)",
+      "subjects": [
+        "gps_lead"
+      ],
+      "data": {
+        "mass": 0.001067166852296787,
+        "wire_mass": 0.0009715418522967869,
+        "connector_mass_estimated": 9.562500000000002e-05,
+        "tie_count": 0,
+        "units": "kg"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "harness_mass",
+      "severity": "info",
+      "message": "encoder_lead: 2.7 g (2.0 g copper+insulation)",
+      "subjects": [
+        "encoder_lead"
+      ],
+      "data": {
+        "mass": 0.002677482273791011,
+        "wire_mass": 0.001958702273791011,
+        "connector_mass_estimated": 0.00031878,
+        "tie_count": 2,
+        "units": "kg"
+      },
+      "stage": "wiring",
+      "hint": ""
+    },
+    {
+      "code": "cable_sags_into_moving_part",
+      "severity": "error",
+      "message": "battery_lead cable enters the knuckle_fl envelope by 83.3 mm during the slack simulation (t = 0.844 s)",
+      "subjects": [
+        "battery_lead",
+        "W_BAT_N",
+        "W_BAT_P",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.08332452287413883,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "time": 0.8440000000000006,
+        "worst_wire": "W_BAT_P",
+        "load_case": "0.5 g 25 Hz + 3 g bump + lock-to-lock steering",
+        "per_wire_min_distance": {
+          "W_BAT_P": -0.08332452287413883,
+          "W_BAT_N": -0.08164783766391044
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point or shorten the slack on this span."
+    },
+    {
+      "code": "cable_sags_into_moving_part",
+      "severity": "error",
+      "message": "power_y cable enters the knuckle_fr envelope by 189.6 mm during the slack simulation (t = 0.801 s)",
+      "subjects": [
+        "power_y",
+        "W_Y_P_FUSE",
+        "W_Y_P_HAT",
+        "W_Y_P_IN",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.1895680968703658,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "time": 0.8010000000000006,
+        "worst_wire": "W_Y_P_HAT",
+        "load_case": "0.5 g 25 Hz + 3 g bump + lock-to-lock steering",
+        "per_wire_min_distance": {
+          "W_Y_P_HAT": -0.1895680968703658,
+          "W_Y_P_IN": -0.18515393658437754,
+          "W_Y_P_FUSE": -0.18866301393528034
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point or shorten the slack on this span."
+    },
+    {
+      "code": "cable_sags_into_moving_part",
+      "severity": "error",
+      "message": "power_y cable enters the knuckle_fl envelope by 202.0 mm during the slack simulation (t = 2.009 s)",
+      "subjects": [
+        "power_y",
+        "W_Y_N_ESC",
+        "W_Y_N_HAT",
+        "W_Y_N_IN",
+        "W_Y_P_ESC",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.2019995216035151,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "time": 2.0089999999998898,
+        "worst_wire": "W_Y_N_ESC",
+        "load_case": "0.5 g 25 Hz + 3 g bump + lock-to-lock steering",
+        "per_wire_min_distance": {
+          "W_Y_N_IN": -0.17976608923525011,
+          "W_Y_N_ESC": -0.2019995216035151,
+          "W_Y_N_HAT": -0.177288256880933,
+          "W_Y_P_ESC": -0.1959591322722853
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point or shorten the slack on this span."
+    },
+    {
+      "code": "cable_sags_into_moving_part",
+      "severity": "error",
+      "message": "esc_motor cable enters the knuckle_fl envelope by 236.8 mm during the slack simulation (t = 0.750 s)",
+      "subjects": [
+        "esc_motor",
+        "W_MOT_A",
+        "W_MOT_B",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.23681241829045763,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "time": 0.7500000000000006,
+        "worst_wire": "W_MOT_B",
+        "load_case": "0.5 g 25 Hz + 3 g bump + lock-to-lock steering",
+        "per_wire_min_distance": {
+          "W_MOT_B": -0.23681241829045763,
+          "W_MOT_A": -0.23160921088730843
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point or shorten the slack on this span."
+    },
+    {
+      "code": "cable_sags_into_moving_part",
+      "severity": "error",
+      "message": "esc_signal cable enters the knuckle_fr envelope by 195.5 mm during the slack simulation (t = 1.863 s)",
+      "subjects": [
+        "esc_signal",
+        "W_ESC_BEC",
+        "W_ESC_GND",
+        "W_ESC_SIG",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.19550702138846204,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "time": 1.8629999999999056,
+        "worst_wire": "W_ESC_GND",
+        "load_case": "0.5 g 25 Hz + 3 g bump + lock-to-lock steering",
+        "per_wire_min_distance": {
+          "W_ESC_SIG": -0.19550702115974805,
+          "W_ESC_BEC": -0.195507021240267,
+          "W_ESC_GND": -0.19550702138846204
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point or shorten the slack on this span."
+    },
+    {
+      "code": "cable_sags_into_moving_part",
+      "severity": "error",
+      "message": "servo_lead cable enters the knuckle_fl envelope by 186.9 mm during the slack simulation (t = 1.750 s)",
+      "subjects": [
+        "servo_lead",
+        "W_SRV_GND",
+        "W_SRV_SIG",
+        "W_SRV_VCC",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.1868526899824287,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "time": 1.749999999999918,
+        "worst_wire": "W_SRV_SIG",
+        "load_case": "0.5 g 25 Hz + 3 g bump + lock-to-lock steering",
+        "per_wire_min_distance": {
+          "W_SRV_SIG": -0.1868526899824287,
+          "W_SRV_VCC": -0.1868500552978606,
+          "W_SRV_GND": -0.18684986858773897
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point or shorten the slack on this span."
+    },
+    {
+      "code": "cable_sags_into_moving_part",
+      "severity": "error",
+      "message": "rx_lead cable enters the gearbox envelope by 145.9 mm during the slack simulation (t = 1.518 s)",
+      "subjects": [
+        "rx_lead",
+        "W_RX_5V",
+        "W_RX_GND",
+        "W_RX_PI_RX",
+        "W_RX_PI_TX",
+        "gearbox"
+      ],
+      "data": {
+        "min_distance": -0.14588945873575246,
+        "required": 0.008,
+        "component": "gearbox",
+        "time": 1.5179999999999436,
+        "worst_wire": "W_RX_GND",
+        "load_case": "0.5 g 25 Hz + 3 g bump + lock-to-lock steering",
+        "per_wire_min_distance": {
+          "W_RX_5V": -0.14190590495014843,
+          "W_RX_PI_TX": -0.1447689641354967,
+          "W_RX_PI_RX": -0.14553231448205695,
+          "W_RX_GND": -0.14588945873575246
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point or shorten the slack on this span."
+    },
+    {
+      "code": "cable_sags_into_moving_part",
+      "severity": "error",
+      "message": "gps_lead cable enters the knuckle_fl envelope by 228.4 mm during the slack simulation (t = 0.554 s)",
+      "subjects": [
+        "gps_lead",
+        "W_GPS_5V",
+        "W_GPS_GND",
+        "W_GPS_PI_RX",
+        "W_GPS_PI_TX",
+        "knuckle_fl"
+      ],
+      "data": {
+        "min_distance": -0.22839127244295812,
+        "required": 0.008,
+        "component": "knuckle_fl",
+        "time": 0.5540000000000004,
+        "worst_wire": "W_GPS_PI_TX",
+        "load_case": "0.5 g 25 Hz + 3 g bump + lock-to-lock steering",
+        "per_wire_min_distance": {
+          "W_GPS_5V": -0.22781196112774124,
+          "W_GPS_PI_TX": -0.22839127244295812,
+          "W_GPS_PI_RX": -0.22809555547769955,
+          "W_GPS_GND": -0.22829903455720996
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point or shorten the slack on this span."
+    },
+    {
+      "code": "cable_sags_into_moving_part",
+      "severity": "error",
+      "message": "encoder_lead cable enters the knuckle_fr envelope by 278.8 mm during the slack simulation (t = 0.181 s)",
+      "subjects": [
+        "encoder_lead",
+        "W_ENC_GND",
+        "W_ENC_OUT",
+        "W_ENC_VCC",
+        "knuckle_fr"
+      ],
+      "data": {
+        "min_distance": -0.27883256989364774,
+        "required": 0.008,
+        "component": "knuckle_fr",
+        "time": 0.18100000000000013,
+        "worst_wire": "W_ENC_OUT",
+        "load_case": "0.5 g 25 Hz + 3 g bump + lock-to-lock steering",
+        "per_wire_min_distance": {
+          "W_ENC_VCC": -0.26606349674202334,
+          "W_ENC_OUT": -0.27883256989364774,
+          "W_ENC_GND": -0.27498485742598583
+        },
+        "units": "m"
+      },
+      "stage": "wiring",
+      "hint": "Add a tie point or shorten the slack on this span."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "wiring/routes.json",
+      "kind": "json",
+      "description": "Routed wire paths, harness bundles, ties and clearances (contract)"
+    },
+    {
+      "path": "wiring/routing_detail.json",
+      "kind": "json",
+      "description": "Routing internals: nodes, bundle segments, bends, mates, holes"
+    },
+    {
+      "path": "wiring/harness_bom.csv",
+      "kind": "csv",
+      "description": "Harness BOM: wire cut lengths per AWG/colour, connectors, ties"
+    },
+    {
+      "path": "wiring/slack_sim.json",
+      "kind": "json",
+      "description": "Cable slack simulation: per-wire minimum clearance to moving parts"
+    },
+    {
+      "path": "wiring/routes_iso.png",
+      "kind": "plot_png",
+      "description": "Harness routing render"
+    },
+    {
+      "path": "wiring/routes_top_side.png",
+      "kind": "plot_png",
+      "description": "Harness routing render"
+    },
+    {
+      "path": "wiring/routes_top.png",
+      "kind": "plot_png",
+      "description": "Harness routing render"
+    },
+    {
+      "path": "wiring/routes_side.png",
+      "kind": "plot_png",
+      "description": "Harness routing render"
+    },
+    {
+      "path": "wiring/slack_peak_bump.png",
+      "kind": "plot_png",
+      "description": "Cable slack simulation render"
+    },
+    {
+      "path": "wiring/slack_peak_bump_iso.png",
+      "kind": "plot_png",
+      "description": "Cable slack simulation render"
+    },
+    {
+      "path": "wiring/slack_clearance_timeline.png",
+      "kind": "plot_png",
+      "description": "Cable slack simulation render"
+    }
+  ],
+  "assumptions": [
+    {
+      "domain": "geometry",
+      "statement": "Catalog convention: box frames sit on their bottom face; x/y-axis cylinders are centred on the component origin; z-axis cylinders (standoffs) start at their mounting face."
+    },
+    {
+      "domain": "geometry",
+      "statement": "Swept volumes sample joint travel at 1 deg (steering about the kingpin); spinning cylinders about their own axis are invariant. Moving parts without joints (motor can, gearbox) use their own envelope."
+    },
+    {
+      "domain": "routing",
+      "statement": "Voxel A* (3 mm) with length, surface-following, moving-proximity and bend costs, then any-angle string pulling and elastic-rod relaxation; wires of one harness bundle on shared voxels. Harnesses do not avoid each other."
+    },
+    {
+      "domain": "routing",
+      "statement": "Minimum bend radius = catalog factor x bundle OD, bundle OD from optimal circle packing of the conductors (conservative for loose, untaped wires)."
+    },
+    {
+      "domain": "routing",
+      "statement": "Floating (harness-to-harness) mated pairs are placed at the copper-mass-weighted geodesic optimum with a tie-ability term; mated pair length = sum of bodies - 50% engagement."
+    },
+    {
+      "domain": "routing",
+      "statement": "Cut length = routed length + route.slack + termination allowances (estimates per connector family: solder cup 5-6 mm, crimp 3 mm, splice 6 mm)."
+    },
+    {
+      "domain": "checks",
+      "statement": "Slack reach uses the ellipsoid |x - p1| + |x - p2| <= L between consecutive pins, ignoring gravity and stiffness (conservative); route slack is distributed uniformly over spans."
+    },
+    {
+      "domain": "checks",
+      "statement": "Clearance and intersection ignore a termination zone at each end against the component the wire terminates on (and the parts it is mounted on)."
+    },
+    {
+      "domain": "simulation",
+      "statement": "XPBD rods, 7.5 mm segments, 0.5 ms substeps; EI from catalog estimates, axial stiffness 0.6 x E_Cu x A; velocity damping 19 1/s (~5 % of critical at 30 Hz) and friction 0.5 are estimates. Wires are simulated individually (no wire-wire contact); moving parts do not push cables, contacts are reported."
+    }
+  ],
+  "metrics": {
+    "harness_length": {
+      "battery_lead": 0.05543865946549131,
+      "power_y": 0.14380110868577295,
+      "esc_power": 0.037777840494318524,
+      "esc_motor": 0.20706340766944495,
+      "esc_signal": 0.16022576195236715,
+      "servo_lead": 0.23409707218588766,
+      "rx_lead": 0.07043019328126739,
+      "gps_lead": 0.09344273153709837,
+      "encoder_lead": 0.18463358597677898
+    },
+    "wire_routed_length": {
+      "W_BAT_P": 0.05543865946549131,
+      "W_BAT_N": 0.05543865946549131,
+      "W_Y_P_HAT": 0.2042027157200276,
+      "W_Y_N_IN": 0.13168121115962775,
+      "W_Y_P_IN": 0.15317163225447084,
+      "W_Y_N_ESC": 0.14380110868577295,
+      "W_Y_N_HAT": 0.18162320698786,
+      "W_Y_P_FUSE": 0.08849962052591256,
+      "W_Y_P_ESC": 0.11635660629595054,
+      "W_ESC_P": 0.037777840494318524,
+      "W_ESC_N": 0.037777840494318524,
+      "W_MOT_B": 0.2186679246172673,
+      "W_MOT_A": 0.20706340766944495,
+      "W_ESC_SIG": 0.16022576195236715,
+      "W_ESC_BEC": 0.16022576195236715,
+      "W_ESC_GND": 0.16022576195236715,
+      "W_SRV_SIG": 0.23409707218588766,
+      "W_SRV_VCC": 0.23409707218588766,
+      "W_SRV_GND": 0.23409707218588766,
+      "W_RX_5V": 0.07043019328126739,
+      "W_RX_PI_TX": 0.07043019328126739,
+      "W_RX_PI_RX": 0.07043019328126739,
+      "W_RX_GND": 0.07043019328126739,
+      "W_GPS_5V": 0.09344273153709837,
+      "W_GPS_PI_TX": 0.09344273153709837,
+      "W_GPS_PI_RX": 0.09344273153709837,
+      "W_GPS_GND": 0.09344273153709837,
+      "W_ENC_VCC": 0.18463358597677898,
+      "W_ENC_OUT": 0.18463358597677898,
+      "W_ENC_GND": 0.18463358597677898
+    },
+    "wire_cut_length": {
+      "W_BAT_P": 0.08643865946549131,
+      "W_BAT_N": 0.08643865946549131,
+      "W_Y_P_HAT": 0.2392027157200276,
+      "W_Y_N_IN": 0.16868121115962775,
+      "W_Y_P_IN": 0.19017163225447084,
+      "W_Y_N_ESC": 0.18080110868577295,
+      "W_Y_N_HAT": 0.21762320698786,
+      "W_Y_P_FUSE": 0.12449962052591255,
+      "W_Y_P_ESC": 0.15335660629595055,
+      "W_ESC_P": 0.06877784049431852,
+      "W_ESC_N": 0.06877784049431852,
+      "W_MOT_B": 0.24466792461726733,
+      "W_MOT_A": 0.23306340766944494,
+      "W_ESC_SIG": 0.19822576195236716,
+      "W_ESC_BEC": 0.19822576195236716,
+      "W_ESC_GND": 0.19822576195236716,
+      "W_SRV_SIG": 0.27209707218588763,
+      "W_SRV_VCC": 0.27209707218588763,
+      "W_SRV_GND": 0.27209707218588763,
+      "W_RX_5V": 0.0984301932812674,
+      "W_RX_PI_TX": 0.0984301932812674,
+      "W_RX_PI_RX": 0.0984301932812674,
+      "W_RX_GND": 0.0984301932812674,
+      "W_GPS_5V": 0.12144273153709836,
+      "W_GPS_PI_TX": 0.12144273153709836,
+      "W_GPS_PI_RX": 0.12144273153709836,
+      "W_GPS_GND": 0.12144273153709836,
+      "W_ENC_VCC": 0.21763358597677898,
+      "W_ENC_OUT": 0.21763358597677898,
+      "W_ENC_GND": 0.21763358597677898
+    },
+    "wire_min_clearance_moving": {
+      "W_BAT_P": -0.08116863048791109,
+      "W_BAT_N": -0.08116863048791109,
+      "W_Y_P_HAT": -0.19075524617452527,
+      "W_Y_N_IN": -0.18225924241069713,
+      "W_Y_P_IN": -0.18382713417077692,
+      "W_Y_N_ESC": -0.2030369021642036,
+      "W_Y_N_HAT": -0.18225924241069713,
+      "W_Y_P_FUSE": -0.18382713417077692,
+      "W_Y_P_ESC": -0.2030369021642036,
+      "W_ESC_P": -0.060531116664001794,
+      "W_ESC_N": -0.060531116664001794,
+      "W_MOT_B": -0.236724893599821,
+      "W_MOT_A": -0.23199657879390956,
+      "W_ESC_SIG": -0.22390239565526662,
+      "W_ESC_BEC": -0.22390239565526662,
+      "W_ESC_GND": -0.22390239565526662,
+      "W_SRV_SIG": -0.2034512240592059,
+      "W_SRV_VCC": -0.2034512240592059,
+      "W_SRV_GND": -0.2034512240592059,
+      "W_RX_5V": -0.1432673530293646,
+      "W_RX_PI_TX": -0.1432673530293646,
+      "W_RX_PI_RX": -0.1432673530293646,
+      "W_RX_GND": -0.1432673530293646,
+      "W_GPS_5V": -0.20020017411238028,
+      "W_GPS_PI_TX": -0.20020017411238028,
+      "W_GPS_PI_RX": -0.20020017411238028,
+      "W_GPS_GND": -0.20020017411238028,
+      "W_ENC_VCC": -0.20905059829845482,
+      "W_ENC_OUT": -0.20905059829845482,
+      "W_ENC_GND": -0.20905059829845482
+    },
+    "worst_static_clearance": {
+      "wire": "W_MOT_B",
+      "distance": -0.236724893599821,
+      "component": "knuckle_fl",
+      "position": [
+        0.045873082406422086,
+        -0.06312691659357791,
+        0.0748730824064221
+      ]
+    },
+    "worst_dynamic_clearance": {
+      "wire": "W_ENC_OUT",
+      "min_distance": -0.27883256989364774,
+      "component": "knuckle_fr",
+      "time": 0.18100000000000013
+    },
+    "cable_sags_into_moving_part": true,
+    "harness_mass": {
+      "battery_lead": 0.009606359351894219,
+      "power_y": 0.04404624638985139,
+      "esc_power": 0.008016885644488667,
+      "esc_motor": 0.015771939968601368,
+      "esc_signal": 0.004189375715142609,
+      "servo_lead": 0.005519059299345978,
+      "rx_lead": 0.0010830665462501392,
+      "gps_lead": 0.001067166852296787,
+      "encoder_lead": 0.002677482273791011
+    },
+    "tie_points": 21,
+    "pass_throughs": 0,
+    "diagnostic_counts": {
+      "wire_clearance_violation": 26,
+      "wire_intersects_component": 32,
+      "connector_clearance_violation": 10,
+      "wire_bend_radius_violation": 57,
+      "excess_slack_loop": 9,
+      "harness_mass": 9,
+      "cable_sags_into_moving_part": 9
+    },
+    "router": {
+      "voxel": 0.003,
+      "grid_shape": [
+        125,
+        55,
+        45
+      ],
+      "voxels": 309375,
+      "astar_expansions": 659337,
+      "relaxed_segments_reverted": 3
+    },
+    "slack_sim": {
+      "max_particle_speed": 16.19601407280487,
+      "max_tensile_strain": 0.7785787146371088,
+      "duration": 2.6
+    }
+  },
+  "inputs": {
+    "robot_yaml_sha256": "83384dd2bb286d98",
+    "git_commit": "9c33004b11acf398c0bd0e9ff17c8421f2df3d63",
+    "cad_revision": "1a7a9093e7808f8c"
+  }
+}
