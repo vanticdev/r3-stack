@@ -1,0 +1,14 @@
+{
+  "body_file": "ff06d3746094873ceafe5526.body",
+  "body_sha256": "700975d83b916452c2ad8ba3e7581c90aedd273d6c8784e5ff9a6720f2779d44",
+  "headers": {
+    "Content-Type": "text/html; charset=utf-8",
+    "Etag": "W/\"700975d83b916452c2ad8ba3e7581c90\""
+  },
+  "method": "GET",
+  "request_url": "https://pip.raspberrypi.com/categories/892-raspberry-pi-5",
+  "retrieved_at": 1793253126.282799,
+  "size": 48805,
+  "status": 200,
+  "url": "https://pip.raspberrypi.com/categories/892-raspberry-pi-5"
+}

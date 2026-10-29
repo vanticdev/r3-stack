@@ -29,6 +29,7 @@ from . import projects as views
 from .agents import AgentManager
 from .errors import ApiError, raise_for
 from .runs import RunManager
+from .sourcing_jobs import SourcingJobs
 
 API_VERSION = "1.0.0"
 
@@ -82,6 +83,24 @@ class AgentRequest(BaseModel):
     prompt: str = Field(min_length=1)
     provider: Literal["claude", "codex"] = "claude"
     model: str | None = None
+
+
+class SourcingSearchRequest(BaseModel):
+    providers: list[str] | None = Field(None, description="Provider ids (default: the slot's source.providers, else all).")
+    offline: bool = Field(False, description="Use only cached responses (no network).")
+
+
+class SourcingChooseRequest(BaseModel):
+    candidate: str | int = Field(description="Rank in the last search (1-based) or a candidate id.")
+    allow_rejected: bool = Field(False, description="Pin even if the candidate fails a hard requirement.")
+
+
+class SourcingJobCreated(_Open):
+    job_id: str
+    slot: str
+    status: str
+    events_url: str
+    status_url: str
 
 
 class ProjectSummary(_Open):
@@ -242,11 +261,12 @@ def default_web_dist() -> Path:
 
 def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | Path | None = None,
                runs: RunManager | None = None, agents: AgentManager | None = None,
-               doctor: Any = None) -> FastAPI:
+               doctor: Any = None, sourcing_jobs: SourcingJobs | None = None) -> FastAPI:
     """Build the app. ``doctor`` (a zero-argument callable) replaces ``run_doctor`` in tests."""
     registry = views.ProjectRegistry(projects_roots)
     runs = runs or RunManager()
     agents = agents or AgentManager()
+    sourcing_jobs = sourcing_jobs or SourcingJobs()
     dist = Path(web_dist) if web_dist else default_web_dist()
     doctor_cache: dict[str, Any] = {}
 
@@ -259,7 +279,7 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
     app = FastAPI(title="R3 API", version=API_VERSION, openapi_url="/api/openapi.json", docs_url="/api/docs", redoc_url=None,
                   lifespan=lifespan, description="Robot projects, pipeline runs, digital-twin results, release gate and "
                                                  "headless coding agents. Errors are `{code, message, data}`.")
-    app.state.registry, app.state.runs, app.state.agents = registry, runs, agents
+    app.state.registry, app.state.runs, app.state.agents, app.state.sourcing = registry, runs, agents, sourcing_jobs
     app.add_middleware(GZipMiddleware, minimum_size=2048)
     app.add_middleware(CORSMiddleware, allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
                        allow_methods=["*"], allow_headers=["*"])
@@ -506,6 +526,85 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
     async def cancel_agent(sid: str) -> dict[str, Any]:
         get_session_or_404(sid)
         return agents.cancel(sid).to_json()
+
+    # ---------------------------------------------------------- sourcing
+    def sourcing_call(function: Any, *args: Any, **kwargs: Any) -> Any:
+        from .. import sourcing
+
+        try:
+            return function(*args, **kwargs)
+        except sourcing.SourcingError as error:
+            raise ApiError("sourcing_slot_not_found", str(error).strip("'\""), {}) from error
+
+    @app.get("/api/projects/{pid}/sourcing", tags=["sourcing"], responses=ERRORS,
+             summary="`source:` slots: requirements, pinned parts (r3.lock.yaml), last searches, provider availability")
+    async def get_sourcing(pid: str) -> dict[str, Any]:
+        from .. import sourcing
+
+        ref = project(pid)
+        return await call(lambda: sourcing_call(sourcing.list_slots, api.load_project(ref.root)))
+
+    @app.get("/api/projects/{pid}/sourcing/{component}", tags=["sourcing"], responses=ERRORS,
+             summary="The last stored search of a slot: every ranked candidate with parameters, provenance, offers and twin checks")
+    async def get_sourcing_slot(pid: str, component: str) -> dict[str, Any]:
+        from .. import sourcing
+
+        ref = project(pid)
+
+        def load() -> dict[str, Any]:
+            loaded = api.load_project(ref.root)
+            slot = sourcing.requirement_for(loaded, component).slot
+            stored = sourcing.stored_search(loaded, slot)
+            if stored is None:
+                raise ApiError("sourcing_not_searched", f"no search stored for {slot}; POST .../sourcing/{slot}/search", {"slot": slot})
+            stored["stale"] = stored["requirement_sha256"] != sourcing.requirement_for(loaded, slot).digest()
+            stored["pinned"] = (loaded.lock.get("sourcing") or {}).get(slot)
+            return stored
+
+        return await call(lambda: sourcing_call(load))
+
+    @app.post("/api/projects/{pid}/sourcing/{component}/search", tags=["sourcing"], status_code=202, response_model=SourcingJobCreated,
+              responses=ERRORS, summary="Start a search job (SSE: provider_*, candidate, search_finished, job_finished)")
+    async def search_sourcing(pid: str, component: str, body: SourcingSearchRequest | None = None) -> dict[str, Any]:
+        ref = project(pid)
+        body = body or SourcingSearchRequest()
+        job = await run_in_threadpool(sourcing_jobs.start, ref.id, ref.root, component, body.providers, body.offline)
+        return {"job_id": job.id, "slot": job.slot, "status": job.status, "events_url": f"/api/sourcing/jobs/{job.id}/events",
+                "status_url": f"/api/sourcing/jobs/{job.id}"}
+
+    def get_job_or_404(jid: str) -> Any:
+        job = sourcing_jobs.get(jid)
+        if job is None:
+            raise ApiError("sourcing_job_not_found", f"no sourcing job {jid!r}", {"job_id": jid})
+        return job
+
+    @app.get("/api/sourcing/jobs/{jid}", tags=["sourcing"], responses=ERRORS)
+    async def get_sourcing_job(jid: str) -> dict[str, Any]:
+        return get_job_or_404(jid).to_json()
+
+    @app.get("/api/sourcing/jobs/{jid}/events", tags=["sourcing"], responses={**SSE_RESPONSE, 404: {"model": ErrorBody}},
+             summary="SSE: job_started, search_started, provider_*, ranking_started, candidate, search_finished, job_finished")
+    async def sourcing_events(request: Request, jid: str, after: int | None = Query(None, ge=0)) -> StreamingResponse:
+        return event_stream(request, get_job_or_404(jid).events, after)
+
+    @app.post("/api/projects/{pid}/sourcing/{component}/choose", tags=["sourcing"], responses=ERRORS,
+              summary="Pin a candidate of the last search: writes catalog/components/sourced_<id>.yaml and r3.lock.yaml")
+    async def choose_sourcing(pid: str, component: str, body: SourcingChooseRequest) -> dict[str, Any]:
+        from .. import sourcing
+
+        ref = project(pid)
+        if any(j.status == "running" and j.project_id == ref.id for j in sourcing_jobs.list(ref.id)):
+            raise ApiError("sourcing_busy", "a search is still running for this project; wait for it before choosing", {})
+        payload = await call(lambda: sourcing_call(sourcing.choose, ref.root, component, body.candidate, allow_rejected=body.allow_rejected))
+        return raise_for(payload)
+
+    @app.post("/api/projects/{pid}/sourcing/{component}/unpin", tags=["sourcing"], responses=ERRORS,
+              summary="Remove a slot's pin (the authored `type`, if any, is used again)")
+    async def unpin_sourcing(pid: str, component: str) -> dict[str, Any]:
+        from .. import sourcing
+
+        ref = project(pid)
+        return await call(lambda: sourcing_call(sourcing.unpin, ref.root, component))
 
     # ---------------------------------------------------------- web app
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PATCH", "PUT", "DELETE"], include_in_schema=False)

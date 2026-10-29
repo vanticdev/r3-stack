@@ -122,7 +122,10 @@ class RobotGraph:
         """Return (connector type, pin number -> node) for a component or harness connector."""
         owner, _, connector = ref.partition(".")
         if owner in self.spec.components:
-            ctype = self.catalog.component(self.spec.components[owner].type)
+            type_id = self.spec.components[owner].type
+            if type_id not in self.catalog.components:
+                return None  # reported once as component_unsourced / unknown_component_type
+            ctype = self.catalog.component(type_id)
             inst = ctype.connectors.get(connector)
             if inst is None:
                 return None
@@ -137,6 +140,9 @@ class RobotGraph:
     def _mate(self, a: str, b: str, context: str) -> None:
         left, right = self._connector_pins(a), self._connector_pins(b)
         for side, ref in ((left, a), (right, b)):
+            owner = ref.partition(".")[0]
+            if side is None and owner in self.spec.components and self.spec.components[owner].type not in self.catalog.components:
+                continue
             if side is None:
                 self.diagnostics.append(Diagnostic.error(
                     "unknown_connector", f"{context}: connector {ref!r} does not exist", subjects=[ref]))
@@ -157,6 +163,12 @@ class RobotGraph:
     def _build(self) -> None:
         spec, catalog = self.spec, self.catalog
         for cid, comp in spec.components.items():
+            if not comp.type:
+                self.diagnostics.append(Diagnostic.error(
+                    "component_unsourced", f"component {cid!r} is declared by requirements (source) but no part is pinned yet",
+                    subjects=[cid], data={"slot": comp.source.group or cid if comp.source else cid},
+                    hint=f"Run `r3 source {cid}` and choose a candidate (`--choose N`), or give it a catalog `type`."))
+                continue
             try:
                 ctype = catalog.component(comp.type)
             except KeyError as error:

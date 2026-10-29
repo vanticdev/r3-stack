@@ -1,0 +1,14 @@
+{
+  "body_file": "1219b82b2ae5958298328c99.body",
+  "body_sha256": "fbad3caf108d0f963c7dc1554bee8a241002a37d7592fdb0a2e42f657ce6dfe2",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"e73a083785a215a5c38ff0a162d7381b2bb4f9ab9f02ea743ab97efce28d1282\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%20C3%20LR2021.json",
+  "retrieved_at": 1793253131.979442,
+  "size": 497,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%20C3%20LR2021.json"
+}

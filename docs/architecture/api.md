@@ -102,6 +102,13 @@ r3 serve [--host 127.0.0.1] [--port 8321] [--projects-root DIR ...] [--web-dist 
 | GET | `/api/agent/{sid}` | | `AgentStatus` |
 | GET | `/api/agent/{sid}/events` | `?after=` / `Last-Event-ID` | SSE, see [Agent events](#agent-events) |
 | POST | `/api/agent/{sid}/cancel` | | `AgentStatus` (SIGTERM to the CLI's process group; SIGKILL after 5 s) |
+| GET | `/api/projects/{pid}/sourcing` | | `{slots[], providers[]}`: every `source:` slot with its requirement, pin (`r3.lock.yaml` `sourcing.<slot>`) and last search; provider availability (keys, agent CLI). See [sourcing](sourcing.md). |
+| GET | `/api/projects/{pid}/sourcing/{component}` | | The stored search (`build/sourcing/<slot>/candidates.json`): every ranked candidate with parameters, provenance, offers, requirement matches and twin checks, plus `stale` and `pinned`. 404 `sourcing_not_searched` |
+| POST | `/api/projects/{pid}/sourcing/{component}/search` | `{providers?: [...], offline=false}` | 202 `{job_id, slot, status, events_url, status_url}`. 409 `sourcing_busy`; 404 `sourcing_slot_not_found` |
+| GET | `/api/sourcing/jobs/{jid}` | | `{job_id, project, slot, status, counts, error}` |
+| GET | `/api/sourcing/jobs/{jid}/events` | `?after=` / `Last-Event-ID` | SSE: `job_started`, `search_started`, `provider_started` / `provider_skipped` / `provider_finished` / `provider_failed`, `ranking_started`, `candidate`, `search_finished`, `job_finished` |
+| POST | `/api/projects/{pid}/sourcing/{component}/choose` | `{candidate: rank \| id, allow_rejected=false}` | `{ok, pinned, catalog_file, entry, twin, diagnostics[]}`. 409 `sourcing_search_stale` (requirements changed since the search), 422 `sourcing_candidate_rejected` |
+| POST | `/api/projects/{pid}/sourcing/{component}/unpin` | | `{ok, removed}` |
 
 Beyond the brief, the API adds:
 - `GET /api/projects/{pid}/release`

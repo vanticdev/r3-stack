@@ -1,0 +1,14 @@
+{
+  "body_file": "8d8bcf0c98accd7d9cec9e8a.body",
+  "body_sha256": "a65ba296d47778b253937bfbbd1e5e6b9b301a2a2ae68192ebfb9892a2a7b12f",
+  "headers": {
+    "Content-Type": "text/plain",
+    "last-modified": "Tue, 22 Sep 2026 13:36:41 GMT"
+  },
+  "method": "GET",
+  "request_url": "https://pip-assets.raspberrypi.com/robots.txt",
+  "retrieved_at": 1793253126.378935,
+  "size": 148,
+  "status": 200,
+  "url": "https://pip-assets.raspberrypi.com/robots.txt"
+}

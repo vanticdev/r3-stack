@@ -1,0 +1,28 @@
+{
+  "_note": "Synthesized from the published DigiKey Product Information API v4 schema (OAuth2 token, KeywordSearch and ProductDetails responses); no API key was available to record live traffic. Part data are fixtures, not real listings.",
+  "responses": [
+    {"method": "POST", "url": "https://api.digikey.com/v1/oauth2/token",
+     "body": {"access_token": "fixture-digikey-token", "expires_in": 599, "token_type": "Bearer"}},
+    {"method": "POST", "url": "https://api.digikey.com/products/v4/search/keyword",
+     "body": {"ProductsCount": 2, "Products": [
+       {"Description": {"ProductDescription": "SBC RASPBERRY PI 5 4GB (FIXTURE)", "DetailedDescription": "Raspberry Pi 5 single board computer, 4 GB RAM"},
+        "Manufacturer": {"Id": 1, "Name": "Fixture Pi Reseller"}, "ManufacturerProductNumber": "FIXTURE-RPI5-4GB", "UnitPrice": 60.0,
+        "ProductUrl": "https://example.com/digikey/fixture-rpi5-4gb", "DatasheetUrl": "https://example.com/digikey/fixture-rpi5.pdf",
+        "QuantityAvailable": 412, "ManufacturerLeadWeeks": "6",
+        "Parameters": [{"ParameterText": "Core Processor", "ValueText": "ARM Cortex-A76"}, {"ParameterText": "RAM Size", "ValueText": "4GB"},
+                       {"ParameterText": "Supply Voltage", "ValueText": "5V"}],
+        "ProductVariations": [{"DigiKeyProductNumber": "FIX-RPI5-4GB-ND", "QuantityAvailableforPackageType": 412,
+                               "StandardPricing": [{"BreakQuantity": 1, "UnitPrice": 60.0}, {"BreakQuantity": 10, "UnitPrice": 58.5}]}]},
+       {"Description": {"ProductDescription": "CASE RASPBERRY PI 5 (FIXTURE)", "DetailedDescription": "Case for Raspberry Pi 5"},
+        "Manufacturer": {"Id": 2, "Name": "Fixture Cases"}, "ManufacturerProductNumber": "FIXTURE-RPI5-CASE", "UnitPrice": 10.0,
+        "ProductUrl": "https://example.com/digikey/fixture-rpi5-case", "QuantityAvailable": 9000,
+        "Parameters": [], "ProductVariations": [{"DigiKeyProductNumber": "FIX-CASE-ND", "StandardPricing": [{"BreakQuantity": 1, "UnitPrice": 10.0}]}]}
+     ]}},
+    {"method": "GET", "url": "https://api.digikey.com/products/v4/search/FIXTURE-BUCK-5V3A/productdetails",
+     "body": {"Product": {"Description": {"ProductDescription": "IC REG BUCK 5V 3A (FIXTURE)", "DetailedDescription": "Buck converter"},
+              "Manufacturer": {"Name": "Fixture Semi"}, "ManufacturerProductNumber": "FIXTURE-BUCK-5V3A", "UnitPrice": 2.25,
+              "ProductUrl": "https://example.com/digikey/fixture-buck", "QuantityAvailable": 5000, "Parameters": [],
+              "ProductVariations": [{"DigiKeyProductNumber": "FIX-BUCK-CT-ND", "QuantityAvailableforPackageType": 5000,
+                                     "StandardPricing": [{"BreakQuantity": 1, "UnitPrice": 2.25}, {"BreakQuantity": 10, "UnitPrice": 1.70}]}]}}}
+  ]
+}

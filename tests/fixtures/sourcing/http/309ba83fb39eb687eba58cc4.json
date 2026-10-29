@@ -1,0 +1,14 @@
+{
+  "body_file": "309ba83fb39eb687eba58cc4.body",
+  "body_sha256": "5fbe33f6a839e50fdde67d2c034d7b74371c3648bd34e7260c0dc68bf19d0f11",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"29840f7137668ef2df205084318cdfc09777b6fcf9aa9dc4aa6b487e53bb7691\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/targets.json",
+  "retrieved_at": 1793253130.710037,
+  "size": 182523,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/targets.json"
+}

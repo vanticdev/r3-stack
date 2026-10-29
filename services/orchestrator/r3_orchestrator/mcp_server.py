@@ -30,7 +30,8 @@ from .cli import configure_headless
 
 INSTRUCTIONS = """R3 robot project tools. robot.yaml is the single source of truth.
 Loop: r3_get_spec -> r3_patch_spec (pass the sha256 you read; on spec_conflict re-read and re-apply)
--> r3_validate -> r3_get_diagnostics / r3_diagnose -> fix -> repeat. Diagnostics carry stable codes,
+-> r3_validate -> r3_get_diagnostics / r3_diagnose -> fix -> repeat. Parts declared by requirements
+(`source:` in robot.yaml) are found with r3_source_search and pinned with r3_source_choose. Diagnostics carry stable codes,
 subjects (component/wire/pin ids) and numeric data. deploy_fleet and create_github_repo need confirm=true
 and must only be called when the human explicitly asked for them."""
 
@@ -40,12 +41,14 @@ _READ = ToolAnnotations(read_only_hint=True, destructive_hint=False, idempotent_
 _DESIGN = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False)
 _EDIT = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=False)
 _GATED = ToolAnnotations(read_only_hint=False, destructive_hint=True, idempotent_hint=False, open_world_hint=True)
+# Reads public vendor data and official APIs over the network; writes only build/sourcing/.
+_SEARCH = ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=True)
 
 #: Permission tier of every registered tool: ``read``, ``design``, ``edit`` or
 #: ``gated``. Headless agent sessions (``r3 serve``) pre-approve every tier but
 #: ``gated``; gated tools additionally refuse to act without ``confirm=true``.
 TOOL_TIERS: dict[str, str] = {}
-_TIER_OF = {id(_READ): "read", id(_DESIGN): "design", id(_EDIT): "edit", id(_GATED): "gated"}
+_TIER_OF = {id(_READ): "read", id(_DESIGN): "design", id(_EDIT): "edit", id(_GATED): "gated", id(_SEARCH): "design"}
 
 
 def _tool(annotations: ToolAnnotations) -> Any:
@@ -157,6 +160,51 @@ def r3_doctor(require: list[str] | None = None) -> dict[str, Any]:
     from .doctor import run_doctor
 
     return run_doctor(require or None)
+
+
+def _sourcing(call: Any) -> dict[str, Any]:
+    """``_guard``: an unknown slot (SourcingError is a KeyError) becomes a ``usage_error`` result."""
+    return _guard(call)
+
+
+@_tool(_READ)
+def r3_source_slots(project: str = "") -> dict[str, Any]:
+    """Components declared by requirements (`source:` in robot.yaml): requirement, pinned part (r3.lock.yaml
+    sourcing.<slot>), last search summary, and which sourcing providers are available here (API keys, agent CLI)."""
+    from . import sourcing
+
+    return _sourcing(lambda: sourcing.list_slots(api.load_project(project or None)))
+
+
+@_tool(_SEARCH)
+def r3_source_search(component: str, project: str = "", providers: list[str] | None = None, top: int = 10,
+                     offline: bool = False) -> dict[str, Any]:
+    """Search online for real parts that meet a slot's `source.requires` (component id or source.group), rank them
+    (hard filters, then twin checks: pin voltages/currents against the robot's nets, envelope interference, assembly
+    interfaces, mass budget; plus price, stock, lead time and a penalty for estimated parameters) and store the full
+    result in build/sourcing/<slot>/candidates.json. Every parameter carries a provenance URL and status
+    (datasheet|vendor|estimated). Does not change the project; pin a result with r3_source_choose."""
+    from . import sourcing
+
+    def run() -> dict[str, Any]:
+        project_obj = api.load_project(project or None)
+        from r3_catalog.sourcing import HttpClient
+
+        payload = sourcing.search_slot(project_obj, component, provider_ids=providers or None,
+                                       http=HttpClient(offline=True) if offline else None)
+        return sourcing.trimmed(payload, top)
+
+    return _sourcing(run)
+
+
+@_tool(_EDIT)
+def r3_source_choose(component: str, candidate: str, project: str = "", allow_rejected: bool = False) -> dict[str, Any]:
+    """Pin a candidate from the last r3_source_search of this slot: `candidate` is its rank ("1") or candidate id.
+    Writes catalog/components/sourced_<id>.yaml (provenance per field) and r3.lock.yaml sourcing.<slot>, then
+    re-checks the slot. Run r3_validate afterwards. Choosing again later is how a slot is re-sourced."""
+    from . import sourcing
+
+    return _sourcing(lambda: sourcing.choose(api.resolve_project(project or None), component, candidate, allow_rejected=allow_rejected))
 
 
 @_tool(_GATED)

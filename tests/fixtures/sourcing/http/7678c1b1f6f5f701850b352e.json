@@ -1,0 +1,14 @@
+{
+  "body_file": "7678c1b1f6f5f701850b352e.body",
+  "body_sha256": "3baeddff5577713506a5bd171ac6317588081f28c4ce3fdfd0111345ecc1fd1e",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"099fcc851c7d92df9e633d114cd4a5f5500ab4f2cc7e43003ea6640b8d2359da\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%202400%20Diversity%20PA.json",
+  "retrieved_at": 1793253130.923619,
+  "size": 433,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%202400%20Diversity%20PA.json"
+}

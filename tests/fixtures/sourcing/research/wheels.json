@@ -1,0 +1,37 @@
+{
+  "_note": "Agent research output fixture in the RESEARCH_SCHEMA shape (what `claude -p --json-schema` returns as structured_output). Products and URLs are fixtures on example.com, not real listings.",
+  "candidates": [
+    {"name": "Fixture 1/10 Wheel 110x45 (12 mm hex)", "manufacturer": "Fixture Wheels", "mpn": "FW-110-45-HEX12",
+     "product_url": "https://example.com/wheels/fw-110-45",
+     "parameters": [
+       {"name": "diameter", "value": "110 mm", "status": "vendor", "source_url": "https://example.com/wheels/fw-110-45", "quote": "Diameter: 110 mm"},
+       {"name": "width", "value": "45 mm", "status": "vendor", "source_url": "https://example.com/wheels/fw-110-45", "quote": "Width: 45 mm"},
+       {"name": "hub", "value": "12 mm hex", "status": "vendor", "source_url": "https://example.com/wheels/fw-110-45", "quote": "12 mm hex hub"},
+       {"name": "mass", "value": "92 g", "status": "vendor", "source_url": "https://example.com/wheels/fw-110-45", "quote": "Weight: 92 g per wheel"}],
+     "offers": [{"vendor": "Fixture Hobby Shop", "url": "https://example.com/shop/fw-110-45", "price": 7.5, "currency": "USD", "in_stock": true}],
+     "models": []},
+    {"name": "Fixture 1/10 Wheel 108x42 (12 mm hex)", "manufacturer": "Fixture Wheels", "mpn": "FW-108-42-HEX12",
+     "product_url": "https://example.com/wheels/fw-108-42",
+     "parameters": [
+       {"name": "diameter", "value": "108 mm", "status": "vendor", "source_url": "https://example.com/wheels/fw-108-42", "quote": "108 mm diameter"},
+       {"name": "width", "value": "42 mm", "status": "vendor", "source_url": "https://example.com/wheels/fw-108-42", "quote": "42 mm wide"},
+       {"name": "hub", "value": "12 mm hex", "status": "estimated", "source_url": "", "quote": ""},
+       {"name": "mass", "value": "120 g", "status": "vendor", "source_url": "https://example.com/wheels/fw-108-42", "quote": "Weight 120 g"}],
+     "offers": [{"vendor": "Fixture Hobby Shop", "url": "https://example.com/shop/fw-108-42", "price": 6.0, "currency": "USD", "in_stock": null}],
+     "models": []},
+    {"name": "Fixture 1/10 Wheel 95x40", "manufacturer": "Fixture Wheels", "mpn": "FW-95-40-HEX12",
+     "product_url": "https://example.com/wheels/fw-95-40",
+     "parameters": [
+       {"name": "diameter", "value": "95 mm", "status": "vendor", "source_url": "https://example.com/wheels/fw-95-40", "quote": "95 mm"},
+       {"name": "width", "value": "40 mm", "status": "vendor", "source_url": "https://example.com/wheels/fw-95-40", "quote": "40 mm"},
+       {"name": "hub", "value": "12 mm hex", "status": "vendor", "source_url": "https://example.com/wheels/fw-95-40", "quote": "12mm hex"}],
+     "offers": [{"vendor": "Fixture Hobby Shop", "url": "https://example.com/shop/fw-95-40", "price": 4.0, "currency": "USD", "in_stock": true}],
+     "models": []},
+    {"name": "Fixture 1/10 Wheel 112 mm (width not published)", "manufacturer": "Fixture Wheels", "mpn": "FW-112",
+     "product_url": "https://example.com/wheels/fw-112",
+     "parameters": [
+       {"name": "diameter", "value": "112 mm", "status": "vendor", "source_url": "https://example.com/wheels/fw-112", "quote": "112 mm"},
+       {"name": "hub", "value": "12 mm hex", "status": "vendor", "source_url": "https://example.com/wheels/fw-112", "quote": "12 mm hex"}],
+     "offers": [], "models": []}
+  ]
+}

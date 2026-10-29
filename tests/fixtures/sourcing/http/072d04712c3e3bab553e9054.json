@@ -1,0 +1,14 @@
+{
+  "body_file": "072d04712c3e3bab553e9054.body",
+  "body_sha256": "05d68cbac8407099609fda7c90d1fa1cc583f831ca00fde08218e7901037ecce",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"57491f6f8d63eb27494a4d98eaa65d12d99cfd63205b91e9135435ae1a1f20f5\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%202400%20PWMP7.json",
+  "retrieved_at": 1793253131.9079309,
+  "size": 437,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%202400%20PWMP7.json"
+}

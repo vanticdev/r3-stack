@@ -1,0 +1,14 @@
+{
+  "body_file": "2586428fa0e580217b19b921.body",
+  "body_sha256": "5ab2e03ebd9ae9c4a6bdb914b7bd678b383b37992fcfa0a1aa74888dfb34e247",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"25a618cef5104949daddda389ba712c258479b2298e2ebb416943d7954022a41\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%20S3%20LR1121%20True%20Diversity.json",
+  "retrieved_at": 1793253131.4497762,
+  "size": 569,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%20S3%20LR1121%20True%20Diversity.json"
+}

@@ -1,0 +1,14 @@
+{
+  "body_file": "dc6146b6787322596aab9563.body",
+  "body_sha256": "140e77fbd336ab5a48847b1b8ee33e574436130d3320f3fe7e06c2c353846ab5",
+  "headers": {
+    "Content-Type": "application/xml; charset=utf-8",
+    "Etag": "W/\"140e77fbd336ab5a48847b1b8ee33e57\""
+  },
+  "method": "GET",
+  "request_url": "https://pip.raspberrypi.com/sitemap.xml",
+  "retrieved_at": 1793253125.7612631,
+  "size": 278745,
+  "status": 200,
+  "url": "https://pip.raspberrypi.com/sitemap.xml"
+}

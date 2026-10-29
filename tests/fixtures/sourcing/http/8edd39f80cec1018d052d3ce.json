@@ -1,0 +1,14 @@
+{
+  "body_file": "8edd39f80cec1018d052d3ce.body",
+  "body_sha256": "9241f7621a7eadc527952e319d246af85b1215cbfed14cfd134d9fd6e390846f",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"7e61bba238ee740f33ba0de09d85600e90839c5a90adaf3d1c01e045f028f97f\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/FLYSKY%20PR01.json",
+  "retrieved_at": 1793253131.556596,
+  "size": 413,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/FLYSKY%20PR01.json"
+}

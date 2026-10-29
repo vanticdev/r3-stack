@@ -1,0 +1,14 @@
+{
+  "body_file": "ca86a49aeba48e4fce4058b7.body",
+  "body_sha256": "18709f5c41813fafc8d4bbb76f83094a961e2d16577ce5c9ad92fc82f405018a",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"29cd793a9edef82cd2a58f1e703a7a881cee4d6049f52c7473db506c8a4583a0\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%202400%20PWMP6.json",
+  "retrieved_at": 1793253131.788467,
+  "size": 454,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%202400%20PWMP6.json"
+}

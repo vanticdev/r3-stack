@@ -1,0 +1,14 @@
+{
+  "body_file": "c66a2e8be49c58facabfd11e.body",
+  "body_sha256": "7bf19d80cb5b21a47dd361de4a7b9407186cc3bae61b6b3749e912106dd0c1ef",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"749c37af689b69e2430f5385dbe8d005acb3d5edee374ceba5a2c425b65ecfb1\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/iFlight%202400.json",
+  "retrieved_at": 1793253132.125962,
+  "size": 457,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/iFlight%202400.json"
+}

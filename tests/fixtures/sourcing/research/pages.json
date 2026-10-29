@@ -1,0 +1,5 @@
+{
+  "_note": "Cited product pages for citation verification (fixtures on example.com).",
+  "https://example.com/wheels/fw-110-45": "<html><body><h1>FW-110-45</h1><ul><li>Diameter: 110 mm</li><li>Width: 45 mm</li><li>12 mm hex hub</li><li>Weight: 92 g per wheel</li></ul></body></html>",
+  "https://example.com/wheels/fw-108-42": "<html><body><h1>FW-108-42</h1><p>108 mm diameter, 42 mm wide. Weight 135 g.</p></body></html>"
+}

@@ -39,6 +39,7 @@ class Project:
         lock_path = root / "r3.lock.yaml"
         lock = yaml.safe_load(lock_path.read_text()) if lock_path.exists() else {}
         project = cls(root=root, spec=spec, lock=lock or {})
+        project.apply_sourcing()
         if spec.assembly is not None:
             project.assembly  # compile now so every stage sees derived poses
         return project
@@ -76,6 +77,21 @@ class Project:
             self._graph = RobotGraph(self.spec, self.catalog)
         return self._graph
 
+    def apply_sourcing(self) -> dict[str, str]:
+        """Resolve sourced slots: a component with ``source`` whose slot is pinned in
+        ``r3.lock.yaml`` (``sourcing.<slot>.catalog_id``) uses the pinned catalog id
+        instead of its authored ``type``. Returns component id -> resolved type.
+        Re-sourcing never happens here; it is the explicit ``r3 source`` command."""
+        pins = self.lock.get("sourcing") or {}
+        resolved: dict[str, str] = {}
+        for slot, members in self.spec.source_slots().items():
+            pin = pins.get(slot)
+            if isinstance(pin, dict) and pin.get("catalog_id"):
+                for cid in members:
+                    self.spec.components[cid].type = str(pin["catalog_id"])
+                    resolved[cid] = str(pin["catalog_id"])
+        return resolved
+
     def build_dir(self, stage: str = "") -> Path:
         path = self.root / "build" / stage if stage else self.root / "build"
         path.mkdir(parents=True, exist_ok=True)
@@ -101,4 +117,7 @@ class Project:
         for key, value in self.lock.items():
             if isinstance(value, dict) and "revision" in value:
                 result[f"{key}_revision"] = str(value["revision"])
+        if self.lock.get("sourcing"):
+            pinned = json.dumps(self.lock["sourcing"], sort_keys=True, default=str)
+            result["sourcing_sha256"] = hashlib.sha256(pinned.encode()).hexdigest()[:16]
         return result
