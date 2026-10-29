@@ -83,7 +83,10 @@ def test_catalog_params_of_rc_car_parts():
 
 
 def _spec(mutate):
+    """The RC-car spec without its authored sourcing slots, then ``mutate``."""
     data = yaml.safe_load((RC_CAR / "robot.yaml").read_text())
+    for component in data["components"].values():
+        component.pop("source", None)
     mutate(data["components"])
     return data
 
