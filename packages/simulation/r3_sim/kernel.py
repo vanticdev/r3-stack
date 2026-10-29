@@ -51,11 +51,11 @@ SNAPSHOT_PERIOD = 1.0 / 30.0
 UART_BUFFER_BYTES = 4096  # Linux n_tty receive buffer
 #: Scenario fault types the kernel and runner inject (``scenario.faults``).
 FAULT_TYPES = {"software_freeze", "transmitter_off"}
-DEFAULT_GPS_ORIGIN = (37.4275, -122.1697, 30.0)
+DEFAULT_GPS_ORIGIN = (37.4275, -122.1697, 30.0)  # fixed geodetic origin of the local tangent plane (estimate)
 #: UTC at scenario t = 0 for GNSS time stamps (NMEA UTC, RTCM GPS time of week).
 GNSS_EPOCH_UTC = datetime(2026, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
 RTK_PREROLL_S = 30.0  # base + rover on before the scenario (warm start); >= 3 x the datasheet RTK convergence bound
-RTK_PREROLL_STEP = 0.01  # fixed geodetic origin of the local tangent plane (estimate)
+RTK_PREROLL_STEP = 0.01  # s
 
 
 def _get(mapping: Any, *path: str, default: Any = None) -> Any:
@@ -378,6 +378,7 @@ class CoSimKernel:
         spec, env = project.spec, project.spec.simulation.environment
         base = env.gnss_base
         gps_type = project.catalog.component(spec.components[self.gps_id].type)
+        # Correction input: the rover's second UART receive pin (UART1 RX carries the computer's commands).
         rx2 = next((name for name, pin in gps_type.pins.items() if pin.role == "uart_rx" and name != "RX"), None)
         radios = [cid for cid in _find_kind(project, "telemetry.sik")]
         connected = [cid for cid in radios if rx2 and project.graph.connected(f"C:{cid}.TX", f"C:{self.gps_id}.{rx2}", through_internal=True)]
