@@ -302,6 +302,8 @@ def build_parser() -> argparse.ArgumentParser:
     visibility.add_argument("--public", dest="private", action="store_false")
     p.add_argument("--platform-url", default=None, help="pip URL of r3-platform written into the CI workflow.")
     p.set_defaults(func=cmd_create)
+    from .models_cli import register as register_models
+    register_models(sub, common)
     return parser
 
 

@@ -4,14 +4,14 @@ from __future__ import annotations
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 Category = Literal['computer', 'camera', 'motor', 'gearbox', 'esc', 'servo', 'battery', 'gnss', 'imu',
                    'receiver', 'connector', 'wheel', 'fastener', 'regulator', 'sensor', 'cable', 'bearing', 'other']
 
 
 class Record(BaseModel):
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra='forbid', allow_inf_nan=False)
 
 
 class Spec(Record):
@@ -35,7 +35,7 @@ class Source(Record):
     did: str = ''
     vid: str = ''
     eid: str = ''
-    part_id: str = ''
+    part_id: str = Field('', validation_alias=AliasChoices('part_id', 'partId'))
 
     @model_validator(mode='after')
     def valid_location(self) -> Source:
@@ -75,6 +75,7 @@ class ModelEntry(Record):
     # Real geometry frame in component coordinates, in metres. Reviewed before CAD insertion.
     placement: dict[str, list[float]] | None = None
     interface_frames: dict[str, dict[str, list[float]]] = Field(default_factory=dict)
+    onshape_connectors: dict[str, str] = Field(default_factory=dict)
 
     @property
     def available(self) -> bool:

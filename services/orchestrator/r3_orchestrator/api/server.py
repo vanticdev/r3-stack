@@ -279,6 +279,8 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
     app = FastAPI(title="R3 API", version=API_VERSION, openapi_url="/api/openapi.json", docs_url="/api/docs", redoc_url=None,
                   lifespan=lifespan, description="Robot projects, pipeline runs, digital-twin results, release gate and "
                                                  "headless coding agents. Errors are `{code, message, data}`.")
+    from .models import router as models_router
+    app.include_router(models_router)
     app.state.registry, app.state.runs, app.state.agents, app.state.sourcing = registry, runs, agents, sourcing_jobs
     app.add_middleware(GZipMiddleware, minimum_size=2048)
     app.add_middleware(CORSMiddleware, allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",

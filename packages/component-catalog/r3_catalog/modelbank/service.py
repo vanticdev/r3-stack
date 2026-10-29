@@ -34,7 +34,9 @@ def add(name: str, category: str, mpn: str = '', manufacturer: str = '', url: st
         if not match:
             raise ValueError('Onshape URL must point to an immutable public version (/v/, not /w/)')
         from r3_onshape.client import ApiKeyTransport
-        transport = ApiKeyTransport()
+        transport = ApiKeyTransport.from_env()
+        if transport is None:
+            raise ValueError('Onshape source validation requires ONSHAPE_ACCESS_KEY and ONSHAPE_SECRET_KEY')
         did, vid, eid = match.groups()
         document = transport.json('GET', f'/documents/{did}')
         if document.get('isPublic') is not True:

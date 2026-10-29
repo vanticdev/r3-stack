@@ -1,3 +1,4 @@
+import { BankMatch } from "../components/BankMatch.tsx";
 // Parts: components declared by requirements (`source:` in robot.yaml), the real parts found online,
 // their parameters with provenance links, price/stock, the digital-twin check results, and a choose button.
 import { useQueryClient } from "@tanstack/react-query";
@@ -339,6 +340,7 @@ function CandidateDetail({ entry, candidate }: { entry: RankedCandidate; candida
           </table></div>
         )}
         <h3 className="small">Links and models</h3>
+        <BankMatch mpn={candidate.mpn} />
         <div className="row small">
           {Object.entries(candidate.urls).map(([k, u]) => <Link key={k} href={u}>{k.replace(/_/g, " ")}</Link>)}
           {candidate.models.map((m) => <Link key={m.url} href={m.url}>{m.format === "pdf_drawing" ? "drawing" : m.format.replace("_", " ")}</Link>)}

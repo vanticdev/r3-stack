@@ -72,7 +72,12 @@ def ingest_page(provider: str, url: str, *, name: str, category: str = 'other', 
                            category=category, sources=[Source(kind='database', url=url, requires_login=True, direct=False)],
                            proxy_reason='Account-gated model: a human must fetch under the source terms.')]
     parser = Links()
-    parser.feed(html if html is not None else public_page(url))
+    resource_path = urllib.parse.unquote(urllib.parse.urlparse(url).path).lower()
+    is_direct = bool(re.search(r'\.(step|stp)$', resource_path) or (resource_path.endswith('.zip') and 'step' in resource_path))
+    if is_direct:
+        parser.links = [url]
+    else:
+        parser.feed(html if html is not None else public_page(url))
     entries = []
     for link in sorted(set(parser.links)):
         direct = urllib.parse.urljoin(url, link)
@@ -153,7 +158,10 @@ def ingest(bank: ModelBank, provider: str, **options: Any) -> dict[str, Any]:
         entries = ingest_kicad(Path(root) if root else None, query=options.get('query', ''))
     elif provider == 'onshape':
         from r3_onshape.client import ApiKeyTransport
-        entries = ingest_onshape(options.get('query', ''), ApiKeyTransport())
+        transport = ApiKeyTransport.from_env()
+        if transport is None:
+            raise ValueError('Onshape public search requires ONSHAPE_ACCESS_KEY and ONSHAPE_SECRET_KEY')
+        entries = ingest_onshape(options.get('query', ''), transport)
     else:
         entries = ingest_page(provider, options['url'], name=options.get('name') or provider,
                               category=options.get('category', 'other'), mpn=options.get('mpn', ''))

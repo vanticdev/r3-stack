@@ -53,6 +53,10 @@ def acquire(source: Source, *, pin: bool = False, downloader: Callable[..., Path
             return existing, source
     with tempfile.TemporaryDirectory(dir=root) as temporary:
         path = downloader(source.url, Path(temporary) / ('source' + suffix))
+        if pin and source.format in ('step', 'stp') and b'ISO-10303-21' not in path.read_bytes()[:4096]:
+            raise ValueError('download is not a STEP file (possibly a login or error page)')
+        if pin and source.format == 'stp.zip' and not zipfile.is_zipfile(path):
+            raise ValueError('download is not a STEP ZIP archive')
         actual = checksum(path)
         if source.sha256 and actual != source.sha256:
             raise ValueError(f'sha256 mismatch: {actual} != {source.sha256}')
@@ -116,7 +120,7 @@ def fetch(entry: ModelEntry, *, converter: Callable[..., dict[str, Any]] = conve
         try:
             path, pinned = acquire(source, downloader=downloader)
             return {'ok': True, 'id': entry.id, 'provenance': pinned.model_dump(), **converter(path, pinned)}
-        except (OSError, ValueError, RuntimeError) as error:
+        except (OSError, ValueError, RuntimeError, ImportError) as error:
             failures.append({'url': source.url, 'reason': str(error)})
     return {'ok': False, 'id': entry.id, 'code': 'model_unavailable', 'message': 'No downloadable, checksum-pinned model', 'sources': failures}
 

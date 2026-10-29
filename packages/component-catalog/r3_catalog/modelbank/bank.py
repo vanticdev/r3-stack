@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 import tempfile
+from contextlib import closing
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
@@ -103,7 +104,7 @@ class ModelBank:
                specs: dict[str, list[float | None]] | None = None, limit: int = 30) -> list[dict[str, Any]]:
         if not 1 <= limit <= 200:
             raise ValueError('limit must be between 1 and 200')
-        with self._connect() as db:
+        with closing(self._connect()) as db:
             conditions, values = [], []
             if category:
                 conditions.append('category = ?'); values.append(category)

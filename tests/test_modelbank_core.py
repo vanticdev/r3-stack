@@ -99,3 +99,17 @@ def test_onshape_search_requires_public_versions():
     models = ingest_onshape('Pi', API())
     assert len(models) == 1
     assert models[0].sources[0].vid == 'v1'
+
+
+def test_direct_official_resource_is_ingestable_without_scraping():
+    models = ingest_page('pololu', 'https://www.pololu.com/file/0J1733/d36v50fx-step-down-voltage-regulator.step', name='Regulator', pin=False)
+    assert len(models) == 1 and models[0].sources[0].format == 'step'
+
+
+def test_add_rejects_login_html_before_pinning(tmp_path, monkeypatch):
+    monkeypatch.setenv('R3_MODEL_CACHE', str(tmp_path / 'cache'))
+    def login(_url, target):
+        target.write_text('<html>Please sign in</html>')
+        return target
+    with pytest.raises(ValueError, match='not a STEP'):
+        acquire(Source(kind='vendor_step', url='https://vendor.test/m.step'), pin=True, downloader=login)

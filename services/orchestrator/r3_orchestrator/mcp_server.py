@@ -30,6 +30,7 @@ from .cli import configure_headless
 
 INSTRUCTIONS = """R3 robot project tools. robot.yaml is the single source of truth.
 New robot: r3_guide (read it first), r3_create_project(template="blank"), then grow the spec component by component.
+Purchased CAD: r3_models_search first; on a miss find a public model and r3_models_add it with provenance.
 Parts: r3_list_catalog / r3_get_catalog_component; your own printed parts with r3_put_catalog_component.
 Loop: r3_get_spec -> r3_patch_spec (pass the sha256 you read; on spec_conflict re-read and re-apply)
 -> r3_validate -> r3_get_diagnostics / r3_diagnose -> fix -> repeat. Parts declared by requirements
@@ -266,6 +267,31 @@ def create_github_repo(name: str, directory: str, private: bool = True, confirm:
     from r3_github import scaffold
 
     return scaffold.create_remote(name, Path(directory).expanduser().resolve(), private=private)
+
+
+@_tool(_READ)
+def r3_models_search(query: str = "", category: str | None = None, manufacturer: str | None = None,
+                     specs: dict[str, list[float | None]] | None = None, limit: int = 30) -> dict[str, Any]:
+    """Search the bank FIRST for bought parts; spec ranges use SI. On a miss, find a public model and add it."""
+    from r3_catalog.modelbank import service
+    return service.guard(lambda: service.search(query, category, manufacturer, specs, limit))
+
+
+@_tool(_SEARCH)
+def r3_models_add(name: str, category: str, mpn: str = "", manufacturer: str = "", url: str = "", onshape: str = "",
+                  model_id: str = "", license: str = "unspecified; verify redistribution terms", format: str = "step",
+                  member: str = "", catalog_component: str | None = None) -> dict[str, Any]:
+    """Download/convert a public model, pin its checksum and add a human-editable provenance record.
+    Onshape sources need a public immutable /v/ URL. Unknown geometry remains unverified."""
+    from r3_catalog.modelbank import service
+    return service.guard(lambda: service.add(name, category, mpn, manufacturer, url, onshape, model_id, license, format, member, catalog_component))
+
+
+@_tool(_SEARCH)
+def r3_models_fetch(model_id: str) -> dict[str, Any]:
+    """Fetch a checksum-pinned bank model and convert to GLB/STL for viewing and simulation."""
+    from r3_catalog.modelbank import service
+    return service.guard(lambda: service.fetch_model(model_id))
 
 
 def main() -> None:
