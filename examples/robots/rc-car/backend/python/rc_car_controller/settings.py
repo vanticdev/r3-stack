@@ -44,6 +44,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "wheel_radius_m": 0.055,
     "encoder_pulses_per_rev": 4,
     "arm_channel": 5,
+    "crsf_channels": {"steering": 1, "throttle": 2, "arm": 5},
     # Firmware-level defaults (not in robot.yaml).
     "steering_channel": 1,
     "throttle_channel": 2,

@@ -22,7 +22,9 @@ def test_electrical_stage_on_rc_car():
     document = json.loads((build / "operating_points.json").read_text())
     assert len(document["operating_points"]) == 15
     codes = {d.code for d in result.diagnostics}
-    assert "wire_length_estimated" in codes  # no routes.json in the example
+    routed = (RC_CAR / "build" / "wiring" / "routes.json").exists()
+    # Without a wiring-stage run the lengths are estimates; with one they come from routes.json.
+    assert ("wire_length_estimated" in codes) == (not routed)
     for d in result.diagnostics:
         assert all(isinstance(v, (int, float, dict)) or v is None for v in d.data.values()), d
     # cruise at 4 m/s must be cheap, stall must be a burst far above it
