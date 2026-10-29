@@ -38,7 +38,7 @@ def test_catalog_hat_matches_the_board(project):
     assert hat.pins["ESC_GND"].role == "ground" and hat.pins["ESC_BEC"].role == "power_in"
     assert hat.connectors["J_GPIO"].pins["13"] == "HEARTBEAT"
     link = next(link for link in hat.internal_links if link.a == "PI_ESC_PWM")
-    assert link.kind == "failsafe_arbiter" and link.value == pytest.approx(0.1)
+    assert link.kind == "failsafe_arbiter" and link.value == pytest.approx(0.06)
     params = hat.behavior.params
     assert params["tvs"]["part"] == "SMAJ10A" and params["servo_regulator"]["model"] == "regulator.buck_boost"
 
@@ -90,7 +90,7 @@ def test_model_stage_understands_the_arbiter_and_failsafe_chain(project):
     assert not errors, [d.message for d in errors]
     chain = next(d for d in result.diagnostics if d.code == "failsafe_chain")
     timeouts = list(chain.data.values())
-    assert timeouts == sorted(timeouts) and timeouts[0] == pytest.approx(0.12) and timeouts[-1] == pytest.approx(1.0)
+    assert timeouts == sorted(timeouts) and timeouts[0] == pytest.approx(0.08) and timeouts[-1] == pytest.approx(1.0)
 
 
 def test_failsafe_chain_flags_a_receiver_that_holds(project):
@@ -134,9 +134,9 @@ def _run(device: ArbiterDevice, t0: float, t1: float, pulse: float, beat: bool, 
 
 def test_arbiter_params_from_catalog(project):
     params = arbiter_params(project.catalog.component("r3-carrier-hat").behavior.params["failsafe"])
-    assert params == ArbiterParams(part="ATtiny412", timeout=0.1, neutral_us=1500.0, frame=0.02, rearm_edges=3,
+    assert params == ArbiterParams(part="ATtiny412", timeout=0.06, neutral_us=1500.0, frame=0.02, rearm_edges=3,
                                    rearm_band_us=50.0, brake_us=1000.0, brake_hold=3.0, deadband_us=15.0,
-                                   esc_reverse_delay=0.1)
+                                   esc_reverse_delay=0.1, brake_pattern_us=(1460.0, 1484.0))
 
 
 def test_arbiter_boots_neutral_and_rearms_only_at_neutral():
@@ -205,7 +205,7 @@ def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(rc_car_fresh):
         esc.set_pulse_us(1700.0)
         hal.clock.sleep_until(0.5)                         # no heartbeat for 200 ms
         # After forward driving the arbiter brakes first (brake_us), then holds neutral.
-        assert device.failsafe and kernel.esc_pulse == pytest.approx(device.params.brake_us)
+        assert device.failsafe and kernel.esc_pulse in device.params.brake_pattern_us
     finally:
         hal.close()
         thread.join(5.0)
@@ -290,7 +290,7 @@ def test_electrical_stage_tvs_check(project):
     system = ElectricalSystem(project, routes={})
     result = StageResult(stage="electrical")
     report = check_tvs(system, result)["hat"]
-    assert report["expected_surge_current"] == pytest.approx(20.0) and report["clamp_at_expected_surge"] < report["abs_max"]
+    assert report["expected_surge_current"] == pytest.approx(10.0) and report["clamp_at_expected_surge"] < report["abs_max"]
     assert not [d for d in result.diagnostics if d.code == "tvs_clamp_exceeds_abs_max"]
     system.models["hat"].params.values["tvs"] = {"part": "SMAJ16A", "v_breakdown_max": 19.7, "v_clamp": 26.0, "i_pp": 15.4}
     result = StageResult(stage="electrical")

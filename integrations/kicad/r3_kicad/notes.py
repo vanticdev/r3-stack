@@ -12,9 +12,10 @@ from .spice import TVS_PARTS, tvs_clamp
 
 
 def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckBoostDesign, power: dict[str, Any],
-                 erc: dict[str, Any], drc: dict[str, Any], pour_report: list[dict[str, Any]] | None = None) -> str:
+                 erc: dict[str, Any], drc: dict[str, Any], pour_report: list[dict[str, Any]] | None = None,
+                 arbiter: ArbiterParams | None = None) -> str:
     dt = float(intent.rules.get("delta_t_power", 20.0))
-    arb = ArbiterParams()
+    arb = arbiter or ArbiterParams()
     hold = hold_up_time(pi.values["c_out_effective"], pi.values["v_out_nominal"], 4.63, 6.5)
     lines = [
         f"# {intent.title}: design notes",
@@ -96,9 +97,9 @@ def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckBoostDesign, po
         "- INA226 at 0x40 (A0 = A1 = GND) across a 2 mOhm Vishay WSK2512 Kelvin shunt, 10 Ohm + 100 nF filter "
         "(SBOS547 sec. 8.4.1), sense traces from the shunt's Kelvin pads. VBUS measures VIN_HAT. Full scale 81.92 mV / "
         "2 mOhm = 41 A, LSB 1.25 mA. **Limitation:** the INA226 sees only the HAT branch (Pi, servo, logic). The ESC/motor "
-        "current splits off in the XT60 Y-harness before the HAT and is not measured.",
-        "- MPU-6050 at 0x68 (AD0 = GND), CLKIN/FSYNC low, REGOUT 100 nF, CPOUT 2.2 nF / 50 V, VDD/VLOGIC 100 nF / 10 nF.",
-        "- I2C pull-ups 4.7 kOhm to 3V3 (parallel with the Pi's 1.8 kOhm: 1.3 kOhm, 2.6 mA sink).",
+        "current splits off in the battery Y-harness before the HAT and is not measured.",
+        "- Owned GY-521 MPU-6050 board at 0x68 (AD0 = GND), through the keyed J_IMU header; no duplicate IMU on the HAT.",
+        "- No HAT I2C pull-ups: use the Pi and owned GY-521 board pull-ups (see assembly verification note below).",
         "- 220 Ohm series resistors on the ESC (after the isolator, ESC side) and servo PWM lines; 10 kOhm encoder pull-up.",
         "- ESC signal isolation: U6 ISO6720F re-drives the arbiter output on the ESC's side, referenced to the ESC's own "
         "ground (J_ESC.3 = ESC_GND, a separate net from HAT GND) and powered from the ESC's BEC (J_ESC.2) through U7 "
@@ -112,7 +113,7 @@ def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckBoostDesign, po
         f"{arb.heartbeat_pin} (GPIO27) every control cycle.",
         f"- PASS: U4 mirrors every PWM edge (pin-change interrupt, ~{arb.latency_us:g} us latency, estimated).",
         f"- Timeout: no heartbeat edge for {arb.timeout * 1000:.0f} ms -> FAILSAFE, red LED D4 on: if the ESC is "
-        f"brake-armed (it was driving forward or braking) U4 sends {arb.brake_us:.0f} us full-brake pulses for "
+        f"brake-armed (it was driving forward or braking) U4 sends {list(arb.brake_pattern_us) or [arb.brake_us]} us brake pulses for "
         f"{arb.brake_hold:g} s, then {arb.neutral_us:.0f} us neutral, every {arb.frame * 1000:.0f} ms. A hobby ESC coasts at "
         "neutral; the brake is QuicRun 1060 forward/brake/reverse logic (reverse stick after forward = brake), which U4 "
         "mirrors from the pulses it passes so it never sends a pulse the ESC could take as reverse. Worst-case latency "

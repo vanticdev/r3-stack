@@ -27,7 +27,7 @@ from typing import Any
 from r3_model.diagnostics import Diagnostic, StageResult
 
 from . import ipc2152, pours
-from .arbiter import ArbiterParams
+from .arbiter import arbiter_params
 from .board_json import catalog_check, connector_geometry, connectors_map, nets_map, power_summary, traces
 from .board_read import read_board
 from .cli import KicadCli, report_counts, report_items
@@ -177,11 +177,11 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
     tvs_part = next((p.value for p in intent.parts if p.lib_id.startswith("Diode:SMAJ")), "SMAJ10A")
     spice.write_text(power_subcircuit(pi, servo, tvs=tvs_part))
     files["spice"] = _rel(project, spice)
-    notes = design_notes(intent, pi, servo, power, erc, drc, pour_report)
+    arbiter = arbiter_params(ctype.behavior.params.get("failsafe") if ctype and ctype.behavior else None)
+    notes = design_notes(intent, pi, servo, power, erc, drc, pour_report, arbiter)
     (out / "design-notes.md").write_text(notes)
     (source / "design-notes.md").write_text(notes)
     files["design_notes"] = _rel(project, source / "design-notes.md")
-    arbiter = ArbiterParams()
     board_json = {
         "board": name,
         "component": board.component,
@@ -207,7 +207,8 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
         "arbiter": {"part": arbiter.part, "timeout": arbiter.timeout, "neutral_us": arbiter.neutral_us,
                     "frame": arbiter.frame, "rearm_edges": arbiter.rearm_edges, "rearm_band_us": arbiter.rearm_band_us,
                     "heartbeat_pin": arbiter.heartbeat_pin, "input_pin": arbiter.input_pin, "output": "J_ESC.1",
-                    "supply": arbiter.supply},
+                    "supply": arbiter.supply, "brake_us": arbiter.brake_us, "brake_hold": arbiter.brake_hold,
+                    "brake_pattern_us": list(arbiter.brake_pattern_us)},
         "erc": erc,
         "drc": drc,
         "files": files,

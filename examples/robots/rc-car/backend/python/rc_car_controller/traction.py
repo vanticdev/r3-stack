@@ -84,12 +84,10 @@ class TractionConfig:
     brake_target_slip: float = 0.12           # braking slip ratio (v_g - v_w) / v_g held by the modulation
     brake_apply_gain_per_s: float = 60.0      # d ln(b)/dt per unit slip error while the wheel grips (ramp up)
     brake_release_gain_per_s: float = 150.0   # d ln(b)/dt per unit slip error while it locks (fast release)
-    brake_min_fraction: float = 0.02          # brake fraction floor: never back to neutral (that arms reverse)
-    brake_initial_fraction: float = 0.02      # the brake ramps up from the floor (a step locks the wheels in 50 ms)
-    # Below this ground speed the brake is applied fully: the shorted motor's torque scales with the back-EMF, so
-    # at cruise speed (4 m/s) full brake stops the car straight (twin pi_hang/range_failsafe); the rear wheels lock
-    # and the car yaws only from higher speeds.
-    brake_full_below_mps: float = 5.0
+    brake_min_fraction: float = 0.001          # brake fraction floor: never back to neutral (that arms reverse)
+    brake_initial_fraction: float = 0.002      # the brake ramps up from the floor (a step locks the wheels in 50 ms)
+    # Full brake only at walking pace; at higher speeds even a 2% shorting duty can lock the rear axle.
+    brake_full_below_mps: float = 0.5
     free_rolling_current_a: float = 2.5       # below this estimated motor current the wheel rolls freely
     steer_lag_s: float = 0.08                 # servo first-order lag for the yaw reference (estimate)
     yaw_error_throttle_cut_rps: float = 0.6   # yaw error beyond which forward force is cut back
@@ -484,9 +482,12 @@ class TractionControl:
         self.yaw.reset()
 
     def update_speed(self, dt: float, accel_x: float | None, wheel_speed_signed: float, throttle: float,
-                     stationary: bool, gps_speed: float | None = None) -> float:
+                     stationary: bool, gps_speed: float | None = None, braking: bool = False) -> float:
         self.ground.predict(dt, accel_x)
-        if gps_speed is not None:
+        # GNSS velocity describes an earlier navigation epoch. Injecting that delayed speed during a
+        # hard stop invents braking slip (the wheel can be rolling while the filter is >1 m/s too fast).
+        # For the bounded failsafe brake interval, propagate calibrated IMU acceleration instead.
+        if gps_speed is not None and not braking:
             self.ground.update_gps(gps_speed)
         self.ground.stationary = stationary
         if stationary:
@@ -508,10 +509,10 @@ class TractionControl:
         return self.throttle_ceiling
 
     def brake_command(self, dt: float, wheel_speed: float, yaw_rate: float) -> TractionOutput:
-        """Failsafe brake: anti-lock brake fraction as an ESC throttle (< 0) and yaw-hold steering."""
+        """Failsafe brake: wheel-slip modulation and centred steering."""
         v_g = max(0.0, self.ground.speed)
         fraction = self.brake.update(dt, v_g, wheel_speed)
-        steer_rad = self.yaw.update(dt, 0.0, v_g, yaw_rate) if self.config.yaw_assist_enabled else 0.0
+        steer_rad = 0.0  # Hold the steering centred while ABS preserves rear lateral grip.
         self.motor_current = 0.0
         return TractionOutput(-self.motor.throttle_for_duty(fraction), steer_rad)
 

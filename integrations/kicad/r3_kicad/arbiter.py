@@ -14,7 +14,9 @@ the control rate. U4 behaviour (firmware contract; the twin models this class):
   pulses every 20 ms (50 Hz); the status LED (D4) is lit. A hobby ESC coasts at
   neutral (a 4 m/s car rolls > 5 m), so U4 first *brakes*: when the switch to
   FAILSAFE happens while the ESC is in its brake-armed state, U4 sends
-  ``brake_us`` (full reverse stick) for ``brake_hold``, then ``neutral_us``.
+  the optional frame-by-frame ``brake_pattern_us`` (otherwise ``brake_us``)
+  for ``brake_hold``, then ``neutral_us``. Every pattern pulse stays on the
+  brake side of the neutral deadband, so modulation cannot arm reverse.
   Hobbywing QuicRun 1060 forward/brake/reverse logic (manual, "Fwd/Rev/Brk"
   mode): a reverse pulse after forward is the brake, and it stays the brake
   until the stick returns to neutral; reverse needs neutral first and then a
@@ -38,6 +40,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
+
+from r3_model.units import to_si
 
 
 class ArbiterState(str, Enum):
@@ -59,8 +64,31 @@ class ArbiterParams:
     input_pin: str = "J_GPIO.12"      # GPIO18 (PWM0 channel 2)
     brake_us: float = 1000.0          # full reverse stick: the ESC's full brake (QuicRun brake force 100 %)
     brake_hold: float = 3.0           # s of brake pulses before neutral (0: neutral at once, the original contract)
+    brake_pattern_us: tuple[float, ...] = ()  # optional fixed frame-by-frame brake modulation; never neutral
     deadband_us: float = 15.0         # ESC neutral deadband (QuicRun 1060: 3 % of the 500 us half range)
     esc_reverse_delay: float = 0.1    # s at neutral after a brake before the ESC accepts reverse (catalog)
+
+
+def arbiter_params(failsafe: dict[str, Any] | None, timeout: float | None = None) -> ArbiterParams:
+    """:class:`ArbiterParams` from a board's ``behavior.params.failsafe`` block (catalog units)."""
+    failsafe = failsafe or {}
+    defaults = ArbiterParams()
+    values: dict[str, Any] = {}
+    for key in ("timeout", "frame", "brake_hold", "esc_reverse_delay"):
+        if failsafe.get(key) is not None:
+            values[key] = float(to_si(failsafe[key]))
+    for key in ("neutral_us", "rearm_band_us", "brake_us", "deadband_us"):
+        if failsafe.get(key) is not None:
+            values[key] = float(failsafe[key])
+    if failsafe.get("brake_pattern_us") is not None:
+        values["brake_pattern_us"] = tuple(float(v) for v in failsafe["brake_pattern_us"])
+    if failsafe.get("rearm_edges") is not None:
+        values["rearm_edges"] = int(failsafe["rearm_edges"])
+    if failsafe.get("part"):
+        values["part"] = str(failsafe["part"])
+    if timeout and "timeout" not in values:
+        values["timeout"] = float(timeout)
+    return ArbiterParams(**{**defaults.__dict__, **values})
 
 
 class EscDrive(str, Enum):
@@ -87,6 +115,10 @@ class FailsafeArbiter:
     last_active: EscDrive = EscDrive.NEUTRAL  # last non-neutral ESC state
     neutral_since: float = float("-inf")
     brake_until: float = float("-inf")         # FAILSAFE frames before this time carry ``brake_us``
+
+    def __post_init__(self) -> None:
+        if any(pulse >= self.params.neutral_us - self.params.deadband_us for pulse in self.params.brake_pattern_us):
+            raise ValueError("every modulated brake pulse must stay outside neutral to avoid arming reverse")
 
     def heartbeat_edge(self, t: float) -> None:
         if self.last_edge is not None and t - self.last_edge <= self.params.timeout:
@@ -138,6 +170,10 @@ class FailsafeArbiter:
                 self.brake_until = float("-inf")
         if self.state is ArbiterState.FAILSAFE:
             out = p.brake_us if t < self.brake_until else p.neutral_us
+            if t < self.brake_until and p.brake_pattern_us:
+                elapsed = t - (self.brake_until - p.brake_hold)
+                frame = int((elapsed + 1e-9) / p.frame)
+                out = p.brake_pattern_us[frame % len(p.brake_pattern_us)]
         else:
             out = input_us
         self._track(t, out)

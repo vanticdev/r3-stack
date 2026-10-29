@@ -274,8 +274,9 @@ def test_brake_slip_controller_releases_a_locking_wheel_and_never_reaches_neutra
     for _ in range(50):                                     # wheel locking (slip 0.75): the brake backs off
         brake.update(dt, 8.0, 2.0)
     assert brake.fraction == pytest.approx(cfg.brake_min_fraction)  # floored, never neutral (would arm reverse)
-    assert brake.update(dt, 0.5, 0.0) == 1.0                # slow: full brake
-    assert brake.update(dt, 4.0, 3.9) == 1.0                # cruise speed: full brake (no lock-up)
+    assert brake.update(dt, 0.4, 0.0) == 1.0                # slow: full brake
+    brake.reset()
+    assert brake.update(dt, 4.0, 0.0) < 0.01             # still release a locked axle at cruise speed
 
 
 def test_brake_command_stays_on_the_brake_side_of_the_esc_deadband() -> None:
@@ -285,3 +286,16 @@ def test_brake_command_stays_on_the_brake_side_of_the_esc_deadband() -> None:
     traction.ground.v = 6.0
     out = traction.brake_command(0.01, 1.0, 0.0)            # heavy slip: minimum brake
     assert out.throttle < -TractionConfig().esc_deadband
+
+
+def test_failsafe_prediction_does_not_fuse_delayed_gnss_speed():
+    from traction import TractionControl
+    traction = TractionControl(TractionConfig(), WHEEL_RADIUS, WHEELBASE, MAX_STEER)
+    traction.ground.v = 8.0
+    traction.ground.since_gps = 0.0  # fresh velocity fix immediately before braking
+    for _ in range(50):
+        traction.update_speed(.01, -4.0, 6.0, -.04, False, gps_speed=8.0, braking=True)
+    assert traction.ground.speed == pytest.approx(6.0)
+    # Steering stays centred even with a nonzero measured yaw rate and an accumulated yaw correction.
+    traction.yaw.update(.01, .2, 6.0, .5)
+    assert traction.brake_command(.01, 5.9, .5).steer_rad == 0.0

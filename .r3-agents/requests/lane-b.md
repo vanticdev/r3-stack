@@ -82,3 +82,23 @@ rerouting/supporting leads from the relocated edge. Parts newly needing an
 Onshape rebuild from this lane: HAT, GY-521 board proxy, IMU pedestal, deck
 (new IMU bonding interface), 5 A fuse; battery XT90H connector geometry also
 changes. No live Onshape API was used.
+
+
+### Straight-stop control (finish-b2)
+
+The Pi now holds steering centred during the failsafe brake, starts at 0.2%
+shorting duty, releases down to 0.1%, and only applies full brake below
+0.5 m/s. Encoder/IMU slip control no longer injects delayed GNSS velocity
+during the bounded stop. Software radio timeout is 90 ms. The independent
+ATtiny heartbeat timeout is 60 ms (six edges at 100 Hz), plus a 20 ms frame;
+it alternates 1460/1484 us for 3 s, then neutral. Both pulses remain outside
+the ESC's neutral band, so modulation does not arm reverse. Its servo remains
+on the Pi's PWM path; the tested Pi-hang mission was driving straight.
+
+With real Pi firmware and the copied integration wiring, the final control
+settings pass: full_throttle 8.519 m/s; top_speed_failsafe 8.340 m from
+8.512 m/s, maximum unwrapped yaw 0.077 deg; pi_hang 2.820 m from 3.995 m/s,
+yaw 0.049 deg, heartbeat-to-arbiter latency 70 ms. The 9 m / 3 m stop limits
+and 8 m/s minimum speed are unchanged. Both failsafe scenarios now enforce
+a 30 deg maximum yaw through the end of the run. Hardware brake pulse
+strength is a twin-tested setting, still requiring ESC bench calibration.

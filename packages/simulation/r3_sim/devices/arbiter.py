@@ -8,7 +8,7 @@ co-simulation needs around it:
   (a write that changes the level is one edge, as on the physical pin);
 * the arbiter decides once per output frame (``frame`` = 20 ms, aligned to the
   PWM period starting at t = 0): in PASS the ESC sees the Pi's pulse, in
-  FAILSAFE the arbiter's own pulses: ``brake_us`` for ``brake_hold`` when the
+  FAILSAFE the arbiter's own pulses: ``brake_pattern_us`` (or ``brake_us``) for ``brake_hold`` when the
   ESC is brake-armed (after forward driving), then ``neutral_us``;
 * it runs from the computer's 3V3: unpowered, its output is held low by the
   pull-down (no pulses, the ESC's own signal-loss failsafe applies) and it boots
@@ -20,28 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from r3_kicad.arbiter import ArbiterParams, ArbiterState, FailsafeArbiter
-from r3_model.units import to_si
-
-
-def arbiter_params(failsafe: dict[str, Any] | None, timeout: float | None = None) -> ArbiterParams:
-    """:class:`ArbiterParams` from a board's ``behavior.params.failsafe`` block (catalog units)."""
-    failsafe = failsafe or {}
-    defaults = ArbiterParams()
-    values: dict[str, Any] = {}
-    for key in ("timeout", "frame", "brake_hold", "esc_reverse_delay"):
-        if failsafe.get(key) is not None:
-            values[key] = float(to_si(failsafe[key]))
-    for key in ("neutral_us", "rearm_band_us", "brake_us", "deadband_us"):
-        if failsafe.get(key) is not None:
-            values[key] = float(failsafe[key])
-    if failsafe.get("rearm_edges") is not None:
-        values["rearm_edges"] = int(failsafe["rearm_edges"])
-    if failsafe.get("part"):
-        values["part"] = str(failsafe["part"])
-    if timeout and "timeout" not in values:
-        values["timeout"] = float(timeout)
-    return ArbiterParams(**{**defaults.__dict__, **values})
+from r3_kicad.arbiter import ArbiterParams, ArbiterState, FailsafeArbiter, arbiter_params
 
 
 @dataclass(eq=False)  # identity semantics: one device may sit behind several bindings
@@ -96,6 +75,8 @@ class ArbiterDevice:
                     braking = self.model.braking(frame_t)
                     event["brake_until"] = self.model.brake_until if braking else None
                     event["brake_us"] = self.params.brake_us if braking else None
+                    event["brake_pattern_us"] = list(self.params.brake_pattern_us) if braking else []
+                    event["frame"] = self.params.frame
                 self.events.append(event)
             elif was_braking and self.failsafe and not self.model.braking(frame_t):
                 self.events.append({"t": frame_t, "event": "arbiter_brake_end", "board": self.board})

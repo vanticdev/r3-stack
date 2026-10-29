@@ -13,7 +13,7 @@ Everything ran headless (no KiCad window, as on a server); the flow is `python -
 
 ## Board
 
-- 65 x 56.5 mm, R3 corners, 1.6 mm FR-4, 2 layers, 1 oz copper. Rules for a standard 2-layer fab (JLCPCB/PCBWay): min track/clearance 0.15/0.13 mm, via 0.5/0.3 mm, copper-edge 0.3 mm.
+- 65 x 70 mm, R3 corners, 1.6 mm FR-4, 2 layers, 1 oz copper. Rules for a standard 2-layer fab (JLCPCB/PCBWay): min track/clearance 0.15/0.13 mm, via 0.5/0.3 mm, copper-edge 0.3 mm.
 - 2x20 socket on the bottom side at the HAT position; GND pours on both layers; power rails as wide hand-routed tracks (the 5 V path to the Pi pins doubled on the bottom layer) and pours at the regulator pins and the FET -> shunt gap.
 
 ## Copper sizing (IPC-2152)
@@ -29,28 +29,28 @@ External-conductor fit (Brooks, PCD&F 2015): dT = 215.3 I^2 W^-1.15 Th^-1 (mil, 
 
 | Net | Design current | Pour area (mm^2) | Vias (capacity) | Narrowest hand-routed track |
 | --- | --- | --- | --- | --- |
-| 5V | 5 A | - | 4 (7.41 A) | 0.50 mm (1.97 A) |
+| 5V | 5 A | - | 3 (5.56 A) | 0.50 mm (1.97 A) |
 | CS_6V | 4.55 A | F.Cu 25.16 | 2 (3.17 A) | 0.30 mm (1.47 A) |
-| GND | 5 A | F.Cu 1896.39, B.Cu 2672.74 | 101 (160.12 A) | - |
-| SERVO_6V | 3 A | F.Cu 44.96 | 2 (3.71 A) | 0.30 mm (1.47 A) |
+| GND | 5 A | F.Cu 2750.74, B.Cu 3529.67 | 138 (218.78 A) | - |
+| SERVO_6V | 3 A | F.Cu 43.05 | 2 (3.71 A) | 0.30 mm (1.47 A) |
 | SW1_6V | 4.55 A | F.Cu 36.62 | 0 (0 A) | 0.30 mm (1.47 A) |
-| SW2_6V | 4.55 A | F.Cu 32.44 | 0 (0 A) | 2.70 mm (5.18 A) |
-| SW_5V | 5 A | F.Cu 14.42 | 2 (3.17 A) | 0.50 mm (1.97 A) |
+| SW2_6V | 4.55 A | F.Cu 32.36 | 0 (0 A) | 1.00 mm (2.93 A) |
+| SW_5V | 5 A | F.Cu 14.2 | 2 (3.17 A) | 0.50 mm (1.97 A) |
 | VBAT | 5 A | - | 0 (0 A) | 2.59 mm (5.06 A) |
-| VBAT_PROT | 5 A | F.Cu 14.88 | 0 (0 A) | 1.00 mm (2.93 A) |
-| VIN_HAT | 5 A | F.Cu 44.77 | 2 (3.17 A) | 0.30 mm (1.47 A) |
+| VBAT_PROT | 5 A | F.Cu 14.88 | 2 (3.71 A) | 1.00 mm (2.93 A) |
+| VIN_HAT | 5 A | F.Cu 46.01 | 2 (3.17 A) | 0.30 mm (1.47 A) |
 
 Power pours (KiCad-filled copper on F.Cu where the current enters fine-pitch pins or crosses between large pads); narrowest filled cross-section between the terminals, measured by `r3_kicad.pours`:
 
 | Pour | Terminals | Current | Narrowest cross-section | IPC-2152 rating |
 | --- | --- | --- | --- | --- |
-| SW_5V pour | L1.1 -> U2.19+U2.20 | 5 A | 2.74 mm | 5.22 A |
-| VIN_HAT pour | bus -> U2.2+U2.3+U2.4+U2.5 | 4.42 A | 2.86 mm | 5.36 A |
+| SW_5V pour | L1.1 -> U2.19+U2.20 | 5 A | 2.50 mm | 4.96 A |
+| VIN_HAT pour | bus -> U2.2+U2.3+U2.4+U2.5 | 4.42 A | 3.74 mm | 6.25 A |
 | VIN_HAT pour | C17.2+C18.2 -> Q2.5 | 4.28 A | 3.74 mm | 6.25 A |
 | SW1_6V pour | L2.2 -> Q3.5 -> Q2.1+Q2.2+Q2.3 | 4.55 A | 3.94 mm | 6.44 A |
 | CS_6V pour | R21.2 -> Q3.1+Q3.2+Q3.3 -> Q4.1+Q4.2+Q4.3 | 4.55 A | 2.70 mm | 5.18 A |
 | SW2_6V pour | L2.1 -> Q4.5 -> Q5.1+Q5.2+Q5.3 | 4.55 A | 2.26 mm | 4.68 A |
-| SERVO_6V pour | C20.2+C21.2+C22.2+C35.2 -> Q5.5 | 3 A | 4.18 mm | 6.66 A |
+| SERVO_6V pour | C20.2+C21.2+C22.2+C35.2 -> Q5.5 | 3 A | 3.94 mm | 6.44 A |
 | VBAT_PROT pour | R2.1 -> Q1.1+Q1.2+Q1.3 | 5 A | 2.90 mm | 5.40 A |
 
 The Pi's 5 V pins (2, 4) sit on the header's edge row, behind pins 1/3: the 5 V path reaches them around pin 1 (between it and the H1 hole) as a parallel pair, 1.4 mm on top and 0.8 mm on the bottom (the current splits by width). Fine-pitch pins are reached by pours, not fixed-width necks.
@@ -134,9 +134,9 @@ Design checks:
 
 - Reverse polarity: DMP3013SFV P-MOSFET (-30 V, 9.5 mOhm at -10 V) in the + lead, gate pulled to GND by 100 k, BZT52B12 clamps VGS (VGS max +-25 V).
 - TVS: SMAJ10A (VRWM 10 V, VBR 11.1-12.3 V, VC 17 V at 23.5 A). A 2S pack is 8.4 V full, below the 10 V stand-off. Clamp 16.3 V at the expected 20 A surge (>= 2 x the HAT branch's fuse; V_C(I) = V_BR,max + (V_C - V_BR,max) I / I_PP) and 17 V at I_PP, below the regulators' 22 V VIN absolute maximum (TPS568230 22 V; LM5175 60 V, CSD17577Q3A 30 V). The previous SMAJ16A clamped at 26.0 V at its 15.4 A I_PP, above 20 V. A 3S pack (12.6 V) would need a different TVS.
-- INA226 at 0x40 (A0 = A1 = GND) across a 2 mOhm Vishay WSK2512 Kelvin shunt, 10 Ohm + 100 nF filter (SBOS547 sec. 8.4.1), sense traces from the shunt's Kelvin pads. VBUS measures VIN_HAT. Full scale 81.92 mV / 2 mOhm = 41 A, LSB 1.25 mA. **Limitation:** the INA226 sees only the HAT branch (Pi, servo, logic). The ESC/motor current splits off in the XT60 Y-harness before the HAT and is not measured.
-- MPU-6050 at 0x68 (AD0 = GND), CLKIN/FSYNC low, REGOUT 100 nF, CPOUT 2.2 nF / 50 V, VDD/VLOGIC 100 nF / 10 nF.
-- I2C pull-ups 4.7 kOhm to 3V3 (parallel with the Pi's 1.8 kOhm: 1.3 kOhm, 2.6 mA sink).
+- INA226 at 0x40 (A0 = A1 = GND) across a 2 mOhm Vishay WSK2512 Kelvin shunt, 10 Ohm + 100 nF filter (SBOS547 sec. 8.4.1), sense traces from the shunt's Kelvin pads. VBUS measures VIN_HAT. Full scale 81.92 mV / 2 mOhm = 41 A, LSB 1.25 mA. **Limitation:** the INA226 sees only the HAT branch (Pi, servo, logic). The ESC/motor current splits off in the battery Y-harness before the HAT and is not measured.
+- Owned GY-521 MPU-6050 board at 0x68 (AD0 = GND), through the keyed J_IMU header; no duplicate IMU on the HAT.
+- No HAT I2C pull-ups: use the Pi and owned GY-521 board pull-ups (see assembly verification note below).
 - 220 Ohm series resistors on the ESC (after the isolator, ESC side) and servo PWM lines; 10 kOhm encoder pull-up.
 - ESC signal isolation: U6 ISO6720F re-drives the arbiter output on the ESC's side, referenced to the ESC's own ground (J_ESC.3 = ESC_GND, a separate net from HAT GND) and powered from the ESC's BEC (J_ESC.2) through U7 AP7381-33 (40 V input LDO). The 22 AWG ESC signal lead's ground therefore carries only U6/U7's few mA instead of paralleling the power harness's motor return. Default-low outputs: with the Pi unpowered the ESC sees no pulses; R26 holds ESC_PWM low while U6's ESC side is unpowered. The servo is powered only by U3.
 
@@ -144,7 +144,7 @@ Design checks:
 
 - The Pi's ESC PWM (J_GPIO.12, GPIO18) reaches the ESC only through U4. The Pi toggles a heartbeat on J_GPIO.13 (GPIO27) every control cycle.
 - PASS: U4 mirrors every PWM edge (pin-change interrupt, ~1.5 us latency, estimated).
-- Timeout: no heartbeat edge for 100 ms -> FAILSAFE, red LED D4 on: if the ESC is brake-armed (it was driving forward or braking) U4 sends 1000 us full-brake pulses for 3 s, then 1500 us neutral, every 20 ms. A hobby ESC coasts at neutral; the brake is QuicRun 1060 forward/brake/reverse logic (reverse stick after forward = brake), which U4 mirrors from the pulses it passes so it never sends a pulse the ESC could take as reverse. Worst-case latency from the last edge to the first failsafe frame is 120 ms.
+- Timeout: no heartbeat edge for 60 ms -> FAILSAFE, red LED D4 on: if the ESC is brake-armed (it was driving forward or braking) U4 sends [1460.0, 1484.0] us brake pulses for 3 s, then 1500 us neutral, every 20 ms. A hobby ESC coasts at neutral; the brake is QuicRun 1060 forward/brake/reverse logic (reverse stick after forward = brake), which U4 mirrors from the pulses it passes so it never sends a pulse the ESC could take as reverse. Worst-case latency from the last edge to the first failsafe frame is 80 ms.
 - Re-arm: 3 heartbeat edges within the timeout and a commanded pulse within +-50 us of neutral. U4 boots in FAILSAFE.
 - U4 runs from the Pi's 3V3; if the Pi is unpowered, U6's outputs default low (R15 also holds its input low) and the ESC's own signal-loss failsafe applies. UPDI header J8 programs U4. Behaviour model: `r3_kicad.arbiter.FailsafeArbiter`.
 
@@ -160,6 +160,9 @@ U2 drives the Pi's 5 V pins directly. Do not connect the Pi's USB-C supply at th
 
 ## Notes
 
+- 65 x 70 mm custom PCB: 13.5 mm south extension, original GPIO datum and all four HAT mounting holes unchanged.
+- Owned GY-521 at J_IMU (J9): 3.3 V, GND, SDA, SCL; AD0 low, address 0x68. No HAT pull-ups: Pi 1.8k || typical GY-521 4.7k = 1.30k, sink current 2.23 mA at VOL=0.4 V, below the 3 mA I2C limit. Verify the owned board pull-ups before assembly. PESD3V3U1UL clamps on both external I2C signals.
+- Camera connects directly to Pi CAM0 by 22-pin FPC, never through this HAT. CAM top z=90.8 mm; HAT underside z=100.6 mm: 9.8 mm free height, or 6.8 mm allowing 3 mm trimmed THT tails. Route the 0.3 mm FPC up 1 mm, bend toward -y at radius 3 mm, then under the extension at z=94.8 mm and beyond y=-43 mm. Cable top z=94.95 leaves 2.65 mm below the lowest allowed solder tail. Plug and latch FPC before fitting HAT.
 - IPC-2152 external fit, 1 oz, 20 C rise: 5 A -> 2.59 mm, 3 A -> 1.09 mm; signals 0.2 mm.
 - INA226 measures only the HAT branch (Pi + servo + HAT logic). The ESC/motor branch splits off in the XT60 Y-harness before the HAT, so motor current is not visible to the Pi.
 - J_ESC is galvanically isolated (U6 ISO6720F): pin 3 is the ESC's own ground, not HAT GND, so no motor return current can flow in the ESC signal lead; pin 2 (the ESC's 6 V BEC) powers only U6's ESC side through U7. The servo is powered by U3, never by the ESC BEC.

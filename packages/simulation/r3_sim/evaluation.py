@@ -235,6 +235,16 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
                                 f"{fault['type']} at t={fault['t']:.2f}s; stopped at t={t[k1]:.2f}s, {t[k1] - fault['t']:.2f}s later",
                                 {"speed_at_fault": float(speed[min(k0, len(speed) - 1)]), "stop_t": float(t[k1]),
                                  "fault_t": float(fault["t"])}))
+        elif key == "max_failsafe_yaw_deg":
+            trigger = context.get("fault") or context.get("link_lost")
+            if trigger is None:
+                checks.append(Check(key, expected, None, False, "no fault or link loss to exercise yaw stability"))
+                continue
+            k0 = min(int(np.searchsorted(t, trigger["t"])), len(t) - 1)
+            yaw = np.unwrap(rec["yaw"])
+            value = float(np.degrees(np.max(np.abs(yaw[k0:] - yaw[k0]))))
+            checks.append(Check(key, expected, round(value, 3), value < float(expected),
+                                "maximum unwrapped heading deviation from fault through the end of the run"))
         elif key == "arbiter_neutral_within_s":
             fault = context.get("fault")
             events = [e for e in context.get("events", []) if e.get("event") == "arbiter_failsafe"
@@ -253,9 +263,18 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
             target = np.full(len(t), neutral)
             if brake_until is not None and brake_us is not None:
                 target[t < float(brake_until) - 0.02] = float(brake_us)
+                pattern = event.get("brake_pattern_us") or []
+                if pattern:
+                    # Recordings timestamp the completed physics step. At an exact frame boundary the
+                    # recorded input is still the preceding frame's pulse (zero-order hold).
+                    frames = np.floor((t - event["t"] - 1e-7) / event["frame"]).astype(int)
+                    active = (t >= event["t"]) & (t < float(brake_until) - 0.02)
+                    target[active] = np.asarray(pattern)[frames[active] % len(pattern)]
             settled = after & ~((brake_until is not None) & (np.abs(t - float(brake_until or 0.0)) < 0.021))
             held = bool(np.all(np.abs(rec["esc_pulse"][settled] - target[settled]) < 1.0)) if settled.any() else False
-            phase = (f"brake {brake_us:.0f} us until t={float(brake_until):.2f}s, then neutral" if brake_until is not None
+            brake_description = (f"pattern {event['brake_pattern_us']} us" if event.get("brake_pattern_us")
+                                 else f"{brake_us:.0f} us" if brake_us is not None else "inactive")
+            phase = (f"brake {brake_description} until t={float(brake_until):.2f}s, then neutral" if brake_until is not None
                      else "neutral")
             checks.append(Check(key, expected, round(latency, 4), latency <= float(expected) and held,
                                 f"last heartbeat edge t={edge}, failsafe from t={event['t']:.3f}s ({phase}); ESC held at the "
