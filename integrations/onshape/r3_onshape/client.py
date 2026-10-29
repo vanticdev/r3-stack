@@ -1,6 +1,6 @@
 """Onshape REST transports.
 
-Two transports expose the same ``request`` method, so sync logic is
+Three transports expose the same ``request`` method, so sync logic is
 transport-independent:
 
 * :class:`ApiKeyTransport`: official API keys (``ONSHAPE_ACCESS_KEY`` /
@@ -8,12 +8,15 @@ transport-independent:
   Requests are HMAC-SHA256 signed by default (Onshape's "request signature"
   scheme). Basic auth, which Onshape documents as "for local testing only", is
   available with ``ONSHAPE_API_AUTH=basic``.
+* :class:`r3_onshape.session.SessionTransport`: a headless logged-in web session
+  (cookies + XSRF token), for a personal account without API keys.
 * :class:`NativeBridgeTransport`: the local ``onshape-native`` companion
   (browser-session auth). It proxies official ``/api/v17`` paths. It needs a
   logged-in browser, so it is a local-development convenience only.
 
 ``R3_ONSHAPE_TRANSPORT`` selects one explicitly: ``api-keys``, ``native``,
-``none`` or ``auto`` (the default: the bridge when connected, else API keys).
+``session``, ``none`` or ``auto`` (the default: API keys when configured, else a
+valid headless session, else the bridge when connected).
 """
 
 from __future__ import annotations
@@ -225,7 +228,7 @@ class ApiKeyTransport(_HttpTransport):
                 "Authorization": sign_request(method, url, nonce, date, content_type, self._access, self._secret)}
 
 
-TRANSPORT_CHOICES = ("auto", "api-keys", "native", "none")
+TRANSPORT_CHOICES = ("auto", "api-keys", "session", "native", "none")
 
 
 def _native_if_connected() -> NativeBridgeTransport | None:
@@ -237,8 +240,9 @@ def _native_if_connected() -> NativeBridgeTransport | None:
 
 
 def default_transport() -> Transport | None:
-    """The transport selected by ``R3_ONSHAPE_TRANSPORT`` (default ``auto``: the
-    native bridge if connected, else API keys from the environment, else None)."""
+    """The transport selected by ``R3_ONSHAPE_TRANSPORT``. ``auto`` prefers the
+    official API keys (the supported server path), then a valid headless
+    session, then the local browser bridge."""
     choice = (os.environ.get("R3_ONSHAPE_TRANSPORT") or "auto").lower()
     if choice not in TRANSPORT_CHOICES:
         raise ValueError(f"R3_ONSHAPE_TRANSPORT must be one of {', '.join(TRANSPORT_CHOICES)}, not {choice!r}")
@@ -246,10 +250,20 @@ def default_transport() -> Transport | None:
         return None
     if choice == "api-keys":
         return ApiKeyTransport.from_env()
+    if choice in ("auto", "session"):
+        if choice == "auto":
+            keys = ApiKeyTransport.from_env()
+            if keys is not None:
+                return keys
+        from .session import SessionTransport
+
+        session = SessionTransport(os.environ.get("ONSHAPE_BASE", "https://cad.onshape.com"))
+        if session.healthy() or choice == "session":
+            return session
     native = _native_if_connected()
     if native is not None or choice == "native":
         return native
-    return ApiKeyTransport.from_env()
+    return None
 
 
 def describe_transport() -> dict[str, Any]:

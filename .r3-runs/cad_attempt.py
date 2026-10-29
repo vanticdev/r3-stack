@@ -1,18 +1,24 @@
-import json, sys, time
+"""Run the cad stage on the RC car (headless Onshape session) and print diagnostics.
+
+    python .r3-runs/cad_attempt.py [--force]
+"""
+import json
+import os
+import sys
+from collections import Counter
+from pathlib import Path
+
 from r3_model.project import Project
-from r3_model.diagnostics import StageResult
-from r3_onshape.client import NativeBridgeTransport
-from r3_onshape.sync import sync, write_cad_model
-label = sys.argv[1]
-project = Project.load("examples/robots/rc-car")
-api = NativeBridgeTransport()
-result = StageResult(stage="cad")
-t0 = time.time()
-report = sync(project, api, result, attempt_label=label)
-result.duration_s = time.time() - t0
-if result.ok:
-    write_cad_model(project, report, api.name)
-print("doc", report.document and report.document.url(), "status", report.feature_status)
-for e in report.feature_errors: print("FEATURE_ERR", e[:800])
-for d in result.diagnostics: print(d.severity.value, d.code, d.message, json.dumps(d.data)[:1500])
-result.write(project.build_dir("cad") / f"attempt_{label}.json")
+from r3_onshape.stage import run
+
+if "--force" in sys.argv:
+    os.environ["R3_CAD_FORCE"] = "1"
+project = Project.load(Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car")
+result = run(project)
+result.write(project.build_dir("cad") / "stage_result.json")
+print(json.dumps(result.metrics, indent=1, default=str))
+print(Counter((d.severity.value, d.code) for d in result.diagnostics))
+for d in result.diagnostics:
+    if d.severity.value != "info":
+        print(d.severity.value, d.code, d.message[:300])
+print("OK" if result.ok else "FAILED")

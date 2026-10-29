@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from .schema import Catalog, ComponentType, ConnectorType, WireGauge
+from .schema import Catalog, ComponentType, ConnectorType, FastenerType, WireGauge
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -25,6 +25,11 @@ def load_catalog(*extra_dirs: Path) -> Catalog:
             for entry in yaml.safe_load(wires.read_text())["wires"]:
                 gauge = WireGauge.model_validate(entry)
                 catalog.wires[gauge.awg] = gauge
+        fasteners = root / "fasteners.yaml"
+        if fasteners.exists():
+            for entry in yaml.safe_load(fasteners.read_text())["fasteners"]:
+                fastener = FastenerType.model_validate(entry)
+                catalog.fasteners[fastener.id] = fastener
         connectors = root / "connectors.yaml"
         if connectors.exists():
             for entry in yaml.safe_load(connectors.read_text())["connectors"]:
@@ -44,4 +49,4 @@ def default_catalog() -> Catalog:
     return load_catalog()
 
 
-__all__ = ["Catalog", "ComponentType", "ConnectorType", "WireGauge", "default_catalog", "load_catalog"]
+__all__ = ["Catalog", "ComponentType", "ConnectorType", "FastenerType", "WireGauge", "default_catalog", "load_catalog"]

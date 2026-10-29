@@ -1,11 +1,14 @@
-"""`cad` stage: build the robot in Onshape from robot.yaml and import its data.
+"""`cad` stage: build the robot in Onshape from robot.yaml and import verified data.
 
 Behavior:
 * If ``build/cad/cad_model.json`` exists and was produced by the current
-  generator digest, it is reused (offline CI, no Onshape access needed).
-* Otherwise, when an Onshape transport is available (onshape-native bridge or
-  API keys), a fresh document is built from scratch, verified, and pinned in
-  ``r3.lock.yaml``. Failed attempts are deleted. ``R3_CAD_FORCE=1`` forces a rebuild.
+  generator digest (plans + spec + catalog + generator/validator versions),
+  it is reused (offline CI, no Onshape access needed).
+* Otherwise, with an Onshape transport (headless session, onshape-native
+  bridge or API keys), a fresh document is built from scratch with standard
+  features, verified (fasteners, interfaces, joints, transmissions, retention,
+  motion, assembly mates) and pinned in ``r3.lock.yaml``. Failed attempts are
+  deleted; the superseded document is trashed. ``R3_CAD_FORCE=1`` rebuilds.
 * Without a transport, downstream stages fall back to catalog geometry and a
   ``cad_geometry_estimated`` warning is emitted.
 * Screenshots come from Onshape's REST shaded-view endpoints
@@ -27,8 +30,7 @@ from .sync import sync, write_cad_model
 
 
 def _direct_builder():
-    """The direct-CAD builder (standard Onshape features only). Returns
-    (builder, digest_fn) or None while it is not installed."""
+    """The direct-CAD builder (standard Onshape features only)."""
     try:
         from .direct import build_robot, input_digest
     except ImportError:
@@ -39,16 +41,16 @@ def _direct_builder():
 def run(project: Project) -> StageResult:
     result = StageResult(stage="cad", inputs=project.fingerprint())
     started = time.time()
-    result.assume("mechanical", "Purchased parts are modeled as envelopes; their material density is set so CAD mass equals the catalog mass.")
-    result.assume("mechanical", "Fabricated structure (plates, standoffs, arms, axles) mass is computed by Onshape from geometry x material density.")
-    result.assume("mechanical", "Interference/contact is evaluated on exact B-rep in the modeled (straight-ahead) pose only; joint sweeps are checked by the wiring stage.")
+    result.assume("mechanical", "Purchased parts are catalog envelopes plus their datasheet features; their mass is a labeled catalog "
+                                "mass override (inertia scaled from the envelope geometry).")
+    result.assume("mechanical", "Fabricated parts (plates, brackets, knuckles, axles, horn, tie rods, straps, tape) get mass from "
+                                "geometry x material density; fasteners are full-geometry steel/brass parts (hex sockets not modeled).")
     if project.spec.cad.provider == "none":
         result.add(Diagnostic.info("cad_disabled", "cad.provider is none"))
         return result
     direct = _direct_builder()
     if direct is None:
-        result.add(Diagnostic.error("cad_builder_unavailable", "direct-CAD builder (r3_onshape.direct) is not installed",
-                                    hint="FeatureScript generation was removed by policy; CAD is built with standard Onshape features."))
+        result.add(Diagnostic.error("cad_builder_unavailable", "direct-CAD builder (r3_onshape.direct) is not installed"))
         return result
     builder, input_digest = direct
     digest = input_digest(project)
@@ -64,23 +66,29 @@ def run(project: Project) -> StageResult:
         return result
     api = default_transport()
     if api is None:
-        result.add(Diagnostic.warning("cad_geometry_estimated", "no Onshape transport (onshape-native bridge or API keys); downstream stages use catalog geometry",
-                                      hint="Start the onshape-native companion or set ONSHAPE_ACCESS_KEY/ONSHAPE_SECRET_KEY."))
+        result.add(Diagnostic.warning("cad_geometry_estimated", "no Onshape transport (headless session, onshape-native bridge or API keys); "
+                                      "downstream stages use catalog geometry",
+                                      hint="Run `python -m r3_onshape.session login` once, or start the onshape-native companion."))
         return result
     previous = (project.lock.get("cad", {}) or {})
     attempt = previous.get("attempt", 0) + 1
     report = sync(project, api, result, builder, attempt_label=f"attempt-{attempt}")
     if result.ok and report.document:
-        path = write_cad_model(project, report, api.name)
-        result.artifact(path.relative_to(project.build_dir()), "json", "Per-part mass properties, bounding boxes, meshes, contacts")
-        for name in sorted(report.parts):
-            result.artifact(f"cad/meshes/{name}.stl", "stl")
+        path = write_cad_model(project, report, api.name, digest)
+        model = json.loads(path.read_text())
+        result.artifact(path.relative_to(project.build_dir()), "json", "Per-part mass properties, meshes, fit report, steering table, RF")
+        for name, part in sorted(report.parts.items()):
+            result.artifact(f"cad/{part['mesh']}", "stl")
+        for image in report.images:
+            result.artifact(f"cad/{image}", "plot_png", "Onshape shaded view (headless)")
         project.write_lock("cad", {"provider": "onshape", "document_id": report.document.did, "workspace_id": report.document.wid,
-                                   "element_id": report.document.part_studio, "url": report.document.url(),
-                                   "generator_digest": digest, "attempt": attempt, "revision": digest})
+                                   "element_id": report.document.part_studio, "assembly_id": report.assembly.get("element_id"),
+                                   "url": report.document.url(), "microversion": report.microversion, "generator_digest": digest,
+                                   "validator_version": model["source"]["validator_version"], "mesh_digest": model["source"]["mesh_digest"],
+                                   "attempt": attempt, "revision": report.microversion or digest})
         _views(project, api, {"document_id": report.document.did, "workspace_id": report.document.wid,
                               "element_id": report.document.part_studio}, result)
-        _summarize(project, json.loads(path.read_text()), result)
+        _summarize(project, model, result)
         old = previous.get("document_id")
         if old and old != report.document.did:
             # Keep exactly one live document per robot: the superseded build is trashed.
@@ -118,7 +126,13 @@ def _views(project: Project, api: Transport | None, source: dict, result: StageR
 def _summarize(project: Project, model: dict, result: StageResult) -> None:
     parts = model.get("parts", {})
     total = sum(p["mass"] for p in parts.values())
-    result.metrics.update({"parts": len(parts), "total_mass_kg": round(total, 4), "onshape_document": model["source"].get("url")})
+    fit = model.get("fit", {})
+    steering = (model.get("kinematics") or {}).get("steering") or {}
+    result.metrics.update({"parts": len(parts), "total_mass_kg": round(total, 4), "onshape_document": model["source"].get("url"),
+                           "verified_fasteners": len(fit.get("verified_fasteners", [])),
+                           "verified_interfaces": len(fit.get("verified_interfaces", [])),
+                           "ackermann_pct_full_lock": steering.get("ackermann_pct_full_lock"),
+                           "assembly_mates": len((model.get("assembly") or {}).get("mates", []))})
     limit = project.spec.requirements.max_mass
     if limit and total > limit:
         result.add(Diagnostic.error("mass_budget_exceeded", f"CAD mass {total:.3f} kg exceeds {limit:.3f} kg",

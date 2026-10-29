@@ -70,6 +70,9 @@ class Joint(_Model):
     limits: Vector | None = Field(default=None, description="[lower, upper] rad or m.")
     damping: Quantity = 0.0
     friction: Quantity = 0.0
+    interface: str | None = Field(default=None, description="Mechanical interface id that physically realizes this joint. "
+                                                            "Required for revolute/continuous/prismatic joints once the spec "
+                                                            "declares mechanical.interfaces.")
 
 
 class Transmission(_Model):
@@ -82,11 +85,72 @@ class Transmission(_Model):
     ratio: float = 1.0
     efficiency: float = 1.0
     params: dict[str, Any] = Field(default_factory=dict)
+    path: list[str] = Field(default_factory=list, description="Ordered interface (or fastener) ids from the actuator to the driven "
+                                                              "joints. Each link after the first shares a part with an earlier one.")
+
+
+class Fastener(_Model):
+    """One purchased fastener (screw, ball stud, stacking standoff, or a nut on a
+    male thread) placed in the robot frame.
+
+    ``position`` is the head seat point (underside of the head, or the bearing
+    face of a nut) and ``axis`` the insertion direction (head toward tip).
+    ``clamps`` lists the clamped parts in stack order, head side first;
+    ``thread_into`` is the part with the tapped hole (or, for a nut type, the
+    part carrying the male thread). ``nut`` names a catalog nut that ends a
+    through-bolt; it becomes the part ``nut:<id>``. ``preloaded: false`` marks a
+    pivot screw (e.g. a kingpin) that is threadlocked without clamping, so its
+    head must clear the parts it retains.
+    """
+
+    id: str
+    type: str = Field(description="Catalog fastener id (fasteners.yaml).")
+    length: Quantity | None = Field(default=None, description="Nominal length (screws, studs); a catalog standard length.")
+    position: Vector
+    axis: Vector = Field(default_factory=lambda: [0.0, 0.0, -1.0])
+    clamps: list[str] = Field(default_factory=list, description="Clamped parts in stack order, head side first.")
+    thread_into: str | None = Field(default=None, description="Part with the tapped hole (or male thread for nuts).")
+    nut: str | None = Field(default=None, description="Catalog nut id when the fastener ends in a nut.")
+    grip: Quantity | None = Field(default=None, description="Clamp length from the head seat to the nut seat (through bolts).")
+    preloaded: bool = True
+
+    @property
+    def part(self) -> str:
+        return f"fastener:{self.id}"
+
+    @property
+    def nut_part(self) -> str | None:
+        return f"nut:{self.id}" if self.nut else None
+
+
+InterfaceKind = Literal["revolute_fit", "press_fit", "drive_flat", "ball_joint", "spline", "adhesive", "strap",
+                        "magnetic_target", "connector_retention"]
+
+
+class Interface(_Model):
+    """A physical mechanical interface between two parts, verified on exact CAD geometry.
+
+    ``parts`` is ``[a, b]``; for shaft/bore kinds ``a`` carries the shaft (or
+    ball, magnet, male pins) and ``b`` the bore (socket, sensor, female socket).
+    ``axis_point``/``axis_dir`` locate the interface axis in the robot frame.
+    ``params`` holds the kind-specific limits in SI units, e.g. ``clearance``
+    ``[min, max]`` radial, ``min_engagement``, ``retainers`` (part ids),
+    ``flat_offset``, ``min_fraction`` or ``gap``.
+    """
+
+    id: str
+    kind: InterfaceKind
+    parts: list[str] = Field(min_length=2, max_length=2)
+    axis_point: Vector | None = None
+    axis_dir: Vector | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
 
 
 class Mechanical(_Model):
     joints: list[Joint] = Field(default_factory=list)
     transmissions: list[Transmission] = Field(default_factory=list)
+    fasteners: list[Fastener] = Field(default_factory=list)
+    interfaces: list[Interface] = Field(default_factory=list)
 
 
 class HarnessConnector(_Model):
@@ -295,10 +359,12 @@ class RobotSpec(_Model):
         for cid, comp in self.components.items():
             if comp.mount != "world" and comp.mount not in ids:
                 raise ValueError(f"component {cid!r} mounts on unknown component {comp.mount!r}")
+        self._check_mount_graph()
         for joint in self.mechanical.joints:
             for end in (joint.parent, joint.child):
                 if end != "world" and end not in ids:
                     raise ValueError(f"joint {joint.id!r} references unknown component {end!r}")
+        self._check_mechanical(ids)
         harness_ids = [h.id for h in self.electrical.harnesses]
         if len(harness_ids) != len(set(harness_ids)):
             raise ValueError("harness ids must be unique")
@@ -325,3 +391,114 @@ class RobotSpec(_Model):
             if module.runs_on not in ids:
                 raise ValueError(f"software module {module.name!r} runs on unknown component {module.runs_on!r}")
         return self
+
+    def _check_mount_graph(self) -> None:
+        """Mount parents must form a forest rooted at ``world`` (no cycles)."""
+        for start in self.components:
+            seen: list[str] = []
+            node = start
+            while node != "world":
+                if node in seen:
+                    raise ValueError(f"component mount cycle: {' -> '.join(seen + [node])}")
+                seen.append(node)
+                node = self.components[node].mount
+
+    def part_ids(self) -> set[str]:
+        """Every CAD part name the mechanical section may reference."""
+        parts = set(self.components)
+        for fastener in self.mechanical.fasteners:
+            parts.add(fastener.part)
+            if fastener.nut_part:
+                parts.add(fastener.nut_part)
+        return parts
+
+    def _check_mechanical(self, ids: set[str]) -> None:
+        mech = self.mechanical
+        for label, values in (("joint", [j.id for j in mech.joints]), ("transmission", [t.id for t in mech.transmissions]),
+                              ("fastener", [f.id for f in mech.fasteners]), ("interface", [i.id for i in mech.interfaces])):
+            duplicates = sorted({v for v in values if values.count(v) > 1})
+            if duplicates:
+                raise ValueError(f"{label} ids must be unique: {duplicates}")
+        shared = sorted({f.id for f in mech.fasteners} & {i.id for i in mech.interfaces})
+        if shared:
+            raise ValueError(f"fastener and interface ids must differ (transmission paths reference both): {shared}")
+        parts = self.part_ids()
+        collisions = sorted(ids & {p for p in parts if ":" in p})
+        if collisions:
+            raise ValueError(f"part names collide with component ids: {collisions}")
+        for fastener in mech.fasteners:
+            refs = [*fastener.clamps, *([fastener.thread_into] if fastener.thread_into else [])]
+            for ref in refs:
+                if ref not in parts:
+                    raise ValueError(f"fastener {fastener.id!r} references unknown part {ref!r}")
+            if fastener.part in refs:
+                raise ValueError(f"fastener {fastener.id!r} references itself")
+            if len(set(refs)) != len(refs):
+                raise ValueError(f"fastener {fastener.id!r} lists a part twice")
+            if not refs:
+                raise ValueError(f"fastener {fastener.id!r} neither clamps nor threads into anything")
+            if fastener.thread_into is None and fastener.nut is None:
+                raise ValueError(f"fastener {fastener.id!r} needs thread_into or a nut")
+            if fastener.thread_into is not None and fastener.nut is not None:
+                raise ValueError(f"fastener {fastener.id!r} cannot both thread into a part and end in a nut")
+            if fastener.nut is not None and fastener.grip is None:
+                raise ValueError(f"fastener {fastener.id!r} ends in a nut and needs its grip length")
+            if sum(c * c for c in fastener.axis) < 1e-12:
+                raise ValueError(f"fastener {fastener.id!r} has a zero axis")
+        interfaces = {i.id: i for i in mech.interfaces}
+        for interface in mech.interfaces:
+            for ref in interface.parts:
+                if ref not in parts:
+                    raise ValueError(f"interface {interface.id!r} references unknown part {ref!r}")
+            if interface.parts[0] == interface.parts[1]:
+                raise ValueError(f"interface {interface.id!r} joins a part to itself")
+            axial = interface.kind in ("revolute_fit", "press_fit", "drive_flat", "spline", "ball_joint",
+                                       "magnetic_target", "connector_retention")
+            if axial and (interface.axis_point is None or interface.axis_dir is None):
+                raise ValueError(f"interface {interface.id!r} ({interface.kind}) needs axis_point and axis_dir")
+            for key in ("retainers", "through"):
+                for ref in interface.params.get(key, []) or []:
+                    if ref not in parts:
+                        raise ValueError(f"interface {interface.id!r} {key} references unknown part {ref!r}")
+        joint_ids = {j.id for j in mech.joints}
+        for joint in mech.joints:
+            moving = joint.type in ("revolute", "continuous", "prismatic")
+            if moving and mech.interfaces and joint.interface is None:
+                raise ValueError(f"joint {joint.id!r} ({joint.type}) must reference the interface that realizes it")
+            if joint.interface is not None:
+                interface = interfaces.get(joint.interface)
+                if interface is None:
+                    raise ValueError(f"joint {joint.id!r} references unknown interface {joint.interface!r}")
+                if joint.type in ("revolute", "continuous") and interface.kind != "revolute_fit":
+                    raise ValueError(f"joint {joint.id!r} is {joint.type} but interface {interface.id!r} is {interface.kind}")
+        for transmission in mech.transmissions:
+            if transmission.actuator not in ids:
+                raise ValueError(f"transmission {transmission.id!r} actuator {transmission.actuator!r} is not a component")
+            for jid in transmission.joints:
+                if jid not in joint_ids:
+                    raise ValueError(f"transmission {transmission.id!r} references unknown joint {jid!r}")
+            reached: set[str] = set()
+            for index, link in enumerate(transmission.path):
+                members = self.link_parts(link)
+                if members is None:
+                    raise ValueError(f"transmission {transmission.id!r} path references unknown interface or fastener {link!r}")
+                if index == 0 and transmission.actuator not in members:
+                    raise ValueError(f"transmission {transmission.id!r} path must start at actuator {transmission.actuator!r}")
+                if index > 0 and not reached.intersection(members):
+                    raise ValueError(f"transmission {transmission.id!r} path breaks at {link!r}: shares no part with earlier links")
+                reached.update(members)
+
+    def link_parts(self, link: str) -> list[str] | None:
+        """Parts joined by an interface or fastener id (None if unknown)."""
+        for interface in self.mechanical.interfaces:
+            if interface.id == link:
+                return list(interface.parts)
+        for fastener in self.mechanical.fasteners:
+            if fastener.id == link:
+                members = [fastener.part, *fastener.clamps]
+                if fastener.thread_into:
+                    members.append(fastener.thread_into)
+                if fastener.nut_part:
+                    members.append(fastener.nut_part)
+                return members
+        return None

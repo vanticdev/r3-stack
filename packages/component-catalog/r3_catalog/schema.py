@@ -55,6 +55,73 @@ class ConnectorInstance(_Model):
     pins: dict[str, str] = Field(description="connector pin number -> component pin name.")
 
 
+FeatureKind = Literal["bore", "d_bore", "shaft", "d_shaft", "tapped_hole", "clearance_hole", "spline", "face", "slot",
+                      "sphere", "socket", "pocket"]
+
+
+class Feature(_Model):
+    """A datasheet mechanical interface of a part, in the component frame.
+
+    Material-removing kinds (bore, d_bore, tapped_hole, clearance_hole, slot,
+    socket, pocket) are cut into the envelope starting at ``position`` and going
+    along ``axis`` (into the material) for ``depth``. Material-adding kinds
+    (shaft, d_shaft, spline, sphere) grow from ``position`` along ``axis`` for
+    ``depth``. D-shapes keep a flat at ``flat_offset`` from the axis whose
+    outward normal is ``flat_normal``. ``thread`` is the catalog fastener whose
+    thread a tapped hole accepts (the hole is cut at its tap-drill diameter; depth 0 = threaded through).
+    Slots are obround, ``length`` center-to-center along ``slot_dir``. Pockets
+    are boxes of ``size`` [along slot_dir, across, depth]. ``face`` only names a
+    seating face for verification (``position`` on it, ``axis`` its outward normal).
+    """
+
+    id: str
+    kind: FeatureKind
+    position: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
+    axis: Vector = Field(default_factory=lambda: [0.0, 0.0, -1.0])
+    diameter: Quantity = 0.0
+    depth: Quantity = 0.0
+    flat_offset: Quantity | None = None
+    flat_normal: Vector | None = None
+    thread: str | None = None
+    length: Quantity = 0.0
+    slot_dir: Vector | None = None
+    size: Vector | None = None
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="datasheet"))
+
+
+SolidKind = Literal["box", "cylinder", "prism", "revolve", "sphere"]
+
+
+class Solid(_Model):
+    """One primitive of a part's envelope or fabricated geometry, component frame.
+
+    * ``box``: ``position`` is the center, ``size`` the full extents.
+    * ``cylinder``: base center ``position``, grows along ``axis`` for ``length``.
+    * ``prism``: 2D ``profile`` polygon (plane coordinates u, v) on the plane
+      through ``position`` normal to ``axis``, extruded ``depth`` along ``axis``.
+      ``u_axis`` gives the in-plane u direction (v = axis x u). A profile string
+      ``"@name"`` reads the polygon from the instance ``params[name]``.
+    * ``revolve``: profile ``[[r, t], ...]`` (radius, distance along ``axis`` from
+      ``position``) revolved 360 degrees about the axis.
+    * ``sphere``: center ``position``, ``diameter``.
+
+    ``op: remove`` subtracts the primitive (pockets, cavities).
+    """
+
+    kind: SolidKind
+    op: Literal["add", "remove"] = "add"
+    name: str = ""
+    position: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
+    axis: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0])
+    u_axis: Vector | None = None
+    size: Vector | None = None
+    diameter: Quantity = 0.0
+    length: Quantity = 0.0
+    depth: Quantity = 0.0
+    profile: list[Vector] | str | None = None
+    inner: list[list[Vector]] = Field(default_factory=list, description="prism: inner loops (holes) in plane coordinates.")
+
+
 class Mechanical(_Model):
     shape: Literal["box", "cylinder", "custom"] = "box"
     size: Vector = Field(description="box: [x, y, z]; cylinder: [diameter, length] along local axis.")
@@ -66,6 +133,10 @@ class Mechanical(_Model):
     mount_holes: list[Vector] = Field(default_factory=list)
     keepout_margin: Quantity = 0.002
     moving: bool = Field(default=False, description="Part rotates or sweeps volume (wheels, gears).")
+    fabricated: bool = Field(default=False, description="Made for this robot: mass from geometry x density, holes and bores "
+                                                        "derived from the fasteners and interfaces that use it.")
+    solids: list[Solid] = Field(default_factory=list, description="Custom geometry; empty means the box/cylinder envelope.")
+    features: list[Feature] = Field(default_factory=list, description="Datasheet interfaces realized on the envelope.")
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 
@@ -188,10 +259,64 @@ class WireGauge(_Model):
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 
+FastenerKind = Literal["socket_head_screw", "button_head_screw", "ball_stud", "nut", "standoff_mf", "heat_set_insert"]
+
+
+class FastenerType(_Model):
+    """Purchased fastener dimensions (ISO metric coarse threads).
+
+    ``minor_diameter`` is the internal-thread minor diameter D1 = d - 1.0825 P
+    (ISO 724); ``tap_drill`` the drill a tapped hole is cut with (the modeled hole
+    diameter). The screw shank is modeled at the major diameter ``d``, so the
+    screw/tapped-part intersection volume is pi/4 (d^2 - tap_drill^2) x engagement.
+    Heads: ``head_diameter`` dk, ``head_height`` k. Nuts: ``across_flats`` s and
+    ``height`` m (modeled as a hexagonal prism). Ball studs: ``collar_*`` (hex
+    collar modeled as a cylinder), ``neck_*`` and ``ball_diameter``. Male-female
+    standoffs: hex ``across_flats`` x ``height`` body, male ``thread_length``,
+    female ``female_depth``. Clearance holes follow ISO 273 (close/normal/coarse).
+    """
+
+    id: str
+    kind: FastenerKind
+    name: str
+    standard: str = ""
+    thread: str = Field(description="e.g. M3")
+    d: Quantity
+    pitch: Quantity
+    minor_diameter: Quantity
+    tap_drill: Quantity
+    head_diameter: Quantity | None = None
+    head_height: Quantity | None = None
+    across_flats: Quantity | None = None
+    height: Quantity | None = None
+    collar_diameter: Quantity | None = None
+    collar_height: Quantity | None = None
+    neck_diameter: Quantity | None = None
+    neck_length: Quantity | None = None
+    ball_diameter: Quantity | None = None
+    thread_length: Quantity | None = None
+    female_depth: Quantity | None = None
+    lengths: list[Quantity] = Field(default_factory=list, description="Standard nominal lengths.")
+    clearance_close: Quantity | None = None
+    clearance_normal: Quantity | None = None
+    clearance_coarse: Quantity | None = None
+    material: str = "Steel 10.9"
+    density: Quantity = 7850.0
+    color: str = "#30343a"
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="datasheet"))
+
+
 class Catalog(_Model):
     components: dict[str, ComponentType] = Field(default_factory=dict)
     connectors: dict[str, ConnectorType] = Field(default_factory=dict)
     wires: dict[int, WireGauge] = Field(default_factory=dict)
+    fasteners: dict[str, FastenerType] = Field(default_factory=dict)
+
+    def fastener(self, type_id: str) -> FastenerType:
+        try:
+            return self.fasteners[type_id]
+        except KeyError:
+            raise KeyError(f"fastener type {type_id!r} not in catalog") from None
 
     def component(self, type_id: str) -> ComponentType:
         try:

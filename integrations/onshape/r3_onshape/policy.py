@@ -8,6 +8,7 @@ leaving R3 passes :func:`check_request`; forbidden requests raise
 
 Forbidden:
 * Feature Studio elements (create, read, update) and their feature specs.
+  (Reading the built-in feature specs of a Part Studio or Assembly is allowed.)
 * FeatureScript evaluation endpoints (``.../featurescript``).
 * Custom features: any feature with a non-empty ``namespace`` (that is how a
   Feature Studio feature is referenced) or a ``featureType`` outside the
@@ -45,7 +46,10 @@ STANDARD_FEATURE_TYPES = frozenset({
 _FORBIDDEN_PATHS = (
     re.compile(r"/featurestudios(/|$)"),
     re.compile(r"/featurescript(\?|$)"),
-    re.compile(r"/featurespecs(\?|$)"),
+    # Feature specs are only readable for the built-in Part Studio / Assembly
+    # feature sets (standard feature parameters); any other element's specs
+    # would describe custom FeatureScript features.
+    re.compile(r"^(?!.*/(?:partstudios|assemblies)/d/[^/]+/[wvm]/[^/]+/e/[^/]+/featurespecs(?:\?|$)).*/featurespecs(\?|$)"),
 )
 
 
