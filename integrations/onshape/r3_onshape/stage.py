@@ -4,11 +4,10 @@ Behavior:
 * If ``build/cad/cad_model.json`` exists and was produced by the current
   generator digest (plans + spec + catalog + generator/validator versions),
   it is reused (offline CI, no Onshape access needed).
-* Otherwise, with an Onshape transport (headless session, onshape-native
-  bridge or API keys), a fresh document is built from scratch with standard
-  features, verified (fasteners, interfaces, joints, transmissions, retention,
-  motion, assembly mates) and pinned in ``r3.lock.yaml``. Failed attempts are
-  deleted; the superseded document is trashed. ``R3_CAD_FORCE=1`` rebuilds.
+* With a transport, pinned CAD is updated incrementally with standard features,
+  verified (geometry, mass, fit, motion and mates), and pinned in ``r3.lock.yaml``.
+  ``R3_CAD_FORCE=1`` bypasses the offline cache. ``R3_CAD_FULL=1`` explicitly builds
+  a fresh robot document; only the full path can delete superseded documents.
 * Without a transport, downstream stages fall back to catalog geometry and a
   ``cad_geometry_estimated`` warning is emitted.
 * Screenshots come from Onshape's REST shaded-view endpoints
@@ -63,7 +62,8 @@ def run(project: Project) -> StageResult:
     digest = input_digest(project)
     existing = project.read_build_json("cad/cad_model.json")
     force = os.environ.get("R3_CAD_FORCE") == "1"
-    if existing and existing.get("source", {}).get("generator_digest") == digest and not force:
+    if (existing and existing.get("source", {}).get("generator_digest") == digest and not force
+            and os.environ.get("R3_CAD_FULL") != "1" and not project.lock.get("cad_incremental_pending")):
         # Revalidate matching geometry against the current input revision (the
         # digest already covers its resolved plans, sources and feature evidence).
         existing["inputs"] = project.fingerprint()
@@ -91,7 +91,6 @@ def run(project: Project) -> StageResult:
     previous = (project.lock.get("cad", {}) or {})
     attempt = previous.get("attempt", 0) + 1
     from .studio import StudioBuildError
-    from .client import OnshapeError
     try:
         report = sync_organized(project, api, result, attempt_label=os.environ.get("R3_CAD_LABEL", ""))
     except StudioBuildError as error:
@@ -114,6 +113,8 @@ def run(project: Project) -> StageResult:
     if result.ok and report.get("robot") is not None:
         path = write_model(project, report, api.name, digest)
         model = json.loads(path.read_text())
+        from .incremental import finish_incremental
+        finish_incremental(project, report)
         result.artifact(path.relative_to(project.build_dir()), "json", "Per-part mass properties, meshes, fit report, steering table, RF")
         for name, part in sorted(model["parts"].items()):
             result.artifact(f"cad/{part['mesh']}", "stl")
