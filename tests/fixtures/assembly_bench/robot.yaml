@@ -1,0 +1,67 @@
+schema: r3/robot@1
+robot:
+  name: assembly-bench
+  description: >
+    Assembly-compiler fixture: a deck on 4 standoffs, a motor on a bracket via a
+    2-hole pattern, an idler wheel on an axle stub (revolute) and a HAT on a Pi via
+    the GPIO header plus 4 standoffs. No pose is authored except the root's.
+
+components:
+  plate: {type: bench-plate, pose: {xyz: [0, 0, 0]}}
+  s_fl: {type: standoff-m3-30}
+  s_fr: {type: standoff-m3-30}
+  s_rl: {type: standoff-m3-30}
+  s_rr: {type: standoff-m3-30}
+  deck: {type: bench-deck}
+  bracket: {type: side-bracket}
+  motor: {type: motor-540-bench}
+  axle: {type: axle-stub-6}
+  wheel: {type: wheel-60x20}
+  pi_so_1: {type: standoff-m2.5-6-mf}
+  pi_so_2: {type: standoff-m2.5-6-mf}
+  pi_so_3: {type: standoff-m2.5-6-mf}
+  pi_so_4: {type: standoff-m2.5-6-mf}
+  pi: {type: pi-board-bench}
+  hat_so_1: {type: standoff-m2.5-11}
+  hat_so_2: {type: standoff-m2.5-11}
+  hat_so_3: {type: standoff-m2.5-11}
+  hat_so_4: {type: standoff-m2.5-11}
+  hat: {type: hat-bench}
+
+assembly:
+  root: plate
+  joins:
+    # Deck on 4 standoffs: s_fl carries the deck, the other three close loops.
+    - {a: plate.so_fl, b: s_fl.bottom, fasteners: {type: M3x8}}
+    - {a: plate.so_fr, b: s_fr.bottom, fasteners: {type: M3x8}}
+    - {a: plate.so_rl, b: s_rl.bottom, fasteners: {type: M3x8}}
+    - {a: plate.so_rr, b: s_rr.bottom, fasteners: {type: M3x8}}
+    - {a: s_fl.top, b: deck.h_fl, fasteners: {type: M3x8}}
+    - {a: s_fr.top, b: deck.h_fr, fasteners: {type: M3x8}}
+    - {a: s_rl.top, b: deck.h_rl, fasteners: {type: M3x8}}
+    - {a: s_rr.top, b: deck.h_rr, fasteners: {type: M3x8}}
+    # Bracket and motor on 2-hole patterns (symmetric: the clock must be explicit).
+    - {a: plate.bracket_seat, b: bracket.foot, clock: 0 deg, fasteners: {type: M3x10, count: 2}}
+    - {a: bracket.motor_face, b: motor.face, clock: 0 deg, fasteners: {type: M3x10, count: 2}}
+    # Idler wheel spinning on an axle stub.
+    - {a: plate.axle_hole, b: axle.base, fasteners: {type: M3x8}}
+    - {a: axle.shaft, b: wheel.hub, kind: revolute, joint: wheel_spin}
+    # Pi on 4 male-female standoffs.
+    - {a: deck.pi_1, b: pi_so_1.bottom, fasteners: {type: M2.5x6}}
+    - {a: deck.pi_2, b: pi_so_2.bottom, fasteners: {type: M2.5x6}}
+    - {a: deck.pi_3, b: pi_so_3.bottom, fasteners: {type: M2.5x6}}
+    - {a: deck.pi_4, b: pi_so_4.bottom, fasteners: {type: M2.5x6}}
+    - {a: pi_so_1.top, b: pi.b1}
+    - {a: pi_so_2.top, b: pi.b2}
+    - {a: pi_so_3.top, b: pi.b3}
+    - {a: pi_so_4.top, b: pi.b4}
+    # HAT on the GPIO header (clock inferred from pin 1) plus 4 standoffs.
+    - {a: pi.gpio, b: hat.socket}
+    - {a: pi.t1, b: hat_so_1.bottom}
+    - {a: pi.t2, b: hat_so_2.bottom}
+    - {a: pi.t3, b: hat_so_3.bottom}
+    - {a: pi.t4, b: hat_so_4.bottom}
+    - {a: hat_so_1.top, b: hat.h1, fasteners: {type: M2.5x5}}
+    - {a: hat_so_2.top, b: hat.h2, fasteners: {type: M2.5x5}}
+    - {a: hat_so_3.top, b: hat.h3, fasteners: {type: M2.5x5}}
+    - {a: hat_so_4.top, b: hat.h4, fasteners: {type: M2.5x5}}

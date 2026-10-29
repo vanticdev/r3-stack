@@ -1,0 +1,146 @@
+# Fixture objects for the assembly compiler tests. Each object is modeled in its
+# own frame (box: origin at the bottom-face center; z-axis cylinder: bottom
+# center; x-axis cylinder: centered) with named interfaces. Dimensions are
+# fixture values; real catalog parts get interfaces in phase B.
+components:
+  - id: bench-plate
+    kind: structure
+    name: Bench base plate 260 x 120 x 4 mm (6061)
+    mechanical: {shape: box, size: [260 mm, 120 mm, 4 mm], mass: 0.34, material: al6061}
+    interfaces:
+      so_fl: {kind: hole_pattern, origin: [60 mm, 40 mm, 4 mm], params: {holes: [[0, 0, 3.2 mm, clearance, 4 mm]]}}
+      so_fr: {kind: hole_pattern, origin: [60 mm, -40 mm, 4 mm], params: {holes: [[0, 0, 3.2 mm, clearance, 4 mm]]}}
+      so_rl: {kind: hole_pattern, origin: [-60 mm, 40 mm, 4 mm], params: {holes: [[0, 0, 3.2 mm, clearance, 4 mm]]}}
+      so_rr: {kind: hole_pattern, origin: [-60 mm, -40 mm, 4 mm], params: {holes: [[0, 0, 3.2 mm, clearance, 4 mm]]}}
+      bracket_seat:
+        kind: hole_pattern
+        origin: [75 mm, 0, 4 mm]
+        params: {holes: [[0, 15 mm, 3.2 mm, clearance, 4 mm], [0, -15 mm, 3.2 mm, clearance, 4 mm]]}
+      axle_hole: {kind: hole_pattern, origin: [-50 mm, 0, 4 mm], params: {holes: [[0, 0, 3.2 mm, clearance, 4 mm]]}}
+
+  - id: side-bracket
+    kind: structure
+    name: Upright motor bracket 6 x 50 x 50 mm (PETG, heat-set M3 inserts in the foot)
+    mechanical: {shape: box, size: [6 mm, 50 mm, 50 mm], mass: 0.018, material: petg}
+    interfaces:
+      foot:
+        kind: hole_pattern
+        z: [0, 0, -1]
+        params: {holes: [[0, 15 mm, 3 mm, tapped, 8 mm], [0, -15 mm, 3 mm, tapped, 8 mm]]}
+      motor_face:
+        kind: hole_pattern
+        origin: [3 mm, 0, 30 mm]
+        z: [1, 0, 0]
+        x: [0, 0, 1]
+        params: {holes: [[12.5 mm, 0, 3.2 mm, clearance, 6 mm], [-12.5 mm, 0, 3.2 mm, clearance, 6 mm]]}
+
+  - id: motor-540-bench
+    kind: motor
+    name: 540 can motor (envelope without shaft)
+    mechanical: {shape: cylinder, size: [36 mm, 50 mm], axis: x, mass: 0.16}
+    interfaces:
+      # 540 face: two M3 tapped holes on a 25 mm pitch, 3.175 mm shaft.
+      face:
+        kind: hole_pattern
+        origin: [25 mm, 0, 0]
+        z: [1, 0, 0]
+        x: [0, 0, 1]
+        params: {holes: [[12.5 mm, 0, 3 mm, tapped, 4 mm], [-12.5 mm, 0, 3 mm, tapped, 4 mm]]}
+      shaft:
+        kind: shaft
+        origin: [25 mm, 0, 0]
+        z: [-1, 0, 0]
+        x: [0, 0, 1]
+        params: {d: 3.175 mm, length: 12 mm}
+
+  - id: standoff-m3-30
+    kind: structure
+    name: M3 x 30 mm female-female standoff
+    mechanical: {shape: cylinder, size: [5.5 mm, 30 mm], mass: 0.003, material: al6061}
+    interfaces:
+      bottom: {kind: hole_pattern, z: [0, 0, -1], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
+      top: {kind: hole_pattern, origin: [0, 0, 30 mm], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
+
+  - id: bench-deck
+    kind: structure
+    name: Upper deck 140 x 100 x 3 mm
+    mechanical: {shape: box, size: [140 mm, 100 mm, 3 mm], mass: 0.06, material: petg}
+    interfaces:
+      h_fl: {kind: hole_pattern, origin: [60 mm, 40 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 3.2 mm, clearance, 3 mm]]}}
+      h_fr: {kind: hole_pattern, origin: [60 mm, -40 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 3.2 mm, clearance, 3 mm]]}}
+      h_rl: {kind: hole_pattern, origin: [-60 mm, 40 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 3.2 mm, clearance, 3 mm]]}}
+      h_rr: {kind: hole_pattern, origin: [-60 mm, -40 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 3.2 mm, clearance, 3 mm]]}}
+      # Raspberry Pi mounting pattern (58 x 49 mm), Pi centered at deck x = -20 mm.
+      pi_1: {kind: hole_pattern, origin: [-59 mm, 24.5 mm, 3 mm], params: {holes: [[0, 0, 2.75 mm, clearance, 3 mm]]}}
+      pi_2: {kind: hole_pattern, origin: [-59 mm, -24.5 mm, 3 mm], params: {holes: [[0, 0, 2.75 mm, clearance, 3 mm]]}}
+      pi_3: {kind: hole_pattern, origin: [-1 mm, 24.5 mm, 3 mm], params: {holes: [[0, 0, 2.75 mm, clearance, 3 mm]]}}
+      pi_4: {kind: hole_pattern, origin: [-1 mm, -24.5 mm, 3 mm], params: {holes: [[0, 0, 2.75 mm, clearance, 3 mm]]}}
+
+  - id: standoff-m2.5-6-mf
+    kind: structure
+    name: M2.5 x 6 mm male-female standoff (5 mm stud)
+    mechanical: {shape: cylinder, size: [5 mm, 6 mm], mass: 0.001, material: brass}
+    interfaces:
+      bottom: {kind: hole_pattern, z: [0, 0, -1], params: {holes: [[0, 0, 2.5 mm, tapped, 4 mm]]}}
+      top: {kind: hole_pattern, origin: [0, 0, 6 mm], params: {holes: [[0, 0, 2.5 mm, thread, 5 mm]]}}
+
+  - id: standoff-m2.5-11
+    kind: structure
+    name: M2.5 x 11 mm female-female standoff (HAT stacking height)
+    mechanical: {shape: cylinder, size: [5 mm, 11 mm], mass: 0.0015, material: brass}
+    interfaces:
+      bottom: {kind: hole_pattern, z: [0, 0, -1], params: {holes: [[0, 0, 2.5 mm, tapped, 5 mm]]}}
+      top: {kind: hole_pattern, origin: [0, 0, 11 mm], params: {holes: [[0, 0, 2.5 mm, tapped, 5 mm]]}}
+
+  - id: pi-board-bench
+    kind: computer
+    name: Raspberry Pi board envelope (85 x 56 x 1.6 mm PCB)
+    mechanical: {shape: box, size: [85 mm, 56 mm, 1.6 mm], mass: 0.046}
+    interfaces:
+      b1: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      b2: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      b3: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      b4: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      t1: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 1.6 mm], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      t2: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 1.6 mm], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      t3: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 1.6 mm], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      t4: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 1.6 mm], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      # 2x20 GPIO header; origin on the 2.5 mm plastic base (the socket seating plane).
+      # Pin 1 sits on the inner row at the end nearest the b1/t1 hole.
+      gpio:
+        kind: header
+        origin: [-10 mm, 24.5 mm, 4.1 mm]
+        params: {pitch: 2.54 mm, rows: 2, cols: 20, pin1: [-24.13 mm, -1.27 mm]}
+
+  - id: hat-bench
+    kind: pcb
+    name: HAT 65 x 56.5 x 1.6 mm with 2x20 stacking socket
+    mechanical: {shape: box, size: [65 mm, 56.5 mm, 1.6 mm], mass: 0.025}
+    interfaces:
+      h1: {kind: hole_pattern, origin: [-29 mm, 24.5 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      h2: {kind: hole_pattern, origin: [-29 mm, -24.5 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      h3: {kind: hole_pattern, origin: [29 mm, 24.5 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      h4: {kind: hole_pattern, origin: [29 mm, -24.5 mm, 0], z: [0, 0, -1], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      # Socket bottom face 8.5 mm below the HAT: 2.5 mm header base + 8.5 mm = 11 mm stack.
+      # Interface y = z x x = -y_hat, so pin 1 (above the header's pin 1) is at +1.27 mm.
+      socket:
+        kind: socket
+        origin: [0, 24.5 mm, -8.5 mm]
+        z: [0, 0, -1]
+        params: {pitch: 2.54 mm, rows: 2, cols: 20, pin1: [-24.13 mm, 1.27 mm]}
+
+  - id: axle-stub-6
+    kind: structure
+    name: 6 mm steel axle stub, M3 tapped base
+    mechanical: {shape: cylinder, size: [6 mm, 26 mm], mass: 0.006, material: steel}
+    interfaces:
+      base: {kind: hole_pattern, z: [0, 0, -1], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
+      # Shaft seat 2 mm above the base (shoulder washer), 24 mm usable length.
+      shaft: {kind: shaft, origin: [0, 0, 2 mm], params: {d: 6 mm, tol: g6, length: 24 mm}}
+
+  - id: wheel-60x20
+    kind: wheel
+    name: 60 x 20 mm idler wheel, 6 mm H7 bore
+    mechanical: {shape: cylinder, size: [60 mm, 20 mm], mass: 0.03, moving: true}
+    interfaces:
+      hub: {kind: bore, z: [0, 0, -1], params: {d: 6 mm, tol: H7, depth: 20 mm}}

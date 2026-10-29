@@ -228,6 +228,52 @@ class Simulation(_Model):
     scenarios: list[Scenario] = Field(default_factory=list)
 
 
+class Fasteners(_Model):
+    """Fasteners that close a ``fasten`` join, e.g. ``{type: "M3x10", count: 2}``.
+    ``type`` is ``M<d>x<length>`` (ISO metric, length under the head, mm)."""
+
+    type: str
+    count: int | None = Field(default=None, description="Default: every matched hole pair.")
+
+
+class Join(_Model):
+    """Two object interfaces mated like puzzle pieces (see :mod:`r3_model.assembly`).
+
+    ``b``'s interface frame is placed on ``a``'s with opposing z axes, aligned x
+    axes, then rotated by ``clock`` about ``a``'s z and moved ``offset`` along
+    ``a``'s z (a positive offset leaves a gap)."""
+
+    a: str = Field(description="<object>.<interface> on the parent side.")
+    b: str = Field(description="<object>.<interface> on the child side.")
+    kind: Literal["fasten", "revolute", "slider", "ball", "drive_flat"] = "fasten"
+    id: str | None = Field(default=None, description="Stable join id; default '<a>~<b>'.")
+    clock: Quantity | None = Field(default=None, description="Rotation about a's z (rad). Omitted: inferred when unique.")
+    offset: Quantity = 0.0
+    fasteners: Fasteners | None = None
+    joint: str | None = Field(default=None, description="mechanical.joints id realized by a moving join.")
+    limits: Vector | None = Field(default=None, description="[lower, upper] rad or m for a derived joint.")
+    fit: Literal["clearance", "transition", "interference", "any"] | None = Field(
+        default=None, description="Required shaft/bore fit; default clearance for revolute/slider, any otherwise.")
+
+    @property
+    def join_id(self) -> str:
+        return self.id or f"{self.a}~{self.b}"
+
+
+class AssemblyTolerance(_Model):
+    position: Quantity = 5e-5
+    angle: Quantity = 0.1 * 3.141592653589793 / 180.0
+
+
+class Assembly(_Model):
+    """Object/interface assembly: poses are derived from joins, never authored
+    (except the root's pose in the robot frame)."""
+
+    root: str
+    joins: list[Join] = Field(default_factory=list)
+    tolerance: AssemblyTolerance = Field(default_factory=AssemblyTolerance)
+
+
 class RobotSpec(_Model):
     schema_: str = Field(alias="schema", default=SCHEMA_ID)
     robot: RobotInfo
@@ -239,6 +285,7 @@ class RobotSpec(_Model):
     cad: Cad = Field(default_factory=Cad)
     software: Software = Field(default_factory=Software)
     simulation: Simulation = Field(default_factory=Simulation)
+    assembly: Assembly | None = None
 
     @model_validator(mode="after")
     def _check_references(self) -> "RobotSpec":
@@ -258,6 +305,19 @@ class RobotSpec(_Model):
         wire_ids = [w.id for h in self.electrical.harnesses for w in h.wires]
         if len(wire_ids) != len(set(wire_ids)):
             raise ValueError("wire ids must be unique across harnesses")
+        if self.assembly is not None:
+            if self.assembly.root not in ids:
+                raise ValueError(f"assembly root {self.assembly.root!r} is not a component")
+            join_ids = [join.join_id for join in self.assembly.joins]
+            if len(join_ids) != len(set(join_ids)):
+                raise ValueError("assembly join ids must be unique")
+            for join in self.assembly.joins:
+                for end in (join.a, join.b):
+                    obj, dot, iface = end.partition(".")
+                    if not dot or not iface:
+                        raise ValueError(f"join end {end!r} must be <object>.<interface>")
+                    if obj not in ids:
+                        raise ValueError(f"join {join.join_id!r} references unknown component {obj!r}")
         for board in self.pcb.boards:
             if board.component not in ids:
                 raise ValueError(f"board references unknown component {board.component!r}")

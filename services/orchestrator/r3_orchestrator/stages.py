@@ -34,6 +34,7 @@ class StageSpec:
 
 
 STAGES: tuple[StageSpec, ...] = (
+    StageSpec("assembly", "r3_orchestrator.assembly_stage", "Object/interface assembly: derived poses, fits, hole patterns, loop closure"),
     StageSpec("model", "r3_orchestrator.model_stage", "Spec, catalog and graph checks (bindings, pins, voltages, I2C, interference, mass)"),
     StageSpec("cad", "r3_onshape.stage", "Onshape CAD sync, mass properties and meshes"),
     StageSpec("pcb", "r3_kicad.stage", "KiCad schematic/PCB generation, ERC/DRC"),

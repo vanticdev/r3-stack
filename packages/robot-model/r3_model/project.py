@@ -38,7 +38,26 @@ class Project:
         spec = RobotSpec.model_validate(yaml.safe_load(spec_path.read_text()))
         lock_path = root / "r3.lock.yaml"
         lock = yaml.safe_load(lock_path.read_text()) if lock_path.exists() else {}
-        return cls(root=root, spec=spec, lock=lock or {})
+        project = cls(root=root, spec=spec, lock=lock or {})
+        if spec.assembly is not None:
+            project.assembly  # compile now so every stage sees derived poses
+        return project
+
+    @property
+    def assembly(self):  # -> r3_model.assembly.AssemblyResult | None
+        """Compiled object/interface assembly. Compiling fills
+        ``spec.components[*].pose`` (and ``mount`` / derived joints) with the
+        derived poses, so stages that read poses work unchanged. Specs without
+        an ``assembly`` section are left untouched and return None."""
+        if self.spec.assembly is None:
+            return None
+        if not hasattr(self, "_assembly"):
+            from .assembly import apply_to_spec, compile_assembly
+
+            result = compile_assembly(self.spec, self.catalog)
+            result.diagnostics.extend(apply_to_spec(self.spec, result))
+            self._assembly = result
+        return self._assembly
 
     # Catalog is resolved lazily so r3_model has no hard import-time dependency.
     @property

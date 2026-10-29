@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from r3_model.units import Quantity, Vector
 
@@ -102,6 +102,42 @@ class InternalLink(_Model):
     value: Quantity = Field(default=0.0, description="Resistance (ohm) or fuse rating (A).")
 
 
+InterfaceKind = Literal[
+    "face_mount", "hole_pattern", "shaft", "bore", "spline", "header", "socket",
+    "ball_stud", "ball_socket", "strap_seat", "strap_slot", "adhesive_pad", "connector_body",
+]
+
+
+class Interface(_Model):
+    """A named mating feature of a component, in the component frame.
+
+    ``z`` is the outward normal of a seat face (or the shaft/bore axis pointing
+    out of the part), ``x`` the clocking reference, ``origin`` the seat point.
+    ``params`` depend on ``kind`` (see :mod:`r3_model.assembly`), e.g.
+    ``holes: [[x, y, d, clearance|tapped|thread, depth]]`` in the interface frame."""
+
+    kind: InterfaceKind
+    origin: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
+    z: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0])
+    x: Vector = Field(default_factory=lambda: [1.0, 0.0, 0.0])
+    params: dict[str, Any] = Field(default_factory=dict)
+    description: str = ""
+
+    @model_validator(mode="after")
+    def _check_frame(self) -> "Interface":
+        for name, vector in (("origin", self.origin), ("z", self.z), ("x", self.x)):
+            if len(vector) != 3:
+                raise ValueError(f"interface {name} must have 3 components")
+        z_norm = sum(v * v for v in self.z) ** 0.5
+        x_norm = sum(v * v for v in self.x) ** 0.5
+        if z_norm < 1e-12 or x_norm < 1e-12:
+            raise ValueError("interface z and x axes must be non-zero")
+        cosine = sum(a * b for a, b in zip(self.z, self.x)) / (z_norm * x_norm)
+        if abs(cosine) > 1e-6:
+            raise ValueError(f"interface x axis must be perpendicular to z (cos = {cosine:.3g})")
+        return self
+
+
 class ComponentType(_Model):
     id: str
     kind: Literal[
@@ -115,6 +151,7 @@ class ComponentType(_Model):
     mechanical: Mechanical
     pins: dict[str, Pin] = Field(default_factory=dict)
     connectors: dict[str, ConnectorInstance] = Field(default_factory=dict)
+    interfaces: dict[str, Interface] = Field(default_factory=dict, description="Mating features for the assembly compiler.")
     internal_links: list[InternalLink] = Field(default_factory=list)
     behavior: BehaviorModel | None = None
     software: list[SoftwareInterface] = Field(default_factory=list)
