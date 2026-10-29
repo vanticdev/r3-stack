@@ -1,10 +1,13 @@
-# Simulation worker
+# Simulation worker (`r3_sim_worker`)
 
-Reserved for executing simulation jobs with pinned robot revisions and artifact
-references, managing job resources, and publishing results and diagnostics.
-Shared simulation behavior belongs in `packages/simulation/`.
+Runs digital-twin scenario jobs for a project and records the input fingerprints
+(`robot.yaml` hash, git commit, lock revisions) in every result.
 
-Documentation only. No worker, container runtime, queue, or simulator is
-implemented. This execution boundary can run locally before remote hosting.
+```
+python -m r3_sim_worker examples/robots/rc-car                       # project firmware, all scenarios
+python -m r3_sim_worker examples/robots/rc-car --scenario full_throttle \
+    --software-cmd python tests/sim_test_controller.py               # built-in test controller
+```
 
-See [repository layout](../../docs/architecture/repository-layout.md).
+The exit status is 0 only when every selected scenario passes. Shared simulation
+behavior lives in `packages/simulation/` (`r3_sim`).
