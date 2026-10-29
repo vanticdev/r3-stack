@@ -137,3 +137,27 @@ def plot_all(rec: dict[str, np.ndarray], context: dict[str, Any], out: Path) -> 
     fig.savefig(paths[-1])
     plt.close(fig)
     return paths
+
+
+def plot_overview(outcomes: list[Any], path: Path) -> Path:
+    """One row per scenario: every expectation as a pass/fail cell with the measured value."""
+    rows = [(o.scenario, c) for o in outcomes for c in o.summary["checks"]]
+    fig, ax = plt.subplots(figsize=(9, 0.42 * max(len(rows), 1) + 1.2), dpi=130)
+    ax.set_axis_off()
+    for i, (scenario, check) in enumerate(rows):
+        y = len(rows) - i
+        color = SERIES[2] if check["pass"] else SERIES[1]
+        ax.add_patch(plt.Rectangle((0.0, y - 0.4), 0.06, 0.8, color=color, transform=ax.transData))
+        ax.text(0.08, y, scenario, va="center", fontsize=8.5, color=INK, fontweight="bold")
+        ax.text(0.36, y, check["key"], va="center", fontsize=8.5, color=INK)
+        measured = check["measured"]
+        ax.text(0.70, y, f"{measured}", va="center", fontsize=8.5, color=color)
+        ax.text(0.86, y, f"limit {check['expected']}", va="center", fontsize=8.5, color=MUTED)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0.3, len(rows) + 0.9)
+    passed = sum(o.passed for o in outcomes)
+    ax.set_title(f"Digital twin scenarios: {passed}/{len(outcomes)} passed", loc="left", fontsize=11, color=INK, fontweight="bold")
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+    return path

@@ -316,11 +316,18 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         rx_req = gain - kernel.radio.propagation.two_ray_loss_db(tx, np.array([tx[0] + r, tx[1], h_rx]))
         metrics["two_ray_rssi_at_range_requirement_dbm"] = round(rx_req, 1)
         metrics["link_margin_at_range_requirement_db"] = round(rx_req - (kernel.radio.noise_dbm + kernel.radio.snr_required_db), 1)
+    metrics.update(_loss_breakdown(project, kernel, rec))
+    diagnostics.extend(_sensor_capability(project, kernel, scenario))
     passed = all(c.passed for c in checks) and not any(d.severity.value == "error" and d.code in ("software_not_connected", "software_hung")
                                                        for d in diagnostics)
 
     artifacts: list[tuple[str, str, str]] = []
-    rel = lambda p: str(Path(p).relative_to(project.root / "build"))  # noqa: E731
+    def rel(path: Path) -> str:
+        try:
+            return str(Path(path).resolve().relative_to((project.root / "build").resolve()))
+        except ValueError:
+            return str(Path(path).resolve())
+
     mjcf_path = write_mjcf(kernel.vm, out_dir / "vehicle.xml")
     artifacts.append((rel(mjcf_path), "mjcf", "generated MuJoCo vehicle model"))
     npz = out_dir / "recording.npz"
@@ -375,3 +382,39 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, default=float))
     artifacts.insert(0, (rel(out_dir / "summary.json"), "json", "scenario summary"))
     return ScenarioOutcome(scenario.id, passed, summary, diagnostics, kernel.assumptions, artifacts, out_dir)
+
+
+def _loss_breakdown(project: Project, kernel: CoSimKernel, rec: dict[str, np.ndarray]) -> dict[str, Any]:
+    """Road-load power split at the top-speed sample: aero 1/2 rho CdA v^3, rolling C_rr m g v,
+    and viscous spin-joint damping sum(c w^2) from robot.yaml."""
+    if not len(rec["speed"]):
+        return {}
+    k = int(np.argmax(rec["speed"]))
+    v = float(rec["speed"][k])
+    vehicle = kernel.vehicle
+    aero = 0.5 * vehicle.rho * vehicle.drag_area * v ** 3
+    wheels = list(kernel.vm.wheels.values())
+    crr = wheels[0].rolling_resistance if wheels else 0.0
+    rolling = crr * kernel.vm.total_mass * project.spec.simulation.environment.gravity * v
+    damping = sum(j.damping * (v / w.radius) ** 2 for w in wheels for j in project.spec.mechanical.joints if j.id == w.joint)
+    return {"loss_breakdown_at_top_speed_w": {"speed_mps": round(v, 3), "aero": round(aero, 2), "rolling": round(rolling, 2),
+                                              "spin_joint_damping": round(damping, 2)}}
+
+
+def _sensor_capability(project: Project, kernel: CoSimKernel, scenario: Any) -> list[Diagnostic]:
+    """Static check: can the navigation sensor meet the scenario's cross-track tolerance?
+    A 2-D Gaussian GPS error with CEP50 has per-axis sigma = CEP / 1.1774; 95 % of
+    lateral errors stay within 1.96 sigma."""
+    limit = (scenario.expect or {}).get("max_cross_track_error_m")
+    if limit is None or kernel.gps is None:
+        return []
+    lateral95 = 1.96 * kernel.gps.cep / 1.1774
+    if lateral95 <= float(limit):
+        return []
+    return [Diagnostic.warning(
+        "gps_accuracy_insufficient",
+        f"{kernel.gps_id}: CEP {kernel.gps.cep} m gives a 95 % lateral error of {lateral95:.2f} m, above the "
+        f"{limit} m cross-track tolerance of {scenario.id}; GPS-only navigation cannot meet it reliably",
+        subjects=[kernel.gps_id, scenario.id], data={"cep_m": kernel.gps.cep, "lateral_error_95_m": round(lateral95, 3),
+                                                     "limit_m": float(limit)},
+        hint="Use an RTK/dual-band receiver, fuse odometry against a surveyed start pose, or relax the tolerance.")]
