@@ -1,16 +1,33 @@
-"""Shared infrastructure for electrical behavior models."""
+"""Shared infrastructure for electrical behavior models.
+
+A behavior model owns one SPICE subcircuit (the physics, solved by ngspice)
+and the device logic around it that is not circuit physics: command
+decoding, protection state machines, boot timers. That logic reads the
+solution at the co-simulation step boundary and drives the subcircuit
+through ``EXTERNAL`` sources.
+"""
 
 from __future__ import annotations
 
-import math
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
-
 from r3_model.units import to_si
 
-from ..mna import GROUND, Circuit, NumericElement, SpiceWriter
+from ..netlist import GROUND, Netlist, Solution, fmt
+
+_SAFE = re.compile(r"[^a-z0-9_]")
+
+
+def spice_name(text: str) -> str:
+    """Deterministic SPICE identifier for a label (lowercase, [a-z0-9_])."""
+    return _SAFE.sub("_", text.lower()).strip("_")
+
+
+def node_name(label: str) -> str:
+    """SPICE node for a graph node label such as ``C:battery.POS``."""
+    return "n_" + spice_name(label)
 
 
 @dataclass
@@ -55,7 +72,8 @@ class Params:
 @dataclass
 class PinRef:
     name: str
-    node: int
+    label: str  # graph node label, e.g. "C:esc.VIN"
+    node: str  # SPICE node
     role: str
     voltage_nominal: float | None
     voltage_min: float | None
@@ -66,30 +84,45 @@ class PinRef:
 class BuildContext:
     """What a model needs to attach itself to the network."""
 
-    def __init__(self, circuit: Circuit, project: Any, ambient_c: float) -> None:
-        self.circuit = circuit
+    def __init__(self, project: Any, ambient_c: float, reference: str | None = None) -> None:
         self.project = project
         self.ambient_c = ambient_c
-        self.internal_links: dict[str, list[Any]] = {}
+        self.reference = reference  # graph label mapped to SPICE ground
+        self._nodes: dict[str, str] = {}
+
+    def node(self, label: str) -> str:
+        found = self._nodes.get(label)
+        if found is None:
+            found = self._nodes[label] = GROUND if label == self.reference else node_name(label)
+        return found
 
     def pins(self, component_id: str, ctype: Any) -> dict[str, PinRef]:
         result = {}
         for name, pin in ctype.pins.items():
-            result[name] = PinRef(name, self.circuit.node(f"C:{component_id}.{name}"), pin.role, pin.voltage_nominal,
-                                  pin.voltage_min, pin.voltage_max, pin.current_max)
+            label = f"C:{component_id}.{name}"
+            result[name] = PinRef(name, label, self.node(label), pin.role, pin.voltage_nominal, pin.voltage_min,
+                                  pin.voltage_max, pin.current_max)
         return result
+
+
+THERMAL_AMBIENT_NODE = "tamb"
 
 
 class BehaviorModel:
     """A component's electrical behavior.
 
-    Lifecycle per step: ``begin_step`` (apply inputs, update per-step element
-    parameters) -> Newton solve -> ``resolve`` (active-set changes; return True
-    to re-solve the same step) -> ``end_step`` (integrate states, emit events)
-    -> ``outputs``. ``dt=None`` means a DC operating point: inductors short,
-    capacitors open, no state integration."""
+    Lifecycle: ``build(netlist)`` emits the subcircuit (once per deck flavour);
+    per co-simulation step ``begin_step`` sets ``controls`` (the values of the
+    model's ``EXTERNAL`` sources), ngspice integrates the circuit to the step
+    boundary, ``end_step`` advances device logic and returns events, and
+    ``outputs`` reports the solution. ``dt=None`` means a static operating
+    point: no timers advance and no device state changes."""
 
     model = ""
+    # Controls that are continuous physical quantities owned by another domain
+    # (e.g. MuJoCo speeds): fed to ngspice as a first-order hold (linear ramp
+    # across the step) instead of a zero-order-hold jump.
+    ramped: tuple[str, ...] = ()
 
     def __init__(self, component_id: str, ctype: Any, params: dict[str, Any], ctx: BuildContext) -> None:
         self.id = component_id
@@ -98,6 +131,42 @@ class BehaviorModel:
         self.ctx = ctx
         self.pins = ctx.pins(component_id, ctype) if ctype is not None else {}
         self.ambient_c = ctx.ambient_c
+        self.inst = "x" + spice_name(component_id)
+        self.controls: dict[str, float] = {}
+        self.sources: dict[str, str] = {}  # control name -> EXTERNAL source name
+        self.states: dict[str, float] = {}  # state node -> value (initial conditions of the next transient)
+
+    # Naming -------------------------------------------------------------------
+    def local(self, name: str) -> str:
+        """Top-level node owned by this model (state ports, readouts)."""
+        return f"m_{spice_name(self.id)}_{name}"
+
+    def internal(self, node: str) -> str:
+        """Output-vector name of a node inside this model's subcircuit."""
+        return f"{self.inst}.{node}"
+
+    def sense(self, source: str) -> str:
+        """Vector name prefix of a 0 V current sense source inside the subcircuit."""
+        return f"v.{self.inst}.{source}"
+
+    def control(self, net: Netlist, name: str, value: float = 0.0) -> str:
+        """Declare an ``EXTERNAL`` source for control ``name``; returns its node."""
+        source = f"x_{spice_name(self.id)}_{name}"
+        node = net.external(source)
+        self.sources[name] = f"v{source}"
+        self.controls.setdefault(name, value)
+        return node
+
+    def thermal(self, net: Netlist, temperature_node: str, heat_capacity: float, theta: float,
+                power: str, lines: list[str]) -> None:
+        """First-order thermal RC: C dT/dt = P - (T - T_amb) / theta (transient only;
+        in operating points components stay at ambient)."""
+        if net.transient:
+            lines += [f"bheat 0 {temperature_node} i = {power}",
+                      f"cth {temperature_node} 0 {fmt(heat_capacity)}",
+                      f"rth {temperature_node} {THERMAL_AMBIENT_NODE} {fmt(theta)}"]
+        else:
+            lines.append(f"rth {temperature_node} {THERMAL_AMBIENT_NODE} {fmt(theta)}")
 
     # Pin selection by catalog role, in catalog order.
     def pin_by_role(self, *roles: str) -> PinRef | None:
@@ -114,7 +183,8 @@ class BehaviorModel:
             raise ValueError(f"{self.id} ({self.model}): no {what} pin in catalog entry")
         return pin
 
-    def build(self, circuit: Circuit) -> None:
+    # Lifecycle ----------------------------------------------------------------
+    def build(self, net: Netlist) -> None:
         pass
 
     def initialize(self, initial: dict[str, Any]) -> None:
@@ -123,85 +193,54 @@ class BehaviorModel:
     def begin_step(self, dt: float | None, inputs: dict[str, Any], time: float) -> None:
         pass
 
-    def resolve(self, x: np.ndarray) -> bool:
+    def resolve(self, sol: Solution) -> bool:
+        """Operating points only: update an active-set state from the solution;
+        True requests a re-solve of the same point."""
         return False
 
-    def end_step(self, dt: float | None, x: np.ndarray, time: float) -> list[Event]:
+    def end_step(self, dt: float | None, sol: Solution, time: float) -> list[Event]:
         return []
 
-    def outputs(self, x: np.ndarray) -> dict[str, Any]:
+    def outputs(self, sol: Solution) -> dict[str, Any]:
         return {}
+
+    def time_sources(self, start: float, end: float) -> tuple[dict[str, Any], list[float]]:
+        """EXTERNAL sources evaluated at ngspice's own time points within
+        (start, end] (ngspice clock), and their corner times."""
+        return {}, []
+
+    def watches(self) -> list[tuple[str, str]]:
+        """Vectors reduced over every accepted point of a step: (name, "min" | "max" | "mean")."""
+        return []
+
+    def capture_states(self, sol: Solution) -> None:
+        for node in self.states:
+            self.states[node] = sol.v(node)
 
     # State snapshot for static operating points.
     def snapshot(self) -> dict[str, Any]:
-        return {k: v for k, v in self.__dict__.items() if k.startswith("s_")}
+        state = {k: v for k, v in self.__dict__.items() if k.startswith("s_")}
+        state["states"] = dict(self.states)
+        state["controls"] = dict(self.controls)
+        return state
 
     def restore(self, state: dict[str, Any]) -> None:
+        state = dict(state)
+        self.states = dict(state.pop("states", self.states))
+        self.controls = dict(state.pop("controls", self.controls))
         self.__dict__.update(state)
 
 
-def voltage(x: np.ndarray, a: int, b: int = GROUND) -> float:
-    va = x[a] if a != GROUND else 0.0
-    vb = x[b] if b != GROUND else 0.0
-    return float(va - vb)
+def constant_current(current: float, v_knee: float, v: str) -> str:
+    """I = I0 above ``v_knee``; I0 V / v_knee below (supply collapse keeps Newton well posed)."""
+    return f"({v} >= {fmt(v_knee)} ? {fmt(current)} : {fmt(current)}*max({v},{fmt(-v_knee)})/{fmt(v_knee)})"
 
 
-def first_order(state: float, target: float, dt: float, tau: float) -> float:
-    """Exact update of dy/dt = (target - y) / tau over dt with constant target."""
-    if tau <= 0:
-        return target
-    return target + (state - target) * math.exp(-dt / tau)
+def gated_power(power: str, v_on: float, width: float, v: str) -> str:
+    """Constant-power input behind an input UVLO: I = P / V x (1 + tanh((V - V_on) / w)) / 2.
 
-
-class SupplyLoad(NumericElement):
-    """Two-terminal load drawing ``current_fn(v)`` from ``pos`` to ``neg``.
-    ``spice_expr(vexpr)`` returns the same current as a SPICE expression."""
-
-    def __init__(self, name: str, pos: int, neg: int, current_fn: Any, spice_expr: Any) -> None:
-        self.name = name
-        self.pos, self.neg = pos, neg
-        self.current_fn = current_fn
-        self.spice_expr = spice_expr
-        self.rows = [pos, neg]
-        self.deps = [pos, neg]
-
-    def residual(self, v: np.ndarray) -> np.ndarray:
-        i = self.current_fn(v[0] - v[1])
-        return np.array([i, -i])
-
-    def current(self, x: np.ndarray) -> float:
-        return float(self.current_fn(voltage(x, self.pos, self.neg)))
-
-    def spice(self, writer: SpiceWriter, x: np.ndarray) -> None:
-        writer.comment(f"{self.name}: nonlinear supply load")
-        expression = self.spice_expr(writer.v(self.pos, self.neg))
-        writer.add(f"{writer.name('B')} {writer.node(self.pos)} {writer.node(self.neg)} I = {expression}")
-
-
-def constant_power_current(power: float, v_knee: float):
-    """I = P/V above ``v_knee``; resistive continuation P V / v_knee^2 below it
-    (a collapsing supply cannot deliver constant power; keeps Newton well posed)."""
-
-    def fn(v: float) -> float:
-        if v >= v_knee:
-            return power / v
-        return power * v / (v_knee * v_knee)
-
-    def spice(vexpr: str) -> str:
-        return f"({vexpr} >= {v_knee:.12g} ? {power:.12g}/{vexpr} : {power:.12g}*{vexpr}/{v_knee * v_knee:.12g})"
-
-    return fn, spice
-
-
-def constant_current(current: float, v_knee: float):
-    """I = I0 above ``v_knee``; I0 V / v_knee below (supply collapse)."""
-
-    def fn(v: float) -> float:
-        if v >= v_knee:
-            return current
-        return current * max(v, -v_knee) / v_knee
-
-    def spice(vexpr: str) -> str:
-        return f"({vexpr} >= {v_knee:.12g} ? {current:.12g} : {current:.12g}*max({vexpr},{-v_knee:.12g})/{v_knee:.12g})"
-
-    return fn, spice
+    Above V_on + 3 w this is P / V to < 0.25 %; below V_on the converter is off
+    and draws nothing. Unlike a resistive continuation, a current-limited
+    supply then has a single DC solution (no spurious collapsed state), and the
+    expression is smooth for Newton."""
+    return f"({power})/max({v},0.5)*0.5*(1+tanh(({v}-{fmt(v_on)})/{fmt(width)}))"

@@ -3,8 +3,13 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from r3_model.project import Project
 from r3_sim.electrical.stage import run
+from r3_sim.electrical.ngspice import find_library
+
+pytestmark = pytest.mark.skipif(find_library() is None, reason="libngspice not installed")
 
 RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
 
