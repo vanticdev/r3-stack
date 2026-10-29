@@ -157,6 +157,38 @@ def cmd_doctor(args: argparse.Namespace) -> dict[str, Any]:
     return run_doctor(required)
 
 
+def cmd_source(args: argparse.Namespace) -> dict[str, Any]:
+    from . import sourcing
+
+    if args.bom:
+        return {**sourcing.price_bom(api.load_project(args.project), provider_ids=args.provider), "view": "bom"}
+    if args.import_cad:
+        from r3_onshape.sourced import import_sourced
+
+        return {**import_sourced(api.load_project(args.project), slots=[args.component] if args.component else None), "view": "cad"}
+    if args.unpin:
+        if not args.component:
+            return {"ok": False, "code": "usage_error", "message": "--unpin needs a component"}
+        return sourcing.unpin(api.resolve_project(args.project), args.component)
+    if args.component and args.all:
+        return {"ok": False, "code": "usage_error", "message": "give a component or --all, not both"}
+    try:
+        return sourcing.source(api.resolve_project(args.project), args.component, all_slots=args.all, providers=args.provider,
+                               choose_rank=args.choose, refresh=args.refresh, offline=args.offline, top=args.top,
+                               allow_rejected=args.allow_rejected)
+    except sourcing.SourcingError as error:
+        return {"ok": False, "code": "usage_error", "message": str(error).strip("'\"")}
+
+
+def _print_source(payload: dict[str, Any]) -> None:
+    from .sourcing import print_source
+
+    if payload.get("view") in ("bom", "cad") or "results" not in payload and payload.get("view") != "slots":
+        _print_generic(payload)
+        return
+    print_source(payload)
+
+
 def _print_doctor(payload: dict[str, Any]) -> None:
     from .doctor import print_doctor
 
@@ -171,7 +203,7 @@ def _print_create(payload: dict[str, Any]) -> None:
 
 
 PRINTERS: dict[str, Callable[[dict[str, Any]], None]] = {"status": _print_status, "diagnose": _print_diagnose, "create": _print_create,
-                                                        "doctor": _print_doctor}
+                                                        "doctor": _print_doctor, "source": _print_source}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -216,6 +248,24 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true", help="fleet: deploy even without a clean validation of the current spec.")
     p.add_argument("deploy_args", nargs=argparse.REMAINDER, help="fleet: extra arguments for backend/deploy.py after `--`.")
     p.set_defaults(func=cmd_deploy)
+
+    p = sub.add_parser("source", parents=[common], help="Find real parts for `source:` slots online, rank them with twin checks, pin one.",
+                       description="Without arguments: list the slots. `r3 source <component>` searches and ranks (no change to the "
+                                   "project); `--choose N` (rank or candidate id) builds the catalog entry and pins it in r3.lock.yaml.")
+    p.add_argument("component", nargs="?", help="Component id or source.group of a slot.")
+    p.add_argument("--all", action="store_true", help="Every slot (with --choose: only slots not pinned yet).")
+    p.add_argument("--provider", action="append", metavar="ID",
+                   help="Restrict to provider(s): raspberrypi, expresslrs, nexar, digikey, mouser, research.")
+    p.add_argument("--choose", metavar="N|ID", help="Pin candidate N (rank in the last search) or a candidate id.")
+    p.add_argument("--refresh", action="store_true", help="Search again even if a current stored search exists.")
+    p.add_argument("--offline", action="store_true", help="Use only cached responses (no network).")
+    p.add_argument("--top", type=int, default=10, help="Candidates to show (default 10).")
+    p.add_argument("--allow-rejected", action="store_true", help="Allow pinning a candidate that fails a hard requirement.")
+    p.add_argument("--unpin", action="store_true", help="Remove the slot's pin (the authored `type`, if any, is used again).")
+    p.add_argument("--bom", action="store_true", help="Price and stock-check the PCB BOM MPNs through the distributor APIs.")
+    p.add_argument("--import-cad", action="store_true",
+                   help="Import pinned vendor STEP models into the Onshape parts library and add mate connectors (API keys).")
+    p.set_defaults(func=cmd_source)
 
     p = sub.add_parser("doctor", parents=[common], help="Report available tools and which stages can run headless here.")
     p.add_argument("--require", action="append", metavar="STAGE",

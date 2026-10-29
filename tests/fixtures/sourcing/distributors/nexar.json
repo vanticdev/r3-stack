@@ -1,0 +1,29 @@
+{
+  "_note": "Synthesized from the published Nexar API schema (identity token + supSearch/supSearchMpn GraphQL response shapes); no API key was available to record live traffic. Part data are fixtures, not real listings.",
+  "responses": [
+    {"method": "POST", "url": "https://identity.nexar.com/connect/token",
+     "body": {"access_token": "fixture-nexar-token", "expires_in": 86400, "token_type": "Bearer", "scope": "supply.domain"}},
+    {"method": "POST", "url": "https://api.nexar.com/graphql", "match": "supSearchMpn",
+     "body": {"data": {"supSearchMpn": {"results": [{"part": {
+       "mpn": "FIXTURE-BUCK-5V3A", "name": "Fixture Semi FIXTURE-BUCK-5V3A", "shortDescription": "Buck converter 5 V 3 A, QFN-16",
+       "octopartUrl": "https://octopart.com/fixture-buck-5v3a-fixture+semi-000001",
+       "manufacturer": {"name": "Fixture Semi"}, "bestDatasheet": {"url": "https://example.com/datasheets/fixture-buck-5v3a.pdf"},
+       "specs": [{"attribute": {"name": "Input Voltage", "shortname": "inputvoltage"}, "displayValue": "4.5 V ~ 17 V"}],
+       "sellers": [{"company": {"name": "Fixture Distributor A"}, "offers": [{"clickUrl": "https://example.com/buy/a/fixture-buck", "sku": "A-123",
+                     "inventoryLevel": 1200, "factoryLeadDays": 84, "prices": [{"quantity": 1, "price": 2.10, "currency": "USD"},
+                                                                                  {"quantity": 10, "price": 1.85, "currency": "USD"}]}]},
+                   {"company": {"name": "Fixture Distributor B"}, "offers": [{"clickUrl": "https://example.com/buy/b/fixture-buck", "sku": "B-9",
+                     "inventoryLevel": 0, "factoryLeadDays": 120, "prices": [{"quantity": 1, "price": 1.60, "currency": "USD"}]}]}]}}]}}}},
+    {"method": "POST", "url": "https://api.nexar.com/graphql", "match": "supSearch(",
+     "body": {"data": {"supSearch": {"results": [
+       {"part": {"mpn": "FIXTURE-RX24-CRSF", "name": "Fixture RF FIXTURE-RX24-CRSF", "shortDescription": "2.4 GHz ExpressLRS CRSF receiver module",
+                 "octopartUrl": "https://octopart.com/fixture-rx24-crsf-fixture+rf-000002", "manufacturer": {"name": "Fixture RF"},
+                 "bestDatasheet": null,
+                 "specs": [{"attribute": {"name": "Frequency", "shortname": "frequency"}, "displayValue": "2.4 GHz"},
+                           {"attribute": {"name": "Supply Voltage", "shortname": "supplyvoltage"}, "displayValue": "4.5 V ~ 6 V"},
+                           {"attribute": {"name": "Protocol", "shortname": "protocol"}, "displayValue": "CRSF"},
+                           {"attribute": {"name": "Weight", "shortname": "weight"}, "displayValue": "1.6 g"}],
+                 "sellers": [{"company": {"name": "Fixture Distributor A"}, "offers": [{"clickUrl": "https://example.com/buy/a/rx24", "sku": "A-77",
+                              "inventoryLevel": 35, "factoryLeadDays": null, "prices": [{"quantity": 1, "price": 18.0, "currency": "USD"}]}]}]}}]}}}}
+  ]
+}

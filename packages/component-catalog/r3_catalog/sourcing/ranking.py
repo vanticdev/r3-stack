@@ -3,15 +3,16 @@
 Tiers (in order): ``eligible`` (every hard requirement verified), ``unverified``
 (no requirement fails, but some have no value from any source), ``rejected``
 (a requirement or the budget fails; twin checks are not run). Within a tier,
-candidates without new twin-check errors come first, then by score.
+twin-checked candidates come first (only the best ``twin_limit`` are checked),
+then those without new twin-check errors, then by score.
 
 Score (100 = no penalties)::
 
     - 30 per new twin-check error, - 8 per new twin-check warning
       (new = not already present with the slot's current part)
     - 12 per required parameter without a value
-    -  5 per required parameter that is only estimated, - 1 per other estimated parameter (max - 5)
-    - 15 * (price - cheapest) / (dearest - cheapest) among ranked candidates   (x2 with prefer.price: low)
+    -  8 per required parameter that is only estimated, - 1 per other estimated parameter (max - 5)
+    - 15 * min(1, (price - cheapest) / cheapest) within the tier   (x2 with prefer.price: low)
     -  6 without a price; stock: - 10 if none, - 6 if below the quantity, - 3 unknown
     - lead time / 7 days (max - 5)
     - 10 * normalized mass with prefer.mass: low; + 5 for a preferred vendor/manufacturer;
@@ -61,6 +62,7 @@ class Ranked:
     currency: str = ""
     stock: int | None = None
     rank: int = 0
+    twin_checked: bool = False
 
     @property
     def twin_errors(self) -> int:
@@ -73,7 +75,8 @@ class Ranked:
     def to_json(self) -> dict[str, Any]:
         return {"rank": self.rank, "tier": self.tier, "score": round(self.score, 2), "breakdown": {k: round(v, 2) for k, v in self.breakdown.items()},
                 "reasons": self.reasons, "unit_price": self.unit_price, "currency": self.currency, "stock": self.stock,
-                "twin": {"errors": self.twin_errors, "warnings": self.twin_warnings, "checks": [c.to_json() for c in self.checks]},
+                "twin": {"checked": self.twin_checked, "errors": self.twin_errors, "warnings": self.twin_warnings,
+                         "checks": [c.to_json() for c in self.checks]},
                 "matches": [m.to_json() for m in self.matches], "candidate": self.candidate.model_dump(mode="json")}
 
 
@@ -100,9 +103,11 @@ def _normalized(values: dict[int, float]) -> dict[int, float]:
 
 
 def rank(requirement: Requirement, candidates: list[Candidate], check: CheckFunction | None = None,
-         incumbent: str = "") -> list[Ranked]:
-    """``incumbent``: name or part number of the slot's current part; a candidate
-    that is the same product gets + 2 (keeps a working design on ties)."""
+         incumbent: str = "", twin_limit: int = 30) -> list[Ranked]:
+    """Filter and score. Twin checks run for the ``twin_limit`` best candidates by the
+    purchase/provenance score (they dominate the cost); the rest are marked unchecked.
+    ``incumbent``: name or part number of the slot's current part; a candidate that
+    is the same product gets + 2 (keeps a working design on ties)."""
     ranked: list[Ranked] = []
     seen: set[str] = set()
     for candidate in candidates:
@@ -123,12 +128,16 @@ def rank(requirement: Requirement, candidates: list[Candidate], check: CheckFunc
         elif any(m.status == "unknown" for m in matches):
             entry.tier = "unverified"
             entry.reasons.extend(f"{m.param}: no value from any source" for m in matches if m.status == "unknown")
-        if entry.tier != "rejected" and check is not None:
-            entry.checks = check(candidate)
         ranked.append(entry)
-    _score(requirement, [r for r in ranked if r.tier != "rejected"], incumbent)
+    live = [r for r in ranked if r.tier != "rejected"]
     order = {tier: i for i, tier in enumerate(TIERS)}
-    ranked.sort(key=lambda r: (order[r.tier], r.twin_errors > 0, -r.score, r.candidate.name))
+    _score(requirement, live, incumbent)
+    if check is not None:
+        for entry in sorted(live, key=lambda r: (order[r.tier], -r.score, r.candidate.name))[:twin_limit]:
+            entry.checks = check(entry.candidate)
+            entry.twin_checked = True
+        _score(requirement, live, incumbent)
+    ranked.sort(key=lambda r: (order[r.tier], check is not None and not r.twin_checked, r.twin_errors > 0, -r.score, r.candidate.name))
     for index, entry in enumerate(ranked, start=1):
         entry.rank = index
     return ranked
@@ -138,9 +147,18 @@ def _score(requirement: Requirement, entries: list[Ranked], incumbent: str = "")
     prefer = {canonical(k): v for k, v in requirement.prefer.items()}
     currencies = Counter(e.currency for e in entries if e.unit_price is not None)
     currency = currencies.most_common(1)[0][0] if currencies else ""
-    prices = _normalized({i: e.unit_price for i, e in enumerate(entries) if e.unit_price is not None and e.currency == currency})
-    masses = _normalized({i: float(e.candidate.value("mass")) for i, e in enumerate(entries)
-                          if isinstance(e.candidate.value("mass"), (int, float))})
+    # Price and mass are compared within a tier: an unverified part must not make verified ones look dear.
+    prices: dict[int, float] = {}
+    masses: dict[int, float] = {}
+    for tier in TIERS:
+        members = [i for i, e in enumerate(entries) if e.tier == tier]
+        tier_prices = {i: float(entries[i].unit_price) for i in members
+                       if entries[i].unit_price is not None and entries[i].currency == currency}
+        cheapest = min(tier_prices.values(), default=0.0)
+        # Relative premium over the cheapest: a $1.50 difference on a $6 part is not a full penalty.
+        prices.update({i: min(1.0, (p - cheapest) / cheapest) if cheapest > 0 else 0.0 for i, p in tier_prices.items()})
+        masses.update(_normalized({i: float(entries[i].candidate.value("mass")) for i in members
+                                   if isinstance(entries[i].candidate.value("mass"), (int, float))}))
     price_weight = 30.0 if normalize(prefer.get("price", "")) == "low" else 15.0
     for index, entry in enumerate(entries):
         b: dict[str, float] = {}
@@ -148,7 +166,7 @@ def _score(requirement: Requirement, entries: list[Ranked], incumbent: str = "")
         b["twin_warnings"] = -8.0 * entry.twin_warnings
         required = {m.param for m in entry.matches if m.param != "kind"}
         b["unknown_required"] = -12.0 * sum(1 for m in entry.matches if m.status == "unknown")
-        b["estimated_required"] = -5.0 * sum(1 for m in entry.matches if m.status == "pass" and m.provenance == "estimated")
+        b["estimated_required"] = -8.0 * sum(1 for m in entry.matches if m.status == "pass" and m.provenance == "estimated")
         other_estimates = sum(1 for name, p in entry.candidate.params.items() if canonical(name) not in required and p.status == "estimated")
         b["estimated_other"] = -min(5.0, float(other_estimates))
         if index in prices:

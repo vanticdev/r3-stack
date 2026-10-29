@@ -1,0 +1,18 @@
+{
+  "_note": "Synthesized from the published Mouser Search API v1 schema (keyword and part-number search responses); no API key was available to record live traffic. Part data are fixtures, not real listings.",
+  "responses": [
+    {"method": "POST", "url": "https://api.mouser.com/api/v1/search/keyword",
+     "body": {"Errors": [], "SearchResults": {"NumberOfResult": 1, "Parts": [
+       {"ManufacturerPartNumber": "FIXTURE-RPI5-8GB", "Manufacturer": "Fixture Pi Reseller", "Description": "Raspberry Pi 5 8GB single board computer (fixture)",
+        "DataSheetUrl": "https://example.com/mouser/fixture-rpi5.pdf", "ProductDetailUrl": "https://example.com/mouser/fixture-rpi5-8gb",
+        "MouserPartNumber": "FIX-RPI5-8GB", "AvailabilityInStock": "57", "LeadTime": "42 Days",
+        "PriceBreaks": [{"Quantity": 1, "Price": "$80.00", "Currency": "USD"}, {"Quantity": 5, "Price": "$78.40", "Currency": "USD"}],
+        "ProductAttributes": [{"AttributeName": "Memory Size", "AttributeValue": "8 GB"}]}]}}},
+    {"method": "POST", "url": "https://api.mouser.com/api/v1/search/partnumber",
+     "body": {"Errors": [], "SearchResults": {"NumberOfResult": 1, "Parts": [
+       {"ManufacturerPartNumber": "FIXTURE-BUCK-5V3A", "Manufacturer": "Fixture Semi", "Description": "Buck converter 5 V 3 A (fixture)",
+        "ProductDetailUrl": "https://example.com/mouser/fixture-buck", "MouserPartNumber": "FIX-BUCK", "AvailabilityInStock": "300",
+        "LeadTime": "70 Days", "PriceBreaks": [{"Quantity": 1, "Price": "$1.95", "Currency": "USD"}, {"Quantity": 10, "Price": "$1.66", "Currency": "USD"}],
+        "ProductAttributes": []}]}}}
+  ]
+}

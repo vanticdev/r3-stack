@@ -196,7 +196,9 @@ def search_slot(project: Project, slot: str, provider_ids: list[str] | None = No
         current = {"type": authored, "matches": [m.to_json() for m in matches],
                    "satisfied": all(m.status == "pass" for m in matches)}
     emit("ranking_started", {"candidates": len(found.candidates), "template": template.id if template else None})
-    incumbent = (template.part_number or template.name) if template is not None and template.id == authored else ""
+    pin = (project.lock.get("sourcing") or {}).get(requirement.slot)
+    incumbent = (pin.get("name", "") if pin else
+                 (template.part_number or template.name) if template is not None and template.id == authored else "")
     ranked = rank(requirement, found.candidates, make_checker(project, requirement, template), incumbent=incumbent)
     for entry in ranked[:50]:
         emit("candidate", {"rank": entry.rank, "tier": entry.tier, "score": round(entry.score, 2), "id": entry.candidate.id,
@@ -405,3 +407,100 @@ def price_bom(project: Project, http: HttpClient | None = None, provider_ids: li
         rows.append({"mpn": mpn, "quantity": quantity, "offers": offers, "best": best})
     return {"ok": True, "bom_files": [str(p.relative_to(project.root)) for p in files], "lines": rows, "skipped": skipped,
             "message": "" if mpns else "no MPN column in build/pcb/*-bom.csv (run the pcb stage with MPN fields)"}
+
+
+# ------------------------------------------------------- command (CLI / MCP)
+def trimmed(payload: dict[str, Any], top: int = 10) -> dict[str, Any]:
+    """A search payload with only the ``top`` ranked candidates (the full list stays in build/sourcing/)."""
+    ranked = payload.get("ranked", [])
+    shown = [r for r in ranked if r["tier"] != "rejected"][:top] or ranked[:top]
+    rejected = [{"rank": r["rank"], "id": r["candidate"]["id"], "name": r["candidate"]["name"], "reasons": r["reasons"]}
+                for r in ranked if r["tier"] == "rejected"][:top]
+    return {**{k: v for k, v in payload.items() if k != "ranked"}, "ranked": shown, "rejected": rejected,
+            "total": len(ranked), "stored": f"build/{BUILD}/{payload.get('slot')}/{CANDIDATES_FILE}"}
+
+
+def source(project_path: str | Path, component: str | None = None, all_slots: bool = False, providers: list[str] | None = None,
+           choose_rank: str | int | None = None, refresh: bool = False, offline: bool = False, top: int = 10,
+           allow_rejected: bool = False, progress: Progress | None = None) -> dict[str, Any]:
+    """``r3 source``: list slots; search one (or every) slot; with ``choose_rank`` pin a candidate.
+
+    ``--choose`` reuses the stored search when it is current (same requirements,
+    no ``--provider``/``--refresh``), so ``N`` means the candidate the user saw."""
+    project = Project.load(project_path)
+    if not component and not all_slots:
+        return {**list_slots(project), "view": "slots"}
+    slots = list(project.spec.source_slots()) if all_slots else [requirement_for(project, component).slot]
+    if all_slots and not slots:
+        return {"ok": True, "view": "source", "results": [], "message": "no component declares `source:`"}
+    http = HttpClient(offline=True) if offline else None
+    pins = project.lock.get("sourcing") or {}
+    results = []
+    for slot in slots:
+        if all_slots and choose_rank is not None and slot in pins:
+            results.append({"ok": True, "slot": slot, "skipped": "pinned", "pinned": pins[slot],
+                            "message": f"already pinned to {pins[slot].get('name')}; re-source it explicitly with `r3 source {slot} --choose N`"})
+            continue
+        stored = stored_search(project, slot)
+        current = stored is not None and stored["requirement_sha256"] == requirement_for(project, slot).digest()
+        if choose_rank is None or refresh or providers or not current:
+            stored = search_slot(project, slot, provider_ids=providers, http=http, progress=progress)
+        entry: dict[str, Any] = {"search": trimmed(stored, top)}
+        if choose_rank is not None:
+            entry["choice"] = choose(project.root, slot, choose_rank, allow_rejected=allow_rejected)
+        entry["ok"] = entry.get("choice", {}).get("ok", True)
+        entry["slot"] = slot
+        results.append(entry)
+    return {"ok": all(r.get("ok", True) for r in results), "view": "source", "project": str(project.root), "results": results}
+
+
+def _price(entry: dict[str, Any]) -> str:
+    return f"{entry['unit_price']:g} {entry['currency']}" if entry.get("unit_price") is not None else "-"
+
+
+def print_source(payload: dict[str, Any]) -> None:
+    if payload.get("view") == "slots":
+        if not payload["slots"]:
+            print("No sourcing slots. Add `source: {requires: {kind: ..., ...}}` to a component in robot.yaml.")
+        for slot in payload["slots"]:
+            requires = ", ".join(f"{k}={v}" for k, v in slot["requires"].items() if k != "kind")
+            pin = slot["pinned"]
+            print(f"{slot['slot']:<14} {slot['kind']:<9} {requires}")
+            print(f"  components: {', '.join(slot['components'])}; type: {slot['resolved_type'] or '-'}; "
+                  f"pinned: {pin['name'] + ' (' + pin['provider'] + ')' if pin else 'no'}{' [requirements changed]' if slot['pin_stale'] else ''}")
+        print("providers: " + "; ".join(f"{p['id']} {'ok' if p['available'] else 'unavailable (' + p['reason'] + ')'}" for p in payload["providers"]))
+        return
+    for result in payload.get("results", []):
+        if result.get("skipped"):
+            print(f"{result['slot']}: {result['message']}")
+            continue
+        search_payload = result["search"]
+        requires = ", ".join(f"{k}={v}" for k, v in search_payload["requires"].items() if k != "kind")
+        print(f"{search_payload['slot']} ({search_payload['kind']}: {requires}) x{search_payload['quantity']}"
+              f"  template {search_payload['template'] or '-'}")
+        for report in search_payload["reports"]:
+            detail = f"{report['candidates']} candidates" if report["status"] == "ok" else report["message"]
+            print(f"  provider {report['provider']:<12} {report['status']:<8} {detail}")
+        if search_payload.get("current") and not search_payload["current"]["satisfied"]:
+            failed = [m for m in search_payload["current"]["matches"] if m["status"] != "pass"]
+            print(f"  current part {search_payload['current']['type']} does not meet: "
+                  + "; ".join(f"{m['param']} {m['required']} ({m['detail']})" for m in failed))
+        c = search_payload["counts"]
+        print(f"  {c['eligible']} eligible, {c['unverified']} unverified, {c['rejected']} rejected (all in {search_payload['stored']})")
+        print(f"  {'#':>3} {'tier':<10} {'score':>6} {'price':>12} {'stock':>6} {'twin E/W':>8}  name [provider]")
+        for entry in search_payload["ranked"]:
+            stock = "?" if entry["stock"] is None else str(entry["stock"])
+            print(f"  {entry['rank']:>3} {entry['tier']:<10} {entry['score']:>6.1f} {_price(entry):>12} {stock:>6} "
+                  f"{entry['twin']['errors']:>4}/{entry['twin']['warnings']:<3}  {entry['candidate']['name']} [{entry['candidate']['provider']}]")
+            for check in entry["twin"]["checks"]:
+                if check["severity"] != "info":
+                    print(f"        {check['severity'][0].upper()} {check['code']}: {check['message'][:160]}")
+        choice = result.get("choice")
+        if choice:
+            if choice.get("ok"):
+                pin = choice["pinned"]
+                print(f"  pinned {pin['name']} -> {pin['catalog_id']} ({choice['catalog_file']}, digest {pin['digest']})")
+                for d in choice["diagnostics"]:
+                    print(f"    {d['severity'][0].upper()} {d['code']}: {d['message']}")
+            else:
+                print(f"  not pinned: {choice.get('code')}: {choice.get('message')}")
