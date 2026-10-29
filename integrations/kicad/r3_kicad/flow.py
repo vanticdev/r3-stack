@@ -158,11 +158,31 @@ class Flow:
         return {"nets": len(read_netlist(xml).nets), "matches_intent": True}
 
     def board(self) -> Any:
+        # A project lock left by an interrupted headless run makes pcbnew skip saving the project file (net
+        # classes, rules) without an error; the flow never opens the editors, so any lock here is stale.
+        lock = self.pcb.parent / f"~{self.name}.kicad_pro.lck"
+        if lock.exists():
+            self.log(f"   removing stale project lock {lock.name}")
+            lock.unlink()
+        self._write_custom_rules()
         plan = build_plan(self.intent, self.work / f"{self.name}.xml", self.pcb, date=self.date)
         result, report = run_plan(plan, self.work, "board-plan")
         if not result.ok or report.get("errors"):
             raise FlowError("pcbnew board build failed: " + "; ".join(report.get("errors", [])[:10]))
         return {k: report[k] for k in ("footprints", "tracks", "vias", "zones", "keepouts", "anchored")}
+
+    def _write_custom_rules(self) -> None:
+        """Board Setup > Custom Rules: KiCad reads ``<board>.kicad_dru`` beside the project (the same file the
+        rule editor saves). The intent lists rules as (name, condition, constraint) S-expression fragments."""
+        dru = self.pcb.with_suffix(".kicad_dru")
+        rules = self.intent.rules.get("custom_rules") or []
+        if not rules:
+            dru.unlink(missing_ok=True)
+            return
+        lines = ["(version 1)"]
+        for name, condition, constraint in rules:
+            lines += [f'(rule "{name}"', f'  (condition "{condition}")', f"  {constraint})"]
+        dru.write_text("\n".join(lines) + "\n")
 
     def route(self, attempts: int = 3) -> Any:
         """Autoroute; if an attempt stalls with open connections, start over from the hand-routed board

@@ -15,7 +15,9 @@ requirements:
   # maximum cruise speed (software.config.max_cruise_speed_mps); proven by range_failsafe and pi_hang.
   failsafe_stop_distance: 3 m
   # At the 8 m/s top speed (manual driving) 3 m is physically impossible; the radio failsafe stop distance
-  # proven by top_speed_failsafe (6.0-7.1 m from 8.0 m/s over runs: 0.25 s software failsafe, then ESC brake) plus margin.
+  # proven by top_speed_failsafe (8.46 m from 8.27 m/s: 0.25 s software failsafe, then the slip-servoed ESC brake;
+  # earlier full-brake runs 6.0-7.2 m). Note: rear-wheel braking alone gives at most ~mu g x 0.45 ~ 4 m/s^2, so a
+  # straight stop needs ~2.1 + 8.5 = 10.6 m; inside 9 m the twin's car still yaws while it stops.
   failsafe_stop_distance_at_top_speed: 9 m
   max_wire_voltage_drop_fraction: 0.03
   min_wire_clearance_moving: 8 mm
@@ -319,7 +321,10 @@ electrical:
         - {id: W_BAT_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
       route: {slack: 20 mm}
     - id: power_y
-      description: XT60 Y-harness splitting battery power to the ESC (12 AWG) and, through a 10 A fuse, the HAT (18 AWG).
+      # Gauges from the installed (bundle- and enclosure-derated) ampacity of the wiring stage: the HAT branch is 14 AWG
+      # (~10.3 A installed, the most an XT30 crimp takes) so the 10 A fuse protects it (18 AWG was 5.4 A installed); the
+      # fuse holder's input pigtail is 12 AWG like the trunk, so no thinner conductor sits upstream of the fuse.
+      description: XT60 Y-harness splitting battery power to the ESC (12 AWG) and, through a 10 A fuse, the HAT (14 AWG).
       connectors:
         P1: {type: xt60-male, mates: battery_lead.B}
         P2: {type: xt60-female}
@@ -334,11 +339,11 @@ electrical:
       wires:
         - {id: W_Y_P_IN, from: P1.1, to: SP, awg: 12, color: red, signal: VBAT}
         - {id: W_Y_P_ESC, from: SP, to: P2.1, awg: 12, color: red, signal: VBAT}
-        - {id: W_Y_P_FUSE, from: SP, to: F1.1, awg: 18, color: red, signal: VBAT}
-        - {id: W_Y_P_HAT, from: F2.1, to: P3.1, awg: 18, color: red, signal: VBAT_FUSED}
+        - {id: W_Y_P_FUSE, from: SP, to: F1.1, awg: 12, color: red, signal: VBAT}
+        - {id: W_Y_P_HAT, from: F2.1, to: P3.1, awg: 14, color: red, signal: VBAT_FUSED}
         - {id: W_Y_N_IN, from: P1.2, to: SN, awg: 12, color: black, signal: GND}
         - {id: W_Y_N_ESC, from: SN, to: P2.2, awg: 12, color: black, signal: GND}
-        - {id: W_Y_N_HAT, from: SN, to: P3.2, awg: 18, color: black, signal: GND}
+        - {id: W_Y_N_HAT, from: SN, to: P3.2, awg: 14, color: black, signal: GND}
       route: {slack: 25 mm, keep_away: [motor, gearbox]}
     - id: esc_power
       connectors:
@@ -355,6 +360,8 @@ electrical:
         BP: {type: bullet-3.5-female, mates: motor.J_POS}
         BN: {type: bullet-3.5-female, mates: motor.J_NEG}
       wires:
+        # The ESC's own 14 AWG leads: a 2 s, 58 A stall heats them by a few kelvin (electrical stage, transient R(T)
+        # model), well within the silicone rating; the stall drop above 3 % is a burst warning.
         - {id: W_MOT_A, from: A.1, to: BP.1, awg: 14, color: blue, signal: MOTOR_A}
         - {id: W_MOT_B, from: A.2, to: BN.1, awg: 14, color: yellow, signal: MOTOR_B}
       route: {slack: 15 mm, keep_away: [wheel_rl, wheel_rr, gearbox]}
@@ -363,19 +370,22 @@ electrical:
         A: {type: integral, mates: esc.J_SIG}
         B: {type: servo-3-female, mates: hat.J_ESC}
       wires:
-        # The ESC's BEC (A.2) is not used: the HAT's J_ESC.2 is unconnected and the servo runs from the
-        # HAT's 6.0 V regulator, so the 3-pin lead carries signal and ground only (BEC pin unpopulated).
+        # J_ESC on the HAT is the ESC side of a digital isolator: the lead's ground (A.3) is referenced only to the
+        # isolator's ESC side (not HAT GND), so motor return current cannot share it; the ESC's BEC (A.2) powers that
+        # side (a few mA). The servo runs from the HAT's 6.0 V buck-boost, never from the BEC.
         - {id: W_ESC_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: ESC_PWM}
-        - {id: W_ESC_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
+        - {id: W_ESC_BEC, from: A.2, to: B.2, awg: 22, color: red, signal: ESC_BEC}
+        - {id: W_ESC_GND, from: A.3, to: B.3, awg: 22, color: black, signal: ESC_GND}
       route: {slack: 30 mm}
     - id: servo_lead
       connectors:
         A: {type: integral, mates: servo.J1}
-        B: {type: servo-3-female, mates: hat.J_SERVO}
+        B: {type: servo-3-female-hd, mates: hat.J_SERVO}
       wires:
+        # Power pair 20 AWG (servo re-leaded, heavy-duty JR plug): 22 AWG dropped 3.1 % at servo stall (3 % limit).
         - {id: W_SRV_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: SERVO_PWM}
-        - {id: W_SRV_VCC, from: A.2, to: B.2, awg: 22, color: red, signal: SERVO_6V}
-        - {id: W_SRV_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
+        - {id: W_SRV_VCC, from: A.2, to: B.2, awg: 20, color: red, signal: SERVO_6V}
+        - {id: W_SRV_GND, from: A.3, to: B.3, awg: 20, color: black, signal: GND}
       # Through servo post B's lead pocket, aft along the plate under the linkage, under the deck and up through
       # the deck's lead slot beside the HAT.
       route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr],

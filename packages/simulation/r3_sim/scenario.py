@@ -284,7 +284,19 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         t_loss = kernel.receiver.link_lost_events[0]
         x, y = _interp_position(rec, t_loss)
         tx = kernel.radio.tx_position
-        link_lost = {"t": float(t_loss), "x": x, "y": y, "distance": float(math.hypot(x - tx[0], y - tx[1]))}
+        link_lost = {"t": float(t_loss), "x": x, "y": y, "distance": float(math.hypot(x - tx[0], y - tx[1])),
+                     "source": "receiver"}
+    elif gaps:
+        # At the edge of range the receiver can keep catching single packets (LQ of a few %), so its own
+        # (1 s) loss timeout never fires; the software still fails safe on the first frame gap longer than its
+        # radio failsafe timeout. Score that gap, while moving, as the loss (it can only come earlier).
+        moving = [g for g in gaps if abs(float(np.interp(g[0], rec["t"], rec["speed"]))) > 0.2]
+        if moving:
+            t_loss = moving[0][0]
+            x, y = _interp_position(rec, t_loss)
+            tx = kernel.radio.tx_position
+            link_lost = {"t": float(t_loss), "x": x, "y": y, "distance": float(math.hypot(x - tx[0], y - tx[1])),
+                         "source": "software_failsafe_gap"}
     radio = kernel.radio
     tx = radio.tx_position
     h_rx = float(kernel.rx_antenna_offset[2])

@@ -247,11 +247,20 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
             latency = float(event["t"] - edge) if edge is not None else math.inf
             after = t >= event["t"] + 0.02
             neutral = float(context.get("esc_neutral_us", 1500.0))
-            held = bool(np.all(np.abs(rec["esc_pulse"][after] - neutral) < 1.0)) if after.any() else False
+            # The arbiter's own output from then on: its active brake (``brake_us`` until ``brake_until``, when the
+            # ESC was brake-armed), then neutral. The Pi's command must never reach the ESC again.
+            brake_until, brake_us = event.get("brake_until"), event.get("brake_us")
+            target = np.full(len(t), neutral)
+            if brake_until is not None and brake_us is not None:
+                target[t < float(brake_until) - 0.02] = float(brake_us)
+            settled = after & ~((brake_until is not None) & (np.abs(t - float(brake_until or 0.0)) < 0.021))
+            held = bool(np.all(np.abs(rec["esc_pulse"][settled] - target[settled]) < 1.0)) if settled.any() else False
+            phase = (f"brake {brake_us:.0f} us until t={float(brake_until):.2f}s, then neutral" if brake_until is not None
+                     else "neutral")
             checks.append(Check(key, expected, round(latency, 4), latency <= float(expected) and held,
-                                f"last heartbeat edge t={edge}, neutral from t={event['t']:.3f}s; ESC held at neutral "
-                                f"afterwards: {held}", {"last_edge_t": edge if edge is not None else -1.0,
-                                                        "failsafe_t": float(event["t"])}))
+                                f"last heartbeat edge t={edge}, failsafe from t={event['t']:.3f}s ({phase}); ESC held at the "
+                                f"arbiter's output afterwards: {held}", {"last_edge_t": edge if edge is not None else -1.0,
+                                                                          "failsafe_t": float(event["t"])}))
         elif key == "min_cell_voltage_v":
             k = int(np.argmin(rec["cell_v"]))
             value = float(rec["cell_v"][k])

@@ -230,6 +230,10 @@ class NgSpice:
         self.errors.clear()
         self.log.clear()
         self.source_values = {}
+        # A pooled instance must not keep the previous circuit's time-dependent sources (e.g. a switched ESC's PWM
+        # gate): the next circuit's source of the same name would follow the stale function.
+        self.time_sources = {}
+        self.edges = []
         self._source_by_address = {}
         self._capture = None
         self.accepted_points = 0

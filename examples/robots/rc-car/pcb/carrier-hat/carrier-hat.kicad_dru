@@ -1,0 +1,13 @@
+(version 1)
+(rule "Q2 land pattern (TI VSON-8 gate-source pad gap 0.14 mm)"
+  (condition "A.memberOfFootprint('Q2') && B.memberOfFootprint('Q2')")
+  (constraint clearance (min 0.13mm)))
+(rule "Q3 land pattern (TI VSON-8 gate-source pad gap 0.14 mm)"
+  (condition "A.memberOfFootprint('Q3') && B.memberOfFootprint('Q3')")
+  (constraint clearance (min 0.13mm)))
+(rule "Q4 land pattern (TI VSON-8 gate-source pad gap 0.14 mm)"
+  (condition "A.memberOfFootprint('Q4') && B.memberOfFootprint('Q4')")
+  (constraint clearance (min 0.13mm)))
+(rule "Q5 land pattern (TI VSON-8 gate-source pad gap 0.14 mm)"
+  (condition "A.memberOfFootprint('Q5') && B.memberOfFootprint('Q5')")
+  (constraint clearance (min 0.13mm)))

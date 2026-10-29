@@ -32,7 +32,7 @@ def checked(tmp_path_factory):
     """ERC, DRC (schematic parity, zones refilled), netlist and a pcbnew read-back of a copy of the project,
     with the process table watched for KiCad GUI programs the whole time."""
     work = tmp_path_factory.mktemp("carrier-hat")
-    for suffix in (".kicad_pro", ".kicad_sch", ".kicad_pcb"):
+    for suffix in (".kicad_pro", ".kicad_sch", ".kicad_pcb", ".kicad_dru"):   # .kicad_dru: Board Setup custom rules
         shutil.copy2(BOARD / f"carrier-hat{suffix}", work / f"carrier-hat{suffix}")
     cli = KicadCli.find()
     with GuiWatch(interval=0.1) as watch:
@@ -93,9 +93,10 @@ def test_board_geometry(checked, intent):
     assert len(locked) >= len([t for t in intent.power_tracks]) and any(s.net == "VIN_HAT" for s in locked)
     ground = [z for z in board.zones if z.net == "GND"]
     assert len(ground) == 2 and all(z.area > 500 for z in ground)
-    # Power pours at the regulator pins and the FET -> shunt gap, filled by KiCad on the top layer.
+    # Power pours at the regulator pins, the FET -> shunt gap and the servo buck-boost power row, filled by KiCad on
+    # the top layer.
     power = {z.net: z for z in board.zones if z.net != "GND"}
-    assert set(power) == {"SW_5V", "SW_6V", "VIN_HAT", "VBAT_PROT"}
+    assert set(power) == {"SW_5V", "VIN_HAT", "VBAT_PROT", "SW1_6V", "SW2_6V", "CS_6V", "SERVO_6V"}
     assert all(z.layer == "F.Cu" and z.area > 5 and z.polygons for z in power.values())
 
 

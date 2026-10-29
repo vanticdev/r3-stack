@@ -7,11 +7,11 @@ from typing import Any
 from . import ipc2152
 from .arbiter import ArbiterParams
 from .intent import BoardIntent
-from .regulators import BuckDesign, design_notes_markdown, hold_up_time
+from .regulators import BuckBoostDesign, BuckDesign, buck_boost_notes_markdown, design_notes_markdown, hold_up_time
 from .spice import TVS_PARTS, tvs_clamp
 
 
-def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign, power: dict[str, Any],
+def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckBoostDesign, power: dict[str, Any],
                  erc: dict[str, Any], drc: dict[str, Any], pour_report: list[dict[str, Any]] | None = None) -> str:
     dt = float(intent.rules.get("delta_t_power", 20.0))
     arb = ArbiterParams()
@@ -87,12 +87,7 @@ def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign, power: 
             ("Hold-up", "t = C (V0^2 - V1^2) / (2 P)", f"{hold * 1e6:.0f} us at 6.5 W from {pi.values['v_out_nominal']:.2f} V to "
              "the Pi's 4.63 V brown-out (220 uF polymer + ceramics); plus 220 uF on VIN_HAT"),
         ]),
-        design_notes_markdown(servo, "6.0 V servo rail: U3 TPS56528", [
-            ("Current limit", "valley I_ocl 5.5 / 6.2 / 7.8 A (min/typ/max, datasheet)",
-             f"servo stall (2.5 A, catalog) is supplied; a shorted servo is limited to <= {servo.values['i_out_limit_max']:.1f} A"),
-            ("Dropout", "Dmax = 1 - t_off(min) fsw = 1 - 310 ns x 650 kHz", f"{servo.ic.max_duty:.3f}: the servo sees "
-             f"~{min(servo.values['v_out_nominal'], servo.ic.max_duty * 7.4 - 2.5 * 0.1):.2f} V from a nominal 2S pack"),
-        ]),
+        buck_boost_notes_markdown(servo, "6.0 V servo rail: U3 LM5175 4-switch buck-boost"),
         "## Protection and monitoring",
         "",
         "- Reverse polarity: DMP3013SFV P-MOSFET (-30 V, 9.5 mOhm at -10 V) in the + lead, gate pulled to GND by 100 k, "
@@ -104,21 +99,28 @@ def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign, power: 
         "current splits off in the XT60 Y-harness before the HAT and is not measured.",
         "- MPU-6050 at 0x68 (AD0 = GND), CLKIN/FSYNC low, REGOUT 100 nF, CPOUT 2.2 nF / 50 V, VDD/VLOGIC 100 nF / 10 nF.",
         "- I2C pull-ups 4.7 kOhm to 3V3 (parallel with the Pi's 1.8 kOhm: 1.3 kOhm, 2.6 mA sink).",
-        "- 220 Ohm series resistors on the ESC (after the arbiter) and servo PWM lines; 10 kOhm encoder pull-up.",
-        "- J_ESC pin 2 (the ESC's BEC) is not connected: the servo is powered only by U3.",
+        "- 220 Ohm series resistors on the ESC (after the isolator, ESC side) and servo PWM lines; 10 kOhm encoder pull-up.",
+        "- ESC signal isolation: U6 ISO6720F re-drives the arbiter output on the ESC's side, referenced to the ESC's own "
+        "ground (J_ESC.3 = ESC_GND, a separate net from HAT GND) and powered from the ESC's BEC (J_ESC.2) through U7 "
+        "AP7381-33 (40 V input LDO). The 22 AWG ESC signal lead's ground therefore carries only U6/U7's few mA instead "
+        "of paralleling the power harness's motor return. Default-low outputs: with the Pi unpowered the ESC sees no "
+        "pulses; R26 holds ESC_PWM low while U6's ESC side is unpowered. The servo is powered only by U3.",
         "",
         "## Failsafe arbiter (U4 ATtiny412)",
         "",
         f"- The Pi's ESC PWM ({arb.input_pin}, GPIO18) reaches the ESC only through U4. The Pi toggles a heartbeat on "
         f"{arb.heartbeat_pin} (GPIO27) every control cycle.",
         f"- PASS: U4 mirrors every PWM edge (pin-change interrupt, ~{arb.latency_us:g} us latency, estimated).",
-        f"- Timeout: no heartbeat edge for {arb.timeout * 1000:.0f} ms -> FAILSAFE: {arb.neutral_us:.0f} us neutral pulses every "
-        f"{arb.frame * 1000:.0f} ms; red LED D4 on. Worst-case latency from the last edge to the first neutral frame is "
-        f"{(arb.timeout + arb.frame) * 1000:.0f} ms.",
+        f"- Timeout: no heartbeat edge for {arb.timeout * 1000:.0f} ms -> FAILSAFE, red LED D4 on: if the ESC is "
+        f"brake-armed (it was driving forward or braking) U4 sends {arb.brake_us:.0f} us full-brake pulses for "
+        f"{arb.brake_hold:g} s, then {arb.neutral_us:.0f} us neutral, every {arb.frame * 1000:.0f} ms. A hobby ESC coasts at "
+        "neutral; the brake is QuicRun 1060 forward/brake/reverse logic (reverse stick after forward = brake), which U4 "
+        "mirrors from the pulses it passes so it never sends a pulse the ESC could take as reverse. Worst-case latency "
+        f"from the last edge to the first failsafe frame is {(arb.timeout + arb.frame) * 1000:.0f} ms.",
         f"- Re-arm: {arb.rearm_edges} heartbeat edges within the timeout and a commanded pulse within +-{arb.rearm_band_us:g} us "
         "of neutral. U4 boots in FAILSAFE.",
-        "- U4 runs from the Pi's 3V3; if the Pi is unpowered, R15 holds ESC_PWM low and the ESC's own signal-loss failsafe "
-        "applies. UPDI header J8 programs U4. Behaviour model: `r3_kicad.arbiter.FailsafeArbiter`.",
+        "- U4 runs from the Pi's 3V3; if the Pi is unpowered, U6's outputs default low (R15 also holds its input low) and "
+        "the ESC's own signal-loss failsafe applies. UPDI header J8 programs U4. Behaviour model: `r3_kicad.arbiter.FailsafeArbiter`.",
         "",
         "## Mounting",
         "",
@@ -145,17 +147,17 @@ def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign, power: 
     return "\n".join(lines)
 
 
-def _tvs_note(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign) -> str:
+def _tvs_note(intent: BoardIntent, pi: BuckDesign, servo: BuckBoostDesign) -> str:
     part = next((p.value for p in intent.parts if p.lib_id.startswith("Diode:SMAJ")), None)
     if part not in TVS_PARTS:
         return "- TVS: none."
     d = TVS_PARTS[part]
     abs_max = min(pi.ic.v_in_abs_max, servo.ic.v_in_abs_max)
-    surge = 20.0  # A: 2 x the 10 A blade fuse feeding the HAT (200 % for >= 0.15 s), the expected surge bound
+    surge = 20.0  # A: >= 2 x the blade fuse feeding the HAT (200 % for >= 0.15 s), the expected surge bound
     return (f"- TVS: {part} (VRWM {d['v_rwm']:g} V, VBR {d['v_br_min']:g}-{d['v_br_max']:g} V, VC {d['v_c']:g} V at "
             f"{d['i_pp']:g} A). A 2S pack is 8.4 V full, below the {d['v_rwm']:g} V stand-off. Clamp "
-            f"{tvs_clamp(part, surge):.1f} V at the expected {surge:g} A surge (2 x the HAT branch's 10 A fuse; "
+            f"{tvs_clamp(part, surge):.1f} V at the expected {surge:g} A surge (>= 2 x the HAT branch's fuse; "
             f"V_C(I) = V_BR,max + (V_C - V_BR,max) I / I_PP) and {d['v_c']:g} V at I_PP, below the regulators' "
-            f"{abs_max:g} V VIN absolute maximum (TPS56528 20 V, TPS568230 22 V). The previous SMAJ16A clamped at "
+            f"{abs_max:g} V VIN absolute maximum (TPS568230 22 V; LM5175 60 V, CSD17577Q3A 30 V). The previous SMAJ16A clamped at "
             f"{tvs_clamp('SMAJ16A', min(surge, TVS_PARTS['SMAJ16A']['i_pp'])):.1f} V at its {TVS_PARTS['SMAJ16A']['i_pp']:g} A "
             "I_PP, above 20 V. A 3S pack (12.6 V) would need a different TVS.")

@@ -3,16 +3,16 @@
   "kicad": "10.0.7",
   "steps": {
     "schematic": {
-      "seconds": 14.1,
+      "seconds": 14.5,
       "result": {
-        "symbols": 77,
-        "labels": 207,
+        "symbols": 104,
+        "labels": 290,
         "no_connects": 27,
         "writer": "kicad-sch-api, normalized by kicad-cli sch upgrade"
       }
     },
     "erc": {
-      "seconds": 2.4,
+      "seconds": 1.6,
       "result": {
         "errors": 0,
         "warnings": 0,
@@ -20,19 +20,19 @@
       }
     },
     "netlist": {
-      "seconds": 0.4,
+      "seconds": 0.3,
       "result": {
-        "nets": 80,
+        "nets": 97,
         "matches_intent": true
       }
     },
     "board": {
-      "seconds": 4.7,
+      "seconds": 3.0,
       "result": {
-        "footprints": 73,
-        "tracks": 90,
-        "vias": 7,
-        "zones": 5,
+        "footprints": 97,
+        "tracks": 174,
+        "vias": 29,
+        "zones": 9,
         "keepouts": 16,
         "anchored": {
           "J1": {
@@ -43,65 +43,43 @@
       }
     },
     "route": {
-      "seconds": 306.2,
+      "seconds": 60.6,
       "result": {
         "freerouting": "2.5.0",
         "java": 25,
-        "max_passes": 100,
+        "max_passes": 200,
         "rounds": [
           {
             "round": 1,
             "freerouting_unrouted": 19,
-            "kicad_unconnected": 6,
-            "signal_unconnected": 1,
-            "open_nets": [
-              "/VIN_HAT"
-            ]
-          },
-          {
-            "round": 2,
-            "freerouting_unrouted": 21,
-            "kicad_unconnected": 6,
-            "signal_unconnected": 1,
-            "open_nets": [
-              "/VIN_HAT"
-            ],
-            "unrouted_for_retry": [
-              "/VIN_HAT"
-            ]
-          },
-          {
-            "round": 3,
-            "freerouting_unrouted": 22,
-            "kicad_unconnected": 5,
+            "kicad_unconnected": 9,
             "signal_unconnected": 0,
             "open_nets": []
           }
         ],
         "unconnected_after_routing": 0,
         "note": "signal connections only; ground is completed by the pours",
-        "attempt": 2,
-        "attempts": 2,
+        "attempt": 1,
+        "attempts": 1,
         "attempt_results": [
-          1,
           0
         ]
       }
     },
     "pour": {
-      "seconds": 1.7,
+      "seconds": 2.0,
       "result": {
         "zones": 1,
-        "stitching_vias": 101,
+        "stitching_vias": 49,
         "island_vias": 0,
         "untied_islands": 0
       }
     },
     "drc": {
-      "seconds": 2.6,
+      "seconds": 2.7,
       "result": {
         "errors": 0,
-        "warnings": 86,
+        "warnings": 133,
         "exclusions": 0,
         "unconnected": 0,
         "parity": 0,
@@ -109,14 +87,14 @@
       }
     }
   },
-  "started": "2026-10-29T03:08:53",
+  "started": "2026-10-29T17:25:57",
   "headless": {
     "gui_processes_started": [],
-    "samples": 997,
+    "samples": 244,
     "preexisting_gui_processes": [],
     "tool_windows_opened": [],
-    "window_samples": 250
+    "window_samples": 61
   },
-  "total_seconds": 332.2,
-  "inputs_digest": "629a2a3bc71af0c0"
+  "total_seconds": 84.8,
+  "inputs_digest": "4fbb35e8da6500d7"
 }

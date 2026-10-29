@@ -6,6 +6,10 @@
 dropout the output follows D_max V_in less the conduction drop
 I (D_max R_hs + (1 - D_max) R_ls + DCR), passed as ``R_drop``.
 
+A buck-boost has no dropout: it passes ``dropout`` far below zero, and its
+``current_limit`` is an expression in V_in (the boost-mode peak inductor current
+limit scaled by V_in eta / V_out).
+
 ``min_s``/``softplus`` are smooth min/max (width 20 mV / 20 mA) so the Newton
 iteration stays differentiable through dropout and current-limit foldback.
 Input current: linear -> i; switching -> V_out i / (eta(i) V_in) (power
@@ -28,7 +32,7 @@ ENABLE_CARD = f".model {ENABLE_MODEL} sw vt=0.5 vh=0 ron=1e-5 roff=1e9"
 
 
 def regulator_lines(net: Netlist, prefix: str, out: str, gnd: str, vin: str, v_set: float, r_out: float,
-                    dropout: float, r_dropout: float, current_limit: float, kind: str,
+                    dropout: float, r_dropout: float, current_limit: float | str, kind: str,
                     efficiency: np.ndarray | None = None, enable: tuple[str, str, str, str] | None = None,
                     max_duty: float = 1.0, reverse_limit: float | None = None,
                     enable_gain: str | None = None) -> list[str]:
@@ -51,7 +55,8 @@ def regulator_lines(net: Netlist, prefix: str, out: str, gnd: str, vin: str, v_s
     vin_rel = f"v({vin},{gnd})"
     headroom = vin_rel if max_duty >= 1.0 else f"{fmt(max_duty)}*{vin_rel}"
     regulated = smooth_min(f"{fmt(v_set)}-{fmt(r_out)}*{i}", f"{headroom}-{fmt(dropout)}-{fmt(r_dropout)}*{i}", SMOOTH_V)
-    target = f"{softplus(regulated, SMOOTH_V)}-{FOLDBACK_SLOPE}*{softplus(f'{i}-{fmt(current_limit)}', SMOOTH_I)}"
+    limit = current_limit if isinstance(current_limit, str) else fmt(current_limit)  # a number or an expression
+    target = f"{softplus(regulated, SMOOTH_V)}-{FOLDBACK_SLOPE}*{softplus(f'{i}-({limit})', SMOOTH_I)}"
     if reverse_limit is not None:
         target += f"+{FOLDBACK_SLOPE}*{softplus(f'-{i}-{fmt(reverse_limit)}', SMOOTH_I)}"
     if enable_gain is not None:

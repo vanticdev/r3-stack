@@ -1,17 +1,20 @@
 """SPICE (ngspice) subcircuit of the carrier HAT power path for the electrical twin.
 
 XT30 contact -> P-FET channel (DMP3013SFV) -> 2 mOhm shunt -> VIN_HAT (ceramics +
-220 uF polymer) -> two *averaged* CCM bucks: TPS568230 (5.1 V, Pi) and TPS56528
-(6.0 V, servo). Each buck's switch node is the controlled source D * Vin with an
-integrating error amplifier on the real feedback divider; D is clamped to the
-part's maximum duty, the input draws D * I_L, and the converter is enabled only
-above its VIN UVLO (with hysteresis). The servo buck's valley current limit is a
-behavioural clamp on the inductor current. Switching ripple is not modelled.
+220 uF polymer) -> an *averaged* CCM buck, TPS568230 (5.1 V, Pi), and an averaged
+current-mode 4-switch buck-boost, LM5175 (6.0 V, servo). The buck's switch node is
+the controlled source D * Vin with an integrating error amplifier on the real
+feedback divider; D is clamped to the part's maximum duty and the input draws
+D * I_L. The buck-boost has no dropout: a PI error amplifier on its divider
+commands the output current (current-mode control, inner loop assumed ideal),
+bounded by the minimum current limit (buck valley, boost peak scaled by
+Vin eta / Vout), and the input draws P_out / (eta V_in). Each converter is
+enabled only above its VIN UVLO (with hysteresis). Switching ripple is not modelled.
 """
 
 from __future__ import annotations
 
-from .regulators import BuckDesign
+from .regulators import BuckBoostDesign, BuckDesign
 
 
 def _buck(tag: str, design: BuckDesign, vin: str, vout: str, uvlo_on: float, uvlo_off: float,
@@ -46,6 +49,43 @@ def _buck(tag: str, design: BuckDesign, vin: str, vout: str, uvlo_on: float, uvl
     return lines
 
 
+def _buck_boost(tag: str, design: BuckBoostDesign, vin: str, vout: str) -> list[str]:
+    v, ic = design.values, design.ic
+    c_out = v["c_out_effective"]
+    eta = v["efficiency_min"]
+    ratio = design.r_fb_lower / (design.r_fb_lower + design.r_fb_upper)
+    i_ctl = 2.0 * design.req.i_peak                  # control range of the current command
+    kp = 2 * 3.14159 * v["f_bw"] * c_out / (i_ctl * ratio)
+    ki = kp * 2 * 3.14159 * v["f_bw"] / 5.0
+    i_buck = v["i_out_limit_buck_min"]
+    i_l_pk = v["i_l_peak_limit_min"] - v["ripple_boost_vin_min"] / 2.0
+    return [
+        f"* --- {tag}: {ic.part} 4-switch buck-boost, {v['v_out_nominal']:.3f} V, Cout {c_out * 1e6:.0f} uF eff., "
+        f"crossover {v['f_bw'] / 1e3:.0f} kHz",
+        f"RFB1_{tag} {vout} FB_{tag} {design.r_fb_upper:.6g}",
+        f"RFB2_{tag} FB_{tag} 0 {design.r_fb_lower:.6g}",
+        f"* EN/UVLO divider thresholds: on {v['uvlo_rising']:.3f} V, off {v['uvlo_falling']:.3f} V (Eq. 1/2)",
+        f"BEN_{tag} EN_{tag} 0 V = V({vin}) > {v['uvlo_rising']:.4g} ? 1 : (V({vin}) < {v['uvlo_falling']:.4g} ? 0 : V(ENM_{tag}))",
+        f"RENM_{tag} EN_{tag} ENM_{tag} 1k",
+        f"CENM_{tag} ENM_{tag} 0 1n",
+        f"* PI error amplifier -> output-current command (0..{i_ctl:g} A)",
+        f"BERR_{tag} 0 NC_{tag} I = {ki:.6g}*({ic.v_ref} - V(FB_{tag}))",
+        f"CC_{tag} NC_{tag} 0 1",
+        f"RCL_{tag} NC_{tag} 0 1e9",
+        f"BCMD_{tag} ND_{tag} 0 V = V(EN_{tag}) * min(max(V(NC_{tag}) + {kp:.6g}*({ic.v_ref} - V(FB_{tag})), 0), 1)",
+        f"* current limit: buck valley {i_buck:.2f} A; boost peak {i_l_pk:.2f} A x Vin x {eta:.3f} / Vout (datasheet minimum)",
+        f"BOUT_{tag} 0 {vout} I = min(V(ND_{tag})*{i_ctl:g}, min({i_buck:.4g}, {i_l_pk:.4g}*max(V({vin}),0.5)*{eta:.4g}/"
+        f"{v['v_out_nominal']:.4g}))",
+        f"BIN_{tag} {vin} 0 I = V({vout})*I(VOUT_{tag})/({eta:.4g}*max(V({vin}),0.5))",
+        f"VOUT_{tag} NSO_{tag} 0 0",
+        f"BSO_{tag} NSO_{tag} 0 I = min(V(ND_{tag})*{i_ctl:g}, min({i_buck:.4g}, {i_l_pk:.4g}*max(V({vin}),0.5)*{eta:.4g}/"
+        f"{v['v_out_nominal']:.4g}))",
+        f"BQ_{tag} {vin} 0 I = V(EN_{tag}) * {ic.i_q:.4g}",
+        f"COUT_{tag} {vout} NCE_{tag} {c_out:.4g}",
+        f"RCE_{tag} NCE_{tag} 0 {0.003 / max(design.c_out.count, 1):.4g}",
+    ]
+
+
 # Littelfuse SMAJ series (400 W, unidirectional), datasheet: stand-off V_RWM, breakdown V_BR min/max at
 # I_T = 1 mA, clamp V_C at the rated 10/1000 us peak pulse current I_PP.
 TVS_PARTS: dict[str, dict[str, float]] = {
@@ -60,7 +100,7 @@ def tvs_clamp(part: str, current: float) -> float:
     return d["v_br_max"] + (d["v_c"] - d["v_br_max"]) * current / d["i_pp"]
 
 
-def power_subcircuit(pi: BuckDesign, servo: BuckDesign, name: str = "R3_CARRIER_HAT_POWER", tvs: str = "SMAJ10A") -> str:
+def power_subcircuit(pi: BuckDesign, servo: BuckBoostDesign, name: str = "R3_CARRIER_HAT_POWER", tvs: str = "SMAJ10A") -> str:
     d = TVS_PARTS[tvs]
     # SPICE diode: breakdown at the middle of the V_BR window, series resistance from the clamp line.
     bv, rs = 0.5 * (d["v_br_min"] + d["v_br_max"]), (d["v_c"] - d["v_br_max"]) / d["i_pp"]
@@ -87,15 +127,14 @@ def power_subcircuit(pi: BuckDesign, servo: BuckDesign, name: str = "R3_CARRIER_
         "IQ VIN 0 3m",
     ]
     lines += _buck("PI", pi, "VIN", "V5", uvlo_on=pi.ic.uvlo_rising_max, uvlo_off=pi.ic.uvlo_falling_min, current_limit=None)
-    lines += _buck("SERVO", servo, "VIN", "V6", uvlo_on=servo.ic.uvlo_rising_max, uvlo_off=servo.ic.uvlo_falling_min,
-                   current_limit=servo.ic.i_ocl_min)
+    lines += _buck_boost("SERVO", servo, "VIN", "V6")
     lines += [
         "* 5 V hold-up: 220 uF hybrid polymer on the Pi rail",
         "CHOLD V5 NCH 220u",
         "RCH NCH 0 27m",
         f".ends {name}",
         "",
-        "* Example testbench (ngspice): Pi at 6.5 W, servo stall at 2.5 A, 2S pack sagging to 6 V",
+        "* Example testbench (ngspice): Pi at 6.5 W, servo stall at 2.5 A, 2S pack sagging to 6 V (the servo stays at 6.0 V)",
         "* VB VBAT 0 PWL(0 7.4 5m 7.4 6m 6.0 20m 6.0 21m 7.4)",
         f"* XHAT VBAT 0 V5 V6 {name}",
         "* RPI V5 0 4.0",

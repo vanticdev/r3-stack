@@ -332,7 +332,10 @@ class RcCarController:
         throttle_us = self.link.channel(self.channels["throttle"])
         finished = self.pursuit is not None and self.pursuit.progress >= self.pursuit.end_s - self.pursuit.config.finish_tolerance_m
         previous = self.supervisor.state
-        out = self.supervisor.update(now, link_ok, arm_us, throttle_us, self.ready, wheel_speed, finished, self.battery.cutoff)
+        # A braked wheel can stop turning while the car still slides: the brake ends on the larger of the
+        # wheel speed and the ground-speed estimate.
+        stop_speed = max(wheel_speed, ground_speed) if self.supervisor.braking else wheel_speed
+        out = self.supervisor.update(now, link_ok, arm_us, throttle_us, self.ready, stop_speed, finished, self.battery.cutoff)
         for name, fields in out.events:
             level = "warning" if name in ("radio_failsafe", "low_voltage_cutoff") else "info"
             if name == "mission_complete" and self.pursuit is not None:
@@ -355,7 +358,11 @@ class RcCarController:
         elif out.state == State.MANUAL:
             command = self._assist(self._manual_command(), wheel_speed)
         elif out.state == State.BRAKING:
-            command = Command(-self.supervisor.config.brake_throttle, 0.0)
+            if previous != State.BRAKING:
+                self.traction.brake.reset()
+                self.traction.yaw.reset()
+            brake = self.traction.brake_command(self.dt, wheel_speed, self.gyro_z)
+            command = Command(brake.throttle * self.supervisor.config.brake_throttle, self.pulses.steer_from_angle(brake.steer_rad))
         else:
             command = Command()
             self.speed_reference = 0.0

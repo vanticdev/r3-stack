@@ -23,6 +23,15 @@ E96 = [1.00, 1.02, 1.05, 1.07, 1.10, 1.13, 1.15, 1.18, 1.21, 1.24, 1.27, 1.30, 1
        8.66, 8.87, 9.09, 9.31, 9.53, 9.76]
 
 
+E12 = [1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2]
+
+
+def nearest_e12(value: float) -> float:
+    """Nearest E12 value (capacitors)."""
+    decade = 10 ** math.floor(math.log10(value))
+    return min((m * decade for m in E12 + [10.0]), key=lambda candidate: abs(math.log(candidate / value)))
+
+
 def nearest_e96(value: float) -> float:
     decade = 10 ** math.floor(math.log10(value))
     return min((m * decade for m in E96 + [10.0]), key=lambda candidate: abs(candidate - value))
@@ -339,3 +348,323 @@ def efficiency_curve(design: BuckDesign, v_in: float, loads: tuple[float, ...] =
                   + gate_and_quiescent + core_loss)
         out.append((i, round(v_out * i / (v_out * i + losses), 3)))
     return out
+
+
+# ------------------------------------------------------------------ 4-switch buck-boost (servo rail)
+@dataclass(frozen=True)
+class BuckBoostIC:
+    """Synchronous 4-switch buck-boost controller (external N-FETs), datasheet electrical data."""
+
+    part: str
+    datasheet: str
+    v_in_min: float
+    v_in_max: float
+    v_in_abs_max: float
+    v_ref: float
+    v_ref_min: float
+    v_ref_max: float
+    rt_offset: float              # RT = (1/fsw - rt_offset) / rt_capacitance
+    rt_capacitance: float
+    v_en: float                   # EN/UVLO operating threshold
+    i_en_standby: float           # EN/UVLO pull-up below the threshold (standby source current)
+    i_en_hysteresis: float        # added hysteresis current above it
+    i_ss: float
+    v_cs_buck: tuple[float, float, float]    # buck valley current-limit threshold min/typ/max
+    v_cs_boost: tuple[float, float, float]   # boost peak current-limit threshold min/typ/max
+    a_cs: float                   # current-sense amplifier gain
+    gm_slope: float
+    gm_ea: float
+    i_mode: float
+    v_vcc: float
+    i_q: float                    # operating supply current
+    theta_ja_jedec: float
+
+
+LM5175 = BuckBoostIC(
+    part="LM5175PWPR", datasheet="https://www.ti.com/lit/ds/symlink/lm5175.pdf (SNVSA37A)",
+    v_in_min=3.5, v_in_max=42.0, v_in_abs_max=60.0, v_ref=0.800, v_ref_min=0.788, v_ref_max=0.812,
+    rt_offset=200e-9, rt_capacitance=37e-12, v_en=1.23, i_en_standby=1.5e-6, i_en_hysteresis=3.5e-6, i_ss=5.0e-6,
+    v_cs_buck=(53.2e-3, 76e-3, 98e-3), v_cs_boost=(119e-3, 170e-3, 221e-3), a_cs=5.0, gm_slope=2e-6, gm_ea=1.27e-3,
+    i_mode=20e-6, v_vcc=7.35, i_q=1.65e-3, theta_ja_jedec=33.5,
+)
+
+
+@dataclass(frozen=True)
+class Mosfet:
+    part: str
+    v_ds: float
+    rds_on: float                 # at the gate drive used here (VCC 7.35 V; at VIN < 7.6 V VCC follows VIN)
+    rds_on_4v5: float
+    q_g: float                    # total gate charge at ~7 V gate drive
+    t_switch: float               # rise + fall time (estimated from Qgd and the driver resistance)
+    footprint: str
+    manufacturer: str = "Texas Instruments"
+
+
+# TI CSD17577Q3A NexFET (SLPS433): 30 V, 4.0 mOhm at VGS 10 V, ~5.5 mOhm at 4.5 V, Qg 12 nC (10 V; ~8.5 nC at 7 V, est.).
+CSD17577Q3A = Mosfet("CSD17577Q3AT", 30.0, 4.6e-3, 5.5e-3, 8.5e-9, 15e-9, "Package_SON:VSON-8_3.3x3.3mm_P0.65mm_NexFET")
+
+
+@dataclass
+class BuckBoostRequirements:
+    name: str
+    v_out: float
+    i_out: float                  # continuous design current
+    i_peak: float                 # short-term peak (servo stall with margin)
+    v_in_min: float = 4.4         # HAT input UVLO region (2S pack collapsing under a motor stall)
+    v_in_nom: float = 7.4
+    v_in_max: float = 8.4         # 2S full; 17 V TVS clamp is the absolute transient
+    v_in_transient: float = 17.0
+    f_sw: float = 400e3
+    uvlo_on: float = 4.5
+
+
+@dataclass
+class BuckBoostDesign:
+    ic: BuckBoostIC
+    fet: Mosfet
+    inductor: Inductor
+    c_out: CapacitorBank
+    c_in: CapacitorBank
+    req: BuckBoostRequirements
+    r_fb_upper: float
+    r_fb_lower: float
+    r_sense: float
+    r_t: float
+    c_slope: float
+    r_uv_upper: float
+    r_uv_lower: float
+    c_ss: float
+    r_comp: float
+    c_comp: float
+    c_comp_hf: float
+    r_mode: float
+    topology: str = "buck_boost"
+    values: dict[str, float] = field(default_factory=dict)
+    checks: list[tuple[str, bool, str]] = field(default_factory=list)
+
+    @property
+    def failed_checks(self) -> list[tuple[str, bool, str]]:
+        return [check for check in self.checks if not check[1]]
+
+
+def buck_boost_losses(d: BuckBoostDesign, v_in: float, i_out: float, core_loss: float = 0.06) -> dict[str, float]:
+    """Loss terms (W) of the 4-switch converter at one point: buck mode (QH2 on) above V_out, boost mode (QH1 on)
+    below (LM5175 Eq. 29-36); the sense resistor carries the low-side currents; gate drive Qg VCC fsw per switching
+    pair; dead time 2 x 0.7 V x I_L x 20 ns x fsw (estimated); estimated core loss."""
+    fet, ic, req = d.fet, d.ic, d.req
+    v_out = d.values["v_out_nominal"]
+    r_on = fet.rds_on if v_in >= 7.6 else fet.rds_on_4v5
+    f = req.f_sw
+    if v_in >= v_out:  # buck
+        duty = v_out / v_in
+        i_l = i_out
+        ripple = ripple_current(v_in, v_out, d.inductor.inductance, f)
+        i_sq = i_l ** 2 + ripple ** 2 / 12.0
+        conduction = i_sq * (duty * r_on + (1 - duty) * r_on + r_on) + (1 - duty) * i_sq * d.r_sense
+        switching = 0.5 * v_in * i_l * fet.t_switch * f
+    else:  # boost
+        duty = 1.0 - v_in / v_out
+        i_l = i_out * v_out / (v_in * 0.95)
+        ripple = v_in * (v_out - v_in) / (v_out * d.inductor.inductance * f)
+        i_sq = i_l ** 2 + ripple ** 2 / 12.0
+        conduction = i_sq * (r_on + duty * r_on + (1 - duty) * r_on) + duty * i_sq * d.r_sense
+        switching = 0.5 * v_out * i_l * fet.t_switch * f
+    dcr = i_sq * d.inductor.dcr_typ
+    gate = 2 * fet.q_g * min(ic.v_vcc, v_in) * f
+    dead = 2 * 0.7 * i_l * 20e-9 * f
+    quiescent = ic.i_q * v_in
+    total = conduction + switching + dcr + gate + dead + quiescent + core_loss
+    return {"conduction": conduction, "switching": switching, "dcr": dcr, "gate": gate, "dead_time": dead,
+            "quiescent": quiescent, "core": core_loss, "total": total, "i_l": i_l, "duty": duty}
+
+
+def buck_boost_efficiency(d: BuckBoostDesign, v_in: float, i_out: float) -> float:
+    v_out = d.values["v_out_nominal"]
+    p_out = v_out * i_out
+    return p_out / (p_out + buck_boost_losses(d, v_in, i_out)["total"])
+
+
+def design_buck_boost(ic: BuckBoostIC, fet: Mosfet, inductor: Inductor, c_out: CapacitorBank, c_in: CapacitorBank,
+                      req: BuckBoostRequirements, r_fb_lower: float, r_sense: float, c_slope: float, r_uv_upper: float,
+                      t_ss: float, f_bw: float, theta_ja_board: float = 45.0) -> BuckBoostDesign:
+    """LM5175 design procedure (SNVSA37A sec. 9.2.2), equation numbers from the datasheet."""
+    v: dict[str, float] = {}
+    checks: list[tuple[str, bool, str]] = []
+    f = req.f_sw
+    # Eq. 12: Rfb2 = (Vout - 0.8) / 0.8 * Rfb1.
+    r_fb_upper = nearest_e96(r_fb_lower * (req.v_out / ic.v_ref - 1.0))
+    v_out = ic.v_ref * (1 + r_fb_upper / r_fb_lower)
+    v["v_out_nominal"] = v_out
+    v["v_out_min"] = ic.v_ref_min * (1 + r_fb_upper * 0.99 / (r_fb_lower * 1.01))
+    v["v_out_max"] = ic.v_ref_max * (1 + r_fb_upper * 1.01 / (r_fb_lower * 0.99))
+    # Eq. 5: RT = (1/fsw - 200 ns) / 37 pF.
+    r_t = nearest_e96((1.0 / f - ic.rt_offset) / ic.rt_capacitance)
+    v["f_sw"] = 1.0 / (r_t * ic.rt_capacitance + ic.rt_offset)
+    # Eq. 13/14: inductance for 40 % ripple at the extremes.
+    v["l_buck_target"] = (req.v_in_max - v_out) * v_out / (0.4 * req.i_peak * f * req.v_in_max)
+    v["l_boost_target"] = req.v_in_min ** 2 * (v_out - req.v_in_min) / (0.4 * req.i_peak * f * v_out ** 2)
+    L = inductor.inductance
+    v["ripple_buck_vin_max"] = ripple_current(req.v_in_max, v_out, L, f)
+    v["ripple_boost_vin_min"] = req.v_in_min * (v_out - req.v_in_min) / (v_out * L * f)
+    v["d_boost_max"] = 1.0 - req.v_in_min / v_out
+    # Eq. 15-17: inductor current at the minimum input and peak load (90 % efficiency).
+    v["i_l_max"] = v_out * req.i_peak / (0.9 * req.v_in_min)
+    v["i_l_peak"] = v["i_l_max"] + v["ripple_boost_vin_min"] / 2.0
+    v["i_l_sat_required"] = 1.2 * v["i_l_peak"] / 0.8
+    checks.append(("inductor Isat above 1.2 I_L,peak / 0.8 (Eq. 17)", inductor.i_sat >= v["i_l_sat_required"],
+                   f"{inductor.i_sat:g} A >= {v['i_l_sat_required']:.2f} A"))
+    v["i_l_rms_cont"] = v_out * req.i_out / (0.9 * req.v_in_min)
+    checks.append(("inductor Irms above the continuous current at minimum input", inductor.i_rms >= v["i_l_rms_cont"],
+                   f"{inductor.i_rms:g} A >= {v['i_l_rms_cont']:.2f} A"))
+    # Eq. 22/23: sense resistor, 70 % of the current-limit thresholds at the peak load.
+    v["r_sense_buck_max"] = ic.v_cs_buck[1] * 0.7 / req.i_peak
+    v["r_sense_boost_max"] = ic.v_cs_boost[1] * 0.7 / v["i_l_peak"]
+    checks.append(("sense resistor leaves the peak load below 70 % of both current limits (Eq. 22-23)",
+                   r_sense <= min(v["r_sense_buck_max"], v["r_sense_boost_max"]) + 1e-12,
+                   f"{r_sense * 1e3:.1f} mOhm <= {min(v['r_sense_buck_max'], v['r_sense_boost_max']) * 1e3:.1f} mOhm"))
+    # Output current at the limits: buck valley + ripple/2; boost peak - ripple/2 scaled by Vin eta / Vout.
+    v["i_out_limit_buck_min"] = ic.v_cs_buck[0] / r_sense + ripple_current(req.v_in_nom, v_out, L, f) / 2.0
+    v["i_out_limit_buck_max"] = ic.v_cs_buck[2] / r_sense + v["ripple_buck_vin_max"] / 2.0
+    v["i_l_peak_limit_min"] = ic.v_cs_boost[0] / r_sense
+    v["i_l_peak_limit_max"] = ic.v_cs_boost[2] / r_sense
+    v["i_out_limit_boost_min"] = (v["i_l_peak_limit_min"] - v["ripple_boost_vin_min"] / 2.0) * req.v_in_min * 0.9 / v_out
+    v["i_out_limit_min"] = min(v["i_out_limit_buck_min"], v["i_out_limit_boost_min"])
+    v["i_out_limit_max"] = v["i_out_limit_buck_max"]
+    checks.append(("minimum current limit covers the peak load in buck and boost mode", v["i_out_limit_min"] >= req.i_peak,
+                   f"{v['i_out_limit_min']:.2f} A >= {req.i_peak:g} A"))
+    # In a sustained overload the inductor may reach the maximum boost limit (18 A with 12 mOhm) above its 12.3 A
+    # (30 % drop) saturation rating; hiccup mode (MODE = 93.1 kOhm) stops switching after 128 limited cycles (320 us).
+    v["i_sat_margin_at_max_limit"] = inductor.i_sat / v["i_l_peak_limit_max"]
+    # Eq. 24: sense resistor dissipation at the boost current limit, minimum input.
+    v["p_r_sense_max"] = (ic.v_cs_boost[1] / r_sense) ** 2 * r_sense * (1 - req.v_in_min / v_out)
+    # Eq. 25: dead-beat slope capacitor; a smaller capacitor (more slope) is chosen for the transition region.
+    v["c_slope_deadbeat"] = ic.gm_slope * L / (r_sense * ic.a_cs)
+    checks.append(("slope capacitor at or below the dead-beat value (Eq. 25)", c_slope <= v["c_slope_deadbeat"] * 1.05,
+                   f"{c_slope * 1e12:.0f} pF <= {v['c_slope_deadbeat'] * 1e12:.0f} pF"))
+    # Eq. 7/9: COMP range 0.3-3 V at the input extremes (no load buck, full load boost).
+    d_buck = v_out / req.v_in_transient
+    v["v_comp_buck_vin_transient"] = (1.6 + ic.a_cs * r_sense * v_out / (2 * L * f) * (1 - d_buck)
+                                      - (ic.gm_slope * (req.v_in_transient - v_out) + 6e-6) * (1 - d_buck) / (c_slope * f))
+    d_boost = v["d_boost_max"]
+    v["v_comp_boost_vin_min"] = (1.6 + ic.a_cs * r_sense * (req.i_peak * v_out / req.v_in_min
+                                                            - req.v_in_min * d_boost / (2 * L * f))
+                                 + (ic.gm_slope * (v_out - req.v_in_min) + 5e-6) * d_boost / (c_slope * f))
+    checks.append(("COMP above 0.3 V at no load and the 17 V transient input (Eq. 7)", v["v_comp_buck_vin_transient"] > 0.3,
+                   f"{v['v_comp_buck_vin_transient']:.2f} V"))
+    checks.append(("COMP below 3 V at peak load and minimum input (Eq. 9)", v["v_comp_boost_vin_min"] < 3.0,
+                   f"{v['v_comp_boost_vin_min']:.2f} V"))
+    # Eq. 1/2/26: EN/UVLO divider.
+    r_uv_lower = nearest_e96(r_uv_upper * ic.v_en / (req.uvlo_on + ic.i_en_standby * r_uv_upper - ic.v_en))
+    v["uvlo_rising"] = ic.v_en * (1 + r_uv_upper / r_uv_lower) - r_uv_upper * ic.i_en_standby
+    v["uvlo_hysteresis"] = ic.i_en_hysteresis * r_uv_upper
+    v["uvlo_falling"] = v["uvlo_rising"] - v["uvlo_hysteresis"]
+    checks.append(("UVLO falling threshold above the controller's 3.5 V minimum VIN", v["uvlo_falling"] > ic.v_in_min,
+                   f"{v['uvlo_falling']:.2f} V"))
+    # Eq. 3: soft start.
+    c_ss = nearest_e12(t_ss * ic.i_ss / ic.v_ref)
+    v["t_ss"] = c_ss * ic.v_ref / ic.i_ss
+    # Eq. 37-44: compensation for the boost mode (RHP zero), zero at 1.5 x the boost output pole.
+    c_eff = c_out.effective
+    v["c_out_effective"] = c_eff
+    r_load = v_out / req.i_peak
+    v["f_rhp"] = r_load * (1 - d_boost) ** 2 / (2 * math.pi * L)
+    v["f_bw"] = min(f_bw, v["f_rhp"] / 3.0, f / 20.0)
+    v["f_p_boost"] = 2.0 / (2 * math.pi * r_load * c_eff)
+    r_comp = nearest_e96(2 * math.pi * v["f_bw"] / ic.gm_ea * (r_fb_lower + r_fb_upper) / r_fb_lower
+                         * ic.a_cs * r_sense * c_eff / (1 - d_boost))
+    v["f_zc"] = 1.5 * v["f_p_boost"] / 4.0  # well below crossover: the output pole moves down at light load
+    c_comp = nearest_e12(1.0 / (2 * math.pi * v["f_zc"] * r_comp))
+    c_comp_hf = nearest_e12(1.0 / (2 * math.pi * r_comp * f / 2.0))  # HF pole at fsw / 2
+    checks.append(("crossover below one third of the RHP zero and fsw/20", v["f_bw"] <= min(v["f_rhp"] / 3, f / 20) + 1e-6,
+                   f"{v['f_bw'] / 1e3:.1f} kHz (RHP zero {v['f_rhp'] / 1e3:.1f} kHz)"))
+    # Output capacitor ripple in boost (Eq. 18-20) and input RMS in buck (Eq. 21).
+    v["i_cout_rms"] = req.i_out * math.sqrt(max(v_out / req.v_in_min - 1, 0.0))
+    v["v_ripple_boost"] = req.i_out * (1 - req.v_in_min / v_out) / (c_eff * f) + req.i_out * v_out / req.v_in_min * c_out.esr / c_out.count
+    v["i_cin_rms"] = req.i_out * 0.5
+    checks.append(("FET VDS rating above the 17 V TVS clamp", fet.v_ds >= req.v_in_transient * 1.25,
+                   f"{fet.v_ds:g} V >= {req.v_in_transient * 1.25:.1f} V"))
+    design = BuckBoostDesign(ic=ic, fet=fet, inductor=inductor, c_out=c_out, c_in=c_in, req=req, r_fb_upper=r_fb_upper,
+                             r_fb_lower=r_fb_lower, r_sense=r_sense, r_t=r_t, c_slope=c_slope, r_uv_upper=r_uv_upper,
+                             r_uv_lower=r_uv_lower, c_ss=c_ss, r_comp=r_comp, c_comp=c_comp, c_comp_hf=c_comp_hf,
+                             r_mode=93.1e3, values=v, checks=checks)
+    # Losses, efficiency, junction temperatures.
+    for label, v_in in (("min", req.v_in_min), ("nom", req.v_in_nom), ("max", req.v_in_max)):
+        loss = buck_boost_losses(design, v_in, req.i_out)
+        v[f"loss_{label}"] = loss["total"]
+        v[f"efficiency_{label}"] = v_out * req.i_out / (v_out * req.i_out + loss["total"])
+        v[f"i_in_vin_{label}"] = v_out * req.i_out / (v[f"efficiency_{label}"] * v_in)
+    v["efficiency"] = v["efficiency_nom"]
+    v["theta_ja_board"] = theta_ja_board
+    worst = buck_boost_losses(design, req.v_in_min, req.i_out)
+    per_fet = (worst["conduction"] - worst["i_l"] ** 2 * design.r_sense * worst["duty"]) / 2.0 + worst["switching"]
+    v["t_fet_25c"] = 25.0 + per_fet * 60.0  # VSON 3.3 x 3.3 on 1 oz with a small pour: ~60 C/W (estimated)
+    checks.append(("hottest FET below 125 C at the continuous load, minimum input, 25 C", v["t_fet_25c"] < 125,
+                   f"{v['t_fet_25c']:.0f} C"))
+    v["i_out_max"] = req.i_out
+    return design
+
+
+def servo_rail() -> BuckBoostDesign:
+    """6.0 V servo rail: TI LM5175 4-switch buck-boost, 3 A continuous / 4 A peak from 4.4-8.4 V (17 V transient).
+
+    It replaces the TPS56528 buck, which was in dropout below ~7.8 V input (4.80 V at the servo at minimum
+    charge). Four CSD17577Q3A NexFETs, Coilcraft XAL7030-332 (3.3 uH), 12 mOhm sense resistor, 400 kHz, CCM
+    with hiccup current limit; the servo sees 6.0 V from a full pack down to the 4.2 V UVLO."""
+    req = BuckBoostRequirements("SERVO_6V", v_out=6.0, i_out=3.0, i_peak=4.0)
+    c_out = CapacitorBank("GRM31CR61C226KE15L", 22e-6, 16.0, 0.45, count=4, footprint="Capacitor_SMD:C_1206_3216Metric")
+    c_in = CapacitorBank(*C_IN_22U_25V[:4], count=2, footprint=C_IN_22U_25V[4])
+    return design_buck_boost(LM5175, CSD17577Q3A, XAL7030_332, c_out, c_in, req, r_fb_lower=20.0e3, r_sense=12e-3,
+                             c_slope=47e-12, r_uv_upper=100e3, t_ss=10e-3, f_bw=8e3)
+
+
+def buck_boost_efficiency_curve(design: BuckBoostDesign, v_in: float,
+                                loads: tuple[float, ...] = (0.1, 0.5, 1.0, 2.0, 3.0, 4.0)) -> list[tuple[float, float]]:
+    return [(i, round(buck_boost_efficiency(design, v_in, i), 3)) for i in loads]
+
+
+def buck_boost_notes_markdown(design: BuckBoostDesign, title: str) -> str:
+    v, ic, req, ind, fet = design.values, design.ic, design.req, design.inductor, design.fet
+    rows = [
+        ("Feedback divider", "Vout = 0.8 V (1 + Rfb2/Rfb1) (Eq. 12)",
+         f"Rfb2 = {_si(design.r_fb_upper, 'Ohm')}, Rfb1 = {_si(design.r_fb_lower, 'Ohm')} -> {v['v_out_nominal']:.3f} V "
+         f"({v['v_out_min']:.3f}-{v['v_out_max']:.3f} V)"),
+        ("Switching frequency", "RT = (1/fsw - 200 ns) / 37 pF (Eq. 5)", f"RT = {_si(design.r_t, 'Ohm')} -> {v['f_sw'] / 1e3:.0f} kHz"),
+        ("Inductor", "Eq. 13/14: L for 40 % ripple", f"targets {v['l_buck_target'] * 1e6:.2f} uH (buck) / {v['l_boost_target'] * 1e6:.2f} uH "
+         f"(boost); fitted {ind.manufacturer} {ind.part} {_si(ind.inductance, 'H')}, Isat {ind.i_sat:g} A, Irms {ind.i_rms:g} A"),
+        ("Ripple", "buck Vout (Vin-Vout)/(Vin L f); boost Vin (Vout-Vin)/(Vout L f)",
+         f"{v['ripple_buck_vin_max']:.2f} A at {req.v_in_max:g} V, {v['ripple_boost_vin_min']:.2f} A at {req.v_in_min:g} V"),
+        ("Inductor current", "Eq. 15-17", f"I_L,max {v['i_l_max']:.2f} A, peak {v['i_l_peak']:.2f} A at {req.i_peak:g} A out, "
+         f"Isat required {v['i_l_sat_required']:.2f} A"),
+        ("Sense resistor", "Eq. 22/23: 70 % of 76 mV buck valley / 170 mV boost peak",
+         f"{design.r_sense * 1e3:.0f} mOhm (max {v['r_sense_buck_max'] * 1e3:.1f} / {v['r_sense_boost_max'] * 1e3:.1f} mOhm); "
+         f"dissipation at the boost limit {v['p_r_sense_max']:.2f} W (Eq. 24)"),
+        ("Current limit", "buck valley 53-98 mV, boost peak 119-221 mV",
+         f"output {v['i_out_limit_min']:.2f}-{v['i_out_limit_max']:.2f} A; inductor peak limit {v['i_l_peak_limit_min']:.1f}-"
+         f"{v['i_l_peak_limit_max']:.1f} A; hiccup after 128 cycles (MODE 93.1 kOhm: CCM, hiccup)"),
+        ("Slope", "C_slope = gm_slope L / (Rsense A_cs) (Eq. 25)",
+         f"dead-beat {v['c_slope_deadbeat'] * 1e12:.0f} pF; fitted {design.c_slope * 1e12:.0f} pF (more slope for the transition region)"),
+        ("COMP range", "Eq. 7 / Eq. 9", f"{v['v_comp_buck_vin_transient']:.2f} V at no load, {req.v_in_transient:g} V in; "
+         f"{v['v_comp_boost_vin_min']:.2f} V at {req.i_peak:g} A, {req.v_in_min:g} V in (window 0.3-3 V)"),
+        ("UVLO", "Vuv = 1.23 V (1 + Ruv2/Ruv1) - 1.5 uA Ruv2; hysteresis 3.5 uA Ruv2 (Eq. 1/2)",
+         f"Ruv2 {_si(design.r_uv_upper, 'Ohm')}, Ruv1 {_si(design.r_uv_lower, 'Ohm')}: on {v['uvlo_rising']:.2f} V, off {v['uvlo_falling']:.2f} V"),
+        ("Soft start", "tss = Css 0.8 V / 5 uA (Eq. 3)", f"Css {_si(design.c_ss, 'F')} -> {v['t_ss'] * 1e3:.1f} ms"),
+        ("Compensation", "Eq. 39, 43, 44", f"RHP zero {v['f_rhp'] / 1e3:.1f} kHz, crossover {v['f_bw'] / 1e3:.1f} kHz; Rc1 "
+         f"{_si(design.r_comp, 'Ohm')}, Cc1 {_si(design.c_comp, 'F')}, Cc2 {_si(design.c_comp_hf, 'F')}"),
+        ("Output capacitance", "ceramic X5R (DC bias estimated)", f"{design.c_out.count} x 22 uF -> {v['c_out_effective'] * 1e6:.1f} uF; "
+         f"boost ripple {v['v_ripple_boost'] * 1e3:.0f} mV, RMS {v['i_cout_rms']:.2f} A (Eq. 18-20)"),
+        ("FETs", "Eq. 29-36 + gate drive + dead time (estimated)", f"4 x {fet.part}, {fet.v_ds:g} V, {fet.rds_on * 1e3:.1f} mOhm; "
+         f"hottest {v['t_fet_25c']:.0f} C at {req.i_out:g} A, {req.v_in_min:g} V in"),
+        ("Efficiency at 3 A", "losses above (estimated)", f"{100 * v['efficiency_min']:.1f} / {100 * v['efficiency_nom']:.1f} / "
+         f"{100 * v['efficiency_max']:.1f} % at {req.v_in_min:g} / {req.v_in_nom:g} / {req.v_in_max:g} V"),
+        ("Input current at 3 A", "Iin = Pout / (eta Vin)", f"{v['i_in_vin_min']:.2f} A at {req.v_in_min:g} V, {v['i_in_vin_nom']:.2f} A at "
+         f"{req.v_in_nom:g} V"),
+    ]
+    lines = [f"## {title}", "", f"Part: TI {ic.part} ({ic.datasheet}), 4-switch buck-boost controller, VIN "
+             f"{ic.v_in_min:g}-{ic.v_in_max:g} V. No dropout: the output stays at {v['v_out_nominal']:.2f} V from the 17 V "
+             f"transient down to the {v['uvlo_falling']:.2f} V UVLO.", "",
+             "| Quantity | Equation / source | Value |", "| --- | --- | --- |"]
+    lines += [f"| {a} | {b} | {c} |" for a, b, c in rows]
+    lines += ["", "Design checks:", ""]
+    lines += [f"- [{'x' if ok else ' '}] {name}: {detail}" for name, ok, detail in design.checks]
+    return "\n".join(lines) + "\n"
