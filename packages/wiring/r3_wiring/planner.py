@@ -64,8 +64,9 @@ FLOATING_MOVE = 0.02  # m: a floating mated pair may move this far from the rout
 BRANCH_MOVE = 0.03  # m: a breakout may move this far
 PIGTAIL_CONE = math.radians(30.0)  # integral pigtails may leave their grommet this far off the authored direction
 SUPPORT_TILT = math.radians(15.0)  # bundle axis tilt allowed where it leaves a support strap
-STATIC_MARGIN = 0.0005  # m, extra static clearance (field interpolation error)
-TERMINATION_SLACK = 0.001  # m: inside a termination zone a point may lose this much of its routed clearance
+STATIC_MARGIN = 0.0012  # m, extra static clearance: trilinear 3 mm field error near thin plates and edges
+MOVING_MARGIN = 0.0005  # m, same for the moving-parts field
+TERMINATION_SLACK = 0.0  # m: inside a termination zone a point may not lose any of its routed clearance
 BEND_MARGIN = 1.03  # planned radius / catalog minimum
 EDGE_STRETCH = 1.6
 SURFACE_BAND = 0.006  # m: bundle surface farther than this from structure cannot sit on a tie mount
@@ -324,7 +325,7 @@ class _Problem:
             fm, _ = self.fields.sample("moving", p)
             arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(p, axis=0), axis=1))])
             static_req = np.full(len(p), r + STATIC_MARGIN)
-            moving_req = np.full(len(p), r + self.c_req)
+            moving_req = np.full(len(p), r + self.c_req + MOVING_MARGIN)
             terminal = np.zeros(len(p), dtype=bool)
             for key, from_end in ((seg.start, arc), (seg.end, arc[-1] - arc)):
                 j = self.junctions[key]

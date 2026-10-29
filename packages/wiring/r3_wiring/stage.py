@@ -27,6 +27,7 @@ Artifacts under ``build/wiring/``: ``routes.json`` (contract plus ``valid``,
 
 from __future__ import annotations
 
+import copy
 import json
 import time
 from collections import Counter
@@ -55,6 +56,7 @@ STAGE = "wiring"
 #: Router surface weight used by the stage: routes that hug structure can be supported
 #: (the router's own default, 0.6, lets signal leads float mid-air between parts).
 SUPPORTABLE_SURFACE_WEIGHT = 3.0
+SUPPORT_RETRIES = 2
 
 
 def route_and_check(project: Project, options: RouterOptions | None = None, *, plan: bool = True,
@@ -68,9 +70,22 @@ def route_and_check(project: Project, options: RouterOptions | None = None, *, p
     planning = supports = None
     planning_diagnostics: list[Diagnostic] = []
     if plan:
-        plan_routing(project, router, routing, obstacles=obstacles)
+        first = plan_routing(project, router, routing, obstacles=obstacles)
+        snapshot = copy.deepcopy(routing)
         supports = place_supports(project, obstacles, routing)
         planning = plan_routing(project, router, routing, supports=support_constraints(supports), obstacles=obstacles)
+        # A support whose fixed point / face-parallel axis makes a route infeasible is dropped
+        # and its group re-planned from the unsupported plan (the span check then reports the gap).
+        for _ in range(SUPPORT_RETRIES):
+            blamed = _blamed_supports(supports, planning, first)
+            if not blamed:
+                break
+            supports.supports = [s for s in supports.supports if s.id not in blamed]
+            supports.dropped.extend(sorted(blamed))
+            routing = copy.deepcopy(snapshot)
+            planning = plan_routing(project, router, routing, supports=support_constraints(supports),
+                                    obstacles=obstacles)
+        planning.stats["first_pass"] = first.stats
         planning_diagnostics = planning.diagnostics
         for harness_id, harness in routing.harnesses.items():
             hints = [np.asarray(t, float) for h in project.spec.electrical.harnesses if h.id == harness_id
@@ -92,6 +107,20 @@ def route_and_check(project: Project, options: RouterOptions | None = None, *, p
     return {"obstacles": obstacles, "routing": routing, "report": report, "routes": routes, "router": router,
             "planning": planning, "supports": supports, "cuts": cuts, "bundles": bundles, "audit": audit,
             "witnesses": witnesses, "before": before, "diagnostics": all_diagnostics}
+
+
+def _blamed_supports(supports: Any, planning: Any, first: Any) -> set[str]:
+    """Supports whose own junction is infeasible, in groups that pass 2 made worse than pass 1."""
+    before = {"+".join(p.harnesses): len(p.violations) for p in first.plans}
+    blamed = set()
+    for plan in planning.plans:
+        if len(plan.violations) <= before.get("+".join(plan.harnesses), 0):
+            continue
+        for v in plan.violations:
+            for s in supports.supports:
+                if v.junction == f"{s.harness}/S:{s.id.split('.')[-1]}":
+                    blamed.add(s.id)
+    return blamed
 
 
 def _extend_routes(routes: dict[str, Any], routing: Any, cuts: dict[str, Any], supports: Any, bundles: Any) -> None:
@@ -235,7 +264,8 @@ def run(project: Project, options: RouterOptions | None = None, drive_profile: D
     _dump(out / "geometry_audit.json", bundle["audit"])
     result.artifact("wiring/geometry_audit.json", "json", "CAD mesh audit: closure, winding, units, placement, staleness")
     if supports is not None:
-        _dump(out / "supports.json", {"supports": [s.as_dict() for s in supports.supports], "spans": supports.spans,
+        _dump(out / "supports.json", {"supports": [s.as_dict() for s in supports.supports], "dropped": supports.dropped,
+                                      "spans": supports.spans,
                                       "limits": supports.limits})
         result.artifact("wiring/supports.json", "json", "Cable supports (hardware, pose, host, checks) and spans")
     _dump(out / "cut_lengths.json", cut_report(cuts))
@@ -264,11 +294,12 @@ def run(project: Project, options: RouterOptions | None = None, drive_profile: D
             result.artifact(f"wiring/{path.name}", "plot_png", "Harness routing render")
         for path in render_slack(out, obstacles, routes, detail, drive.snapshot, drive.timeline, drive.requirement, title):
             result.artifact(f"wiring/{path.name}", "plot_png", "Cable slack simulation render")
-        from .views import render_derating, render_planning, render_supports, render_witnesses
+        from .views import render_derating, render_planning, render_support_details, render_supports, render_witnesses
 
         if supports is not None:
-            for path in render_supports(out, obstacles, routes, colors, [s.as_dict() for s in supports.supports],
-                                        supports.spans, title):
+            placed = [s.as_dict() for s in supports.supports]
+            for path in render_supports(out, obstacles, routes, colors, placed, supports.spans, title) + \
+                    render_support_details(out, obstacles, routes, colors, placed, title):
                 result.artifact(f"wiring/{path.name}", "plot_png", "Cable supports render")
         for path in render_witnesses(out, obstacles, routes, colors, bundle["witnesses"], title):
             result.artifact(f"wiring/{path.name}", "plot_png", "Clearance witness pairs")

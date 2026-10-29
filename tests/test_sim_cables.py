@@ -48,8 +48,11 @@ def test_cables_are_in_the_vehicle_world(routed):
     assert rigid == pytest.approx(sum(mujoco.MjModel.from_xml_string(plain.xml).body_mass), rel=1e-9)
     assert sum(model.body_mass) - rigid == pytest.approx(plan.total_mass, rel=0.02)
     assert vm.total_mass == pytest.approx(plain.total_mass + plan.total_mass)
-    # Cables are anchored to the bodies that carry their pins (knuckles, wheels or chassis).
-    welds = [i for i in range(model.neq) if model.eq_type[i] == mujoco.mjtEq.mjEQ_WELD]
+    # Cables are anchored to the bodies that carry their pins (knuckles, wheels or chassis): a weld
+    # per clamped pin, a connect per pinned support (r3_wiring.supports permitted motion).
+    welds = [i for i in range(model.neq)
+             if int(model.eq_type[i]) in (int(mujoco.mjtEq.mjEQ_WELD), int(mujoco.mjtEq.mjEQ_CONNECT))
+             and (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_EQUALITY, i) or "").endswith("_pin")]
     assert len(welds) == sum(len(b.spans) for b in plan.bundles)
     parents = {mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, int(model.eq_obj2id[i])) for i in welds}
     assert parents <= set(vm.bodies)
@@ -68,7 +71,10 @@ def test_kernel_clearance_is_a_physical_surface_distance(routed):
     monitor = kernel.vehicle.cables
     exact = monitor.exact_distances()
     for bundle, current in zip(monitor.bundle_ids, monitor.current):
-        assert current == pytest.approx(exact[bundle][0], abs=1e-6), bundle
+        # Separated pairs: identical signed distance. Penetrating pairs: MuJoCo's contact narrow phase
+        # and mj_geomDistance estimate the depth with different algorithms (tens of micrometres).
+        tolerance = 1e-6 if exact[bundle][0] >= 0 else 5e-5
+        assert current == pytest.approx(exact[bundle][0], abs=tolerance), bundle
     distance, wire, part = kernel.min_wire_clearance
     print("kernel min clearance at rest:", round(distance * 1e3, 2), "mm", wire, part)
     assert -0.005 < distance <= monitor.margin

@@ -389,18 +389,41 @@ def _measure_diagnostic(diagnostic: Diagnostic, obstacle: Obstacle, routing: Any
             return None
         return measure(obstacle, body.surface_points(0.001), 0.0, swept=True, router_value=data.get("min_distance"),
                        use_mujoco=use_mujoco)
-    wire_id = data.get("worst_wire") or next((s for s in diagnostic.subjects if s in routing.wires), None)
+    per_wire = data.get("per_wire_penetration") or {}
+    wire_id = data.get("worst_wire") or (max(per_wire, key=per_wire.get) if per_wire else None) or \
+        next((s for s in diagnostic.subjects if s in routing.wires), None)
     if wire_id not in routing.wires:
         return None
     wire = routing.wires[wire_id]
     points, arc, radius = _wire_samples(wire)
     swept = diagnostic.code == "wire_clearance_violation"
+    keep = ~_exempt(routing, wire, arc, points, obstacle)
     s0 = data.get("arc_length")
     if s0 is not None:
-        window = np.abs(arc - float(s0)) <= 0.015  # the checker's worst point and its neighbourhood
-        points, radius = points[window], radius[window]
+        keep &= np.abs(arc - float(s0)) <= 0.015  # the checker's worst point and its neighbourhood
+    if not keep.any():
+        return None
+    points, radius = points[keep], radius[keep]
     router = data.get("min_distance") if swept else -float(data.get("penetration", 0.0))
     return measure(obstacle, points, radius, swept=swept, router_value=router, use_mujoco=use_mujoco)
+
+
+def _exempt(routing: Any, wire: Any, arc: np.ndarray, points: np.ndarray, obstacle: Obstacle) -> np.ndarray:
+    """The checker's exemptions: termination zones on the part a wire terminates on (and
+    the parts it is mounted on), and this harness's drilled pass-throughs."""
+    nodes = routing.nodes[wire.harness]
+    start, end = nodes[wire.from_node], nodes[wire.to_node]
+    mask = np.zeros(len(arc), dtype=bool)
+    if obstacle.component in start.exempt:
+        mask |= arc <= start.termination_length
+    if obstacle.component in end.exempt:
+        mask |= arc[-1] - arc <= end.termination_length
+    if obstacle.plate_axis is not None:
+        for hole in routing.holes:
+            if hole.plate == obstacle.component and wire.harness in hole.harnesses:
+                in_plane = [i for i in range(3) if i != hole.axis]
+                mask |= np.linalg.norm((points - hole.center)[:, in_plane], axis=1) <= max(hole.diameter / 2, 0.004) + 0.002
+    return mask
 
 
 def _connector_body(diagnostic: Diagnostic, routing: Any, catalog: Any) -> Box | None:

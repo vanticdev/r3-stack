@@ -159,6 +159,7 @@ class SupportReport:
     diagnostics: list[Diagnostic]
     spans: list[dict[str, Any]]
     limits: dict[str, float]  # harness -> max unsupported span
+    dropped: list[str] = field(default_factory=list)  # placed, then removed: they made a route infeasible
 
     def by_harness(self) -> dict[str, list[dict[str, Any]]]:
         out: dict[str, list[dict[str, Any]]] = {}

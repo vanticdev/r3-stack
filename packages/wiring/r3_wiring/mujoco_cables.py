@@ -250,7 +250,7 @@ def _bulged(path: np.ndarray, length: float, direction: np.ndarray, segments: in
     offset = (np.sin(math.pi * u) ** 2)[:, None] * normal
 
     def vertices(amplitude: float) -> np.ndarray:
-        return _resample(path + amplitude * offset, segments)
+        return _equal_chords(path + amplitude * offset, segments)
 
     def chord_length(amplitude: float) -> float:
         return float(np.linalg.norm(np.diff(vertices(amplitude), axis=0), axis=1).sum())
@@ -264,6 +264,44 @@ def _bulged(path: np.ndarray, length: float, direction: np.ndarray, segments: in
         mid = 0.5 * (lo + hi)
         lo, hi = (mid, hi) if chord_length(mid) < length else (lo, mid)
     return vertices(hi)
+
+
+def _equal_chords(path: np.ndarray, segments: int) -> np.ndarray:
+    """``segments + 1`` vertices on ``path`` with equal chord lengths (equal arc spacing would
+    let chords across a tight curl fall below the bending-stability segment length)."""
+    dense = _resample(path, max(4 * segments, 200))
+    end = dense[-1]
+
+    def walk(chord: float) -> tuple[np.ndarray, float]:
+        out, current, k = [dense[0]], dense[0], 0
+        for _ in range(segments):
+            while k < len(dense) - 1 and np.linalg.norm(dense[k + 1] - current) < chord:
+                k += 1
+            if k >= len(dense) - 1:
+                out.append(end)
+                current = end
+                continue
+            # Point on dense[k] -> dense[k+1] at distance ``chord`` from ``current``.
+            a, b = dense[k], dense[k + 1]
+            d = b - a
+            f = a - current
+            qa, qb, qc = d @ d, 2 * f @ d, f @ f - chord * chord
+            disc = max(qb * qb - 4 * qa * qc, 0.0)
+            t = (-qb + math.sqrt(disc)) / (2 * qa) if qa > 0 else 1.0
+            current = a + d * min(max(t, 0.0), 1.0)
+            out.append(current)
+        return np.asarray(out), float(np.linalg.norm(out[-1] - end))
+
+    total = float(np.linalg.norm(np.diff(dense, axis=0), axis=1).sum())
+    lo, hi = 0.0, total / segments * 1.0000001
+    for _ in range(50):  # bisection: the last vertex lands on the end of the path
+        mid = 0.5 * (lo + hi)
+        vertices, miss = walk(mid)
+        reached = np.allclose(vertices[-1], end) and miss < 1e-12
+        lo, hi = (lo, mid) if reached else (mid, hi)
+    vertices, _ = walk(lo)  # the largest chord that does not run past the end; snap the last vertex
+    vertices[-1] = end
+    return vertices
 
 
 def _resample(path: np.ndarray, segments: int) -> np.ndarray:
@@ -743,13 +781,13 @@ class CableMonitor:
         last, body2, anchor, length = [], [], [], []
         for eq in range(self.model.neq):
             name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_EQUALITY, eq) or ""
-            kind = self.model.eq_type[eq]
-            if kind not in (mujoco.mjtEq.mjEQ_WELD, mujoco.mjtEq.mjEQ_CONNECT) or not name.endswith("_pin"):
+            kind = int(self.model.eq_type[eq])  # numpy int vs pybind enum: compare as ints
+            if kind not in (int(mujoco.mjtEq.mjEQ_WELD), int(mujoco.mjtEq.mjEQ_CONNECT)) or not name.endswith("_pin"):
                 continue
             last.append(int(self.model.eq_obj1id[eq]))
             body2.append(int(self.model.eq_obj2id[eq]))
             # Weld: data[0:3] is the anchor in body2. Connect: data[3:6] is the anchor in body2.
-            anchor.append(np.array(self.model.eq_data[eq, 3:6] if kind == mujoco.mjtEq.mjEQ_CONNECT
+            anchor.append(np.array(self.model.eq_data[eq, 3:6] if kind == int(mujoco.mjtEq.mjEQ_CONNECT)
                                    else self.model.eq_data[eq, :3]))
         spans = {s.prefix: s for b in plan.bundles for s in b.spans}
         for body in last:

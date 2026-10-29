@@ -110,6 +110,51 @@ def render_supports(out_dir: Path, obstacles: ObstacleSet, routes: dict[str, Any
     return paths
 
 
+def render_support_details(out_dir: Path, obstacles: ObstacleSet, routes: dict[str, Any], colors: dict[str, str],
+                           supports: list[dict[str, Any]], title: str, reach: float = 0.022) -> list[Path]:
+    """Close-up of every support: the host's real CAD triangles near the mount, the
+    mount body (footprint x height), the tie loop and the bundle through it."""
+    from .geometry import MeshShape
+    from .render import _wire_color
+
+    if not supports:
+        return []
+    n = len(supports)
+    cols = min(4, n)
+    rows = (n + cols - 1) // cols
+    fig = plt.figure(figsize=(4.2 * cols, 4.0 * rows), dpi=150)
+    for k, s in enumerate(supports):
+        ax = fig.add_subplot(rows, cols, k + 1, projection="3d")
+        centre = np.asarray(s["mount"], float)
+        lo, hi = (centre - reach) * MM, (centre + reach) * MM
+        host = obstacles.by_component(s["host"])
+        if host is not None and isinstance(host.shape, MeshShape):
+            tri = host.shape.vertices[host.shape.faces]
+            near = np.all(np.abs(tri.mean(axis=1) - centre) < reach, axis=1)
+            if near.any():
+                ax.add_collection3d(Poly3DCollection(list(tri[near] * MM), facecolor="#b9c4cf", edgecolor="#6c7a89",
+                                                     linewidths=0.15, alpha=0.55))
+        color = SUPPORT_COLORS.get(s["kind"], "#333333")
+        ax.add_collection3d(Poly3DCollection(_support_box(s), facecolor=color, alpha=0.9, edgecolor="#111111",
+                                             linewidths=0.5))
+        ax.plot(*_tie_loop(s).T, color="#111111", lw=1.2)
+        for wire_id in s["wires"]:
+            path = np.asarray(routes["wires"][wire_id]["path"]) * MM
+            inside = np.all((path >= lo) & (path <= hi), axis=1)
+            if inside.sum() >= 2:
+                ax.plot(*path[inside].T, color=_wire_color(colors.get(wire_id, "")), lw=2.0)
+        ax.set_xlim(lo[0], hi[0]); ax.set_ylim(lo[1], hi[1]); ax.set_zlim(lo[2], hi[2])
+        ax.set_box_aspect((1, 1, 1))
+        ax.view_init(elev=30, azim=-60)
+        ax.tick_params(labelsize=5)
+        ax.set_title(f"{s['id']}: {s['mpn'] or s['type']} on {s['host']}\n{s['kind'].replace('_', ' ')}, "
+                     f"{s['permitted_motion']}, OD {s['bundle_od'] * 1e3:.1f} mm", fontsize=7)
+    fig.suptitle(f"{title}: support hardware on the CAD faces (host triangles in grey)", fontsize=10)
+    path = out_dir / "supports_detail.png"
+    fig.tight_layout(); fig.savefig(path); plt.close(fig)
+    return [path]
+
+
 def render_witnesses(out_dir: Path, obstacles: ObstacleSet, routes: dict[str, Any], colors: dict[str, str],
                      witnesses: list[dict[str, Any]], title: str) -> list[Path]:
     """Nearest-point witness pairs of every clearance finding: the segment from the point on
@@ -194,4 +239,4 @@ def render_derating(out_dir: Path, derating: dict[str, dict[str, Any]], currents
     return [path]
 
 
-__all__ = ["render_derating", "render_planning", "render_supports", "render_witnesses"]
+__all__ = ["render_derating", "render_planning", "render_support_details", "render_supports", "render_witnesses"]
