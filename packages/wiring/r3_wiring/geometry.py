@@ -221,13 +221,14 @@ class MeshShape(Shape):
     of the nearest sample, which is exact for closed, consistently oriented
     meshes up to the sampling spacing."""
 
-    def __init__(self, vertices: np.ndarray, faces: np.ndarray, spacing: float = 0.0015) -> None:
+    def __init__(self, vertices: np.ndarray, faces: np.ndarray, spacing: float = 0.0015,
+                 samples: tuple[np.ndarray, np.ndarray] | None = None) -> None:
         from scipy.spatial import cKDTree
 
         self.vertices = np.asarray(vertices, dtype=float)
         self.faces = np.asarray(faces, dtype=int)
         self.spacing = spacing
-        self._samples, self._normals = self._sample(spacing)
+        self._samples, self._normals = samples if samples is not None else self._sample(spacing)
         self._tree = cKDTree(self._samples)
 
     def _sample(self, spacing: float) -> tuple[np.ndarray, np.ndarray]:
@@ -256,7 +257,9 @@ class MeshShape(Shape):
         return self.vertices.min(axis=0), self.vertices.max(axis=0)
 
     def transformed(self, rotation: np.ndarray, translation: np.ndarray) -> "MeshShape":
-        return MeshShape(self.vertices @ rotation.T + translation, self.faces, self.spacing)
+        # Rigid motion: move the existing surface samples and normals instead of re-sampling.
+        return MeshShape(self.vertices @ rotation.T + translation, self.faces, self.spacing,
+                         samples=(self._samples @ rotation.T + translation, self._normals @ rotation.T))
 
     def surface_points(self, spacing: float) -> np.ndarray:
         step = max(1, int(spacing / self.spacing))

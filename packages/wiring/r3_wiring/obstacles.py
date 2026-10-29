@@ -136,7 +136,28 @@ def _spin_invariant(shape: Shape, axis: np.ndarray, origin: np.ndarray) -> bool:
     return bool(parallel and on_axis)
 
 
+def _revolution_envelope(shape: MeshShape, axis: np.ndarray, origin: np.ndarray) -> Cylinder:
+    """The exact volume a body sweeps spinning about (origin, axis) is its solid
+    of revolution; bound it by the cylinder of the mesh's maximum radius over its
+    axial span (conservative for filleted tires and hubs)."""
+    axis = np.asarray(axis, dtype=float) / np.linalg.norm(axis)
+    rel = shape.vertices - np.asarray(origin, dtype=float)
+    along = rel @ axis
+    radial = np.linalg.norm(rel - np.outer(along, axis), axis=1)
+    center = np.asarray(origin, dtype=float) + axis * (along.max() + along.min()) / 2
+    helper = np.array([1.0, 0, 0]) if abs(axis[0]) < 0.9 else np.array([0, 1.0, 0])
+    x = np.cross(helper, axis)
+    x /= np.linalg.norm(x)
+    rotation = np.column_stack([x, np.cross(axis, x), axis])
+    return Cylinder(center, rotation, float(radial.max()), float((along.max() - along.min()) / 2))
+
+
 def _swept(kin: Kinematics, shape: Shape, body: str, label: str) -> Shape:
+    for joint in kin.chain(body):
+        # Spinning meshes (wheels, axles) sweep their solid of revolution: replace the
+        # mesh by that envelope instead of sampling hundreds of spin angles.
+        if joint.type == "continuous" and isinstance(shape, MeshShape) and joint.child == body:
+            shape = _revolution_envelope(shape, joint.axis, joint.origin)
     skip = {j.id for j in kin.chain(body) if j.type == "continuous" and _spin_invariant(shape, j.axis, j.origin)}
     configs = kin.configurations(body, step_angle=SWEEP_STEP, skip=skip)
     if len(configs) == 1 and not configs[0]:
