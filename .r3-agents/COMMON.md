@@ -120,3 +120,22 @@ Every stage must run with no display and no interactive browser.
 - **Docker:** used for firmware.
 The supported server environment is the R3 worker Docker image. Any GUI-only step
 must document its headless path.
+
+## Purchased-part model policy (user directive): never sculpt a bought part
+A purchased component (Pi, motor, ESC, servo, battery, sensors, connectors, wheels, gearbox, …) must use a
+real downloaded 3D model, never one modelled by R3 or by an agent. Source it in this order:
+1. **Onshape public documents:** inserted from the public document version, the way a human uses
+   Insert → Other documents → Public.
+2. **The manufacturer's official STEP:** Raspberry Pi, Arducam, Traxxas, u-blox, Pololu, …
+3. **Open model databases with programmatic or public access:** KiCad 3D libraries, TraceParts,
+   3D ContentCentral, SnapEDA / Ultra Librarian. Respect terms and robots.txt, and never scrape behind
+   logins.
+4. **Only when nothing exists:** a datasheet-dimensioned `proxy` built with standard features, as
+   accurate as possible. It is labelled `proxy` and reported as a `cad_purchased_proxy` warning with the
+   searches that failed.
+
+Every sourced model is:
+- validated against the datasheet (bounding box and key features);
+- given the datasheet mass (mass override);
+- given interface frames derived from its real holes and faces;
+- recorded with URL, licence and checksum.
