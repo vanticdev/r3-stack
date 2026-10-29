@@ -1,5 +1,4 @@
 import threading
-from pathlib import Path
 
 import pytest
 
@@ -10,7 +9,6 @@ from r3_sim import crsf
 from r3_sim.hal_server import TwinHalServer
 from r3_sim.kernel import CoSimKernel
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
 
 
 def _serve(server: TwinHalServer) -> None:
@@ -22,8 +20,8 @@ def _serve(server: TwinHalServer) -> None:
 
 
 @pytest.fixture()
-def twin():
-    project = Project.load(RC_CAR)
+def twin(rc_car_fresh):
+    project = Project.load(rc_car_fresh)
     scenario = next(s for s in project.spec.simulation.scenarios if s.id == "full_throttle")
     kernel = CoSimKernel(project, scenario)
     server = TwinHalServer(kernel, request_timeout=2.0)  # r3_hal close() leaves its socket open; do not wait long

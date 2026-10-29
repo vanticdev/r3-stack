@@ -1,5 +1,4 @@
 import math
-from pathlib import Path
 
 import mujoco
 import numpy as np
@@ -12,12 +11,11 @@ from r3_sim.kernel import CoSimKernel
 from r3_sim.vehicle import Vehicle, build_vehicle_model
 from r3_sim.vehicle.servo import ackermann_angles
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
 
 
 @pytest.fixture(scope="module")
-def project() -> Project:
-    return Project.load(RC_CAR)
+def project(rc_car_fresh) -> Project:
+    return Project.load(rc_car_fresh)
 
 
 def test_mjcf_compiles_with_expected_structure(project):
