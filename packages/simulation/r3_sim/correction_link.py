@@ -131,6 +131,7 @@ class PacketSample:
     received: bool
     distance: float
     frequency: float
+    paths: int = 1
 
 
 def fsk_ber(ebn0_linear: float) -> float:
@@ -228,8 +229,9 @@ class SikCorrectionLink:
         per = 1.0 - (1.0 - ber) ** (8 * (payload + SIK_HEADER_BYTES))
         received = bool(self.rng.random() >= per)
         snr = rx_power - power_sum_dbm(self.n_thermal_dbm, self.interference_dbm)
+        paths = int(channel.paths) if self.model is not self.analytic else 1
         return PacketSample(t, rx_power, snr, ebn0_db, per, received, float(np.linalg.norm(rx_position - self.scene.tx_position)),
-                            frequency)
+                            frequency, paths)
 
     def advance(self, t_end: float, rx_position: np.ndarray, rotation: np.ndarray | None, powered: bool) -> list[tuple[float, int]]:
         out: list[tuple[float, int]] = []
@@ -267,9 +269,15 @@ class SikCorrectionLink:
                       f"{self.model.label}."),
         ] + [("radio", f"RTK correction link propagation: {text}") for text in self.model.assumptions()]
 
-    def stats(self) -> dict[str, Any]:
-        powers = [s.rx_power_dbm for s in self.samples]
-        return {"rtk_link_backend": self.backend, "rtk_link_packets": self.packets_sent, "rtk_link_packets_lost": self.packets_lost,
+    def stats(self, since: float = -math.inf) -> dict[str, Any]:
+        """Link statistics over packets sent at t >= ``since``. Packets for which the ray tracer found no path at all
+        (the car body blocks every traced ray; UTD around a body this size is not traced) are lost and counted
+        separately; the minimum power is over packets with a channel."""
+        samples = [s for s in self.samples if s.t >= since]
+        powers = [s.rx_power_dbm for s in samples if s.paths > 0]
+        lost = sum(not s.received for s in samples)
+        return {"rtk_link_backend": self.backend, "rtk_link_packets": len(samples), "rtk_link_packets_lost": lost,
+                "rtk_link_no_path_packets": sum(s.paths == 0 for s in samples),
                 "rtk_link_min_rx_dbm": round(min(powers), 1) if powers else None,
                 "rtk_link_margin_db": round(min(powers) - self.sensitivity_dbm, 1) if powers else None,
                 "rtk_link_bytes": self.bytes_delivered}

@@ -252,6 +252,11 @@ class RtkGnssReceiver(GpsReceiver):
             self.tx_free_t = start + len(data) * self.byte_time
         return out
 
+    def reset_statistics(self) -> None:
+        """Start the per-mode epoch counts afresh (after the warm-start pre-roll); the solution state is kept."""
+        self.epochs_by_mode = {"single": 0, "float": 0, "fixed": 0}
+        self.max_age_in_rtk = 0.0
+
     def stats(self) -> dict[str, float | int | str | None]:
         total = max(1, sum(self.epochs_by_mode.values()))
         return {"rtk_fixed_fraction": round(self.epochs_by_mode["fixed"] / total, 4),

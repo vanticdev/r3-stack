@@ -446,6 +446,7 @@ class CoSimKernel:
             self.gps.advance(t, gps_pos, np.zeros(3), True)
         self.gps.tx_free_t = 0.0
         stats = self.gps.stats()
+        self.gps.reset_statistics()  # scenario metrics count epochs from t = 0
         self.assumptions.append(("sensors", f"RTK base and rover run {seconds:.0f} s before the scenario with the car parked at the "
                                             f"start (warm receivers): rover in {self.gps.mode} at t = 0 (first fix at "
                                             f"t = {stats['rtk_time_to_first_fix_s']} s)."))

@@ -514,7 +514,7 @@ def _gnss_metrics(kernel: CoSimKernel, rec: dict[str, np.ndarray]) -> dict[str, 
     if callable(stats):
         out.update(stats())
     if kernel.rtk_link is not None:
-        out.update(kernel.rtk_link.stats())
+        out.update(kernel.rtk_link.stats(since=0.0))
     return out
 
 
