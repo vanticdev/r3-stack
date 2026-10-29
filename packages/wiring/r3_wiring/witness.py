@@ -40,7 +40,9 @@ The CAD audit checks every mesh the wiring stage loads for closure
 (watertight), consistent winding, outward orientation (positive volume), units
 and placement (mesh bounds versus ``cad_model.json`` ``bbox_min``/``bbox_max``),
 volume versus the CAD mass properties and revision staleness versus
-``robot.yaml``.
+``robot.yaml``. It audits the CAD export after welding tessellation seams, with
+a chord-error volume envelope, and separately audits the vertex-clustered routing
+copy, which must stay a closed oriented surface (see :mod:`r3_wiring.geometry_audit`).
 """
 
 from __future__ import annotations
@@ -54,18 +56,15 @@ import numpy as np
 from r3_model.diagnostics import Diagnostic, Severity
 from r3_model.project import Project
 
-from .geometry import Box, Cylinder, MeshShape, Shape, SweptShape, resample_polyline
-from .obstacles import Obstacle, ObstacleSet
+from .geometry import Box, Cylinder, MeshShape, Shape, SweptShape, load_stl, resample_polyline
+from .geometry_audit import BBOX_TOLERANCE, VOLUME_TOLERANCE, MeshAudit, audit_mesh, audit_routing_mesh
+from .obstacles import ROUTING_MESH_CELL, Obstacle, ObstacleSet
 
 #: Representations agree when |a - b| <= AGREEMENT_TOLERANCE + AGREEMENT_FRACTION * |b|.
 #: 1 mm covers the router's surface sampling (1.5 mm grid: the nearest sample is at most
 #: ~0.9 mm from the true closest point) and MuJoCo's hulls of slightly non-convex pieces.
 AGREEMENT_TOLERANCE = 0.001
 AGREEMENT_FRACTION = 0.05
-#: Bounding-box agreement for the CAD audit (exported STL vs. mass-property bounds).
-BBOX_TOLERANCE = 0.0005
-#: Relative volume agreement (closed mesh vs. CAD mass properties; tessellation of curved faces).
-VOLUME_TOLERANCE = 0.02
 CHECKED_CODES = ("wire_clearance_violation", "wire_intersects_component", "connector_clearance_violation")
 
 
@@ -454,49 +453,6 @@ def _connector_body(diagnostic: Diagnostic, routing: Any, catalog: Any) -> Box |
 
 
 # ------------------------------------------------------------ CAD audit
-@dataclass
-class MeshAudit:
-    component: str
-    watertight: bool
-    winding_consistent: bool
-    volume: float
-    cad_volume: float | None
-    bbox_error: float | None  # max |mesh bound - cad bound|, m
-    scale_ratio: float | None  # mesh extent / cad extent (1000 => mm exported as m)
-    problems: list[str] = field(default_factory=list)
-
-
-def audit_mesh(component: str, vertices: np.ndarray, faces: np.ndarray, part: dict[str, Any]) -> MeshAudit:
-    import trimesh
-
-    tm = trimesh.Trimesh(np.asarray(vertices, dtype=float), np.asarray(faces, dtype=np.int64), process=False)
-    watertight = bool(tm.is_watertight)
-    winding = bool(tm.is_winding_consistent)
-    volume = float(tm.volume) if watertight else float("nan")
-    cad_volume = float(part["volume"]) if part.get("volume") else None
-    bbox_error = scale = None
-    problems: list[str] = []
-    if "bbox_min" in part and "bbox_max" in part:
-        lo, hi = np.asarray(part["bbox_min"], dtype=float), np.asarray(part["bbox_max"], dtype=float)
-        mlo, mhi = tm.bounds
-        bbox_error = float(max(np.abs(mlo - lo).max(), np.abs(mhi - hi).max()))
-        extent = np.maximum(hi - lo, 1e-9)
-        scale = float(np.median((mhi - mlo) / extent))
-        if abs(scale - 1.0) > 0.05:
-            problems.append(f"mesh is {scale:.3g}x the CAD bounds (units)")
-        elif bbox_error > BBOX_TOLERANCE:
-            problems.append(f"mesh bounds differ from CAD bounds by {bbox_error * 1e3:.2f} mm (placement)")
-    if not watertight:
-        problems.append("mesh is not closed (sign of the distance is unreliable)")
-    if not winding:
-        problems.append("triangle winding is inconsistent")
-    if watertight and volume < 0:
-        problems.append("triangles are wound inward (negative volume)")
-    if watertight and cad_volume and abs(abs(volume) - cad_volume) > VOLUME_TOLERANCE * cad_volume + 1e-9:
-        problems.append(f"mesh volume {abs(volume) * 1e6:.2f} cm3 != CAD volume {cad_volume * 1e6:.2f} cm3")
-    return MeshAudit(component, watertight, winding, volume, cad_volume, bbox_error, scale, problems)
-
-
 def audit_cad(project: Project, obstacles: ObstacleSet) -> tuple[list[Diagnostic], dict[str, Any]]:
     """Audit the CAD meshes the obstacles were built from, and CAD staleness."""
     cad = project.read_build_json("cad/cad_model.json") or {}
@@ -506,20 +462,49 @@ def audit_cad(project: Project, obstacles: ObstacleSet) -> tuple[list[Diagnostic
     for obstacle in obstacles.obstacles:
         if obstacle.source != "cad_mesh" or not isinstance(obstacle.shape, MeshShape):
             continue
-        audit = audit_mesh(obstacle.component, obstacle.shape.vertices, obstacle.shape.faces,
-                           parts.get(obstacle.component, {}))
-        table[obstacle.component] = {"watertight": audit.watertight, "winding_consistent": audit.winding_consistent,
-                                     "volume": audit.volume, "cad_volume": audit.cad_volume,
-                                     "bbox_error": audit.bbox_error, "scale_ratio": audit.scale_ratio,
-                                     "problems": audit.problems}
-        if audit.problems:
+        part = parts.get(obstacle.component, {})
+        entry: dict[str, Any] = {}
+        # 1. The CAD export itself (what Onshape tessellated), not the clustered routing copy.
+        export = project.root / "build" / "cad" / part["mesh"] if part.get("mesh") else None
+        if export is not None and export.exists():
+            audit = audit_mesh(obstacle.component, *load_stl(export), part)
+            entry = {"watertight": audit.watertight, "winding_consistent": audit.winding_consistent,
+                     "volume": audit.volume, "cad_volume": audit.cad_volume, "volume_error": audit.volume_error,
+                     "allowed_deficit": audit.allowed_deficit, "allowed_excess": audit.allowed_excess,
+                     "surface_area": audit.surface_area, "chord_tolerance": audit.chord_tolerance,
+                     "bbox_error": audit.bbox_error, "scale_ratio": audit.scale_ratio, **audit.repair,
+                     "problems": list(audit.problems)}
+            if audit.problems:
+                diagnostics.append(Diagnostic.error(
+                    "cad_mesh_invalid", f"{obstacle.component} mesh: {'; '.join(audit.problems)}",
+                    subjects=[obstacle.component],
+                    data={"representation": "cad_export", "watertight": audit.watertight,
+                          "winding_consistent": audit.winding_consistent, "volume": audit.volume,
+                          "cad_volume": audit.cad_volume, "volume_error": audit.volume_error,
+                          "allowed_deficit": audit.allowed_deficit, "allowed_excess": audit.allowed_excess,
+                          "surface_area": audit.surface_area, "chord_tolerance": audit.chord_tolerance,
+                          "bbox_error": audit.bbox_error, "scale_ratio": audit.scale_ratio,
+                          "welded_vertices": audit.repair.get("welded_vertices"),
+                          "seam_loops_filled": audit.repair.get("seam_loops_filled"),
+                          "open_loops": audit.repair.get("open_loops"), "units": "m"},
+                    hint="Re-export the part from the CAD stage; clearance findings on this part are unreliable."))
+        # 2. The clustered routing mesh whose winding number signs every clearance.
+        routing = audit_routing_mesh(obstacle.component, obstacle.shape.vertices, obstacle.shape.faces, part,
+                                     ROUTING_MESH_CELL, entry.get("volume") if entry.get("watertight") else None)
+        entry["routing_mesh"] = {"cell": routing.cell, "unbalanced_edges": routing.unbalanced_edges,
+                                 "bbox_error": routing.bbox_error, "bbox_limit": routing.bbox_limit,
+                                 "volume_ratio": routing.volume_ratio, "problems": list(routing.problems)}
+        entry["problems"] = entry.get("problems", []) + routing.problems
+        table[obstacle.component] = entry
+        if routing.problems:
             diagnostics.append(Diagnostic.error(
-                "cad_mesh_invalid", f"{obstacle.component} mesh: {'; '.join(audit.problems)}",
+                "cad_mesh_invalid", f"{obstacle.component} mesh: {'; '.join(routing.problems)}",
                 subjects=[obstacle.component],
-                data={"watertight": audit.watertight, "winding_consistent": audit.winding_consistent,
-                      "volume": audit.volume, "cad_volume": audit.cad_volume, "bbox_error": audit.bbox_error,
-                      "scale_ratio": audit.scale_ratio, "units": "m"},
-                hint="Re-export the part from the CAD stage; clearance findings on this part are unreliable."))
+                data={"representation": "routing_mesh", "cell": routing.cell,
+                      "unbalanced_edges": routing.unbalanced_edges, "bbox_error": routing.bbox_error,
+                      "bbox_limit": routing.bbox_limit, "volume_ratio": routing.volume_ratio, "units": "m"},
+                hint="The CAD export is checked separately; the vertex-clustered routing copy "
+                     "(geometry.cluster_decimate) must stay a closed oriented surface."))
     stage = project.read_build_json("cad/stage_result.json") or {}
     cad_digest = (stage.get("inputs") or {}).get("robot_yaml_sha256") if isinstance(stage, dict) else None
     current = project.fingerprint().get("robot_yaml_sha256")
@@ -539,5 +524,5 @@ def severity_counts(diagnostics: list[Diagnostic]) -> dict[str, int]:
     return {s.value: sum(1 for d in diagnostics if d.severity is s) for s in Severity}
 
 
-__all__ = ["AGREEMENT_TOLERANCE", "Closest", "Measurement", "MeshAudit", "audit_cad", "audit_mesh", "exact_closest",
-           "legacy_nearest_normal_sdf", "measure", "mujoco_distance", "verify_clearances"]
+__all__ = ["AGREEMENT_TOLERANCE", "BBOX_TOLERANCE", "Closest", "Measurement", "MeshAudit", "audit_cad", "audit_mesh", "exact_closest",
+           "legacy_nearest_normal_sdf", "measure", "mujoco_distance", "verify_clearances", "VOLUME_TOLERANCE"]
