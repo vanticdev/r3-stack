@@ -238,11 +238,11 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         x, y = _interp_position(rec, t_loss)
         tx = kernel.radio.tx_position
         link_lost = {"t": float(t_loss), "x": x, "y": y, "distance": float(math.hypot(x - tx[0], y - tx[1]))}
-    radial = np.logspace(0, math.log10(max(2.0, float(np.max(rec["tx_distance"])) * 1.2)), 200)
+    radio = kernel.radio
+    tx = radio.tx_position
     h_rx = float(kernel.rx_antenna_offset[2])
-    tx = kernel.radio.tx_position
-    gain = kernel.radio.tx_power_dbm + kernel.radio.tx_gain_dbi + kernel.radio.rx_gain_dbi
-    curve_rssi = [gain - kernel.radio.propagation.two_ray_loss_db(tx, np.array([tx[0] + d, tx[1], h_rx])) for d in radial]
+    curve = radio_curves(radio, max(2.0, float(np.max(rec["tx_distance"])) * 1.2, float(project.spec.requirements.radio_range or 0.0) * 1.2),
+                         h_rx)
     esc_params = kernel.project.catalog.component(project.spec.components[kernel.esc_id].type).behavior.params \
         if kernel.esc_id in project.spec.components else {}
     from r3_model.units import to_si
@@ -254,9 +254,9 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         "esc_neutral_us": to_si(esc_params.get("neutral_pulse", 1500e-6)) * 1e6,
         "obstacles": [{"id": o.get("id"), "center": [to_si(v) for v in o.get("center", [0, 0, 0])]}
                       for o in project.spec.simulation.environment.obstacles],
-        "tx_position": tx.tolist(), "rssi_curve": {"distance": radial.tolist(), "rssi": curve_rssi},
-        "sensitivity_dbm": kernel.radio.sensitivity_dbm, "noise_dbm": kernel.radio.noise_dbm,
-        "snr_required_db": kernel.radio.snr_required_db,
+        "tx_position": tx.tolist(), "rssi_curve": curve, "radio_backend": radio.backend, "radio_label": radio.model.label,
+        "sensitivity_dbm": radio.sensitivity_dbm, "noise_dbm": radio.noise_dbm,
+        "snr_required_db": radio.snr_required_db,
     }
     checks = evaluate(scenario.expect or {}, rec, context)
     for check in checks:
@@ -307,15 +307,7 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         "realtime_factor": round(kernel.t / wall, 2) if wall > 0 else None, "hal_requests": server.requests,
         "hal_errors": dict(server.errors),
     }
-    if "rssi" in rec and project.spec.requirements.radio_range:
-        r = float(project.spec.requirements.radio_range)
-        near = np.abs(rec["tx_distance"] - r) < 5.0
-        if near.any():
-            metrics["rssi_at_range_requirement_dbm"] = round(float(np.nanmean(rec["rssi"][near])), 1)
-            metrics["snr_at_range_requirement_db"] = round(float(np.nanmean(rec["snr"][near])), 1)
-        rx_req = gain - kernel.radio.propagation.two_ray_loss_db(tx, np.array([tx[0] + r, tx[1], h_rx]))
-        metrics["two_ray_rssi_at_range_requirement_dbm"] = round(rx_req, 1)
-        metrics["link_margin_at_range_requirement_db"] = round(rx_req - (kernel.radio.noise_dbm + kernel.radio.snr_required_db), 1)
+    metrics.update(radio_metrics(radio, rec, project.spec.requirements.radio_range, h_rx))
     metrics.update(_loss_breakdown(project, kernel, rec))
     diagnostics.extend(_sensor_capability(project, kernel, scenario))
     passed = all(c.passed for c in checks) and not any(d.severity.value == "error" and d.code in ("software_not_connected", "software_hung")
@@ -338,9 +330,13 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         events=np.asarray([json.dumps(e) for e in kernel.recorder.events] or [""]))
     artifacts.append((rel(npz), "recording", "100 Hz time series, 30 Hz qpos snapshots, firmware logs, events"))
     from .plots import plot_all
+    from .radio_plots import plot_coverage
 
     for path in plot_all(rec, context, out_dir):
         artifacts.append((rel(path), "plot_png", path.stem.replace("_", " ")))
+    coverage = plot_coverage(radio, rec, context, out_dir, project.build_dir("sim") / "radio", h_rx)
+    if coverage is not None:
+        artifacts.append((rel(coverage), "plot_png", f"radio coverage map ({radio.model.label})"))
     renders: list[str] = []
     if render:
         try:
@@ -382,6 +378,54 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
     (out_dir / "summary.json").write_text(json.dumps(summary, indent=2, default=float))
     artifacts.insert(0, (rel(out_dir / "summary.json"), "json", "scenario summary"))
     return ScenarioOutcome(scenario.id, passed, summary, diagnostics, kernel.assumptions, artifacts, out_dir)
+
+
+def radio_curves(radio: Any, max_distance: float, h_rx: float, points: int = 160) -> dict[str, Any]:
+    """Mean RX power along the +x radial from the transmitter (static scene, no shadowing): active model
+    (coherent at the carrier and local mean) and the previous analytic two-ray model."""
+    radial = np.logspace(0, math.log10(max(2.0, max_distance)), points)
+    tx = radio.tx_position
+    xyz = np.column_stack([tx[0] + radial, np.full_like(radial, tx[1]), np.full_like(radial, h_rx)])
+    coherent, mean = radio.mean_rx_power_dbm(xyz)
+    analytic, _ = radio.mean_rx_power_dbm(xyz, model=radio.analytic)
+    return {"distance": radial.tolist(), "rssi": coherent.tolist(), "rssi_local_mean": mean.tolist(),
+            "rssi_analytic": analytic.tolist(), "backend": radio.backend, "label": radio.model.label}
+
+
+def radio_metrics(radio: Any, rec: dict[str, np.ndarray], radio_range: float | None, h_rx: float) -> dict[str, Any]:
+    """Link metrics at the range requirement, small-scale fading statistics and solver statistics."""
+    out: dict[str, Any] = {"radio_backend": radio.backend, "radio_solver": radio.model.stats()}
+    tx = radio.tx_position
+    required = radio.noise_dbm + radio.snr_required_db
+    if radio_range:
+        r = float(radio_range)
+        near = np.abs(rec["tx_distance"] - r) < 5.0
+        if near.any():
+            out["rssi_at_range_requirement_dbm"] = round(float(np.nanmean(rec["rssi"][near])), 1)
+            out["snr_at_range_requirement_db"] = round(float(np.nanmean(rec["snr"][near])), 1)
+        point = np.array([[tx[0] + r, tx[1], h_rx]])
+        model_rx = float(radio.mean_rx_power_dbm(point)[0][0])
+        analytic_rx = float(radio.mean_rx_power_dbm(point, model=radio.analytic)[0][0])
+        out["model_rssi_at_range_requirement_dbm"] = round(model_rx, 1)
+        out["two_ray_rssi_at_range_requirement_dbm"] = round(analytic_rx, 1)  # previous analytic model, reference
+        out["link_margin_at_range_requirement_db"] = round(model_rx - required, 1)
+    # Small-scale fading: coherent RSSI (without shadowing) about its 2 m running mean in power, while moving.
+    if "multipath" in rec and len(rec["rssi"]) > 20:
+        unshadowed = rec["rssi"] + np.nan_to_num(rec.get("shadowing", np.zeros_like(rec["rssi"])))
+        d = rec["tx_distance"]
+        moving = np.abs(np.gradient(d)) > 1e-4
+        if moving.sum() > 50:
+            order = np.argsort(d[moving])
+            dd, pp = d[moving][order], 10.0 ** (unshadowed[moving][order] / 10.0)
+            cumsum = np.concatenate([[0.0], np.cumsum(pp)])
+            lo = np.searchsorted(dd, dd - 1.0)
+            hi = np.searchsorted(dd, dd + 1.0, side="right")
+            local = (cumsum[hi] - cumsum[lo]) / np.maximum(hi - lo, 1)
+            fading = 10.0 * np.log10(pp / local)
+            out["small_scale_fading_db"] = {"std": round(float(np.std(fading)), 2), "p01": round(float(np.percentile(fading, 1)), 2),
+                                            "p50": round(float(np.median(fading)), 2), "window_m": 2.0}
+        out["multipath_vs_incoherent_db_median"] = round(float(np.nanmedian(rec["multipath"])), 2)
+    return out
 
 
 def _loss_breakdown(project: Project, kernel: CoSimKernel, rec: dict[str, np.ndarray]) -> dict[str, Any]:
