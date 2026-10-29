@@ -12,6 +12,7 @@ import numpy as np
 from r3_model.project import Project
 
 from .mjcf import VehicleModel, _behavior_params
+from .overlap import MujocoWorker
 from .servo import SteeringServo, ackermann_angles
 
 #: Frontal drag area C_d * A for a 1/10 touring/buggy body (estimate, m^2).
@@ -49,6 +50,11 @@ class Vehicle:
         self.joint_index = {j.id: joint(j.id) for j in project.spec.mechanical.joints if j.type != "fixed"}
         self.wheel_tire_geom = {cid: mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, f"tire_{cid}") for cid in vm.wheels}
         self.tire_geom_to_wheel = {gid: cid for cid, gid in self.wheel_tire_geom.items()}
+        self._wheel_order = list(vm.wheels)
+        self._tire_index = np.full(model.ngeom, -1, dtype=np.int64)
+        for k, cid in enumerate(self._wheel_order):
+            self._tire_index[self.wheel_tire_geom[cid]] = k
+        self._contact_force = np.zeros(6)
         self.wheel_normal_force = {cid: 0.0 for cid in vm.wheels}
         self.drive_actuators = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"act_{d.id}") for d in vm.drives]
         self.drive_tendons = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_TENDON, d.tendon) for d in vm.drives]
@@ -62,13 +68,22 @@ class Vehicle:
         self.carrier_torque = [0.0 for _ in vm.drives]
         self.steer_targets = [(0.0, 0.0) for _ in vm.steering]
         mujoco.mj_forward(model, self.data)
+        self._worker = MujocoWorker(model, self.data)
+        self.cables = None
+        if vm.cables is not None:
+            from r3_wiring.mujoco_cables import CableMonitor, settle
+
+            # The cables live in this world; let their slack settle with the car at rest before t = 0.
+            self.cables = CableMonitor(model, self.data, vm.cables, vm.root)
+            settle(model, self.data, self.cables)
 
     # ------------------------------------------------------------------ inputs
-    def set_motor_torque(self, index: int, motor_torque: float) -> None:
+    def set_motor_torque(self, index: int, motor_torque: float, omega: float | None = None) -> None:
         """Motor shaft torque (N*m) -> carrier torque through the gear ratio. Gear losses
-        always oppose power flow: tau_c = tau_m N eta when driving, tau_m N / eta when back-driven."""
+        always oppose power flow: tau_c = tau_m N eta when driving, tau_m N / eta when back-driven.
+        ``omega``: motor speed read before :meth:`start_step` (required while one is in flight)."""
         drive = self.vm.drives[index]
-        omega = self.motor_omega(index)
+        omega = self.motor_omega(index) if omega is None else omega
         driving = motor_torque * omega >= 0.0
         factor = drive.ratio * (drive.efficiency if driving else 1.0 / drive.efficiency)
         self.motor_torque[index] = motor_torque
@@ -107,22 +122,70 @@ class Vehicle:
         data.xfrc_applied[self.root_body, :3] = -0.5 * self.rho * self.drag_area * speed * v
 
     def _update_contacts(self) -> None:
+        """Normal force on each tire (for the rolling-resistance moment), from tire contacts only."""
         data = self.data
         for cid in self.wheel_normal_force:
             self.wheel_normal_force[cid] = 0.0
-        force = np.zeros(6)
-        for i in range(data.ncon):
-            contact = data.contact[i]
-            wheel = self.tire_geom_to_wheel.get(contact.geom1) or self.tire_geom_to_wheel.get(contact.geom2)
-            if wheel is None:
-                continue
-            mujoco.mj_contactForce(self.model, data, i, force)
-            self.wheel_normal_force[wheel] += abs(force[0])
+        n = data.ncon
+        if not n:
+            return
+        geoms = data.contact.geom[:n]
+        wheel = np.maximum(self._tire_index[geoms[:, 0]], self._tire_index[geoms[:, 1]])
+        hits = np.flatnonzero(wheel >= 0)
+        if not len(hits):
+            return
+        if self.model.opt.cone == mujoco.mjtCone.mjCONE_ELLIPTIC:
+            # Elliptic cones: the first constraint row of a contact is its normal force.
+            address = data.contact.efc_address[:n][hits]
+            normal = np.where(address >= 0, np.abs(data.efc_force[np.maximum(address, 0)]), 0.0)
+            for k, f in zip(wheel[hits], normal):
+                self.wheel_normal_force[self._wheel_order[k]] += float(f)
+            return
+        force = self._contact_force
+        for i in hits:
+            mujoco.mj_contactForce(self.model, data, int(i), force)
+            self.wheel_normal_force[self._wheel_order[wheel[i]]] += abs(force[0])
 
     def step(self) -> None:
+        self.start_step()
+        self.finish_step()
+
+    @property
+    def overlapped(self) -> bool:
+        """True when MuJoCo's step halves run in the background worker."""
+        return self._worker.enabled
+
+    def start_step(self) -> None:
+        """First half of ``mj_step`` (``mj_step1``), in the background when possible. Until
+        it completes, only controls, applied forces and Python state may change; state
+        written by ``mj_step1`` (kinematics, tendon/actuator velocities, contacts) must not be read."""
+        self._worker.start("mj_step1")
+
+    def launch_step2(self) -> None:
+        """Applied resistances, then ``mj_step2`` (actuation, constraint solve, integration) in
+        the background. ``mj_step1`` does not read applied forces. While it runs, ``qpos``,
+        ``qvel``, ``actuator_force`` and ``sensordata`` must not be read."""
         self._apply_resistances()
-        mujoco.mj_step(self.model, self.data)
+        self._worker.start("mj_step2")
+
+    def complete_step(self) -> None:
+        self._worker.wait()
         self._update_contacts()
+        if self.cables is not None:
+            self.cables.update()
+
+    def finish_step(self) -> None:
+        """``mj_step2`` in this thread; with :meth:`start_step` equal to ``mj_step``."""
+        self._apply_resistances()
+        self._worker.wait()
+        mujoco.mj_step2(self.model, self.data)
+        self._update_contacts()
+        if self.cables is not None:
+            self.cables.update()
+
+    def state(self, moving_parts: bool = False) -> "VehicleState":
+        """Copy of the state the kernel reads after a step (valid while MuJoCo runs on)."""
+        return VehicleState(self, moving_parts)
 
     # ------------------------------------------------------------------ state
     @property
@@ -173,6 +236,9 @@ class Vehicle:
         steer = self.vm.steering[index]
         return 0.5 * sum(self.joint_angle(j) for j in steer.joints)
 
+    def qpos(self) -> np.ndarray:
+        return self.data.qpos.copy()
+
     def body_pose(self, body: str) -> tuple[np.ndarray, np.ndarray]:
         bid = self.body_ids[body]
         return self.data.xpos[bid].copy(), self.data.xquat[bid].copy()
@@ -192,3 +258,63 @@ class Vehicle:
         lin_acc = (v - previous_velocity) / dt if previous_velocity is not None else np.zeros(3)
         ang_acc = (w - previous_omega) / dt if previous_omega is not None else np.zeros(3)
         return {"pos": self.position(), "quat": self.quaternion(), "lin_vel": v, "lin_acc": lin_acc, "ang_vel": w, "ang_acc": ang_acc}
+
+
+class VehicleState:
+    """Snapshot of a :class:`Vehicle` after a step, with the same read accessors."""
+
+    def __init__(self, vehicle: Vehicle, moving_parts: bool = False) -> None:
+        data = vehicle.data
+        self._vehicle = vehicle
+        self._qpos = data.qpos.copy()
+        self._qvel = data.qvel.copy()
+        self._xmat = data.xmat[vehicle.root_body].copy()
+        self._sensordata = data.sensordata.copy()
+        self._ten_velocity = data.ten_velocity.copy()
+        self._moving = vehicle.moving_parts() if moving_parts else None
+
+    def motor_omega(self, index: int = 0) -> float:
+        vehicle = self._vehicle
+        return float(self._ten_velocity[vehicle.drive_tendons[index]]) * vehicle.vm.drives[index].ratio
+
+    def position(self) -> np.ndarray:
+        f = self._vehicle.free_qpos
+        return self._qpos[f:f + 3].copy()
+
+    def quaternion(self) -> np.ndarray:
+        f = self._vehicle.free_qpos
+        return self._qpos[f + 3:f + 7].copy()
+
+    def rotation(self) -> np.ndarray:
+        return self._xmat.reshape(3, 3).copy()
+
+    def yaw(self) -> float:
+        r = self._xmat
+        return math.atan2(r[3], r[0])
+
+    def velocity(self) -> np.ndarray:
+        f = self._vehicle.free_qvel
+        return self._qvel[f:f + 3].copy()
+
+    def forward_speed(self) -> float:
+        r, f = self._xmat, self._vehicle.free_qvel
+        v = self._qvel[f:f + 3]
+        return float(r[0] * v[0] + r[3] * v[1] + r[6] * v[2])
+
+    def joint_angle(self, joint_id: str) -> float:
+        return float(self._qpos[self._vehicle.joint_index[joint_id][0]])
+
+    def imu(self) -> tuple[np.ndarray, np.ndarray]:
+        vehicle = self._vehicle
+        sd = self._sensordata
+        return sd[vehicle.acc_adr:vehicle.acc_adr + 3].copy(), sd[vehicle.gyro_adr:vehicle.gyro_adr + 3].copy()
+
+    def steer_angle(self, index: int = 0) -> float:
+        steer = self._vehicle.vm.steering[index]
+        return 0.5 * sum(self.joint_angle(j) for j in steer.joints)
+
+    def qpos(self) -> np.ndarray:
+        return self._qpos.copy()
+
+    def moving_parts(self) -> dict[str, dict[str, Any]]:
+        return self._moving if self._moving is not None else self._vehicle.moving_parts()

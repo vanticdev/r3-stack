@@ -92,11 +92,18 @@ Fixed-step master clock, `simulation.timestep` (1 ms). Per step, in order:
    wires, connectors, fuse, ESC, motor, regulators, loads) and returns motor
    torque, rail voltages, branch currents, brownouts and temperatures.
 4. MuJoCo vehicle steps with motor torque (through the transmission) and servo torque.
-5. `CableSimulator.step(dt, chassis_state, moving_parts)` (every 5 ms) updates
-   harness slack and reports clearance to moving parts.
+5. The routed harnesses are MuJoCo elastic cables (`composite type="cable"`,
+   `mujoco.elasticity.cable`) in the same world as the vehicle, stepped by step 4.
+   Clearance to moving parts is read from MuJoCo contact data every step.
 6. Radio link model updates RSSI/LQ/packet delivery; receiver model emits CRSF frames.
 7. Sensor models (IMU, GPS, encoder, INA226) sample the physical state.
 8. Time advances; software wakes when its `sleep_until` deadline is reached.
+
+Execution may overlap without changing this order or any result: MuJoCo's
+`mj_step1` (kinematics, collision) runs while step 3 is solved, and within a
+`sleep_until` advance `mj_step2` of one step runs while step 3 of the next is
+solved (its inputs are final then). `R3_SIM_OVERLAP=0` runs strictly serially;
+both produce bit-identical recordings.
 
 Electrical interface, keyed by component id (generic, not RC-car specific):
 
@@ -109,14 +116,25 @@ outputs["motor"]["torque"]; outputs["battery"]["v_terminal"]; outputs["pi"]["pow
 outputs["_nets"]["5V"]; outputs["_branches"]["W_Y_P_IN"]["current"]
 ```
 
-Cable interface:
+Cable interface (`r3_wiring.mujoco_cables`, `r3_wiring.cable_sim`):
 
 ```python
+plan = plan_cables(project, routes)            # bundles, spans, part collision geoms
+emit_mjcf(mjcf_root, plan, body_element, body_origin, body_name)   # into any MuJoCo world
+monitor = CableMonitor(model, data, plan, root_body)
+monitor.update()            # after each mj_step: clearance from MuJoCo contact data
+monitor.wire_clearance()    # {wire_id: (signed surface distance, moving component)}
+monitor.exact_distances()   # the same from mj_geomDistance (cross-check)
+
+# Standalone shaker (wiring stage): chassis-only MuJoCo world plus cables.
 cables = CableSimulator(project, routes)
 report = cables.step(dt, chassis={"pos", "quat", "lin_acc", "ang_vel", "ang_acc"},
-                     moving={"wheel_fl": {"pos", "quat"}, ...})   # poses in world frame
+                     moving={"knuckle_fl": {"pos", "quat"}, ...})  # or joints={"steer_fl": 0.2}
 report.min_clearance  # {wire_id: (distance, component)}
 ```
+
+In the co-simulation, `build_vehicle_model(project, ..., routes=routes)` adds the
+cables to the vehicle MJCF and `Vehicle.cables` is the `CableMonitor`.
 
 ## Software contract
 

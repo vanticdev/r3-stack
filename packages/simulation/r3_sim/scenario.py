@@ -157,6 +157,7 @@ def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | N
     out_dir.mkdir(parents=True, exist_ok=True)
     wall_start = time.monotonic()
     kernel = CoSimKernel(project, scenario, seed=seed)
+    setup = time.monotonic() - wall_start
     diagnostics = list(kernel.diagnostics)
     server = TwinHalServer(kernel)
     cmd = software_cmd if software_cmd is not None else default_software_command(project)
@@ -217,7 +218,7 @@ def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | N
     server.close()
     wall = time.monotonic() - wall_start
 
-    outcome = _finish(project, scenario, kernel, server, software, diagnostics, out_dir, render, wall, hung)
+    outcome = _finish(project, scenario, kernel, server, software, diagnostics, out_dir, render, wall, hung, setup)
     return outcome
 
 
@@ -226,7 +227,8 @@ def _interp_position(rec: dict[str, np.ndarray], t: float) -> tuple[float, float
 
 
 def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHalServer, software: _Software,
-            diagnostics: list[Diagnostic], out_dir: Path, render: bool, wall: float, hung: bool) -> ScenarioOutcome:
+            diagnostics: list[Diagnostic], out_dir: Path, render: bool, wall: float, hung: bool,
+            setup: float = 0.0) -> ScenarioOutcome:
     rec = kernel.recorder.arrays()
     config = project.spec.software.config
     failsafe_timeout = float(config.get("radio_failsafe_timeout_s", 0.25))
@@ -304,7 +306,12 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         "min_wire_clearance_m": (round(kernel.min_wire_clearance[0], 5) if math.isfinite(kernel.min_wire_clearance[0]) else None),
         "min_wire_clearance_wire": kernel.min_wire_clearance[1], "min_wire_clearance_component": kernel.min_wire_clearance[2],
         "vehicle_mass_kg": round(kernel.vm.total_mass, 4), "sim_time_s": round(kernel.t, 3), "wall_time_s": round(wall, 2),
-        "realtime_factor": round(kernel.t / wall, 2) if wall > 0 else None, "hal_requests": server.requests,
+        "realtime_factor": round(kernel.t / wall, 2) if wall > 0 else None,
+        # Setup (model build, cable layout and settling) is a fixed cost; the loop factor is what
+        # long scenarios approach.
+        "setup_time_s": round(setup, 2),
+        "loop_realtime_factor": round(kernel.t / (wall - setup), 2) if wall > setup else None,
+        "hal_requests": server.requests,
         "hal_errors": dict(server.errors),
     }
     metrics.update(radio_metrics(radio, rec, project.spec.requirements.radio_range, h_rx))

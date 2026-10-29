@@ -217,9 +217,12 @@ class Cylinder(Shape):
 
 class MeshShape(Shape):
     """Closed triangle mesh (e.g. a CAD STL export). Distance is measured to a
-    dense set of surface samples; the sign comes from the outward face normal
-    of the nearest sample, which is exact for closed, consistently oriented
-    meshes up to the sampling spacing."""
+    dense set of surface samples. The sign is exact for closed meshes: points
+    outside the bounding box are outside, others use the generalized winding
+    number (sum of the triangles' solid angles / 4 pi, Van Oosterom & Strackee
+    1983). The sign of the nearest sample's face normal is wrong next to edges
+    and corners, where the nearest sample can lie on a face whose plane the
+    point is behind."""
 
     def __init__(self, vertices: np.ndarray, faces: np.ndarray, spacing: float = 0.0015,
                  samples: tuple[np.ndarray, np.ndarray] | None = None) -> None:
@@ -232,25 +235,54 @@ class MeshShape(Shape):
         self._tree = cKDTree(self._samples)
 
     def _sample(self, spacing: float) -> tuple[np.ndarray, np.ndarray]:
-        points, normals = [], []
-        for tri in self.vertices[self.faces]:
-            a, b, c = tri
-            normal = np.cross(b - a, c - a)
-            area2 = np.linalg.norm(normal)
-            if area2 < 1e-14:
-                continue
-            normal /= area2
-            n = max(1, int(math.ceil(max(np.linalg.norm(b - a), np.linalg.norm(c - a), np.linalg.norm(c - b)) / spacing)))
+        """Barycentric grid of each triangle with n = ceil(longest edge / spacing)
+        subdivisions (same points as a per-triangle loop, vectorized per n)."""
+        tri = self.vertices[self.faces]
+        a, b, c = tri[:, 0], tri[:, 1], tri[:, 2]
+        normal = np.cross(b - a, c - a)
+        area2 = np.linalg.norm(normal, axis=1)
+        keep = area2 >= 1e-14
+        a, b, c, normal, area2 = a[keep], b[keep], c[keep], normal[keep], area2[keep]
+        normal = normal / area2[:, None]
+        longest = np.max(np.stack([np.linalg.norm(b - a, axis=1), np.linalg.norm(c - a, axis=1),
+                                   np.linalg.norm(c - b, axis=1)]), axis=0)
+        counts = np.maximum(1, np.ceil(longest / spacing).astype(int))
+        chunks: list[tuple[np.ndarray, np.ndarray, np.ndarray]] = []
+        for n in np.unique(counts):
+            idx = np.flatnonzero(counts == n)
             uv = np.array([(i / n, j / n) for i in range(n + 1) for j in range(n + 1 - i)])
-            points.append(a + uv[:, :1] * (b - a) + uv[:, 1:] * (c - a))
-            normals.append(np.repeat(normal[None], len(uv), axis=0))
-        return np.vstack(points), np.vstack(normals)
+            pts = a[idx, None, :] + uv[None, :, :1] * (b - a)[idx, None, :] + uv[None, :, 1:] * (c - a)[idx, None, :]
+            chunks.append((idx, pts.reshape(-1, 3), np.repeat(normal[idx], len(uv), axis=0)))
+        # Restore triangle order (only affects KD-tree tie-breaking).
+        order = np.argsort(np.concatenate([np.repeat(idx, len(p) // len(idx)) for idx, p, _ in chunks]), kind="stable")
+        points = np.vstack([p for _, p, _ in chunks])[order]
+        normals = np.vstack([nrm for _, _, nrm in chunks])[order]
+        return points, normals
+
+    def winding_number(self, points: np.ndarray) -> np.ndarray:
+        """Generalized winding number of each point (1 inside a closed, outward mesh, 0 outside)."""
+        points = np.atleast_2d(points)
+        tri = self.vertices[self.faces]
+        out = np.zeros(len(points))
+        for start in range(0, len(points), 256):
+            rel = tri[None, :, :, :] - points[start:start + 256, None, None, :]  # (p, f, 3, 3)
+            length = np.linalg.norm(rel, axis=3)
+            ra, rb, rc = rel[:, :, 0], rel[:, :, 1], rel[:, :, 2]
+            la, lb, lc = length[:, :, 0], length[:, :, 1], length[:, :, 2]
+            numerator = np.einsum("pfi,pfi->pf", ra, np.cross(rb, rc))
+            denominator = (la * lb * lc + np.einsum("pfi,pfi->pf", ra, rb) * lc
+                           + np.einsum("pfi,pfi->pf", rb, rc) * la + np.einsum("pfi,pfi->pf", rc, ra) * lb)
+            out[start:start + 256] = np.arctan2(numerator, denominator).sum(axis=1) / (2.0 * math.pi)
+        return out
 
     def sdf(self, points: np.ndarray) -> np.ndarray:
         points = np.atleast_2d(points)
-        distance, index = self._tree.query(points)
-        sign = np.sign(np.einsum("ij,ij->i", points - self._samples[index], self._normals[index]))
-        sign[sign == 0] = 1.0
+        distance, _ = self._tree.query(points)
+        lo, hi = self.aabb()
+        candidate = np.all((points >= lo) & (points <= hi), axis=1)
+        sign = np.ones(len(points))
+        if candidate.any():
+            sign[candidate] = np.where(self.winding_number(points[candidate]) > 0.5, -1.0, 1.0)
         return distance * sign
 
     def aabb(self) -> tuple[np.ndarray, np.ndarray]:

@@ -45,6 +45,10 @@ def headless_gl_backend() -> str | None:
 def configure() -> dict[str, str]:
     """Apply headless defaults; returns the variables that were set."""
     applied: dict[str, str] = {}
+    if sys.platform == "darwin" and "MUJOCO_GL" not in os.environ and "mujoco" not in sys.modules:
+        # macOS: CGL renders offscreen with no window server or display (SSH, CI). Set it
+        # explicitly rather than relying on MuJoCo's CGL-then-GLFW fallback.
+        applied["MUJOCO_GL"] = os.environ["MUJOCO_GL"] = "cgl"
     if has_display():
         return applied
     if "MPLBACKEND" not in os.environ:

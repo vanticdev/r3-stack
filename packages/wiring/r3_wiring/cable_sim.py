@@ -1,426 +1,242 @@
-"""Physical cable slack simulation (extended position-based dynamics).
+"""Standalone cable shaker: the routed harnesses as MuJoCo elastic cables on the
+robot's bodies, with the chassis held by a shaker table.
 
-Every wire is a chain of particles (5-10 mm segments) simulated in the
-*chassis frame*, so the chassis motion enters as inertial pseudo-forces:
+R3 does not integrate cable dynamics itself: :mod:`r3_wiring.mujoco_cables`
+describes the cables (``composite type="cable"`` with MuJoCo's
+``mujoco.elasticity.cable`` plugin) and MuJoCo steps them. In the full digital
+twin the same cables live in the vehicle's MuJoCo world (``r3_sim.vehicle``);
+this module builds a chassis-only world for the wiring stage's
+vibration/bump/steering drive and keeps the ``CableSimulator`` interface:
 
-    a = R^T g - R^T a_o - alpha x r - 2 omega x v - omega x (omega x r)
+* the chassis body is fixed to the world; the world frame *is* the chassis frame;
+* translational chassis acceleration enters through gravity (equivalence
+  principle): in the chassis frame every body feels ``R^T (g - a_o)``, applied as
+  ``opt.gravity`` each step, which is exact for any translation;
+* chassis rotation adds the fictitious forces
+  ``-m (alpha x r + omega x (omega x r) + 2 omega x v)`` on each cable segment
+  (``xfrc_applied``; segment rotational inertia is negligible);
+* jointed bodies (knuckles, wheels) follow the commanded joint values through
+  stiff joint equality constraints, so cables anchored on them move with them
+  and moving parts push cables they hit.
 
-(``R`` chassis attitude, ``a_o`` world acceleration of the robot-frame origin,
-``omega``/``alpha`` body-frame angular velocity/acceleration, ``r``/``v``
-particle position/velocity in the chassis frame).
-
-Constraints are solved with XPBD (Macklin et al. 2016) using graph colouring so
-each colour is an exact vectorised Gauss-Seidel sweep:
-
-* stretch: ``C = |x_i - x_j| - l``, compliance ``l / (E A)`` (stranded copper);
-* bending: ``C = |x_{k-1} - 2 x_k + x_{k+1}|``; with ``C ~ l theta`` the energy
-  ``C^2 / (2 alpha)`` equals the discrete rod energy ``EI theta^2 / (2 l)``
-  when ``alpha = l^3 / EI`` (catalog ``bending_stiffness``);
-* pins: connector ends and tie points are kinematic, moving with their body;
-* contact: particles are projected out of chassis-fixed component geometry
-  (inflated by the wire radius) with Coulomb friction on the tangential
-  displacement (static if ``|dx_t| < mu_s d``, else reduced by ``mu_k d``).
-
-Clearance to moving parts (posed from the ``moving`` input) is measured
-every step; moving parts do not push cables (a contact is the failure being
-detected).
+Clearance to moving parts is read from MuJoCo contact data every step
+(:class:`r3_wiring.mujoco_cables.CableMonitor`).
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
 from r3_model.project import Project
 
-from .bodies import IDENTITY, ROOT, Transform, invert
-from .geometry import project_to_polyline, quat_to_matrix
+from .bodies import ROOT, Kinematics
+from .geometry import quat_to_matrix
+from .mujoco_cables import ANCHOR_SOLREF, SETTLE_TIME, CableMonitor, CablePlan, emit_mjcf, plan_cables, settle
 from .obstacles import ObstacleSet, build_obstacles
-from .terminations import termination_allowance
 
-COPPER_E = 117e9  # Pa, annealed copper
-STRANDING_FACTOR = 0.6  # effective axial modulus of a stranded, insulated conductor (estimate)
 GRAVITY = np.array([0.0, 0.0, -9.80665])
+CHASSIS = "chassis"
 
 
 @dataclass
 class CableReport:
     time: float
-    min_clearance: dict[str, tuple[float, str]]
+    min_clearance: dict[str, tuple[float, str]]  # wire -> (clearance this step, closest moving part)
     penetrating: list[str]
-    max_speed: float
-    max_strain: float
+    max_speed: float  # fastest cable segment, m/s (chassis frame)
+    max_strain: float  # largest pin give (m): cable end to its welded pin; segments are inextensible
 
 
-class RodSolver:
-    """XPBD solver for a set of particle chains."""
+def _fmt(values: Any) -> str:
+    return " ".join(f"{float(v):.9g}" for v in np.ravel(values))
 
-    def __init__(self, iterations: int = 2, damping: float = 19.0, friction: float = 0.5) -> None:
-        self.iterations = iterations
-        self.damping = damping
-        self.friction = friction
-        self._chains: list[dict[str, Any]] = []
-        self.x = np.zeros((0, 3))
 
-    def add_chain(self, points: np.ndarray, rest: np.ndarray, mass: np.ndarray, bending_stiffness: float,
-                  axial_stiffness: float, radius: float, pinned: np.ndarray) -> slice:
-        start = sum(len(c["points"]) for c in self._chains)
-        self._chains.append({"points": np.asarray(points, float), "rest": np.asarray(rest, float),
-                             "mass": np.asarray(mass, float), "ei": bending_stiffness, "ea": axial_stiffness,
-                             "radius": radius, "pinned": np.asarray(pinned, bool)})
-        return slice(start, start + len(points))
+def _component_mass(project: Project, component: str) -> float:
+    cad = project.read_build_json("cad/cad_model.json") or {}
+    part = (cad.get("parts") or {}).get(component) if isinstance(cad, dict) else None
+    if part and part.get("mass"):
+        return float(part["mass"])
+    comp = project.spec.components[component]
+    return float(comp.params.get("mass", project.catalog.component(comp.type).mechanical.mass))
 
-    def finalize(self) -> None:
-        xs, ms, rs, pins = [], [], [], []
-        si, sj, sl, sc, scol = [], [], [], [], []
-        ba, bb, bc, bcomp, bcol = [], [], [], [], []
-        offset = 0
-        for chain in self._chains:
-            n = len(chain["points"])
-            xs.append(chain["points"]); ms.append(chain["mass"]); rs.append(np.full(n, chain["radius"]))
-            pins.append(chain["pinned"])
-            for k in range(n - 1):
-                si.append(offset + k); sj.append(offset + k + 1); sl.append(chain["rest"][k])
-                sc.append(chain["rest"][k] / chain["ea"]); scol.append(k % 2)
-            for k in range(1, n - 1):
-                lbar = 0.5 * (chain["rest"][k - 1] + chain["rest"][k])
-                ba.append(offset + k - 1); bb.append(offset + k); bc.append(offset + k + 1)
-                bcomp.append(lbar ** 3 / chain["ei"]); bcol.append(k % 3)
-            offset += n
-        self.x = np.vstack(xs)
-        self.v = np.zeros_like(self.x)
-        self.mass = np.concatenate(ms)
-        self.radius = np.concatenate(rs)
-        self.pinned = np.concatenate(pins)
-        self.inv_mass = np.where(self.pinned, 0.0, 1.0 / self.mass)
-        self.targets = self.x.copy()
-        si, sj, sl, sc, scol = map(np.asarray, (si, sj, sl, sc, scol))
-        ba, bb, bc, bcomp, bcol = map(np.asarray, (ba, bb, bc, bcomp, bcol))
-        self.stretch = [(si[scol == c], sj[scol == c], sl[scol == c], sc[scol == c]) for c in (0, 1)]
-        self.bend = [(ba[bcol == c], bb[bcol == c], bc[bcol == c], bcomp[bcol == c]) for c in (0, 1, 2)]
-        self.stretch_all = (si, sj, sl)
-        self.colliders: list[tuple[Any, np.ndarray]] = []  # (shape, exempt mask)
 
-    def substep(self, h: float, accel, damping: float | None = None) -> None:
-        free = ~self.pinned
-        self.v[free] += h * accel(self.x[free], self.v[free])
-        previous = self.x.copy()
-        p = self.x + h * self.v
-        p[self.pinned] = self.targets[self.pinned]
-        w = self.inv_mass
-        h2 = h * h
-        lam_s = [np.zeros(len(g[0])) for g in self.stretch]
-        lam_b = [np.zeros(len(g[0])) for g in self.bend]
-        for _ in range(self.iterations):
-            for g, (i, j, rest, comp) in enumerate(self.stretch):
-                if not len(i):
-                    continue
-                d = p[i] - p[j]
-                length = np.linalg.norm(d, axis=1)
-                n = d / np.maximum(length, 1e-12)[:, None]
-                at = comp / h2
-                dl = (-(length - rest) - at * lam_s[g]) / (w[i] + w[j] + at)
-                lam_s[g] += dl
-                p[i] += (w[i] * dl)[:, None] * n
-                p[j] -= (w[j] * dl)[:, None] * n
-            for g, (a, b, c, comp) in enumerate(self.bend):
-                if not len(a):
-                    continue
-                e = p[a] + p[c] - 2 * p[b]
-                value = np.linalg.norm(e, axis=1)
-                ok = value > 1e-12
-                u = e / np.where(ok, value, 1.0)[:, None]
-                at = comp / h2
-                dl = np.where(ok, (-value - at * lam_b[g]) / (w[a] + w[c] + 4 * w[b] + at), 0.0)
-                lam_b[g] += dl
-                p[a] += (w[a] * dl)[:, None] * u
-                p[c] += (w[c] * dl)[:, None] * u
-                p[b] -= (2 * w[b] * dl)[:, None] * u
-        self._collide(p, previous)
-        p[self.pinned] = self.targets[self.pinned]
-        self.v = (p - previous) / h
-        beta = self.damping if damping is None else damping
-        self.v[free] *= math.exp(-beta * h)
-        self.v[self.pinned] = 0.0
-        self.x = p
-
-    def _collide(self, p: np.ndarray, previous: np.ndarray) -> None:
-        mu_s = mu_k = self.friction
-        for shape, exempt in self.colliders:
-            lo, hi = shape.aabb()
-            near = np.all((p >= lo - self.radius[:, None]) & (p <= hi + self.radius[:, None]), axis=1)
-            near &= ~exempt & ~self.pinned
-            if not near.any():
+def build_shaker_mjcf(project: Project, plan: CablePlan, kin: Kinematics, timestep: float) -> str:
+    """Chassis fixed to the world, jointed bodies driven by joint equalities, cables."""
+    mj = ET.Element("mujoco", model=f"{project.spec.robot.name}-cable-shaker")
+    ET.SubElement(mj, "compiler", angle="radian", autolimits="true")
+    ET.SubElement(mj, "option", timestep=f"{timestep:.9g}", integrator="implicitfast", cone="elliptic",
+                  gravity=_fmt(GRAVITY))
+    world = ET.SubElement(mj, "worldbody")
+    bodies: dict[str, ET.Element] = {ROOT: ET.SubElement(world, "body", name=CHASSIS)}
+    origins: dict[str, np.ndarray] = {ROOT: np.zeros(3)}
+    equality = ET.SubElement(mj, "equality")
+    pending = dict(kin.joints)
+    while pending:  # parents before children
+        progressed = False
+        for joint_id, joint in list(pending.items()):
+            parent = kin.body_of(joint.parent) if joint.parent != "world" else ROOT
+            if parent not in bodies:
                 continue
-            idx = np.nonzero(near)[0]
-            d = shape.sdf(p[idx]) - self.radius[idx]
-            hit = d < 0
-            if not hit.any():
-                continue
-            idx, d = idx[hit], d[hit]
-            normal = shape.gradient(p[idx])
-            p[idx] -= normal * d[:, None]
-            # Coulomb friction on the tangential displacement of this substep.
-            delta = p[idx] - previous[idx]
-            tangential = delta - np.einsum("ij,ij->i", delta, normal)[:, None] * normal
-            tlen = np.linalg.norm(tangential, axis=1)
-            depth = -d
-            static = tlen < mu_s * depth
-            scale = np.where(static, 1.0, np.minimum(1.0, mu_k * depth / np.maximum(tlen, 1e-15)))
-            p[idx] -= tangential * scale[:, None]
-
-    def strain(self) -> float:
-        """Maximum tensile strain of any segment (compression is slack, not strain)."""
-        i, j, rest = self.stretch_all
-        if not len(i):
-            return 0.0
-        return float(max(0.0, np.max(np.linalg.norm(self.x[i] - self.x[j], axis=1) / rest - 1.0)))
-
-
-@dataclass
-class _WireSim:
-    wire_id: str
-    harness: str
-    sl: slice
-    pins: list[tuple[int, str, np.ndarray]]  # (particle, body, nominal position)
-    exempt_moving: dict[str, np.ndarray] = field(default_factory=dict)  # component -> particle mask (local)
+            element = ET.SubElement(bodies[parent], "body", name=joint.child, pos=_fmt(joint.origin - origins[parent]))
+            jtype = {"revolute": "hinge", "continuous": "hinge", "prismatic": "slide"}.get(joint.type)
+            if jtype:
+                ET.SubElement(element, "joint", name=joint_id, type=jtype, axis=_fmt(joint.axis))
+                ET.SubElement(equality, "joint", name=f"drive_{joint_id}", joint1=joint_id, polycoef="0 0 0 0 0",
+                              solref=ANCHOR_SOLREF)
+            bodies[joint.child], origins[joint.child] = element, np.asarray(joint.origin, dtype=float)
+            del pending[joint_id]
+            progressed = True
+        if not progressed:
+            raise ValueError(f"joints without a reachable parent body: {sorted(pending)}")
+    emit_mjcf(mj, plan, lambda b: bodies[b], lambda b: origins[b], lambda b: CHASSIS if b == ROOT else b,
+              part_mass=lambda component: _component_mass(project, component))
+    for body, element in bodies.items():
+        if body != ROOT and element.find("geom") is None:  # jointed bodies need mass
+            ET.SubElement(element, "geom", type="sphere", size="0.001", mass="0.001", contype="0", conaffinity="0",
+                          group="4")
+    return ET.tostring(mj, encoding="unicode")
 
 
 class CableSimulator:
     """``CableSimulator(project, routes).step(dt, chassis, moving) -> CableReport``.
 
-    ``chassis``: ``pos``, ``quat`` ([w, x, y, z]) of the robot frame in the
-    world, and world-frame ``lin_acc`` (of the robot-frame origin),
-    ``ang_vel``, ``ang_acc``. ``moving``: world poses (``pos``, ``quat``) of
-    component frames (the frame of ``RobotGraph.component_pose``). Components
-    not listed stay at their nominal pose relative to the chassis.
+    ``chassis``: ``pos``, ``quat`` ([w, x, y, z]) of the robot frame in the world
+    and world-frame ``lin_acc`` (of the robot-frame origin), ``ang_vel``,
+    ``ang_acc``. ``moving``: world poses (``pos``, ``quat``) of joint-child
+    components (the frame of ``RobotGraph.component_pose``), converted to joint
+    values; or pass ``joints={joint_id: value}`` directly. Joints not given
+    stay where they are.
     """
 
     def __init__(self, project: Project, routes: dict[str, Any], obstacles: ObstacleSet | None = None, *,
-                 segment_length: float = 0.0075, substep: float = 0.0005, iterations: int = 2,
-                 damping: float = 19.0, friction: float = 0.5, settle: float = 0.4, seed: int = 1) -> None:
+                 timestep: float | None = None, settle_time: float = SETTLE_TIME, plan: CablePlan | None = None) -> None:
+        import mujoco
+
         self.project = project
         self.routes = routes
         self.obstacles = obstacles or build_obstacles(project)[0]
         self.kin = self.obstacles.kinematics
-        self.substep_dt = substep
+        self.timestep = float(timestep if timestep is not None else project.spec.simulation.timestep)
+        self.plan = plan or plan_cables(project, routes, self.obstacles, timestep=self.timestep)
+        self.xml = build_shaker_mjcf(project, self.plan, self.kin, self.timestep)
+        self.model = mujoco.MjModel.from_xml_string(self.xml)
+        self.data = mujoco.MjData(self.model)
+        self.monitor = CableMonitor(self.model, self.data, self.plan, CHASSIS)
+        self._drive = {joint_id: mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_EQUALITY, f"drive_{joint_id}")
+                       for joint_id, joint in self.kin.joints.items() if joint.type != "fixed"}
+        self._cable_bodies = self.monitor.cable_bodies
+        self._mass = self.model.body_mass[self._cable_bodies]
+        self.joint_values = {joint_id: 0.0 for joint_id in self._drive}
+        self.wire_info = {wire: {"bundle": b.id, "harness": b.harness, "od": b.od, "spans": len(b.spans),
+                                 "segments": sum(s.segments for s in b.spans), "free_length": b.free_length,
+                                 "routed_length": b.routed_length}
+                          for b in self.plan.bundles for wire in b.wires}
+        mujoco.mj_forward(self.model, self.data)
+        if settle_time > 0:
+            settle(self.model, self.data, self.monitor, settle_time)
         self.time = 0.0
-        self.solver = RodSolver(iterations, damping, friction)
-        self.wires: list[_WireSim] = []
-        self.wire_info: dict[str, dict[str, Any]] = {}
-        self._rng = np.random.default_rng(seed)
-        self._build(segment_length)
-        self._transforms: dict[str, Transform] = {}
-        self._previous_targets = self.solver.targets.copy()
-        self.min_history: dict[str, tuple[float, str, float]] = {}
-        if settle > 0:
-            self.settle(settle)
 
-    # ----------------------------------------------------------------- build
-    def _ends(self, wire_id: str) -> tuple[list[tuple[str, set[str], float]], Any]:
-        spec, catalog, graph = self.project.spec, self.project.catalog, self.project.graph
-        for harness in spec.electrical.harnesses:
-            for wire in harness.wires:
-                if wire.id != wire_id:
-                    continue
-                ends = []
-                od = float(catalog.wire(wire.awg).outer_diameter)
-                for ref in (wire.from_, wire.to):
-                    if ref in harness.splices:
-                        ends.append((ROOT, set(), max(0.006, 2 * od)))
-                        continue
-                    conn = harness.connectors[ref.split(".")[0]]
-                    endpoint = graph.endpoints.get(conn.mates) if conn.mates else None
-                    if endpoint is not None and endpoint.owner_kind == "component":
-                        component = conn.mates.split(".")[0]
-                        ends.append((self.kin.body_of(component), set(self.kin.mount_chain(component)), 0.012 + 3 * od))
-                    else:
-                        ends.append((ROOT, set(), 0.006))
-                allowance = sum(termination_allowance(catalog, None if ref in harness.splices
-                                                      else harness.connectors[ref.split(".")[0]].type)
-                                for ref in (wire.from_, wire.to))
-                return ends, (harness, wire, allowance)
-        raise KeyError(wire_id)
+    # ------------------------------------------------------------- inputs
+    def set_joints(self, joints: dict[str, float]) -> None:
+        for joint_id, value in joints.items():
+            if joint_id in self._drive:
+                self.joint_values[joint_id] = float(value)
+                self.model.eq_data[self._drive[joint_id], 0] = float(value)
 
-    def _build(self, segment_length: float) -> None:
-        catalog = self.project.catalog
-        for wire_id, data in self.routes["wires"].items():
-            path = np.asarray(data["path"], dtype=float)
-            if len(path) < 2:
-                continue
-            ends, (harness, wire, allowance) = self._ends(wire_id)
-            gauge = catalog.wire(int(data["awg"]))
-            od = float(gauge.outer_diameter)
-            routed = float(data["routed_length"])
-            free_length = float(data["cut_length"]) - allowance
-            stretch = max(free_length, routed) / max(routed, 1e-9)
-            # pins: ends + ties within reach of this wire's path
-            seg = np.linalg.norm(np.diff(path, axis=0), axis=1)
-            total = float(seg.sum())
-            pin_arcs = [(0.0, ends[0][0], path[0]), (total, ends[1][0], path[-1])]
-            for tie in self.routes["harnesses"].get(harness.id, {}).get("tie_points", []):
-                distance, arc = project_to_polyline(path, np.asarray(tie)[None])
-                if distance <= 1.6 * od + 0.0015 and 0.003 < arc < total - 0.003:
-                    pin_arcs.append((arc, ROOT, None))
-            pin_arcs.sort(key=lambda item: item[0])
-            cum = np.concatenate([[0.0], np.cumsum(seg)])
-
-            def at(s: float) -> np.ndarray:
-                return np.column_stack([np.interp(s, cum, path[:, a]) for a in range(3)])
-
-            points, rest, pinned, pin_bodies = [], [], [], []
-            for (s0, body0, p0), (s1, body1, p1) in zip(pin_arcs[:-1], pin_arcs[1:]):
-                span = s1 - s0
-                if span < 1e-6:
-                    continue
-                n = max(1, int(math.ceil(span / segment_length)))
-                arcs = np.linspace(s0, s1, n + 1)
-                pts = at(arcs)
-                if not points:
-                    points.append(pts[0]); pinned.append(True); pin_bodies.append(body0)
-                points.extend(pts[1:])
-                pinned.extend([False] * (n - 1) + [True])
-                pin_bodies.extend([None] * (n - 1) + [body1])
-                rest.extend([span * stretch / n] * n)
-            points = np.asarray(points)
-            interior = ~np.asarray(pinned)
-            points[interior] += self._rng.normal(0.0, 5e-5, size=(int(interior.sum()), 3))
-            rest = np.asarray(rest)
-            mass = np.zeros(len(points))
-            mass[:-1] += 0.5 * rest * float(gauge.mass_per_m)
-            mass[1:] += 0.5 * rest * float(gauge.mass_per_m)
-            area = math.pi * (float(gauge.conductor_diameter) / 2) ** 2
-            sl = self.solver.add_chain(points, rest, mass, float(gauge.bending_stiffness),
-                                       COPPER_E * STRANDING_FACTOR * area, od / 2, np.asarray(pinned))
-            pins = [(sl.start + k, pin_bodies[k], points[k].copy()) for k in range(len(points)) if pinned[k]]
-            arc_rest = np.concatenate([[0.0], np.cumsum(rest)])
-            sim = _WireSim(wire_id, harness.id, sl, pins)
-            for end_index, (body, exempt, zone) in enumerate(ends):
-                local = arc_rest <= zone if end_index == 0 else arc_rest[-1] - arc_rest <= zone
-                for component in exempt:
-                    sim.exempt_moving[component] = sim.exempt_moving.get(component, np.zeros(len(points), bool)) | local
-            self.wires.append(sim)
-            self.wire_info[wire_id] = {"harness": harness.id, "awg": int(data["awg"]), "color": wire.color,
-                                       "particles": len(points), "pins": len(pins), "free_length": free_length,
-                                       "routed_length": routed, "od": od, "ends": [e[0] for e in ends]}
-        self.solver.finalize()
-        self._setup_colliders()
-
-    def _setup_colliders(self) -> None:
-        x = self.solver.x
-        # Everything rigidly attached to the chassis is a collider, including
-        # parts flagged moving without a joint (motor can, gear housing).
-        fixed = [o for o in self.obstacles.obstacles if not self.kin.is_moving(o.body)]
-        for obstacle in fixed:
-            exempt = np.zeros(len(x), dtype=bool)
-            for sim in self.wires:
-                mask = np.zeros(sim.sl.stop - sim.sl.start, dtype=bool)
-                for component, local in sim.exempt_moving.items():
-                    if component == obstacle.component:
-                        mask |= local
-                exempt[sim.sl] |= mask
-            # Particles that start inside (forced routes, drilled pass-throughs)
-            # are exempt from that collider, plus their neighbours within 4 mm.
-            inside = obstacle.shape.sdf(x) < self.solver.radius
-            if inside.any():
-                close = np.zeros(len(x), dtype=bool)
-                for k in np.nonzero(inside)[0]:
-                    close |= np.linalg.norm(x - x[k], axis=1) < 0.004
-                exempt |= close
-            self.solver.colliders.append((obstacle.shape, exempt))
-        self._moving_exempt = {}
-        for obstacle in self.obstacles.moving:
-            mask = np.zeros(len(x), dtype=bool)
-            for sim in self.wires:
-                if obstacle.component in sim.exempt_moving:
-                    mask[sim.sl] |= sim.exempt_moving[obstacle.component]
-            self._moving_exempt[obstacle.component] = mask
-
-    # ------------------------------------------------------------- dynamics
-    def _relative_transforms(self, chassis: dict[str, Any], moving: dict[str, dict[str, Any]]) -> dict[str, Transform]:
-        """Transform of each moved component relative to its nominal pose, in the chassis frame."""
+    def joints_from_poses(self, chassis: dict[str, Any], moving: dict[str, dict[str, Any]]) -> dict[str, float]:
+        """Joint values whose child components sit at the given world poses."""
         rc = quat_to_matrix(chassis.get("quat", [1, 0, 0, 0]))
         pc = np.asarray(chassis.get("pos", [0, 0, 0]), dtype=float)
-        out = {}
-        for component, pose in (moving or {}).items():
-            if component not in self.project.spec.components:
+        total: dict[str, np.ndarray] = {}  # body -> rotation relative to its nominal pose, chassis frame
+        out: dict[str, float] = {}
+        for joint in sorted(self.kin.joints.values(), key=lambda j: len(self.kin.chain(j.child))):
+            pose = moving.get(joint.child)
+            if pose is None or joint.type == "fixed":
                 continue
-            rm = rc.T @ quat_to_matrix(pose.get("quat", [1, 0, 0, 0]))
-            pm = rc.T @ (np.asarray(pose.get("pos"), dtype=float) - pc)
-            p0, r0 = self.project.graph.component_pose(component)
-            rotation = rm @ r0.T
-            out[component] = (rotation, pm - rotation @ p0)
+            _, r0 = self.project.graph.component_pose(joint.child)
+            rotation = rc.T @ quat_to_matrix(pose.get("quat", [1, 0, 0, 0])) @ r0.T
+            total[joint.child] = rotation
+            parent = self.kin.body_of(joint.parent) if joint.parent != "world" else ROOT
+            relative = total.get(parent, np.eye(3)).T @ rotation
+            if joint.type == "prismatic":
+                p0, _ = self.project.graph.component_pose(joint.child)
+                position = rc.T @ (np.asarray(pose["pos"], dtype=float) - pc)
+                out[joint.id] = float((position - p0) @ joint.axis)
+            else:
+                # Rotation angle about the joint axis: sin from the skew part, cos from the trace.
+                skew = np.array([relative[2, 1] - relative[1, 2], relative[0, 2] - relative[2, 0],
+                                 relative[1, 0] - relative[0, 1]]) / 2.0
+                out[joint.id] = math.atan2(float(skew @ joint.axis), (float(np.trace(relative)) - 1.0) / 2.0)
         return out
 
-    def _body_transform(self, body: str, transforms: dict[str, Transform]) -> Transform:
-        return transforms.get(body, IDENTITY) if body != ROOT else IDENTITY
+    # ---------------------------------------------------------------- step
+    def _frame_forces(self, rc: np.ndarray, omega_w: np.ndarray, alpha_w: np.ndarray) -> None:
+        """Fictitious forces of a rotating chassis frame on the cable segments."""
+        data = self.data
+        data.xfrc_applied[self._cable_bodies] = 0.0
+        omega, alpha = rc.T @ omega_w, rc.T @ alpha_w
+        if not (omega.any() or alpha.any()):
+            return
+        bodies = self._cable_bodies
+        r = data.xipos[bodies]
+        root = self.model.body_rootid[bodies]
+        cvel = data.cvel[bodies]
+        v = cvel[:, 3:] + np.cross(cvel[:, :3], r - data.subtree_com[root])
+        accel = np.cross(alpha, r) + np.cross(omega, np.cross(omega, r)) + 2.0 * np.cross(omega, v)
+        data.xfrc_applied[bodies, :3] = -self._mass[:, None] * accel
 
-    def step(self, dt: float, chassis: dict[str, Any] | None = None,
-             moving: dict[str, dict[str, Any]] | None = None) -> CableReport:
+    def step(self, dt: float, chassis: dict[str, Any] | None = None, moving: dict[str, dict[str, Any]] | None = None,
+             joints: dict[str, float] | None = None) -> CableReport:
+        import mujoco
+
         chassis = chassis or {}
-        transforms = self._relative_transforms(chassis, moving or {})
-        targets = self.solver.targets.copy()
-        for sim in self.wires:
-            for index, body, nominal in sim.pins:
-                rotation, translation = self._body_transform(body, transforms)
-                targets[index] = rotation @ nominal + translation
         rc = quat_to_matrix(chassis.get("quat", [1, 0, 0, 0]))
-        gravity = rc.T @ GRAVITY
-        acc = rc.T @ np.asarray(chassis.get("lin_acc", [0, 0, 0]), dtype=float)
-        omega = rc.T @ np.asarray(chassis.get("ang_vel", [0, 0, 0]), dtype=float)
-        alpha = rc.T @ np.asarray(chassis.get("ang_acc", [0, 0, 0]), dtype=float)
-
-        def accel(x: np.ndarray, v: np.ndarray) -> np.ndarray:
-            a = gravity - acc - np.cross(alpha, x) - 2 * np.cross(omega, v) - np.cross(omega, np.cross(omega, x))
-            return a
-
-        n = max(1, int(math.ceil(dt / self.substep_dt - 1e-9)))
-        h = dt / n
-        start = self._previous_targets
-        for k in range(n):
-            s = (k + 1) / n
-            self.solver.targets = start + (targets - start) * s
-            self.solver.substep(h, accel)
-        self._previous_targets = targets
-        self.time += dt
-        self._transforms = transforms
-        return self._report()
-
-    def settle(self, duration: float, damping: float = 80.0) -> None:
-        """Quasi-static pre-roll under gravity with heavy damping."""
-        steps = int(math.ceil(duration / self.substep_dt))
-        accel = lambda x, v: np.broadcast_to(GRAVITY, x.shape)  # noqa: E731
+        if moving:
+            self.set_joints(self.joints_from_poses(chassis, moving))
+        if joints:
+            self.set_joints(joints)
+        # Equivalence principle: in the chassis frame gravity becomes R^T (g - a_origin).
+        self.model.opt.gravity[:] = rc.T @ (GRAVITY - np.asarray(chassis.get("lin_acc", [0, 0, 0]), dtype=float))
+        omega = np.asarray(chassis.get("ang_vel", [0, 0, 0]), dtype=float)
+        alpha = np.asarray(chassis.get("ang_acc", [0, 0, 0]), dtype=float)
+        steps = max(1, int(round(dt / self.model.opt.timestep)))
         for _ in range(steps):
-            self.solver.substep(self.substep_dt, accel, damping=damping)
-        self.solver.v[:] = 0.0
+            self._frame_forces(rc, omega, alpha)
+            mujoco.mj_step(self.model, self.data)
+            self.monitor.update()
+        self.time += steps * self.model.opt.timestep
+        clearance = self.monitor.wire_clearance()
+        return CableReport(self.time, clearance, [w for w, (d, _) in clearance.items() if d < 0],
+                           self.max_speed(), self.monitor.pin_error())
 
-    def clearances(self) -> dict[str, tuple[float, str]]:
-        x, radius = self.solver.x, self.solver.radius
-        best = {sim.wire_id: (math.inf, "") for sim in self.wires}
-        for obstacle in self.obstacles.moving:
-            rotation, translation = self._transforms.get(obstacle.component,
-                                                         self._transforms.get(obstacle.body, IDENTITY))
-            inv_r, inv_t = invert((rotation, translation))
-            local = x @ inv_r.T + inv_t
-            d = obstacle.shape.sdf_bounded(local, 0.2) - radius
-            d[self._moving_exempt[obstacle.component]] = math.inf
-            for sim in self.wires:
-                value = float(d[sim.sl].min())
-                if value < best[sim.wire_id][0]:
-                    best[sim.wire_id] = (value, obstacle.component)
-        return best
+    # --------------------------------------------------------------- state
+    def max_speed(self) -> float:
+        """Fastest cable segment origin, m/s, from MuJoCo's com-based velocities."""
+        bodies = self._cable_bodies
+        if not len(bodies):
+            return 0.0
+        cvel = self.data.cvel[bodies]
+        v = cvel[:, 3:] + np.cross(cvel[:, :3], self.data.xpos[bodies] - self.data.subtree_com[self.model.body_rootid[bodies]])
+        return float(np.max(np.linalg.norm(v, axis=1)))
 
-    def _report(self) -> CableReport:
-        clear = self.clearances()
-        for wire, (distance, component) in clear.items():
-            if wire not in self.min_history or distance < self.min_history[wire][0]:
-                self.min_history[wire] = (distance, component, self.time)
-        return CableReport(self.time, clear, [w for w, (d, _) in clear.items() if d < 0],
-                           float(np.max(np.linalg.norm(self.solver.v, axis=1))) if len(self.solver.v) else 0.0,
-                           self.solver.strain())
+    @property
+    def min_history(self) -> dict[str, tuple[float, str, float]]:
+        """{wire: (minimum clearance so far, part, time)}."""
+        return self.monitor.wire_minimum()
 
     def positions(self) -> dict[str, np.ndarray]:
-        return {sim.wire_id: self.solver.x[sim.sl].copy() for sim in self.wires}
+        """Cable centreline vertices per wire, chassis frame."""
+        return self.monitor.wire_positions("robot")
+
+    def exact_clearance(self) -> dict[str, tuple[float, str]]:
+        """Per-wire clearance from ``mj_geomDistance`` (cross-check of the contact data)."""
+        bundles = self.monitor.exact_distances()
+        return {wire: bundles[b] for wire, b in self.plan.wire_bundle.items()}
+
+
+__all__ = ["CableReport", "CableSimulator", "build_shaker_mjcf"]
