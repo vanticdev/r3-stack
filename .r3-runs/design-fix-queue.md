@@ -85,4 +85,10 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
 27. Phase-B wiring blockers: a cable notch in servo_post_b; clips holding the servo lead above the tie rod; a moved
     ESC pad (W_MOT_B is 11.5 mm inside the ESC); a re-clocked GPS connector; the encoder lead 4 mm from the ring.
 
-28. **Merged conductors (user report, 2026-10-29).** Every wire in a multi-wire harness gets the harness centreline as its `path` in routes.json: 29 pairs at 0.0 mm separation (W_SRV_*, W_RX_*, W_GPS_*, W_ENC_*). The viewer draws them as one z-fighting tube. Owner: GPT-6 Astra on `r3/wire-lay` (per-conductor lay in a new `r3_wiring/lay.py`, a `wire_conductor_overlap` check, per-conductor tubes in the viewer). Lane A: expect a small hook in the wiring stage/export when this merges.
+28. **Merged conductors (user report, 2026-10-29). Fixed in 2d1030e and 0094b5f.** Two causes:
+    - The integration build/ held a stale routes.json in which every conductor of a harness had an identical path, including its endpoints. Fresh routing ends each conductor on its own pin.
+    - `display.py` grouped conductors by exact core vertex count, so a servo lead with fan-out counts 10, 11 and 12 was never spread.
+
+    Grouping is now geometric. Ribbon leads lie flat and twist to meet the far pins. Fan-outs blend by convergence, and crossovers such as TX/RX are excluded. The viewer also drew focused wires 1.8x thick, which re-merged them.
+
+    Result: conductor pairs merged along the core went from 29 to 0 at full length. The `wire_display_merged` warning remains for W_Y_P_IN/W_Y_P_ESC (27% near the Y splice) and W_SRV_VCC/GND (6%, a sharp bend). Screenshots are in .r3-runs/wire-lay/. Open follow-up: real per-conductor lay in routes.json (`r3_wiring/lay.py` primitives on r3/wire-lay, not merged).
