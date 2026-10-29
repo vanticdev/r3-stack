@@ -5,6 +5,10 @@ hall wheel encoder. Time advances only in ``clock.sleep_until`` (lockstep), in
 
 This is a test double, not the digital twin: dynamics are first-order and
 traction-limited, chosen so the firmware's closed loops can be exercised.
+``CarParams(slip_model=True)`` swaps in a two-mass drivetrain (car + driven
+wheel) with a DC motor, a slip-ratio tire curve and a rear-axle spin-out mode,
+so traction control and yaw assist can be exercised; it is deliberately
+simpler than the MuJoCo twin and its constants are not the firmware's.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ if str(FIRMWARE_DIR) not in sys.path:
 
 import crsf  # noqa: E402
 import nmea  # noqa: E402
+from settings import DEFAULT_CONFIG, channel_map  # noqa: E402
 from r3_hal.api import Clock, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart  # noqa: E402
 
 GRAVITY = 9.80665
@@ -38,6 +43,10 @@ class CarState:
     steer: float = 0.0
     distance: float = 0.0
     yaw_rate: float = 0.0
+    accel: float = 0.0               # forward acceleration (IMU x)
+    wheel_v: float = 0.0             # driven-wheel surface speed (slip model)
+    spin: float = 0.0                # yaw rate beyond the kinematic bicycle (slip model)
+    wheel_distance: float = 0.0
 
 
 @dataclass
@@ -61,6 +70,25 @@ class CarParams:
     gyro_noise: float = 0.003
     gps_sigma: float = 0.35          # m (white part; tests use a benign receiver)
     gps_velocity_sigma: float = 0.05
+    # --- slip model (CarParams(slip_model=True))
+    slip_model: bool = False
+    mass: float = 1.58
+    drivetrain_mass: float = 0.43    # rotor + wheel inertia reflected to the tire, J / r^2
+    grip_force: float = 7.0          # mu m g x rear share: the "about 7 N" of the twin's first run
+    peak_slip: float = 0.10          # slip ratio of peak tire force
+    slide_force_drop: float = 0.2    # force lost at full slide, a real tire's falling curve
+    motor_kv: float = 2100.0
+    motor_resistance: float = 0.13   # deliberately not the firmware's 0.12 (model error)
+    brush_drop: float = 0.2
+    no_load_current: float = 1.6
+    gear_ratio: float = 9.6
+    gear_efficiency: float = 0.88
+    drag_area: float = 0.04
+    spin_growth: float = 4.0         # 1/s, yaw divergence while the rear axle slides
+    spin_seed: float = 0.02          # rad/s, asymmetry that seeds the divergence
+    spin_decay_s: float = 0.3
+    yaw_disturbance: Callable[[float], float] | None = None  # extra yaw rate (rad/s) vs time
+    blocked: bool = False            # wheels held (car against a wall): motor stall
 
 
 class _RegisterDevice:
@@ -95,7 +123,8 @@ class FakeMpu6050(_RegisterDevice):
             def word(value: float) -> bytes:
                 return int(max(-32768, min(32767, round(value)))).to_bytes(2, "big", signed=True)
 
-            raw = (word(0) + word(0) + word(accel_lsb) + word((25.0 - 36.53) * 340) + word(0) + word(0)
+            raw = (word(self.hal.car.accel / GRAVITY * accel_lsb) + word(0) + word(accel_lsb) + word((25.0 - 36.53) * 340)
+                   + word(0) + word(0)
                    + word(math.degrees(rate) * gyro_lsb))
             return raw[:length]
         return bytes(self.registers.get(self.pointer + i, 0) for i in range(length))
@@ -213,6 +242,7 @@ class FakeCarHal(Hal):
         self.last_edge_t = 0.0
         self.logs: list[LogRecord] = []
         self.trace: list[tuple[float, float, float, float, float, float]] = []  # t, x, y, yaw, v, esc_us
+        self.slip_trace: list[tuple[float, float, float, float, float]] = []  # t, v, wheel_v, yaw_rate, motor_a
         self.clock = _FakeClock(self)
         self._bindings = bindings or {}
         self._next_rc = 0.0
@@ -283,6 +313,9 @@ class FakeCarHal(Hal):
                           + nmea.format_vtg(speed, course))
 
     def _physics(self, dt: float) -> None:
+        if self.params.slip_model:
+            self._physics_slip(dt)
+            return
         p, car = self.params, self.car
         esc = self.pulse_us(2)
         servo = self.pulse_us(3)
@@ -302,6 +335,7 @@ class FakeCarHal(Hal):
         else:
             accel = -p.coast_decel if car.v > 0 else 0.0
             self.motor_current = 0.0
+        car.accel = accel if car.v > 0.0 or accel > 0.0 else 0.0
         car.v = max(0.0, car.v + accel * dt)
         car.yaw_rate = car.v * math.tan(car.steer) / p.wheelbase
         car.yaw = math.atan2(math.sin(car.yaw + car.yaw_rate * dt), math.cos(car.yaw + car.yaw_rate * dt))
@@ -315,6 +349,57 @@ class FakeCarHal(Hal):
             self.edge_count += edges
             self.last_edge_t = self.t + dt
 
+    def tire_force(self, wheel_v: float, v: float) -> float:
+        """Slip-ratio tire curve: linear to the peak at ``peak_slip``, then falling to
+        (1 - slide_force_drop) of the peak at full slide."""
+        p = self.params
+        slip = (wheel_v - v) / max(abs(v), 1.0)
+        magnitude = abs(slip)
+        if magnitude <= p.peak_slip:
+            force = p.grip_force * magnitude / p.peak_slip
+        else:
+            force = p.grip_force * (1.0 - p.slide_force_drop * min(1.0, (magnitude - p.peak_slip) / 0.5))
+        return math.copysign(force, slip)
+
+    def _physics_slip(self, dt: float) -> None:
+        p, car = self.params, self.car
+        u = (self.pulse_us(2) - 1500.0) / 500.0
+        duty = 0.0 if u <= 0.03 else (u - 0.03) / 0.97  # forward drive only; ESC deadband rescaling
+        servo = self.pulse_us(3)
+        steer_cmd = max(-1.0, min(1.0, (servo - 1500.0) / 378.0)) * p.max_steer
+        car.steer += max(-p.steer_rate * dt, min(p.steer_rate * dt, steer_cmd - car.steer))
+        k_e = 60.0 / (2.0 * math.pi * p.motor_kv)
+        omega_m = car.wheel_v / p.wheel_radius * p.gear_ratio
+        voltage = self.battery_voltage()
+        current = max(0.0, (duty * voltage - p.brush_drop - k_e * omega_m) / p.motor_resistance) if duty > 0 else 0.0
+        self.motor_current = current
+        motor_force = k_e * max(0.0, current - p.no_load_current) * p.gear_ratio * p.gear_efficiency / p.wheel_radius
+        drag = (0.015 * p.mass * GRAVITY if car.v > 0.01 else 0.0) + 0.5 * 1.2 * p.drag_area * car.v * car.v
+        if p.blocked:
+            car.wheel_v = car.v = car.accel = 0.0
+        else:
+            tire = self.tire_force(car.wheel_v, car.v)
+            car.wheel_v = max(0.0, car.wheel_v + (motor_force - tire) / p.drivetrain_mass * dt)
+            car.accel = (tire - drag) / p.mass if car.v > 0.0 or tire > drag else 0.0
+            car.v = max(0.0, car.v + car.accel * dt)
+            sliding = abs(car.wheel_v - car.v) / max(car.v, 1.0) > 1.5 * p.peak_slip
+            # Rear axle sliding: no lateral grip, the yaw rate diverges (spin-out); gripping: it decays.
+            growth = p.spin_growth * (car.spin + p.spin_seed) if sliding and car.v > 1.0 else -car.spin / p.spin_decay_s
+            car.spin += growth * dt
+        disturbance = p.yaw_disturbance(self.t) if p.yaw_disturbance else 0.0
+        car.yaw_rate = car.v * math.tan(car.steer) / p.wheelbase + car.spin + disturbance
+        car.yaw = math.atan2(math.sin(car.yaw + car.yaw_rate * dt), math.cos(car.yaw + car.yaw_rate * dt))
+        car.x += car.v * math.cos(car.yaw) * dt
+        car.y += car.v * math.sin(car.yaw) * dt
+        car.distance += car.v * dt
+        previous = car.wheel_distance
+        car.wheel_distance += car.wheel_v * dt
+        edge_spacing = 2.0 * math.pi * p.wheel_radius / p.pulses_per_rev
+        edges = int(car.wheel_distance / edge_spacing) - int(previous / edge_spacing)
+        if edges > 0:
+            self.edge_count += edges
+            self.last_edge_t = self.t + dt
+
     def advance_to(self, t: float) -> None:
         dt = 0.001
         while self.t + dt <= t + 1e-9:
@@ -324,20 +409,27 @@ class FakeCarHal(Hal):
             if int(round(self.t * 1000)) % 10 == 0:
                 c = self.car
                 self.trace.append((self.t, c.x, c.y, c.yaw, c.v, self.pulse_us(2)))
+                self.slip_trace.append((self.t, c.v, c.wheel_v, c.yaw_rate, self.motor_current))
         if self.t < t:
             self.t = t
 
 
-def pilot_arm_at(arm_t: float, arm_channel: int = 5, throttle: Callable[[float], float] | None = None,
-                 steering: Callable[[float], float] | None = None) -> Pilot:
-    """Pilot: AUX arm switch low until ``arm_t`` then high; optional stick schedules in [-1, 1]."""
+CHANNELS = channel_map(DEFAULT_CONFIG)
+
+
+def pilot_arm_at(arm_t: float, throttle: Callable[[float], float] | None = None,
+                 steering: Callable[[float], float] | None = None, channels: dict[str, int] | None = None) -> Pilot:
+    """Pilot: AUX arm switch low until ``arm_t`` then high; optional stick schedules in [-1, 1].
+    ``channels``: CRSF channel map by role (default: the firmware's ``crsf_channels``)."""
+    ch = channels or CHANNELS
+
     def pilot(t: float) -> dict[int, float]:
-        channels = {arm_channel: 2000.0 if t >= arm_t else 1000.0}
+        out = {ch["arm"]: 2000.0 if t >= arm_t else 1000.0}
         if throttle is not None:
-            channels[2] = 1500.0 + 500.0 * throttle(t)
+            out[ch["throttle"]] = 1500.0 + 500.0 * throttle(t)
         if steering is not None:
-            channels[1] = 1500.0 + 500.0 * steering(t)
-        return channels
+            out[ch["steering"]] = 1500.0 + 500.0 * steering(t)
+        return out
     return pilot
 
 

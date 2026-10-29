@@ -114,12 +114,16 @@ def test_low_voltage_limit_then_cutoff(tmp_path: Path) -> None:
 
 
 def test_manual_mode_maps_sticks_and_failsafes(tmp_path: Path) -> None:
+    ch = fake.CHANNELS
+
     def pilot(t: float) -> dict[int, float]:
         throttle = 0.0 if t < 1.0 else 0.5
-        return {2: 1500.0 + 512.0 * throttle, 1: 1500.0 + 512.0 * (1.0 if 2.0 <= t < 3.0 else 0.0)}
+        return {ch["throttle"]: 1500.0 + 512.0 * throttle, ch["steering"]: 1500.0 + 512.0 * (1.0 if 2.0 <= t < 3.0 else 0.0)}
 
     hal = fake.FakeCarHal(pilot, link_up=lambda t: t < 5.0)
-    controller = make_controller(tmp_path, hal, None, mode="manual")
+    # Raw stick mapping: traction control and yaw assist are covered in test_firmware_traction.py.
+    controller = make_controller(tmp_path, hal, None, mode="manual",
+                                 traction={"enabled": False, "yaw_assist_enabled": False})
     esc_at, servo_at = {}, {}
     original = controller.step
 

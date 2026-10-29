@@ -24,7 +24,8 @@ from control import (BatteryConfig, BatteryMonitor, LinkMonitor, PulseMap, PureP
                      WaypointPath, clamp, stick_to_normalised)
 from devices import GyroBiasCalibrator, Ina226, Mpu6050
 from estimator import VehicleEstimator, WheelSpeedEstimator, nmea_course_to_enu
-from settings import MODULE_NAME, FirmwareSettings, load_settings, quantity
+from settings import MODULE_NAME, FirmwareSettings, channel_map, load_settings, quantity
+from traction import TractionConfig, TractionControl
 
 EXIT_OK = 0
 EXIT_HAL_ERROR = 3
@@ -61,8 +62,8 @@ class RcCarController:
         self.crsf_parser = crsf.CrsfParser()
         self.nmea_reader = nmea.NmeaReader()
         self.link = LinkMonitor(float(cfg["radio_failsafe_timeout_s"]))
-        self.supervisor = Supervisor(SupervisorConfig(mode=str(cfg["mode"]), arm_channel=int(cfg["arm_channel"]),
-                                                      failsafe_action=str(cfg["failsafe_action"])))
+        self.channels = channel_map(cfg)
+        self.supervisor = Supervisor(SupervisorConfig(mode=str(cfg["mode"]), failsafe_action=str(cfg["failsafe_action"])))
         self.battery = BatteryMonitor(BatteryConfig(limit_v=float(cfg["low_voltage_limit_v"]),
                                                     cutoff_v=float(cfg["low_voltage_cutoff_v"])))
         self.estimator = VehicleEstimator(initial_yaw=math.radians(float(cfg["initial_heading_deg"])))
@@ -70,6 +71,8 @@ class RcCarController:
         self.wheel = WheelSpeedEstimator(metres_per_edge)
         self.calibrator = GyroBiasCalibrator(max(1, int(round(float(cfg["imu_calibration_s"]) * self.rate_hz))))
         self.speed_controller = SpeedController()
+        self.traction = TractionControl(TractionConfig.from_mapping(cfg.get("traction")), float(cfg["wheel_radius_m"]),
+                                        float(cfg["wheelbase_m"]), float(cfg["max_steer_rad"]))
 
         ina = cfg["ina226"]
         self.ina = Ina226(self.i2c, int(ina["address"]), float(ina["shunt_ohm"]), float(ina["max_current_a"]))
@@ -99,6 +102,9 @@ class RcCarController:
 
         self.command = Command()
         self.gyro_z = 0.0
+        self.accel_x: float | None = None
+        self.gps_speed: float | None = None
+        self._last_edge_change_t = 0.0
         self.last_encoder = (0, 0.0)
         self.voltage: float | None = None
         self.current: float | None = None
@@ -109,8 +115,11 @@ class RcCarController:
         self.ticks = 0
         self.overruns = 0
         self._last_velocity_t = -1.0
+        self._last_gps_speed_t = -1.0
         self._last_telemetry_t = -math.inf
         self._limit_logged = False
+        self._traction_logged = False
+        self._current_limit_logged = False
         self._start_t = 0.0
 
     # -- helpers -------------------------------------------------------------
@@ -174,9 +183,13 @@ class RcCarController:
                         and now - self._last_velocity_t > 0.05 and self.estimator.position_initialised:
                     self.estimator.update_gps_velocity(sentence.speed_mps, nmea_course_to_enu(sentence.course_deg))
                     self._last_velocity_t = now
+                if valid and sentence.speed_mps is not None and now - self._last_gps_speed_t > 0.05:
+                    self.gps_speed = sentence.speed_mps  # consumed by the ground-speed filter this tick
+                    self._last_gps_speed_t = now
 
     def _read_imu(self, moving: bool) -> None:
         if not self.imu_ok:
+            self.accel_x = None
             # Fallback yaw rate from the bicycle model: w = v tan(delta) / L.
             delta = self.command.steer * self.pulses.max_steer_rad
             self.gyro_z = self.estimator.speed * math.tan(delta) / float(self.cfg["wheelbase_m"])
@@ -187,6 +200,7 @@ class RcCarController:
             self.hal.log("warning", "imu_read_failed", code=error.code)
             return
         raw = sample.gyro_rps[2]
+        self.accel_x = sample.accel_mps2[0]  # chassis forward; bias is estimated by the ground-speed filter
         if not self.calibrator.done:
             if self.calibrator.add(raw, moving):
                 self.hal.log("info", "imu_calibrated", gyro_bias_z_rps=self.calibrator.bias_rps,
@@ -227,16 +241,34 @@ class RcCarController:
             cruise = min(cruise, float(self.cfg["link_degraded_speed_mps"]))
         reference = self.planner.update(self.dt, result.progress_m, self.pursuit.end_s, result.curvature, cruise)
         self.speed_reference = reference
-        throttle = self.speed_controller.update(self.dt, reference, est.speed, max_throttle=self.throttle_scale,
+        # The traction ceiling enters the speed controller's anti-windup as well as the final clamp.
+        throttle = self.speed_controller.update(self.dt, reference, est.speed,
+                                                 max_throttle=min(self.throttle_scale, self.traction.throttle_ceiling),
                                                  reference_accel=self.planner.reference_accel)
         return Command(throttle, self.pulses.steer_from_angle(result.steer_rad))
 
     def _manual_command(self) -> Command:
-        throttle = stick_to_normalised(self.link.channel(int(self.cfg["throttle_channel"])))
-        steer = stick_to_normalised(self.link.channel(int(self.cfg["steering_channel"])))
+        throttle = stick_to_normalised(self.link.channel(self.channels["throttle"]))
+        steer = stick_to_normalised(self.link.channel(self.channels["steering"]))
         if throttle > 0:
             throttle *= self.throttle_scale
         return Command(throttle, steer)
+
+    def _assist(self, command: Command, wheel_speed: float) -> Command:
+        """Traction/launch/current limits on forward throttle and gyro yaw assist on steering."""
+        max_steer = self.pulses.max_steer_rad
+        out = self.traction.apply(self.dt, command.throttle, command.steer * max_steer, wheel_speed, self.gyro_z)
+        traction = self.traction
+        if traction.limiting and not self._traction_logged:
+            self.hal.log("info", "traction_limit", ceiling=round(traction.throttle_ceiling, 3),
+                         slip=round(traction.slip.slip, 3), v_ground=round(traction.ground.speed, 3))
+        self._traction_logged = traction.limiting
+        current_limited = traction.slip.current_limited and traction.limiting
+        if current_limited and not self._current_limit_logged:
+            self.hal.log("warning", "motor_current_limit", limit_a=traction.config.motor_current_limit_a,
+                         motor_current_a=round(traction.motor_current, 2), v_wheel=round(wheel_speed, 3))
+        self._current_limit_logged = current_limited
+        return Command(out.throttle, self.pulses.steer_from_angle(out.steer_rad))
 
     def step(self, now: float) -> None:
         self._read_radio(now)
@@ -250,12 +282,22 @@ class RcCarController:
         wheel_speed = self.wheel.update(now, count, last_t)
         reversing = self.command.throttle < -0.05 and not self.supervisor.braking and self.supervisor.state == State.MANUAL
         signed_speed = -wheel_speed if reversing else wheel_speed
+        if moving:
+            self._last_edge_change_t = now
+        # Stationary: no encoder edge for 0.5 s and the ESC at neutral (a stalled, powered
+        # wheel is not "stationary": its throttle is non-zero).
+        stationary = wheel_speed == 0.0 and now - self._last_edge_change_t > 0.5 and abs(self.command.throttle) < 0.05
+        ground_speed = self.traction.update_speed(self.dt, self.accel_x, signed_speed, self.command.throttle,
+                                                  stationary, self.gps_speed)
+        self.gps_speed = None
         self.estimator.predict(self.dt, self.gyro_z)
-        self.estimator.update_wheel_speed(signed_speed)
+        # A slipping wheel is not a speed measurement: de-weight it by the slip the
+        # ground-speed filter sees.
+        self.estimator.update_wheel_speed(signed_speed, extra_sigma=abs(signed_speed - ground_speed))
 
         link_ok = self.link.ok(now)
-        arm_us = self.link.channel(int(self.cfg["arm_channel"])) if link_ok else 1000.0
-        throttle_us = self.link.channel(int(self.cfg["throttle_channel"]))
+        arm_us = self.link.channel(self.channels["arm"]) if link_ok else 1000.0
+        throttle_us = self.link.channel(self.channels["throttle"])
         finished = self.pursuit is not None and self.pursuit.progress >= self.pursuit.end_s - self.pursuit.config.finish_tolerance_m
         previous = self.supervisor.state
         out = self.supervisor.update(now, link_ok, arm_us, throttle_us, self.ready, wheel_speed, finished, self.battery.cutoff)
@@ -270,12 +312,16 @@ class RcCarController:
         if out.state == State.ARMED and previous != State.ARMED:
             self.speed_controller.reset()
             if self.planner is not None:
-                self.planner.reference = wheel_speed
+                self.planner.reference = max(0.0, ground_speed)
+        if out.state in (State.ARMED, State.MANUAL) and previous != out.state:
+            self.traction.reset()
 
+        driving = out.state in (State.ARMED, State.MANUAL)
+        self.traction.ceiling(self.dt, wheel_speed, self.voltage, driving and self.command.throttle > 0.0)
         if out.state == State.ARMED:
-            command = self._autonomous_command()
+            command = self._assist(self._autonomous_command(), wheel_speed)
         elif out.state == State.MANUAL:
-            command = self._manual_command()
+            command = self._assist(self._manual_command(), wheel_speed)
         elif out.state == State.BRAKING:
             command = Command(-self.supervisor.config.brake_throttle, 0.0)
         else:
@@ -300,7 +346,11 @@ class RcCarController:
                      vbat=round(self.voltage, 3) if self.voltage is not None else None,
                      vbat_filtered=round(self.battery.filtered_v, 3) if self.battery.filtered_v is not None else None,
                      ibat_hat=round(self.current, 3) if self.current is not None else None,
-                     throttle_scale=round(self.throttle_scale, 3), link_ok=link_ok, lq=self.link.link_quality,
+                     throttle_scale=round(self.throttle_scale, 3), v_ground=round(self.traction.ground.speed, 3),
+                     slip=round(self.traction.slip.slip, 3), throttle_ceiling=round(self.traction.throttle_ceiling, 3),
+                     yaw_rate=round(self.gyro_z, 3), yaw_rate_ref=round(self.traction.yaw.reference, 3),
+                     yaw_correction=round(self.traction.yaw.correction, 4),
+                     motor_current_est=round(self.traction.motor_current, 2), link_ok=link_ok, lq=self.link.link_quality,
                      rssi_dbm=self.link.rssi_dbm, pos_sigma_m=round(est.sigma(0), 3), yaw_sigma=round(est.sigma(2), 4),
                      crsf_crc_errors=self.crsf_parser.crc_errors, nmea_checksum_errors=self.nmea_reader.checksum_errors)
 
@@ -326,6 +376,7 @@ class RcCarController:
             self._write_outputs(Command())
             self.hal.log("info", "shutdown", ticks=self.ticks, overruns=self.overruns,
                          failsafe_events=self.supervisor.failsafe_events, cutoff=self.battery.cutoff,
+                         peak_motor_current_est=round(self.traction.peak_motor_current, 2),
                          min_filtered_v=round(self.battery.min_filtered_v, 3) if self.battery.filtered_v else None)
         except HalError:
             pass

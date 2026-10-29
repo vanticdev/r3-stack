@@ -180,9 +180,10 @@ class VehicleEstimator:
             h = [[0.0, 0.0, -v * s, c, 0.0], [0.0, 0.0, v * c, s, 0.0]]
         return self._update(innovation, h, [[sigma2, 0.0], [0.0, sigma2]])
 
-    def update_wheel_speed(self, speed: float) -> bool:
+    def update_wheel_speed(self, speed: float, extra_sigma: float = 0.0) -> bool:
+        """``extra_sigma``: additional 1-sigma error (m/s), e.g. the estimated wheel slip."""
         cfg = self.config
-        sigma = cfg.wheel_speed_sigma_mps + cfg.wheel_slip_fraction * abs(speed)
+        sigma = cfg.wheel_speed_sigma_mps + cfg.wheel_slip_fraction * abs(speed) + extra_sigma
         return self._update([speed - self.state[V]], [[0.0, 0.0, 0.0, 1.0, 0.0]], [[sigma ** 2]])
 
 
