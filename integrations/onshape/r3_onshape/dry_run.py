@@ -28,9 +28,11 @@ class FeaturePlanner(PartStudioBuilder):
     def __init__(self, name: str, variables: Any = None, bindings: Any = None) -> None:
         super().__init__(_OfflineMetadata(), "planned", "planned", "planned", name, variables, bindings)
         self.writes: list[dict[str, Any]] = []
+        self.definitions: list[dict[str, Any]] = []
 
     def _add(self, feature: dict[str, Any], part: str, folder: str) -> str:
         fid = f"planned-{len(self.writes)}"
+        self.definitions.append({"id": fid, "folder": folder, "part": part, "feature": feature})
         self.writes.append({"part": part, "feature": feature["name"], "type": feature["featureType"], "folder": folder})
         self.out.features += 1
         self.out.folders.setdefault(folder, []).append(fid)
@@ -76,7 +78,15 @@ def studio_plan(name: str, members: list[LocalPart], variables: Any = None, bind
             "feature_writes": len(writes), "estimated_features_calls": len(writes)}
 
 
-def rebuild_plan(project: Project) -> dict[str, Any]:
+def rebuild_plan(project: Project, full: bool = False) -> dict[str, Any]:
+    import os
+    if not full and os.environ.get("R3_CAD_FULL") != "1" and (project.lock.get("cad") or {}).get("document_id"):
+        from .incremental import incremental_plan
+        return incremental_plan(project)
+    return full_rebuild_plan(project)
+
+
+def full_rebuild_plan(project: Project) -> dict[str, Any]:
     from .aliases import geometry_aliases, reusable_alias_parts
     from .organized import library_digest, plan_assembly, robot_variables
     from .purchased import public_source
@@ -128,10 +138,15 @@ def organize_plan(project: Project) -> dict[str, Any]:
     state_path = project.build_dir("cad") / "build_state.json"
     if not state_path.exists():
         raise ValueError(f"{state_path}: pinned construction state is required to plan organization")
+    checkpoint = None
+    if project.lock.get("cad_incremental_pending"):
+        from .incremental import pending_organization_state
+        state_path, library, checkpoint = pending_organization_state(project)
+    else:
+        library = locked_library_document(project)
     robot = json.loads(state_path.read_text())["robot"]
-    library = locked_library_document(project)
     documents = [(robot["did"], robot["name"], robot["studios"])]
-    if not (project.lock.get("cad_library") or {}).get("organized"):
+    if not (project.lock.get("cad_library") or {}).get("organized") or checkpoint and any(i["document"] == "library" for i in checkpoint["work"]):
         from dataclasses import asdict
         documents.append((library.did, library.name, {n: asdict(s) for n, s in library.studios.items()}))
     studios = []

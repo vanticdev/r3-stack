@@ -115,3 +115,50 @@ interface and model inputs agree. Library `part_signatures` include the solid an
 frames. An unchanged inherited SKU can keep its existing immutable document/version/part
 reference while other library families rebuild; an unknown or changed signature requires
 a rebuild. `organize` always operates on the pinned documents and never rebuilds a library.
+
+### Incremental rebuilds of pinned CAD
+
+`python -m r3_onshape.organized rebuild <project>` updates the existing robot and
+parts-library workspaces whenever `r3.lock.yaml` contains a CAD document. Use
+`--full` to request a fresh robot document explicitly (the matching library can
+still be reused). The stage also accepts `R3_CAD_FULL=1`.
+
+`--dry-run` uses no authentication or transport. Its incremental report lists
+pending studios, feature candidates, affected instances, mate additions/deletions,
+and estimated `/features` calls including rollback operations and verification
+reads. These are conservative estimates before the live diff, rather than a
+promise that every candidate feature will be written. Solid parameter changes
+batch; sketches with changed entities/constraints use the single-feature update
+API. Unchanged features, connector IDs and unaffected assembly IDs survive.
+
+The lock must match `build/cad/build_state.json`. Restore that pinned build if it
+is missing; incremental mode fails closed rather than silently starting a full
+rebuild. Legacy builds use `pending_rebuild`/recorded plan evidence; successful
+incremental builds additionally pin complete part signatures. A pending Pi SKU
+alias with a reviewed identical geometry signature does not rebuild its studio.
+
+Every acknowledged operation is journaled. `build/cad/incremental_state.json`
+checkpoints completed studios, the library version, and assembly construction.
+After a 429, rerun the same command with the same inputs after the reported reset.
+Completed studios and writes are skipped, including when verification was blocked.
+Changing the inputs or target lock during an unfinished attempt is rejected.
+Native geometry, bounds, volume and mass are compared with changed local plans;
+the shared solved-pose, exact fit and motion checks still run. Library/CAD pins are
+published only after successful verification. Existing documents are never
+trashed by incremental mode, even after failure.
+
+Current full-only operations are replacing vendor imports, changing a mirrored
+family, adding/removing subassembly levels, and moving instances between levels.
+Retired source parts stay in their existing studios; their unused instances and
+mates can be removed without deleting source history.
+
+Folder creation/movement remains an Onshape API limitation: the public REST API
+can read tab folders but cannot create/move tab folders or feature/mate folders.
+Parameter edits preserve existing membership. New features, tabs and recreated
+mates record `cad_incremental_organization_pending`; they need the existing
+native organizer to finish folder membership. Headless verification does not
+pretend those organizational checks passed, and a loose tab is still an error.
+This limitation also applies to full rebuilds. The explicit `organize` command
+and its `--dry-run` can read unpublished incremental checkpoints; estimate its
+editor feature-tree reads separately before running it. No browser is opened by
+the incremental path. See [headless capabilities](../../docs/architecture/headless.md).

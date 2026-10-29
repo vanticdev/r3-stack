@@ -748,7 +748,8 @@ def _assembly_folders(bridge: Any, robot: DocumentInfo, eid: str, plan: Assembly
 
 # ===================================================================== organization check
 def organization_check(api: Transport, bridge: Any, robot: DocumentInfo, library: DocumentInfo, parts: dict[str, LocalPart],
-                       bindings: dict[str, Any], result: StageResult, organize_report: dict[str, Any] | None = None) -> dict[str, Any]:
+                       bindings: dict[str, Any], result: StageResult, organize_report: dict[str, Any] | None = None,
+                       allow_retired: bool = False) -> dict[str, Any]:
     """Diagnostics for the document's organization, read over REST (headless)
     wherever Onshape exposes the data, else through the bridge."""
     report: dict[str, Any] = {"studios": {}, "tabs": {}, "assemblies": {}, "unchecked": []}
@@ -789,7 +790,8 @@ def organization_check(api: Transport, bridge: Any, robot: DocumentInfo, library
                 err("cad_unconstrained_sketch", f"{doc.name}/{name}: {len(loose)} sketches are not fully defined: {loose[:5]}",
                     [name], sketches=loose[:20])
             actual = {p.get("name") for p in api.json("GET", f"/parts/d/{doc.did}/{wvm}/{wvmid}/e/{studio.element_id}")}
-            wrong = sorted(expected_names.get(name, set()) ^ actual)
+            wanted_names = {parts[key].name for key in studio.part_ids if key in parts}
+            wrong = sorted(wanted_names - actual if allow_retired else expected_names.get(name, set()) ^ actual)
             if wrong:
                 err("cad_part_name_mismatch", f"{doc.name}/{name}: part names differ from the plan: {wrong[:6]}", [name], names=wrong)
             for var_feature, var in (bindings.get(name, {}).get("extrude") or {}).items():
@@ -952,11 +954,10 @@ def _world_mass(props: dict[str, Any], pose: np.ndarray) -> dict[str, Any]:
 
 
 def sync_organized(project: Project, api: Transport, result: StageResult, attempt_label: str = "", keep_failed: bool = False) -> dict[str, Any]:
-    """Build (library if needed + a fresh robot document), organize, verify and import. Returns the report."""
-    from .bridge import connect
-    from .fit import verify_fit
-    from .motion import run_motion
-    from .sync import antenna_position, full_lock_views, mesh_filename, stl_bytes
+    """Update pinned CAD by default; explicitly full builds create a fresh robot document."""
+    if (project.lock.get("cad") or {}).get("document_id") and os.environ.get("R3_CAD_FULL") != "1":
+        from .incremental import sync_incremental
+        return sync_incremental(project, api, result)
 
     started = time.time()
     spec = project.spec
@@ -1011,85 +1012,9 @@ def sync_organized(project: Project, api: Transport, result: StageResult, attemp
             builder.build()
             _save_state(state_path, robot, builder)
             project.write_lock("cad_build_pending", {**project.lock["cad_build_pending"], "construction_complete": True})
-        builder.api = api  # verification must observe the current remote document
-        verification = builder.verify()
-        report["assembly"] = {k: v for k, v in verification.items() if k != "solved_transforms"}
-        bridge = connect()
-        organize_report = organize(bridge, robot, library, plan, result, library_fresh, builder,
-                                   build_dir / f"organization-{robot.did}-{digest}.json") if bridge is not None else None
-        report["organize"] = organize_report or {"skipped": "onshape-native bridge not connected (headless)"}
-        if organize_report is not None and library_fresh and not [e for e in organize_report["errors"] if library.name in e]:
-            project.write_lock("cad_library", {**(project.lock.get("cad_library") or {}), "organized": True})
-        report["organization_check"] = organization_check(api, bridge, robot, library, parts, bindings, result, organize_report)
-        solved = {k: np.asarray(v) for k, v in verification["solved_transforms"].items()}
-        keys = {p.key for p in plan.placements.values()}
-        fixture: dict[str, Any] = {}
-        local = {**fetch_local_geometry(api, robot, keys, fixture), **fetch_local_geometry(api, library, keys, fixture)}
-        from .purchased import public_documents
-        external_docs = public_documents(parts)
-        for document in external_docs:
-            local.update(fetch_local_geometry(api, document, keys, fixture))
-        model = compose_world(local, plan, solved)
-        fixture_dir = build_dir / "fixtures"
-        fixture_dir.mkdir(parents=True, exist_ok=True)
-        with gzip.open(fixture_dir / "onshape_local_geometry.json.gz", "wt") as handle:
-            json.dump({"parts": fixture, "placements": {k: [v.key, solved.get(k, v.pose).tolist()] for k, v in plan.placements.items()}}, handle)
-        # The plans this geometry was built from: an offline recomposition (r3_onshape.recompose) reuses a part only
-        # while its plan solid is unchanged. A new recording also invalidates the cached part-frame masses.
-        from .recompose import MASS_FIXTURE, record_plans
-
-        record_plans(project, parts, input_digest(project))
-        (build_dir / MASS_FIXTURE).unlink(missing_ok=True)
-        materials = {iid: parts[p.key].plan.material for iid, p in plan.placements.items()}
-        fit = verify_fit(project, model, materials, result)
-        report["fit"] = fit.summary()
-        report["kinematics"] = run_motion(project, model, fit, result)
-        report["rf"] = antenna_position(project, model)
-        masses = {**local_mass(api, robot, keys), **local_mass(api, library, keys)}
-        for document in external_docs:
-            masses.update(local_mass(api, document, keys))
-        mesh_dir = build_dir / "meshes"
-        mesh_dir.mkdir(parents=True, exist_ok=True)
-        imported: dict[str, Any] = {}
-        for iid, placement in plan.placements.items():
-            geometry = model.parts.get(iid)
-            if geometry is None:
-                continue
-            part = parts[placement.key]
-            data = stl_bytes(geometry)
-            filename = mesh_filename(iid)
-            (mesh_dir / filename).write_bytes(data)
-            entry = {"part_id": geometry.part_id, "part_name": part.name, "part_key": placement.key, "kind": part.plan.kind,
-                     "owner": part.plan.owner if part.plan.kind == "fastener" else iid, "material": part.plan.material,
-                     "density": part.plan.density or None, "mass_status": "catalog_override" if part.plan.kind == "purchased" else "cad_geometry",
-                     "bbox_min": geometry.lo.tolist(), "bbox_max": geometry.hi.tolist(), "mesh": f"meshes/{filename}",
-                     "mesh_triangles": int(len(geometry.triangles)), "mesh_sha256": hashlib.sha256(data).hexdigest(),
-                     "subassembly": placement.level, "studio": part.studio, "library": part.library}
-            if part.bank_model:
-                entry["model_bank_id"] = part.bank_model["id"]
-                entry["model_sources"] = part.bank_model["sources"]
-                entry["model_validation"] = part.bank_model["validation"]
-            elif part.plan.kind == "purchased":
-                entry["proxy"] = True
-            entry.update(_world_mass(masses.get(placement.key, {}), solved.get(iid, placement.pose)))
-            if part.plan.kind == "fastener":
-                fastener = next((f for f in spec.mechanical.fasteners if iid in (f.part, f.nut_part)), None)
-                entry["owner"] = (fastener.thread_into or (fastener.clamps[0] if fastener.clamps else "")) if fastener else ""
-            imported[iid] = entry
-        report["parts"] = imported
-        images = render_views(api, robot, library, build_dir / "views", result)
-        plans = {iid: parts[p.key].plan for iid, p in plan.placements.items()}
-        from .sync import SyncReport
-
-        lock_report = SyncReport()
-        lock_report.kinematics = report["kinematics"]
-        full_lock_views(model, plans, report["kinematics"], build_dir, lock_report, result)
-        report["images"] = [f"views/{i}" for i in images] + lock_report.images
-        report["microversion"] = api.json("GET", f"/documents/d/{robot.did}/w/{robot.wid}/currentmicroversion").get("microversion", "")
-        report["seconds"] = round(time.time() - started, 1)
+        report = verify_and_import(project, api, result, robot, library, builder, parts, plan, bindings,
+                                   report, started, library_fresh)
         ok = result.ok
-        report["robot"] = robot
-        report["library_doc"] = library
         if ok:
             project.write_lock("cad_build_pending", {})
         return report
@@ -1115,6 +1040,104 @@ def sync_organized(project: Project, api: Transport, result: StageResult, attemp
                     quota_diagnostic(error, result)
                 else:
                     result.add(Diagnostic.error("cad_attempt_delete_failed", str(error), subjects=["cad"], data={"document_id": robot.did}))
+
+
+def verify_and_import(project: Project, api: Transport, result: StageResult, robot: DocumentInfo,
+                      library: DocumentInfo, builder: AssemblyBuilder, parts: dict[str, LocalPart],
+                      plan: AssemblyPlan, bindings: dict[str, Any], report: dict[str, Any],
+                      started: float, library_fresh: bool = False, incremental: bool = False) -> dict[str, Any]:
+    """Common solved-pose, native geometry, mass, fit, motion and artifact verification."""
+    from .bridge import connect
+    from .fit import verify_fit
+    from .motion import run_motion
+    from .sync import antenna_position, full_lock_views, mesh_filename, stl_bytes
+
+    spec, build_dir = project.spec, project.build_dir("cad")
+    digest = input_digest(project)
+    builder.api = api  # verification must observe the current remote document
+    verification = builder.verify()
+    report["assembly"] = {k: v for k, v in verification.items() if k != "solved_transforms"}
+    bridge = None if incremental else connect()
+    organize_report = organize(bridge, robot, library, plan, result, library_fresh, builder,
+                               build_dir / f"organization-{robot.did}-{digest}.json") if bridge is not None else None
+    report["organize"] = organize_report or {"skipped": "onshape-native bridge not connected (headless)"}
+    if organize_report is not None and library_fresh and not [e for e in organize_report["errors"] if library.name in e]:
+        project.write_lock("cad_library", {**(project.lock.get("cad_library") or {}), "organized": True})
+    report["organization_check"] = organization_check(api, bridge, robot, library, parts, bindings, result, organize_report,
+                                                        allow_retired=incremental)
+    solved = {k: np.asarray(v) for k, v in verification["solved_transforms"].items()}
+    keys = {p.key for p in plan.placements.values()}
+    fixture: dict[str, Any] = {}
+    local = {**fetch_local_geometry(api, robot, keys, fixture), **fetch_local_geometry(api, library, keys, fixture)}
+    from .purchased import public_documents
+    external_docs = public_documents(parts)
+    for document in external_docs:
+        local.update(fetch_local_geometry(api, document, keys, fixture))
+    model = compose_world(local, plan, solved)
+    materials = {iid: parts[p.key].plan.material for iid, p in plan.placements.items()}
+    fit = verify_fit(project, model, materials, result)
+    report["fit"] = fit.summary()
+    report["kinematics"] = run_motion(project, model, fit, result)
+    report["rf"] = antenna_position(project, model)
+    masses = {**local_mass(api, robot, keys), **local_mass(api, library, keys)}
+    for document in external_docs:
+        masses.update(local_mass(api, document, keys))
+    if incremental:
+        from .incremental import verify_plan_properties
+        report["plan_verification"] = verify_plan_properties(parts, set(report["changed_keys"]), local, masses, result)
+    mesh_dir = build_dir / "meshes"
+    mesh_dir.mkdir(parents=True, exist_ok=True)
+    imported: dict[str, Any] = {}
+    for iid, placement in plan.placements.items():
+        geometry = model.parts.get(iid)
+        if geometry is None:
+            continue
+        part = parts[placement.key]
+        data = stl_bytes(geometry)
+        filename = mesh_filename(iid)
+        (mesh_dir / filename).write_bytes(data)
+        entry = {"part_id": geometry.part_id, "part_name": part.name, "part_key": placement.key, "kind": part.plan.kind,
+                 "owner": part.plan.owner if part.plan.kind == "fastener" else iid, "material": part.plan.material,
+                 "density": part.plan.density or None, "mass_status": "catalog_override" if part.plan.kind == "purchased" else "cad_geometry",
+                 "bbox_min": geometry.lo.tolist(), "bbox_max": geometry.hi.tolist(), "mesh": f"meshes/{filename}",
+                 "mesh_triangles": int(len(geometry.triangles)), "mesh_sha256": hashlib.sha256(data).hexdigest(),
+                 "subassembly": placement.level, "studio": part.studio, "library": part.library}
+        if part.bank_model:
+            entry["model_bank_id"] = part.bank_model["id"]
+            entry["model_sources"] = part.bank_model["sources"]
+            entry["model_validation"] = part.bank_model["validation"]
+        elif part.plan.kind == "purchased":
+            entry["proxy"] = True
+        entry.update(_world_mass(masses.get(placement.key, {}), solved.get(iid, placement.pose)))
+        if part.plan.kind == "fastener":
+            fastener = next((f for f in spec.mechanical.fasteners if iid in (f.part, f.nut_part)), None)
+            entry["owner"] = (fastener.thread_into or (fastener.clamps[0] if fastener.clamps else "")) if fastener else ""
+        imported[iid] = entry
+    report["parts"] = imported
+    images = render_views(api, robot, library, build_dir / "views", result)
+    plans = {iid: parts[p.key].plan for iid, p in plan.placements.items()}
+    from .sync import SyncReport
+
+    lock_report = SyncReport()
+    lock_report.kinematics = report["kinematics"]
+    full_lock_views(model, plans, report["kinematics"], build_dir, lock_report, result)
+    report["images"] = [f"views/{i}" for i in images] + lock_report.images
+    report["microversion"] = api.json("GET", f"/documents/d/{robot.did}/w/{robot.wid}/currentmicroversion").get("microversion", "")
+    report["seconds"] = round(time.time() - started, 1)
+    if result.ok:
+        fixture_dir = build_dir / "fixtures"
+        fixture_dir.mkdir(parents=True, exist_ok=True)
+        with gzip.open(fixture_dir / "onshape_local_geometry.json.gz", "wt") as handle:
+            json.dump({"parts": fixture, "placements": {k: [v.key, solved.get(k, v.pose).tolist()] for k, v in plan.placements.items()}}, handle)
+        # The plans this geometry was built from: an offline recomposition (r3_onshape.recompose) reuses a part only
+        # while its plan solid is unchanged. A new recording also invalidates the cached part-frame masses.
+        from .recompose import MASS_FIXTURE, record_plans
+
+        record_plans(project, parts, input_digest(project))
+        (build_dir / MASS_FIXTURE).unlink(missing_ok=True)
+    report["robot"] = robot
+    report["library_doc"] = library
+    return report
 
 
 def write_model(project: Project, report: dict[str, Any], transport: str, digest: str) -> Path:
@@ -1181,18 +1204,29 @@ def organize_pinned(project: Project) -> dict[str, Any]:
     parts, instances = build_part_catalog(project)
     plan = plan_assembly(project, parts, instances)
     _, bindings = robot_variables(project)
-    library = locked_library_document(project)
-    state_path = project.build_dir("cad") / "build_state.json"
+    incremental_pending = project.lock.get("cad_incremental_pending") or {}
+    checkpoint = None
+    if incremental_pending:
+        from .incremental import pending_organization_state
+        state_path, library, checkpoint = pending_organization_state(project)
+    else:
+        library = locked_library_document(project)
+        state_path = project.build_dir("cad") / "build_state.json"
     saved = json.loads(state_path.read_text())["robot"]
     robot = DocumentInfo(did=saved["did"], wid=saved["wid"], name=saved["name"])
     builder = AssemblyBuilder(api, project, robot, library, parts, plan, result)
     _load_state(state_path, robot, builder)
-    library_fresh = not (project.lock.get("cad_library") or {}).get("organized")
+    library_fresh = (not (project.lock.get("cad_library") or {}).get("organized") or
+                     bool(checkpoint and any(i["document"] == "library" for i in checkpoint["work"])))
     organize_report = organize(bridge, robot, library, plan, result, library_fresh, builder,
                                project.build_dir("cad") / f"organization-{robot.did}-{input_digest(project)}.json")
-    if library_fresh and not [e for e in organize_report["errors"] if library.name in e]:
+    if not incremental_pending and library_fresh and not [e for e in organize_report["errors"] if library.name in e]:
         project.write_lock("cad_library", {**(project.lock.get("cad_library") or {}), "organized": True})
-    check = organization_check(api, bridge, robot, library, parts, bindings, result, organize_report)
+    check = organization_check(api, bridge, robot, library, parts, bindings, result, organize_report,
+                               allow_retired=bool(incremental_pending))
+    if checkpoint is not None and result.ok:
+        checkpoint["organization_complete"] = not organize_report["errors"]
+        save_json(project.build_dir("cad") / "incremental_state.json", checkpoint)
     path = project.build_dir("cad") / "cad_model.json"
     if path.exists():
         model = json.loads(path.read_text())
@@ -1208,16 +1242,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Organized CAD rebuild or pinned organization")
     parser.add_argument("command", choices=("organize", "rebuild"))
     parser.add_argument("project", nargs="?", default="examples/robots/rc-car")
+    parser.add_argument("--full", action="store_true", help="build a fresh robot document instead of updating the lock")
     parser.add_argument("--dry-run", action="store_true", help="offline: list every studio, feature and estimated /features call")
     args = parser.parse_args(argv)
     project = Project.load(args.project)
     if args.dry_run:
         from .dry_run import organize_plan, rebuild_plan
-        out = organize_plan(project) if args.command == "organize" else rebuild_plan(project)
+        out = organize_plan(project) if args.command == "organize" else rebuild_plan(project, full=args.full)
         print(json.dumps(out, indent=2))
         return 0
     if args.command == "rebuild":
         from .stage import run
+        previous_full = os.environ.get("R3_CAD_FULL")
+        if args.full:
+            os.environ["R3_CAD_FULL"] = "1"
         previous_force = os.environ.get("R3_CAD_FORCE")
         os.environ["R3_CAD_FORCE"] = "1"
         try:
@@ -1225,6 +1263,10 @@ def main(argv: list[str] | None = None) -> int:
             print(result.model_dump_json(indent=2))
             return 0 if result.ok else 1
         finally:
+            if previous_full is None:
+                os.environ.pop("R3_CAD_FULL", None)
+            else:
+                os.environ["R3_CAD_FULL"] = previous_full
             if previous_force is None:
                 os.environ.pop("R3_CAD_FORCE", None)
             else:

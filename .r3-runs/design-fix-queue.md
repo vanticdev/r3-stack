@@ -97,3 +97,11 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
     - **No camera.** The rc-car example has none, but the brief is an autonomous RC car with a camera up front. Add `arducam-b0445-imx296` (UC-717), `owned`. Mount it front-facing on a printed mount through joins, with screw holes and caps. Run the FPC cable to the Pi 5 CAM port: a 22-pin 0.5 mm Pi 5 cable, bought, rated for its bend and routed clear of the steering. Add it to the twin, with the camera HAL streaming frames in the sim.
     - **IMU on the wrong board.** The MPU-6050 is soldered onto the HAT (an extra part to buy) instead of the user's GY-521 board. Lane B: remove U_IMU from the HAT and add a 4-pin I2C header (JST-GH or 2.54 mm) at a reachable edge. Layout lane: mount `gy-521-mpu6050` (`owned`) rigidly near the car's centre of mass, axes aligned, through joins, and wire it to the HAT header. Software: same driver and address (0x68), check the mounting rotation.
     Owners: the next layout round (Astra) and the next lane B round, together with the J_RX/J_BATT header move.
+
+30. **Undetected collisions (user screenshots, 2026-10-29).** One: a wire from another harness passes through a cable-side XT connector housing. Two: the HAT's JST receiver lead runs through the Pi 5 USB block.
+    Cause:
+    - Obstacles come only from `spec.components`, so cable-side connector bodies and in-line parts (XT pairs, fuse holder, splices) block nothing.
+    - `_connector_clearance` checks connector bodies against moving parts only.
+    - There is no wire-vs-wire check.
+
+    The USB-block case is fixed in 5a585ab, where the exemption covers only the connector owner, and the HAT header move is with lane B2. Owner for the checks: GPT-6.1 Sol on `r3/wire-collisions`, adding `wire_intersects_connector`, `connector_intersects_component` and `wire_intersects_wire`, and making the router avoid connector bodies. The layout lane then fixes what these checks expose.
