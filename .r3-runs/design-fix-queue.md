@@ -84,3 +84,5 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
     examples/robots/rc-car` and `python -m r3_onshape.negative_organized`.
 27. Phase-B wiring blockers: a cable notch in servo_post_b; clips holding the servo lead above the tie rod; a moved
     ESC pad (W_MOT_B is 11.5 mm inside the ESC); a re-clocked GPS connector; the encoder lead 4 mm from the ring.
+
+28. **Merged conductors (user report, 2026-10-29).** Every wire in a multi-wire harness gets the harness centreline as its `path` in routes.json: 29 pairs at 0.0 mm separation (W_SRV_*, W_RX_*, W_GPS_*, W_ENC_*). The viewer draws them as one z-fighting tube. Owner: GPT-6 Astra on `r3/wire-lay` (per-conductor lay in a new `r3_wiring/lay.py`, a `wire_conductor_overlap` check, per-conductor tubes in the viewer). Lane A: expect a small hook in the wiring stage/export when this merges.
