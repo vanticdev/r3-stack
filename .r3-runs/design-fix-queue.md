@@ -40,3 +40,12 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
     start at the first path segment. Map full stick to 2012 µs.
 15. `full_throttle` passes at 8.045 m/s, which is only just enough: the motor's no-load limit is about 8.05 m/s. Margin
     is close to zero. Consider a 9.0:1 final drive (pinion change) and re-verify current and thermals.
+
+## Sim performance (MuJoCo-cables agent)
+16. The coupled sim runs at 0.43× real time. Per 1 ms step: Sionna ray tracing 0.82 ms (~40 ms per trace while holding the
+    GIL, re-traced every ~31 ms at 8 m/s) and ngspice 0.72 ms. Fix: precompute a Sionna radio map / path cache over the
+    scenario's reachable area in parallel worker processes before the run, then do lookups during the run; run ngspice in
+    a separate process with a shared-memory exchange if the GIL is contended. impratio=10 (tires) doubles the cable
+    contact iterations; evaluate per-geom solref/solimp instead.
+17. Wiring design: W_MOT_B is routed into the right-rear tire (−0.8 mm in MuJoCo), and the encoder/GPS leads rest on
+    the gearbox. Reroute when the layout is converted to the assembly/join model (phase B).
