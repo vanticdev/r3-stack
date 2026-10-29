@@ -66,3 +66,29 @@ enforces this in the R3 client, `tests/test_cad_policy.py` tests it, and
 around it. Verification uses native REST data instead: `bodydetails` face/edge
 surface definitions, mass properties, bounding boxes, and tessellated meshes with
 Python mesh booleans (manifold3d/trimesh are installed in the shared venv).
+
+## Simulator policy (user directive): integrate the best existing simulators, never write your own
+R3's job is to INTEGRATE the best existing domain simulators into one lockstep
+co-simulation tool (`r3_sim`), plus the virtual-hardware glue. It must not
+reimplement them.
+- **Rigid-body physics:** MuJoCo.
+- **Circuits/electronics:** ngspice, through its shared library (libngspice,
+  `/opt/homebrew/lib/libngspice.dylib`), co-simulated in lockstep.
+- **Wire/cable physics:** MuJoCo's built-in elastic cable (`mujoco.elasticity.cable`
+  plugin / `composite type="cable"`) inside the same MuJoCo world as the robot.
+- **RF propagation:** Sionna RT (ray tracing).
+- **Firmware:** the real program, against the twin HAL.
+R3-specific code is limited to the co-simulation master (clock, ordering, data
+exchange), device/register models that bridge software to the physics, and the
+3D harness router (no external tool exists for it).
+
+## Headless policy (user directive): everything must run headless on a server
+Every stage must run with no display and no interactive browser.
+- **MuJoCo rendering:** `MUJOCO_GL=egl` (or osmesa) on Linux.
+- **Onshape:** the official API-key transport. Images come from the REST shaded-view
+  endpoints, never browser captures. The browser bridge is a local-dev convenience only.
+- **KiCad:** `kicad-cli`. If a step needs the KiCad app (IPC API), run it under Xvfb.
+- **Freerouting:** CLI mode.
+- **Docker:** used for firmware.
+The supported server environment is the R3 worker Docker image. Any GUI-only step
+must document its headless path.
