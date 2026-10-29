@@ -33,7 +33,7 @@ from .cutlength import CutLength, termination
 BLOCKING = {"wire_clearance_violation", "wire_intersects_component", "connector_clearance_violation",
             "wire_intersects_connector", "connector_intersects_component", "wire_intersects_wire",
             "wire_bend_radius_violation", "wire_route_failed", "wire_too_short", "route_infeasible",
-            "cable_unsupported_span", "harness_interference", "cable_sags_into_moving_part",
+            "cable_unsupported_span", "cable_support_unplaceable", "harness_interference", "cable_sags_into_moving_part",
             "wire_dynamic_clearance_violation", "terminal_overload", "geometry_uncertain", "cad_mesh_invalid",
             "floating_mate_unplaced", "wire_endpoint_unplaced"}
 IEC_COLORS = {"red": "RD", "black": "BK", "white": "WH", "green": "GN", "yellow": "YE", "blue": "BU",

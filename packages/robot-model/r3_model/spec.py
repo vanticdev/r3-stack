@@ -232,7 +232,8 @@ class Wire(_Model):
 
 class RouteHint(_Model):
     via: list[Vector] = Field(default_factory=list, description="Ordered waypoints in the robot frame.")
-    tie_points: list[Vector] = Field(default_factory=list, description="Cable tie anchors that pin the bundle.")
+    tie_points: list[Vector] = Field(default_factory=list, description="Requested bundle centres at real cable supports; "
+                                   "placement validates mounting hardware, access and retention before pinning the bundle.")
     slack: Quantity = Field(default=0.015, description="Extra length added beyond the routed path.")
     keep_away: list[str] = Field(default_factory=list, description="Component ids to route around.")
 
