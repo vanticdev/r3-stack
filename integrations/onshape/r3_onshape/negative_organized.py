@@ -54,10 +54,25 @@ def document_cases(project: Project, api: Any, bridge: Any) -> list[dict[str, An
     from .organized import DocumentInfo, StudioRef, _new_document, organization_check
     from .parts import build_part_catalog
     from .studio import SketchWriter, build_studio
+    from .journal import RequestJournal, save_json
+    from .organized import input_digest
+    from .quota import raise_if_quota
 
     parts, _ = build_part_catalog(project)
     post = next(p for p in parts.values() if p.name == "Servo post")
-    doc = _new_document(api, "R3 negative tests (scratch)", project.spec.cad.folder, "Deliberately broken organization (R3 negative tests)")
+    state_path = project.build_dir("cad") / "negative_build_state.json"
+    digest = input_digest(project)
+    if state_path.exists():
+        state = json.loads(state_path.read_text())
+        if state["digest"] != digest:
+            raise ValueError("negative-test inputs changed; preserve the scratch document and clear negative_build_state explicitly")
+        doc = DocumentInfo(did=state["did"], wid=state["wid"], name=state["name"])
+    else:
+        doc = _new_document(api, "R3 negative tests (scratch)", project.spec.cad.folder, "Deliberately broken organization")
+        save_json(state_path, {"digest": digest, "did": doc.did, "wid": doc.wid, "name": doc.name})
+    live_api = api
+    api = RequestJournal(api, project.build_dir("cad") / f"negative-{doc.did}.journal.json", digest)
+    quota_blocked = False
     cases: list[dict[str, Any]] = []
     try:
         defaults = api.json("GET", f"/documents/d/{doc.did}/w/{doc.wid}/elements")
@@ -89,38 +104,65 @@ def document_cases(project: Project, api: Any, bridge: Any) -> list[dict[str, An
             cases.append({"id": case, "mutation": mutation, "expected": [code], "found": sorted(codes), "passed": code in codes,
                           "detail": detail, "document": doc.url()})
         del loose, check
+    except Exception as error:
+        # Coerce quota errors from the editor adapter as well as the REST transport.
+        if getattr(error, "status", None) == 429:
+            quota_blocked = True
+            raise
+        try:
+            raise_if_quota(error)
+        except Exception:
+            quota_blocked = True
+            raise
+        raise
     finally:
-        api.request("DELETE", f"/documents/{doc.did}")
+        if not quota_blocked:
+            live_api.request("DELETE", f"/documents/{doc.did}")
+            state_path.unlink(missing_ok=True)
     return cases
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    root = Path(argv[0] if argv else "examples/robots/rc-car").resolve()
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("project", nargs="?", default="examples/robots/rc-car")
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args(argv)
+    root = Path(args.project).resolve()
     project = Project.load(root)
+    if args.dry_run:
+        from .dry_run import negative_plan
+        print(json.dumps(negative_plan(project), indent=2))
+        return 0
     started = time.time()
     cases = [misaligned_hole_pattern(root)]
     from .bridge import connect
     from .client import default_transport
 
-    api = default_transport()
-    if api is not None:
-        try:
-            cases += document_cases(project, api, connect())
-        except Exception as error:  # noqa: BLE001 - e.g. the Onshape feature-API quota: recorded as not run, never as passed
-            for case, code in (("default_feature_name", "cad_default_feature_name"), ("unfoldered_tab", "cad_tab_not_in_folder"),
-                               ("unconstrained_sketch", "cad_unconstrained_sketch")):
-                cases.append({"id": case, "expected": [code], "found": [], "passed": None, "status": "not_run",
-                              "detail": f"{type(error).__name__}: {str(error)[:200]}"})
-    ran = [c for c in cases if c["passed"] is not None]
-    out = {"cases": cases, "passed": all(c["passed"] for c in ran), "not_run": [c["id"] for c in cases if c["passed"] is None],
+    quota_result = StageResult(stage="cad")
+    try:
+        api = default_transport()
+        if api is None:
+            raise RuntimeError("no Onshape transport configured")
+        cases += document_cases(project, api, connect())
+    except Exception as error:  # noqa: BLE001 - e.g. the Onshape feature-API quota: recorded as not run, never as passed
+        if getattr(error, "status", None) == 429:
+            from .quota import quota_diagnostic
+            quota_diagnostic(error, quota_result)
+        for case, code in (("default_feature_name", "cad_default_feature_name"), ("unfoldered_tab", "cad_tab_not_in_folder"),
+                           ("unconstrained_sketch", "cad_unconstrained_sketch")):
+            cases.append({"id": case, "expected": [code], "found": [], "passed": None, "status": "not_run",
+                          "detail": f"{type(error).__name__}: {str(error)[:200]}"})
+    out = {"cases": cases, "passed": all(c["passed"] is True for c in cases), "not_run": [c["id"] for c in cases if c["passed"] is None],
+           "diagnostics": [d.model_dump(mode="json") for d in quota_result.diagnostics],
            "seconds": round(time.time() - started, 1)}
     path = project.build_dir("cad") / "negative_tests.json"
     path.write_text(json.dumps(out, indent=1))
     for case in cases:
         status = "NOT RUN" if case["passed"] is None else ("PASS" if case["passed"] else "FAIL")
         print(f"{status} {case['id']}: expected {case['expected']} found {case['found']} {case.get('detail', '')[:120]}")
-    return 0 if out["passed"] else 1
+    return 0 if out["passed"] and not out["not_run"] else 1
 
 
 if __name__ == "__main__":

@@ -14,6 +14,10 @@ cad:
   validator_version: fit-2.0
   workspace_id: 43c3f297228d9d8f5222124c
 cad_library:
+  part_signatures:
+    raspberry-pi-5-8gb: c4430536314c2fac9a18f78a15c6dda942bd278db378c1b1bd109b54bc3ea078
+  aliases:
+    raspberry-pi-5-4gb: raspberry-pi-5-8gb
   digest: 1cf92f94f33a39de
   document_id: 4d6e613b90c2bb0a65805a0d
   name: R3 Parts Library

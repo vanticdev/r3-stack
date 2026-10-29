@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import base64
 import email.utils
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import json
@@ -42,9 +43,22 @@ API = "/api/v17"
 
 
 class OnshapeError(RuntimeError):
-    def __init__(self, status: int, message: str) -> None:
-        super().__init__(f"Onshape HTTP {status}: {message[:500]}")
+    def __init__(self, status: int, message: str, headers: Any = None) -> None:
         self.status = status
+        self.retry_after = headers.get("Retry-After") if headers else None
+        self.reset_at: str | None = None
+        if status == 429 and self.retry_after:
+            try:
+                reset = datetime.now(timezone.utc) + timedelta(seconds=float(self.retry_after))
+            except (ValueError, OverflowError):
+                try:
+                    reset = email.utils.parsedate_to_datetime(self.retry_after)
+                except (TypeError, ValueError):
+                    reset = None
+            if reset is not None:
+                self.reset_at = reset.astimezone(timezone.utc).isoformat()
+        suffix = f"; quota reset at {self.reset_at}" if self.reset_at else ""
+        super().__init__(f"Onshape HTTP {status}: {message[:500]}{suffix}")
 
 
 class Transport:
@@ -131,12 +145,12 @@ class _HttpTransport(Transport):
                 return self._open(method, url, data, accept, timeout)
             except urllib.error.HTTPError as error:
                 text = error.read().decode(errors="replace")
-                # Only idempotent reads are retried, and only on throttling/transient errors.
+                # Only idempotent reads retry transient server errors; quotas always stop.
                 # The native bridge reports a reloaded browser frame as 502.
-                if method in ("GET", "DELETE") and error.code in (429, 502, 503, 504) and attempt < 3:
+                if method in ("GET", "DELETE") and error.code in (502, 503, 504) and attempt < 3:
                     time.sleep(2 ** attempt)
                     continue
-                raise OnshapeError(error.code, text) from None
+                raise OnshapeError(error.code, text, error.headers) from None
         raise OnshapeError(0, "unreachable")
 
     def upload(self, path: str, file_path: Path, fields: dict[str, Any], timeout: float = 600.0) -> Any:
@@ -166,7 +180,7 @@ def _upload(transport: "_HttpTransport", path: str, file_path: Path, fields: dic
         with urllib.request.urlopen(req, timeout=timeout) as response:
             raw = response.read()
     except urllib.error.HTTPError as error:
-        raise OnshapeError(error.code, error.read().decode(errors="replace")) from None
+        raise OnshapeError(error.code, error.read().decode(errors="replace"), error.headers) from None
     return json.loads(raw) if raw else None
 
 

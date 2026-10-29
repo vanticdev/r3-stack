@@ -46,7 +46,7 @@ USER_AGENT = "r3-onshape/1.0 (+headless session client)"
 
 
 class QuotaExhausted(OnshapeError):
-    """An endpoint's Onshape API quota is used up (HTTP 429 with a Retry-After of hours)."""
+    """An endpoint's Onshape API quota is used up (HTTP 429; every quota response stops immediately)."""
 
 
 class SessionExpired(OnshapeError):
@@ -136,17 +136,7 @@ class SessionTransport(Transport):
                 if error.code in (401, 403) and "login" in text.lower() or error.code == 401:
                     raise SessionExpired(error.code, f"Onshape session is not logged in or expired: {text[:200]}") from None
                 if error.code == 429:
-                    # Rate limited: the request was not executed, so any method may be retried. Onshape budgets each
-                    # endpoint separately (X-Rate-Limit-Remaining); a Retry-After of hours means that endpoint's quota is
-                    # spent: fail at once instead of sleeping.
-                    retry_after = error.headers.get("Retry-After") if error.headers else None
-                    wait = float(retry_after) if retry_after and retry_after.isdigit() else min(60.0, 5.0 * 2 ** attempt)
-                    if wait > 600:
-                        raise QuotaExhausted(429, f"{method} {path}: Onshape API quota for this endpoint is exhausted; "
-                                                  f"retry after {wait / 3600:.1f} h") from None
-                    if attempt < 8:
-                        time.sleep(wait)
-                        continue
+                    raise QuotaExhausted(429, f"{method} {path}: {text}", error.headers) from None
                 if method in ("GET", "DELETE") and error.code in (502, 503, 504) and attempt < 3:
                     time.sleep(2 ** attempt)
                     continue
@@ -194,7 +184,9 @@ class SessionTransport(Transport):
         try:
             info = self.session_info()
             return bool(info.get("id"))
-        except (OnshapeError, ValueError, OSError):
+        except (OnshapeError, ValueError, OSError) as error:
+            from .quota import raise_if_quota
+            raise_if_quota(error)
             return False
 
 

@@ -46,6 +46,8 @@ from r3_model.project import Project
 from r3_model.units import to_si
 
 from .client import OnshapeError, Transport
+from .journal import RequestJournal, save_json
+from .quota import quota_diagnostic, raise_if_quota
 from .geometry import plan_manifold
 from .model import Face, GeometryModel, PartGeometry, part_from_onshape, CHORD_TOLERANCE, ANGLE_TOLERANCE
 from .parts import LocalPart, build_part_catalog
@@ -270,6 +272,7 @@ class DocumentInfo:
     assemblies: dict[str, str] = field(default_factory=dict)  # level -> element id
     variable_studio: str = ""
     digest: str = ""
+    references: list[DocumentInfo] = field(default_factory=list)  # immutable library parts reused from earlier versions
 
     def url(self, eid: str | None = None) -> str:
         base = f"https://cad.onshape.com/documents/{self.did}/w/{self.wid}"
@@ -342,42 +345,64 @@ def ensure_library(api: Transport, project: Project, parts: dict[str, LocalPart]
     if locked.get("digest") == digest and locked.get("document_id"):
         try:
             api.json("GET", f"/documents/{locked['document_id']}")
-            doc = DocumentInfo(did=locked["document_id"], wid=locked["workspace_id"], name=locked.get("name", ""),
-                               vid=locked["version_id"], digest=digest)
-            for name, ref in (locked.get("studios") or {}).items():
-                doc.studios[name] = StudioRef(name, ref["element_id"], ref["part_ids"], ref["connectors"], ref.get("folders", {}))
+            doc = locked_library_document(project)
             result.add(Diagnostic.info("cad_library_reused", "parts library matches its digest", data={"document_id": doc.did}))
             return doc
-        except OnshapeError:
-            pass
+        except OnshapeError as error:
+            raise_if_quota(error)
+            raise  # a failed lookup is not permission to rebuild a library
     name = project.spec.cad.library_name
-    doc = _new_document(api, name, project.spec.cad.folder,
-                        "Purchased parts and fasteners modeled at their own origins with named interface mate connectors "
-                        "(R3 direct CAD). Inserted by version into robot documents.")
+    pending = project.lock.get("cad_library_build") or {}
+    if pending and pending.get("digest") != digest:
+        raise ValueError("unfinished library build has different inputs; preserve it and explicitly clear cad_library_build to start anew")
+    if pending:
+        doc = DocumentInfo(did=pending["document_id"], wid=pending["workspace_id"], name=name)
+    else:
+        doc = _new_document(api, name, project.spec.cad.folder,
+                            "Purchased parts and fasteners with named interface mate connectors (R3 direct CAD).")
+        project.write_lock("cad_library_build", {"digest": digest, "document_id": doc.did, "workspace_id": doc.wid})
+    api = RequestJournal(api, project.build_dir("cad") / f"library-{doc.did}.journal.json", digest)
     doc.digest = digest
+    from .aliases import reusable_alias_parts
+    reused = reusable_alias_parts(project, parts)
+    if reused:
+        original = locked_library_document(project)
+        for source in (original, *original.references):
+            reference = DocumentInfo(did=source.did, wid=source.wid, vid=source.vid, name=source.name, digest=source.digest)
+            reference.studios = {name: StudioRef(name, studio.element_id,
+                                 {key: pid for key, pid in studio.part_ids.items() if key in reused},
+                                 {key: ids for key, ids in studio.connectors.items() if key in reused}, studio.folders)
+                                 for name, studio in source.studios.items() if set(studio.part_ids) & reused}
+            if reference.studios:
+                doc.references.append(reference)
+        for key in sorted(reused):
+            source = next(ref for ref in doc.references if any(key in s.part_ids for s in ref.studios.values()))
+            result.add(Diagnostic.info("cad_library_part_reused", f"{key}: inherited SKU reuses the existing version-pinned library part",
+                                       subjects=[key], data={"document_id": source.did, "version_id": source.vid}))
     groups: dict[str, list[LocalPart]] = {}
     for part in parts.values():
-        if part.library:
+        if part.library and part.key not in reused:
             groups.setdefault(part.studio, []).append(part)
-    try:
-        _build_studios(api, doc, dict(sorted(groups.items())), result)
-        version = api.json("POST", f"/documents/d/{doc.did}/versions",
-                           body={"documentId": doc.did, "workspaceId": doc.wid, "name": f"R3 {digest}",
-                                 "description": f"parts library digest {digest}"})
-        doc.vid = version["id"]
-    except Exception:
-        api.request("DELETE", f"/documents/{doc.did}")
-        raise
+    _build_studios(api, doc, dict(sorted(groups.items())), result)
+    version = api.json("POST", f"/documents/d/{doc.did}/versions",
+                       body={"documentId": doc.did, "workspaceId": doc.wid, "name": f"R3 {digest}",
+                             "description": f"parts library digest {digest}"})
+    doc.vid = version["id"]
     old = locked.get("document_id")
-    if old and old != doc.did:
+    if old and old != doc.did and not doc.references:
         try:
             api.request("DELETE", f"/documents/{old}")
-        except OnshapeError:
-            pass
+        except OnshapeError as error:
+            raise_if_quota(error)
+    from .aliases import geometry_aliases, part_signature
+
     project.write_lock("cad_library", {"document_id": doc.did, "workspace_id": doc.wid, "version_id": doc.vid, "digest": digest,
-                                       "name": name, "url": doc.url(),
+                                       "name": name, "url": doc.url(), "aliases": geometry_aliases(project),
+                                       "references": [asdict(ref) for ref in doc.references],
+                                       "part_signatures": {key: part_signature(part) for key, part in parts.items() if part.library},
                                        "studios": {n: {"element_id": s.element_id, "part_ids": s.part_ids, "connectors": s.connectors,
                                                        "folders": s.folders} for n, s in doc.studios.items()}})
+    project.write_lock("cad_library_build", {})
     return doc
 
 
@@ -401,7 +426,7 @@ class AssemblyBuilder:
                 raise ValueError(f"{source.did}: bank source is not public")
             doc = DocumentInfo(did=source.did, wid="", vid=source.vid, name=self.parts[key].name)
             return doc, source.eid, source.part_id, source.vid
-        for doc in (self.robot, self.library):
+        for doc in (self.robot, self.library, *self.library.references):
             try:
                 eid, pid, _ = doc.part_ref(key)
                 return doc, eid, pid, doc.vid
@@ -452,7 +477,7 @@ class AssemblyBuilder:
         from .purchased import public_source
         if public_source(self.parts[key]):
             return self.parts[key].bank_model["onshape_connectors"][name]
-        for doc in (self.robot, self.library):
+        for doc in (self.robot, self.library, *self.library.references):
             for studio in doc.studios.values():
                 if key in studio.connectors and name in studio.connectors[key]:
                     return studio.connectors[key][name]
@@ -574,6 +599,8 @@ def fetch_local_geometry(api: Transport, doc: DocumentInfo, keys: set[str], fixt
     """Exact local geometry (bodydetails + fine tessellation) of every needed part."""
     wvm, wvmid = ("v", doc.vid) if doc.vid else ("w", doc.wid)
     out = {}
+    for reference in doc.references:
+        out.update(fetch_local_geometry(api, reference, keys, fixture))
     for studio in doc.studios.values():
         wanted = {key: pid for key, pid in studio.part_ids.items() if key in keys}
         if not wanted:
@@ -593,6 +620,8 @@ def fetch_local_geometry(api: Transport, doc: DocumentInfo, keys: set[str], fixt
 def local_mass(api: Transport, doc: DocumentInfo, keys: set[str]) -> dict[str, dict[str, Any]]:
     wvm, wvmid = ("v", doc.vid) if doc.vid else ("w", doc.wid)
     out = {}
+    for reference in doc.references:
+        out.update(local_mass(api, reference, keys))
     for studio in doc.studios.values():
         wanted = {key: pid for key, pid in studio.part_ids.items() if key in keys}
         if not wanted:
@@ -617,15 +646,24 @@ def compose_world(local: dict[str, PartGeometry], plan: AssemblyPlan, solved: di
 
 # ===================================================================== organization (native bridge)
 def organize(bridge: Any, robot: DocumentInfo, library: DocumentInfo, plan: AssemblyPlan, result: StageResult,
-             library_fresh: bool, builder: Any) -> dict[str, Any]:
+             library_fresh: bool, builder: Any, progress_path: Path | None = None) -> dict[str, Any]:
     """Feature folders, tab folders, assembly instance/mate folders, hidden
     reference geometry. Returns what was done (verified by the bridge)."""
     report: dict[str, Any] = {"feature_folders": {}, "tab_folders": [], "assembly_folders": {}, "hidden": {}, "errors": []}
 
+    completed = json.loads(progress_path.read_text()) if progress_path and progress_path.exists() else {}
+
     def guard(label: str, fn, *args):
+        if label in completed:
+            return completed[label]
         try:
-            return fn(*args)
-        except Exception as error:  # noqa: BLE001 - record and continue organizing
+            value = fn(*args)
+            completed[label] = value
+            if progress_path:
+                save_json(progress_path, completed)
+            return value
+        except Exception as error:  # noqa: BLE001 - record non-quota failures
+            raise_if_quota(error)
             report["errors"].append(f"{label}: {str(error)[:300]}")
             result.add(Diagnostic.warning("cad_organize_failed", f"{label}: {str(error)[:300]}", subjects=[label]))
             return None
@@ -718,7 +756,6 @@ def organization_check(api: Transport, bridge: Any, robot: DocumentInfo, library
     def err(code: str, message: str, subjects: list[str], **data: Any) -> None:
         result.add(Diagnostic.error(code, message, subjects=subjects, data=data))
 
-    quota_hit = ""  # set when Onshape's per-endpoint quota for Part Studio features is spent
     expected_names = {}
     for key, part in parts.items():
         expected_names.setdefault(part.studio, set()).add(part.name)
@@ -727,12 +764,7 @@ def organization_check(api: Transport, bridge: Any, robot: DocumentInfo, library
         for name, studio in doc.studios.items():
             base = f"/partstudios/d/{doc.did}/{wvm}/{wvmid}/e/{studio.element_id}"
             entry: dict[str, Any] = {}
-            try:
-                feats = [] if quota_hit else api.json("GET", base + "/features").get("features", [])
-            except OnshapeError as error:
-                if error.status != 429:
-                    raise
-                quota_hit, feats = str(error), []
+            feats = api.json("GET", base + "/features").get("features", [])
             entry["features"] = len(feats) if feats else None
             defaults = [f["name"] for f in feats if DEFAULT_NAME.match(f.get("name", ""))]
             if defaults:
@@ -776,13 +808,6 @@ def organization_check(api: Transport, bridge: Any, robot: DocumentInfo, library
                         err("cad_missing_variable_reference", f"{doc.name}/{name}: {iface} hole sketch does not reference {var}",
                             [name], sketch=iface, variable=var.lstrip("#"))
             report["studios"][f"{doc.name}/{name}"] = entry
-    if quota_hit:
-        report["unchecked"] += ["cad_default_feature_name (Part Studios)", "cad_missing_mate_connector", "cad_missing_variable_reference",
-                                "cad_excess_construction_planes"]
-        result.add(Diagnostic.warning("cad_organization_check_partial", "Onshape's API quota for Part Studio feature lists is "
-                                      "exhausted; feature-name, mate-connector, variable and plane checks were not run",
-                                      data={"error": quota_hit[:200], "unchecked": report["unchecked"]},
-                                      hint="Re-run `python -m r3_onshape.organized organize examples/robots/rc-car` after the quota resets."))
     # ---- tab folders (REST: getDocumentContents)
     for doc in (robot, library):
         contents = api.json("GET", f"/documents/d/{doc.did}/w/{doc.wid}/contents")
@@ -837,6 +862,7 @@ def organization_check(api: Transport, bridge: Any, robot: DocumentInfo, library
             if visible:
                 err("cad_visible_construction_geometry", f"{level}: {len(visible)} mate connectors are visible", [level], items=visible[:20])
         except Exception as error:  # noqa: BLE001
+            raise_if_quota(error)
             report["unchecked"].append(f"visibility {level}: {str(error)[:120]}")
     bridge.close_tabs()
     return report
@@ -863,6 +889,7 @@ def render_views(api: Transport, robot: DocumentInfo, library: DocumentInfo, out
             (out_dir / filename).write_bytes(shaded_view(api, element, view, width=1400, height=1000))
             images.append(filename)
         except (OnshapeError, KeyError, ValueError, OSError) as error:
+            raise_if_quota(error)
             result.add(Diagnostic.warning("cad_views_failed", f"{filename}: {str(error)[:200]}", subjects=["cad"]))
     return images
 
@@ -873,12 +900,14 @@ def _save_state(path: Path, robot: DocumentInfo, builder: AssemblyBuilder) -> No
                        "assemblies": robot.assemblies, "studios": {n: asdict(s) for n, s in robot.studios.items()}},
              "instance_ids": builder.instance_ids, "sub_instances": builder.sub_instances,
              "mate_ids": {level: [[fid, asdict(m)] for fid, m in mates] for level, mates in builder.mate_ids.items()}}
-    path.write_text(json.dumps(state, indent=1, default=str))
+    save_json(path, state)
 
 
 def _load_state(path: Path, robot: DocumentInfo, builder: AssemblyBuilder) -> None:
     state = json.loads(path.read_text())
     saved = state["robot"]
+    if saved["did"] != robot.did or saved["wid"] != robot.wid:
+        raise ValueError("saved construction state belongs to a different document/workspace")
     robot.variable_studio, robot.assemblies = saved["variable_studio"], saved["assemblies"]
     robot.studios = {n: StudioRef(**s) for n, s in saved["studios"].items()}
     builder.instance_ids, builder.sub_instances = state["instance_ids"], state["sub_instances"]
@@ -942,39 +971,52 @@ def sync_organized(project: Project, api: Transport, result: StageResult, attemp
     report["library"] = {"document_id": library.did, "version_id": library.vid, "url": library.url(), "studios": len(library.studios),
                          "rebuilt": library_fresh}
     name = spec.cad.document_name or spec.robot.name
-    resume = os.environ.get("R3_CAD_RESUME") == "1" and (project.build_dir("cad") / "build_state.json").exists()
-    if resume:  # debugging: continue organization/verification on the last built document
+    digest = input_digest(project)
+    pending = project.lock.get("cad_build_pending") or {}
+    if pending and pending.get("digest") != digest:
+        raise ValueError("unfinished robot build has different inputs; preserve it and explicitly clear cad_build_pending to start anew")
+    resume = bool(pending.get("construction_complete")) if pending else (os.environ.get("R3_CAD_RESUME") == "1" and
+              (project.build_dir("cad") / "build_state.json").exists())
+    if pending:
+        robot = DocumentInfo(did=pending["document_id"], wid=pending["workspace_id"], name=pending["name"])
+    elif resume:
         saved = json.loads((project.build_dir("cad") / "build_state.json").read_text())["robot"]
         robot = DocumentInfo(did=saved["did"], wid=saved["wid"], name=saved["name"])
     else:
         robot = _new_document(api, f"{name} ({attempt_label})" if attempt_label else name, spec.cad.folder,
-                              "Generated by R3 from robot.yaml: objects joined at interfaces, parts modeled at their own origins, "
-                              "assemblies mated on interface mate connectors. Purchased parts: linked from the R3 Parts Library.")
+                              "Generated by R3: objects joined at interfaces, standard parts and mated assemblies.")
+    project.write_lock("cad_build_pending", {"digest": digest, "document_id": robot.did, "workspace_id": robot.wid,
+                                            "name": robot.name, "construction_complete": resume})
     report["document"] = {"document_id": robot.did, "workspace_id": robot.wid, "url": robot.url()}
     result.metrics["onshape_document"] = robot.url()
     ok = False
+    quota_blocked = False
     build_dir = project.build_dir("cad")
     state_path = build_dir / "build_state.json"
     try:
-        builder = AssemblyBuilder(api, project, robot, library, parts, plan, result)
+        construction = RequestJournal(api, build_dir / f"robot-{robot.did}.journal.json", digest)
+        builder = AssemblyBuilder(construction, project, robot, library, parts, plan, result)
         if resume:
             _load_state(state_path, robot, builder)
         else:
-            robot.variable_studio = api.json("POST", f"/variables/d/{robot.did}/w/{robot.wid}/variablestudio", body={"name": "Variables"})["id"]
-            api.request("POST", f"/variables/d/{robot.did}/w/{robot.wid}/e/{robot.variable_studio}/variables",
+            robot.variable_studio = construction.json("POST", f"/variables/d/{robot.did}/w/{robot.wid}/variablestudio", body={"name": "Variables"})["id"]
+            construction.request("POST", f"/variables/d/{robot.did}/w/{robot.wid}/e/{robot.variable_studio}/variables",
                         body=[{"name": v.name, "type": "LENGTH", "expression": v.expression, "description": v.description}
                               for v in variables.values()])
             groups: dict[str, list[LocalPart]] = {}
             for part in parts.values():
                 if not part.library:
                     groups.setdefault(part.studio, []).append(part)
-            _build_studios(api, robot, dict(sorted(groups.items())), result, variables, bindings)
+            _build_studios(construction, robot, dict(sorted(groups.items())), result, variables, bindings)
             builder.build()
             _save_state(state_path, robot, builder)
+            project.write_lock("cad_build_pending", {**project.lock["cad_build_pending"], "construction_complete": True})
+        builder.api = api  # verification must observe the current remote document
         verification = builder.verify()
         report["assembly"] = {k: v for k, v in verification.items() if k != "solved_transforms"}
         bridge = connect()
-        organize_report = organize(bridge, robot, library, plan, result, library_fresh, builder) if bridge is not None else None
+        organize_report = organize(bridge, robot, library, plan, result, library_fresh, builder,
+                                   build_dir / f"organization-{robot.did}-{digest}.json") if bridge is not None else None
         report["organize"] = organize_report or {"skipped": "onshape-native bridge not connected (headless)"}
         if organize_report is not None and library_fresh and not [e for e in organize_report["errors"] if library.name in e]:
             project.write_lock("cad_library", {**(project.lock.get("cad_library") or {}), "organized": True})
@@ -1048,21 +1090,31 @@ def sync_organized(project: Project, api: Transport, result: StageResult, attemp
         ok = result.ok
         report["robot"] = robot
         report["library_doc"] = library
+        if ok:
+            project.write_lock("cad_build_pending", {})
         return report
     except (OnshapeError, ValueError, KeyError, RuntimeError, TypeError, AttributeError) as error:
         import traceback
 
+        if getattr(error, "status", None) == 429:
+            quota_blocked = True
+            quota_diagnostic(error, result)
+            return report
         result.add(Diagnostic.error("onshape_request_failed", f"{type(error).__name__}: {str(error)[:400]}", subjects=["cad"],
                                     data={"status": getattr(error, "status", None), "trace": traceback.format_exc()[-1500:]}))
         return report
     finally:
-        if not ok and not (keep_failed or resume or os.environ.get("R3_CAD_KEEP_FAILED") == "1"):
+        if not ok and not quota_blocked and not (keep_failed or resume or os.environ.get("R3_CAD_KEEP_FAILED") == "1"):
             try:
                 api.request("DELETE", f"/documents/{robot.did}")
+                project.write_lock("cad_build_pending", {})
                 result.add(Diagnostic.warning("cad_attempt_deleted", f"failed CAD attempt deleted: {robot.url()}", subjects=["cad"],
                                               data={"document_id": robot.did}))
             except OnshapeError as error:
-                result.add(Diagnostic.error("cad_attempt_delete_failed", str(error), subjects=["cad"], data={"document_id": robot.did}))
+                if error.status == 429:
+                    quota_diagnostic(error, result)
+                else:
+                    result.add(Diagnostic.error("cad_attempt_delete_failed", str(error), subjects=["cad"], data={"document_id": robot.did}))
 
 
 def write_model(project: Project, report: dict[str, Any], transport: str, digest: str) -> Path:
@@ -1101,6 +1153,19 @@ def write_model(project: Project, report: dict[str, Any], transport: str, digest
     return path
 
 
+def locked_library_document(project: Project) -> DocumentInfo:
+    locked = project.lock.get("cad_library") or {}
+    doc = DocumentInfo(did=locked["document_id"], wid=locked["workspace_id"], vid=locked["version_id"],
+                       name=locked.get("name", "Parts library"), digest=locked.get("digest", ""))
+    doc.studios = {name: StudioRef(name, ref["element_id"], ref["part_ids"], ref["connectors"], ref.get("folders", {}))
+                   for name, ref in locked.get("studios", {}).items()}
+    for ref in locked.get("references", []):
+        reference = DocumentInfo(did=ref["did"], wid=ref["wid"], vid=ref["vid"], name=ref["name"], digest=ref.get("digest", ""))
+        reference.studios = {name: StudioRef(**studio) for name, studio in ref["studios"].items()}
+        doc.references.append(reference)
+    return doc
+
+
 def organize_pinned(project: Project) -> dict[str, Any]:
     """Re-run the browser-native organization and the organization check on the
     pinned document (e.g. after Onshape rate-limited the browser session during the
@@ -1116,14 +1181,15 @@ def organize_pinned(project: Project) -> dict[str, Any]:
     parts, instances = build_part_catalog(project)
     plan = plan_assembly(project, parts, instances)
     _, bindings = robot_variables(project)
-    library = ensure_library(api, project, parts, result)
+    library = locked_library_document(project)
     state_path = project.build_dir("cad") / "build_state.json"
     saved = json.loads(state_path.read_text())["robot"]
     robot = DocumentInfo(did=saved["did"], wid=saved["wid"], name=saved["name"])
     builder = AssemblyBuilder(api, project, robot, library, parts, plan, result)
     _load_state(state_path, robot, builder)
     library_fresh = not (project.lock.get("cad_library") or {}).get("organized")
-    organize_report = organize(bridge, robot, library, plan, result, library_fresh, builder)
+    organize_report = organize(bridge, robot, library, plan, result, library_fresh, builder,
+                               project.build_dir("cad") / f"organization-{robot.did}-{input_digest(project)}.json")
     if library_fresh and not [e for e in organize_report["errors"] if library.name in e]:
         project.write_lock("cad_library", {**(project.lock.get("cad_library") or {}), "organized": True})
     check = organization_check(api, bridge, robot, library, parts, bindings, result, organize_report)
@@ -1137,19 +1203,43 @@ def organize_pinned(project: Project) -> dict[str, Any]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import sys
+    import argparse
 
-    argv = list(sys.argv[1:] if argv is None else argv)
-    if not argv or argv[0] != "organize":
-        print("usage: python -m r3_onshape.organized organize [project]")
-        return 2
-    project = Project.load(argv[1] if len(argv) > 1 else "examples/robots/rc-car")
-    out = organize_pinned(project)
+    parser = argparse.ArgumentParser(description="Organized CAD rebuild or pinned organization")
+    parser.add_argument("command", choices=("organize", "rebuild"))
+    parser.add_argument("project", nargs="?", default="examples/robots/rc-car")
+    parser.add_argument("--dry-run", action="store_true", help="offline: list every studio, feature and estimated /features call")
+    args = parser.parse_args(argv)
+    project = Project.load(args.project)
+    if args.dry_run:
+        from .dry_run import organize_plan, rebuild_plan
+        out = organize_plan(project) if args.command == "organize" else rebuild_plan(project)
+        print(json.dumps(out, indent=2))
+        return 0
+    if args.command == "rebuild":
+        from .stage import run
+        previous_force = os.environ.get("R3_CAD_FORCE")
+        os.environ["R3_CAD_FORCE"] = "1"
+        try:
+            result = run(project)
+            print(result.model_dump_json(indent=2))
+            return 0 if result.ok else 1
+        finally:
+            if previous_force is None:
+                os.environ.pop("R3_CAD_FORCE", None)
+            else:
+                os.environ["R3_CAD_FORCE"] = previous_force
+    try:
+        out = organize_pinned(project)
+    except OnshapeError as error:
+        if error.status != 429:
+            raise
+        result = StageResult(stage="cad")
+        quota_diagnostic(error, result)
+        out = {"diagnostics": [d.model_dump(mode="json") for d in result.diagnostics]}
+        save_json(project.build_dir("cad") / "organization_result.json", out)
     errors = [d for d in out["diagnostics"] if d["severity"] == "error"]
-    for d in out["diagnostics"]:
-        if d["severity"] != "info":
-            print(d["severity"], d["code"], d["message"][:200])
-    print(f"{len(errors)} organization errors")
+    print(json.dumps(out, indent=2))
     return 1 if errors else 0
 
 

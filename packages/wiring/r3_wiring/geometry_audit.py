@@ -335,6 +335,8 @@ def audit_routing_mesh(component: str, vertices: np.ndarray, faces: np.ndarray, 
     limit = cell * math.sqrt(3.0) + BBOX_TOLERANCE
     bbox_error = volume_ratio = None
     problems: list[str] = []
+    if not len(faces):
+        problems.append("routing mesh has no triangles (the obstacle disappeared during clustering)")
     if unbalanced:
         problems.append(f"routing mesh ({cell * 1e3:.1f} mm vertex clustering) has {unbalanced} unbalanced edges, "
                         "so its winding-number sign is unreliable near them")
