@@ -41,6 +41,10 @@ def test_every_add_operation_keeps_one_body(catalog):
     """Onshape creates a second part when an ADD does not touch the body."""
     parts, _ = catalog
     for key, part in parts.items():
+        if part.bank_model:
+            # The builder imports these purchased parts; it never executes their
+            # offline proxy ADD operations. Real PCB assemblies can contain gaps.
+            continue
         solid = None
         for op in part.plan.ops:
             if isinstance(op, Hole) or getattr(op, "op", "add") == "remove":
@@ -71,7 +75,7 @@ def test_fabricated_holes_come_from_interfaces(catalog):
     parts, _ = catalog
     chassis = next(p for p in parts.values() if p.name == "Chassis plate")
     holes = [op for op in chassis.plan.ops if isinstance(op, Hole)]
-    assert len(holes) == 4 + 8 + 4 + 4 + 4  # gearbox, hub carriers, standoffs, arms, servo posts
+    assert len(holes) == 4 + 8 + 4 + 4 + 4 + 3  # gearbox, hubs, standoffs, arms, servo and cable posts
     assert all(op.style == "clearance" and op.diameter == pytest.approx(3.4e-3) for op in holes)
     slots = [op for op in chassis.plan.ops if isinstance(op, Prism) and "slot" in op.name]
     assert len(slots) == 4

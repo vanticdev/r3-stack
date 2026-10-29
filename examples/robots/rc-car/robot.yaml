@@ -131,6 +131,7 @@ components:
   cap_hat_2:   {type: screw-cap-m2.5-petg}
   cap_hat_3:   {type: screw-cap-m2.5-petg}
   cap_hat_4:   {type: screw-cap-m2.5-petg}
+  receiver_riser: {type: receiver-riser-petg}
   tape_rx:     {type: foam-tape-3m-4026, params: {size: [11 mm, 9 mm, 1.6 mm]}}
   receiver:    {type: elrs-receiver-2g4, source: {requires: {kind: radio, protocol: crsf, band: 2.4 GHz, supply: [4.5 V, 5.5 V]}}}
   antenna_mast: {type: antenna-mast-petg}
@@ -141,6 +142,16 @@ components:
   gps:         {type: gnss-rtk-zed-f9p}
   tape_rtk_radio: {type: foam-tape-3m-4026, params: {size: [50 mm, 10 mm, 1.6 mm]}}
   rtk_radio:   {type: telemetry-sik-915-100mw}
+  motor_lead_post: {type: motor-lead-post-petg}
+  power_lead_post: {type: power-lead-post-petg}
+  cap_motor_lead_post: {type: screw-cap-m3-petg}
+  cap_power_lead_post: {type: screw-cap-m3-petg}
+  gnss_riser: {type: gnss-riser-petg}
+  encoder_lead_post: {type: encoder-lead-post-petg}
+  sensor_lead_post: {type: sensor-lead-post-petg}
+  cap_encoder_lead_post: {type: screw-cap-m3-petg}
+  cap_sensor_lead_post: {type: screw-cap-m3-petg}
+  cap_lead_post: {type: screw-cap-m3-petg}
   lead_post:   {type: lead-post-petg}   # tie post for the leads climbing to the HAT's top-entry headers
 
 # Join ids name the derived fasteners (<id> or <id>_<n>) and fit interfaces; `verify` holds the exact-geometry limits
@@ -273,13 +284,24 @@ assembly:
     - {id: cap_hat_2, a: hat.cap_2, b: cap_hat_2.seat}
     - {id: cap_hat_3, a: hat.cap_3, b: cap_hat_3.seat}
     - {id: cap_hat_4, a: hat.cap_4, b: cap_hat_4.seat}
-    - {id: rx_tape_bottom, a: deck.rx_pad, b: tape_rx.bottom}
+    - {id: receiver_riser_bond, a: deck.rx_pad, b: receiver_riser.bottom}
+    - {id: rx_tape_bottom, a: receiver_riser.top, b: tape_rx.bottom}
     - {id: rx_tape_top, a: tape_rx.top, b: receiver.bottom}
-    - {id: gps_tape_bottom, a: gearbox.lid_pad, b: tape_gps.bottom}
+    - {id: gnss_riser_bond, a: gearbox.lid_pad, b: gnss_riser.bottom}
+    - {id: gps_tape_bottom, a: gnss_riser.top, b: tape_gps.bottom}
     - {id: gps_tape_top, a: tape_gps.top, b: gps.bottom}
     - {id: rtk_radio_tape_bottom, a: deck.rtk_radio_pad, b: tape_rtk_radio.bottom}
     - {id: rtk_radio_tape_top, a: tape_rtk_radio.top, b: rtk_radio.side}
     - {id: lead_post_mount, a: deck.lead_post, b: lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: motor_lead_post_mount, a: chassis.motor_lead_post, b: motor_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: cap_motor_lead_post, a: chassis.cap_motor_lead_post, b: cap_motor_lead_post.seat}
+    - {id: power_lead_post_mount, a: chassis.power_lead_post, b: power_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: cap_power_lead_post, a: chassis.cap_power_lead_post, b: cap_power_lead_post.seat}
+    - {id: encoder_lead_post_mount, a: chassis.encoder_lead_post, b: encoder_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: sensor_lead_post_mount, a: deck.sensor_lead_post, b: sensor_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: cap_encoder_lead_post, a: chassis.cap_encoder_lead_post, b: cap_encoder_lead_post.seat}
+    - {id: cap_sensor_lead_post, a: deck.cap_sensor_lead_post, b: cap_sensor_lead_post.seat}
+    - {id: cap_lead_post, a: deck.cap_lead_post, b: cap_lead_post.seat}
     # Antenna mast through-bolted to the PETG deck with nylocs underneath; antenna bonded to the mast top.
     - {id: mast_mount, a: deck.mast, b: antenna_mast.flange, clock: 0 deg, fasteners: {type: M3x12, nut: nut-m3-nyloc, head: b}}
     - {id: antenna_bond, a: antenna_mast.antenna_seat, b: rx_antenna.seat}
@@ -324,7 +346,7 @@ electrical:
       description: Battery's own 12 AWG pigtail ending in XT60 female.
       connectors:
         A: {type: integral, mates: battery.J1}
-        B: {type: xt60-female}
+        B: {type: xt60-female, position: [228 mm, 27 mm, 60 mm]}
       wires:
         - {id: W_BAT_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
         - {id: W_BAT_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
@@ -338,10 +360,10 @@ electrical:
         F1: {type: integral, mates: fuse.J1}
         F2: {type: integral, mates: fuse.J2}
       splices:
-        # SP 7 mm off the fuse holder input (J1, its front end on the right of the battery, 15 mm aft of the front
-        # wheels' steering sweep): the fuse sits at the splice. The fused output (J2, aft) turns back under the deck to the deck's power slot below the HAT's XT30.
-        SP: {position: [178 mm, -37 mm, 40 mm]}
-        SN: {position: [178 mm, -25 mm, 47 mm]}
+        # SP is 28 mm beyond the fuse input: its 18 AWG strain-relief run ends before the splice.
+        # The 12 AWG branches split in the open corner ahead of the battery.
+        SP: {position: [199 mm, -37 mm, 40 mm]}
+        SN: {position: [199 mm, -30 mm, 54 mm]}
       wires:
         - {id: W_Y_P_IN, from: P1.1, to: SP, awg: 12, color: red, signal: VBAT}
         - {id: W_Y_P_ESC, from: SP, to: P2.1, awg: 12, color: red, signal: VBAT}
@@ -355,7 +377,7 @@ electrical:
       connectors:
         A: {type: integral, mates: esc.J_PWR}
         # The mated XT60 pair stays beside the battery ahead of the ESC, clear of the front wheels' steering sweep.
-        B: {type: xt60-male, mates: power_y.P2, position: [170 mm, 40 mm, 48 mm]}
+        B: {type: xt60-male, mates: power_y.P2, position: [180 mm, 40 mm, 60 mm]}
       wires:
         - {id: W_ESC_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
         - {id: W_ESC_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
@@ -389,8 +411,7 @@ electrical:
         - {id: W_SRV_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
       # Through servo post B's lead pocket, aft along the plate under the linkage, under the deck and up through
       # the deck's lead slot beside the HAT.
-      route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr],
-              via: [[150 mm, -42 mm, 68 mm], [98 mm, -42 mm, 76.5 mm]]}
+      route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr]}
     - id: rx_lead
       connectors:
         A: {type: integral, mates: receiver.J1}
@@ -447,16 +468,16 @@ cad:
   subassemblies:
     Rear drivetrain: [gearbox, motor, hub_rl, hub_rr, bearing_rl, bearing_rr, axle_rl, axle_rr, spacer_rl, spacer_rr,
                       wheel_rl, wheel_rr, nut_rl, nut_rr, encoder, enc_ring, enc_magnet_1, enc_magnet_2, enc_magnet_3, enc_magnet_4,
-                      tape_gps, gps]
+                      gnss_riser, tape_gps, gps, encoder_lead_post, cap_encoder_lead_post, motor_lead_post, cap_motor_lead_post]
     Front steering L: [arm_fl, kp_fl, knuckle_fl, stub_fl, wheel_fl, nut_fl, bs_kl]
     Front steering R: [arm_fr, kp_fr, knuckle_fr, stub_fr, wheel_fr, nut_fr, bs_kr]
     Steering linkage: [servo_post_a, servo_post_b, servo, servo_output, servo_horn, bs_hl, bs_hr, tie_rod, tie_rod_r,
                        cap_ear_a1, cap_ear_a2, cap_ear_b1, cap_ear_b2]
     Deck and electronics stack: [standoff_rl, standoff_rr, standoff_fl, standoff_fr, deck, cap_so_rl, cap_so_rr, cap_so_fl, cap_so_fr,
                                  pi_spacer_1, pi_spacer_2, pi_spacer_3, pi_spacer_4, pi, pi_standoff_1, pi_standoff_2, pi_standoff_3,
-                                 pi_standoff_4, pi_shim_1, pi_shim_2, pi_shim_3, pi_shim_4, hat, cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, tape_rx, receiver, antenna_mast,
-                                 rx_antenna, tape_rtk_radio, rtk_radio, lead_post]
-    Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc]
+                                 pi_standoff_4, pi_shim_1, pi_shim_2, pi_shim_3, pi_shim_4, hat, cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, receiver_riser, tape_rx, receiver, antenna_mast,
+                                 rx_antenna, tape_rtk_radio, rtk_radio, lead_post, sensor_lead_post, cap_sensor_lead_post, cap_lead_post]
+    Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc, power_lead_post, cap_power_lead_post]
 
 software:
   modules:
