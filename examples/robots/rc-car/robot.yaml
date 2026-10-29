@@ -113,7 +113,7 @@ components:
   battery:     {type: lipo-2s-5000-25c}
   battery_strap: {type: strap-hook-loop-20}
   # The fuse holder hangs in the Y harness at the splice (its input lead is the splice), tied to the plate.
-  fuse:        {type: fuse-atc-10a}
+  fuse:        {type: fuse-atc-5a}
   fuse_tie:    {type: zip-tie-2.5}
   pi_spacer_1: {type: spacer-m2.5-ff-10}
   pi_spacer_2: {type: spacer-m2.5-ff-10}
@@ -312,21 +312,21 @@ electrical:
     - {a: hat.J_GPIO, b: pi.J8}
   harnesses:
     - id: battery_lead
-      description: Battery's own 12 AWG pigtail ending in XT60 female.
+      description: Battery 12 AWG pigtail reterminated with XT90H female (45 A continuous / 90 A burst).
       connectors:
         A: {type: integral, mates: battery.J1}
-        B: {type: xt60-female}
+        B: {type: xt90h-female}
       wires:
         - {id: W_BAT_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
         - {id: W_BAT_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
       route: {slack: 20 mm}
     - id: power_y
       # Gauges from the installed (bundle- and enclosure-derated) ampacity of the wiring stage: the HAT branch is 14 AWG
-      # (~10.3 A installed, the most an XT30 crimp takes) so the 10 A fuse protects it (18 AWG was 5.4 A installed); the
+      # (7.03 A installed in the integrated layout); a 5 A fuse protects it with 35% margin over the 3.70 A HAT load; the
       # fuse holder's input pigtail is 12 AWG like the trunk, so no thinner conductor sits upstream of the fuse.
-      description: XT60 Y-harness splitting battery power to the ESC (12 AWG) and, through a 10 A fuse, the HAT (14 AWG).
+      description: XT90H battery input splitting to the XT60 ESC branch (12 AWG) and, through a 5 A fuse, the XT30 HAT branch (14 AWG).
       connectors:
-        P1: {type: xt60-male, mates: battery_lead.B}
+        P1: {type: xt90h-male, mates: battery_lead.B}
         P2: {type: xt60-female}
         P3: {type: xt30-female, mates: hat.J_BATT}
         F1: {type: integral, mates: fuse.J1}

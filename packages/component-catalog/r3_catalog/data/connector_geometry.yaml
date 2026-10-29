@@ -585,3 +585,39 @@ geometry:
     pins:
       "1": {position: [-3.6 mm, 0, 0], tip: -1.4 mm, pad: [-3.6 mm, 0, -16.0 mm], wire_entry: [-3.6 mm, 0, -20.5 mm], wire_axis: [0.0, 0.0, -1.0]}
       "2": {position: [3.6 mm, 0, 0], tip: -1.4 mm, pad: [3.6 mm, 0, -16.0 mm], wire_entry: [3.6 mm, 0, -20.5 mm], wire_axis: [0.0, 0.0, -1.0]}
+  xt90h-female:
+    model:
+      source: proxy
+      units: mm
+      placement: {origin: [0, 0, 0], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+      params: {"builder": "housing", "width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5}
+      provenance: {status: "estimated", source: "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf"}
+    pin_shape: solder_cup
+    pin_size: 4.5 mm
+    envelope: [20.8 mm, 11.7 mm, 29.7 mm]
+    depth: 29.7 mm
+    reach: 0.0 mm
+    color: "#d9a21b"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf"}
+    pins:
+      "1": {position: [-4.95 mm, 0, 0], tip: 0.0 mm, wire_entry: [-4.95 mm, 0, -29.7 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [4.95 mm, 0, 0], tip: 0.0 mm, wire_entry: [4.95 mm, 0, -29.7 mm], wire_axis: [0.0, 0.0, -1.0]}
+  xt90h-male:
+    model:
+      source: proxy
+      units: mm
+      placement: {origin: [0, 0, 0], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+      params: {"builder": "housing", "width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5}
+      provenance: {status: "estimated", source: "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf"}
+    pin_shape: solder_cup
+    pin_size: 4.5 mm
+    envelope: [20.8 mm, 11.7 mm, 29.7 mm]
+    depth: 29.7 mm
+    reach: 0.0 mm
+    color: "#d9a21b"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf"}
+    pins:
+      "1": {position: [-4.95 mm, 0, 0], tip: 0.0 mm, wire_entry: [-4.95 mm, 0, -29.7 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [4.95 mm, 0, 0], tip: 0.0 mm, wire_entry: [4.95 mm, 0, -29.7 mm], wire_axis: [0.0, 0.0, -1.0]}
