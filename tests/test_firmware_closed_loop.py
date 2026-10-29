@@ -136,7 +136,7 @@ def test_manual_mode_maps_sticks_and_failsafes(tmp_path: Path) -> None:
     assert esc_at[0.9] == 1500.0
     # 0.5 stick with a 2 % deadband -> (0.5 - 0.02) / 0.98 = 0.49 of forward travel.
     assert esc_at[1.5] == pytest.approx(1500.0 + 500.0 * 0.48 / 0.98, abs=1.0)
-    assert servo_at[2.5] == pytest.approx(1878.0, abs=0.5) and servo_at[1.5] == 1500.0
+    assert servo_at[2.5] == pytest.approx(1722.0, abs=0.5) and servo_at[1.5] == 1500.0
     assert hal.events("radio_failsafe") and esc_at[7.9] == 1500.0
     assert controller.supervisor.state == State.FAILSAFE
 

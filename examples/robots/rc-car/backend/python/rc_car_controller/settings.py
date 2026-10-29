@@ -38,7 +38,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "low_voltage_limit_v": 7.0,
     "max_cruise_speed_mps": 4.0,
     "esc_pulse_us": {"reverse": 1000, "neutral": 1500, "forward": 2000},
-    "steering_pulse_us": {"left": 1878, "center": 1500, "right": 1122},
+    "steering_pulse_us": {"left": 1722, "center": 1500, "right": 1278},  # CAD-solved linkage end points (+-30 deg horn)
     "max_steer_rad": 0.45,
     "wheelbase_m": 0.26,
     "wheel_radius_m": 0.055,

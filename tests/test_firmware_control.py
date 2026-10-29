@@ -81,7 +81,7 @@ def test_path_projection_and_corners() -> None:
 def test_pulse_mapping() -> None:
     pulses = PulseMap()
     assert pulses.esc_pulse(0.0) == 1500 and pulses.esc_pulse(1.0) == 2000 and pulses.esc_pulse(-1.0) == 1000
-    assert pulses.steer_pulse(1.0) == 1878 and pulses.steer_pulse(-1.0) == 1122 and pulses.steer_pulse(0) == 1500
+    assert pulses.steer_pulse(1.0) == 1722 and pulses.steer_pulse(-1.0) == 1278 and pulses.steer_pulse(0) == 1500
     assert pulses.steer_from_angle(0.45) == 1.0 and pulses.steer_from_angle(-1.0) == -1.0
     assert stick_to_normalised(1500.0 + 512.0) == 1.0 and stick_to_normalised(1505.0) == 0.0
 
