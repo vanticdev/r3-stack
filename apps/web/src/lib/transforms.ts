@@ -215,3 +215,25 @@ export function resamplePolyline(points: readonly Vec3[], count: number): Vec3[]
   }
   return out;
 }
+
+/** Rest pose (q = 0, robot frame) of every recorded body, i.e. the frame the robot-frame CAD meshes
+ * are authored in. Uses `frames.rest` when the server provides it; otherwise each body's pose relative
+ * to the root body at the first frame (scenarios start at rest with zero joint angles), with the root
+ * body's rest pose taken as the robot frame itself. */
+export function restPoses(frames: { bodies: Record<string, Pose7[]>; rest?: Record<string, Pose7> }, root: string): Record<string, Pose7> {
+  if (frames.rest && Object.keys(frames.rest).length) return frames.rest;
+  const out: Record<string, Pose7> = {};
+  const root0 = frames.bodies[root]?.[0];
+  const inverseRoot = root0 ? pose7Matrix(root0).invert() : new Matrix4();
+  for (const [name, poses] of Object.entries(frames.bodies)) {
+    const first = poses[0];
+    if (!first) continue;
+    if (name === root) { out[name] = [0, 0, 0, 1, 0, 0, 0]; continue; }
+    const m = inverseRoot.clone().multiply(pose7Matrix(first));
+    const p = new Vector3();
+    const q = new Quaternion();
+    m.decompose(p, q, new Vector3());
+    out[name] = [p.x, p.y, p.z, q.w, q.x, q.y, q.z];
+  }
+  return out;
+}

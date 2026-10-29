@@ -4,12 +4,23 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, request, test, type Page } from "@playwright/test";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const shots = path.resolve(here, "..", "test-results", "screenshots");
 mkdirSync(shots, { recursive: true });
 const pid = process.env.R3_E2E_PROJECT ?? "rc-car";
+
+// Against the mock layer every response carries X-R3-Mock: 1. Against a real `r3 serve`, the tests that
+// start pipeline runs or agent sessions are skipped: they would execute stages and spend the user's
+// Claude/Codex subscription.
+let mock = true;
+test.beforeAll(async ({ baseURL }) => {
+  const context = await request.newContext({ baseURL });
+  const response = await context.get("/api/projects");
+  mock = response.headers()["x-r3-mock"] === "1";
+  await context.dispose();
+});
 
 // Driver chatter from software WebGL (SwiftShader) is not an application error.
 const IGNORED = [/GPU stall due to ReadPixels/, /GL Driver Message/, /THREE\.Clock: This module has been deprecated/];
@@ -21,7 +32,9 @@ function watchConsole(page: Page): string[] {
   });
   page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
   page.on("requestfailed", (r) => {
-    if (!/\/events$/.test(r.url())) errors.push(`request failed: ${r.url()} ${r.failure()?.errorText ?? ""}`);
+    // ERR_ABORTED is the app cancelling a superseded query (TanStack Query aborts on refetch) or closing an SSE stream.
+    const reason = r.failure()?.errorText ?? "";
+    if (!/\/events$/.test(r.url()) && !/ERR_ABORTED/.test(reason)) errors.push(`request failed: ${r.url()} ${reason}`);
   });
   page.on("response", (r) => {
     if (r.status() >= 500) errors.push(`HTTP ${r.status()} ${r.url()}`);
@@ -124,8 +137,10 @@ test.describe("interactions", () => {
     await settle(page, 1200);
     await shot(page, "16-wiring-route-edit");
     await page.getByRole("radio", { name: "Slack & vibration" }).click();
-    await expect(page.getByTestId("timeline").or(page.getByText(/No cable recordings/))).toBeVisible({ timeout: 60_000 });
+    const slack = page.getByTestId("timeline").or(page.getByText(/No cable recordings/));
+    await expect(slack).toBeVisible({ timeout: 60_000 });
     await settle(page, 1500);
+    await slack.scrollIntoViewIfNeeded();
     await shot(page, "17-wiring-slack-playback");
     expect(errors, errors.join("\n")).toEqual([]);
   });
@@ -166,6 +181,7 @@ test.describe("interactions", () => {
 
   // Last: the mock agent applies an (in-memory) spec patch, which marks results stale.
   test("pipeline run and agent session stream live", async ({ page }) => {
+    test.skip(!mock, "starts a pipeline run and an agent session: mock API only");
     const errors = watchConsole(page);
     await page.goto(`/#/p/${pid}/overview`);
     await expect(page.getByTestId("evidence-matrix")).toBeVisible();

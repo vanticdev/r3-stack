@@ -45,7 +45,7 @@ export function WiringPage() {
   const [draft, setDraft] = useState<{ via: Vec3[]; ties: Vec3[] } | null>(null);
   const [tab, setTab] = useState<"wires" | "bom" | "slack" | "images">("wires");
 
-  const required = quantity(spec.data?.spec.requirements?.min_wire_clearance_moving ?? "8 mm") || 0.008;
+  const required = wiring?.clearances.requirement ?? (quantity(spec.data?.spec.requirements?.min_wire_clearance_moving ?? "8 mm") || 0.008);
   const rows = useMemo<WireRow[]>(() => wireRows({
     routes: wiring?.routes ?? null, detail: wiring?.routing_detail ?? null,
     currents: electrical.data?.wires ?? [], slack: wiring?.slack_sim ?? null,
@@ -60,7 +60,7 @@ export function WiringPage() {
       return { id: h.id, description: h.description, wires: own.length || h.wires.length, length: routed?.length ?? null, ties: routed?.tie_points.length ?? 0,
                slack: quantity(h.route?.slack ?? 0.015), clearance: clearances.length ? Math.min(...clearances) : null, errors,
                mass: (wiring?.routing_detail?.harness_mass?.[h.id]?.mass as number | undefined) ?? null,
-               hasHints: !!(h.route?.via?.length || h.route?.tie_points?.length) };
+               hasHints: !!(wiring?.harnesses?.[h.id]?.route.via?.length || h.route?.via?.length || h.route?.tie_points?.length) };
     });
   }, [spec.data, rows, wiring, data]);
 
@@ -87,7 +87,7 @@ export function WiringPage() {
   const routed = harness ? wiring?.routes?.harnesses?.[harness] : undefined;
   const ends: [Vec3, Vec3] | null = routed?.bundle_path?.length ? [routed.bundle_path[0]!, routed.bundle_path[routed.bundle_path.length - 1]!] : null;
   const highlight = useMemo(() => (selectedWire ? [selectedWire] : harness ? [harness] : []), [harness, selectedWire]);
-  const worst = wiring?.slack_sim?.worst;
+  const worst = wiring?.clearances.worst_dynamic ?? wiring?.slack_sim?.worst;
   const totalCut = rows.reduce((s, r) => s + (r.cutLength ?? 0), 0);
   const staticMin = rows.reduce<WireRow | null>((w, r) => (r.clearance !== null && (!w || r.clearance < (w.clearance ?? Infinity)) ? r : w), null);
 
@@ -139,18 +139,17 @@ export function WiringPage() {
         <Card title="Harnesses" flush>
           <div className="table-wrap" style={{ maxHeight: 568 }}>
             <table>
-              <thead><tr><th>Harness</th><th className="num">Wires</th><th className="num">Length</th><th className="num">Clearance</th><th className="num">Errors</th></tr></thead>
+              <thead><tr><th>Harness</th><th className="num">Wires</th><th className="num">Length</th><th className="num">Clearance</th></tr></thead>
               <tbody>
                 {harnesses.map((h) => (
                   <tr key={h.id} className={`clickable${harness === h.id ? " selected" : ""}`} onClick={() => { setHarness(harness === h.id ? null : h.id); setSelectedWire(null); }}>
                     <td>
-                      <div className="mono">{h.id}</div>
+                      <div className="row" style={{ gap: 6 }}><span className="mono">{h.id}</span>{h.errors > 0 && <span className="badge critical" title="wiring errors">{h.errors} E</span>}</div>
                       <div className="muted small">{h.ties} ties · slack {fmt(h.slack, "m")}{h.mass ? ` · ${fmt(h.mass, "kg")}` : ""}{h.hasHints ? " · route hints" : ""}</div>
                     </td>
                     <td className="num">{h.wires}</td>
                     <td className="num">{fmt(h.length, "m")}</td>
                     <td className="num"><ClearanceCell value={h.clearance} required={required} component={null} /></td>
-                    <td className="num">{h.errors ? <span className="badge critical">{h.errors}</span> : <span className="muted">0</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -203,7 +202,7 @@ export function WiringPage() {
 function SlackPanel({ pid, required }: { pid: string; required: number }) {
   const scenarios = useScenarios(pid);
   const { data } = useRobotScene(pid);
-  const candidates = (scenarios.data ?? []).filter((s) => s.last);
+  const candidates = (scenarios.data?.scenarios ?? []).filter((s) => s.last?.recording);
   const preferred = candidates.find((s) => s.id === "steering_sweep") ?? candidates[0];
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const chosen = scenarioId ?? preferred?.id ?? null;
@@ -224,7 +223,7 @@ function SlackPanel({ pid, required }: { pid: string; required: number }) {
         <select value={chosen ?? ""} onChange={(e) => setScenarioId(e.target.value)} aria-label="Scenario">
           {candidates.map((s) => <option key={s.id}>{s.id}</option>)}
         </select>
-        <span className="small muted">{recording ? `${recording.cables.length} MuJoCo elastic cables · ${recording.bodies.t.length} frames` : ""}</span>
+        <span className="small muted">{recording?.frames ? `${Object.keys(recording.frames.cables ?? {}).length} MuJoCo elastic-cable spans · ${recording.frames.t.length} frames` : ""}</span>
       </div>
       {scenario.isError && <ErrorBox error={scenario.error} />}
       {scenario.isPending && <div className="skeleton" style={{ height: 420 }} />}

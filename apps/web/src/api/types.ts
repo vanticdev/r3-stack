@@ -1,14 +1,16 @@
-// Typed contract of the R3 HTTP API (`r3 serve`, services/orchestrator/r3_orchestrator/api/).
-// Mirrors .r3-runs/ui-brief.md. Artifact payloads are passed through from build/ files, so
-// their types below follow the stage hand-off formats in docs/architecture/r3-pipeline.md.
-// Fields the UI can live without are optional: the client tolerates older or partial builds.
+// Typed contract of the R3 HTTP API (`r3 serve`). Mirrors docs/architecture/api.md and the pydantic
+// models in services/orchestrator/r3_orchestrator/api/server.py (OpenAPI at /api/openapi.json); the
+// domain views follow api/projects.py. Units are SI. Response objects may gain fields, so every
+// interface is open-ended where the backend says `extra="allow"`. Missing inputs are `null` and listed
+// in `missing`; views never fail because a stage has not run.
 
 export type Vec3 = [number, number, number];
 /** World pose: position (m) + quaternion (w, x, y, z), as MuJoCo xpos/xquat. */
 export type Pose7 = [number, number, number, number, number, number, number];
 export type Severity = "error" | "warning" | "info";
-export type StageName =
-  | "assembly" | "model" | "cad" | "pcb" | "wiring" | "electrical" | "software" | "sim" | "report";
+export type StageName = "assembly" | "model" | "cad" | "pcb" | "wiring" | "electrical" | "software" | "sim" | "report";
+/** Raw robot.yaml values may be quantities ("20 mm"); the API's parsed `spec` holds SI numbers. */
+export type Quantity = number | string;
 
 export const STAGES: StageName[] = ["assembly", "model", "cad", "pcb", "wiring", "electrical", "software", "sim", "report"];
 
@@ -39,12 +41,24 @@ export interface ArtifactRef {
   path: string;
   kind: string;
   description?: string;
+  url?: string;
 }
 
-/** `build/<stage>/result.json` */
+/** A file under build/ as returned by the views (`images[]`, `plots[]`, `renders[]`, `views[]`). */
+export interface FileLink {
+  path: string;
+  url: string;
+  name: string;
+}
+
+export type StageStatusValue = "ok" | "failed" | "unavailable" | "missing";
+
+/** `build/<stage>/result.json` plus `status`, `stale`, diagnostic hints and artifact URLs. */
 export interface StageResult {
   stage: StageName | string;
   ok: boolean;
+  status?: StageStatusValue;
+  stale?: boolean;
   started_at?: number;
   duration_s?: number;
   diagnostics: Diagnostic[];
@@ -53,6 +67,8 @@ export interface StageResult {
   metrics: Record<string, unknown>;
   inputs?: Record<string, string | null>;
 }
+
+export type Fingerprint = Record<string, string>;
 
 // ------------------------------------------------------------------ doctor
 export interface DoctorTool {
@@ -69,39 +85,65 @@ export interface StageReadiness {
   missing: string[];
   note: string;
 }
+/** GET /api/agent/providers row (also `agents` in the doctor payload). */
+export interface AgentProviderInfo {
+  provider: string;
+  available: boolean;
+  path?: string | null;
+  version?: string | null;
+  detail?: string;
+}
 export interface DoctorPayload {
   ok: boolean;
   environment: { python: string; platform: string; display: boolean; worker_image: boolean; ci: boolean };
   tools: Record<string, DoctorTool>;
   stages: StageReadiness[];
-  /** Agent CLIs (`claude`, `codex`) detected by the API, when it reports them. */
-  agents?: Record<string, { available: boolean; version?: string | null; detail?: string }>;
+  checked_at?: number;
+  agents?: AgentProviderInfo[] | Record<string, Omit<AgentProviderInfo, "provider">>;
+  mock?: boolean;
 }
 
 // ------------------------------------------------------------------ projects
-export type RunStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled";
+export type RunStatusValue = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "error";
 
 export interface ProjectSummary {
   id: string;
   name: string;
   path: string;
-  description?: string;
-  last_run?: { status: RunStatus | "ok" | "failed" | "none"; finished_at?: number | null; run_id?: string | null } | null;
-  ok?: boolean | null;
-  counts?: Partial<Record<Severity, number>>;
+  description: string;
+  version: string;
+  robot_yaml_sha256?: string | null;
+  stages: Record<string, StageStatusValue | string>;
+  last_run: {
+    status: "ok" | "failed";
+    finished_at?: number | null;
+    failed_stages?: string[];
+    stale?: boolean;
+    counts?: Partial<Record<Severity, number>>;
+    run_id?: string;
+    run_status?: RunStatusValue;
+  } | null;
+  onshape_url?: string | null;
+  error?: string | null;
+}
+export interface ProjectList {
+  projects: ProjectSummary[];
+  roots: string[];
+  templates: string[];
 }
 
 export interface CreateProjectRequest {
   name: string;
   template: string;
-  github?: { private: boolean };
+  github?: { private: boolean; description?: string };
   confirm?: boolean;
 }
 export interface CreateProjectResponse {
+  ok?: boolean;
   id: string;
   path: string;
   files?: string[];
-  github_url?: string | null;
+  github?: Record<string, unknown> | null;
 }
 
 export type EvidenceStatus = "verified" | "estimated" | "failed" | "not_run" | "stale";
@@ -109,81 +151,89 @@ export type EvidenceStatus = "verified" | "estimated" | "failed" | "not_run" | "
 export interface Evidence {
   stage: string;
   check: string;
-  value: number | string | boolean | null;
-  limit?: number | string | boolean | null;
-  unit?: string;
-  artifact?: string | null;
-  fingerprint?: string | null;
+  passed: boolean | null;
+  value: unknown;
+  limit: unknown;
+  artifact: string | null;
+  inputs: Record<string, string>;
+  estimated: boolean;
+  stale: boolean;
+  detail: string;
 }
 
 /** One row of the release gate (`r3_orchestrator/release.py`). */
-export interface RequirementEvidence {
+export interface ReleaseItem {
+  /** requirement.<name>, scenario.<scenario>.<key> or stage.<name> */
   id: string;
-  kind: "requirement" | "expectation";
-  label: string;
-  scenario?: string | null;
-  requirement: number | string | boolean | null;
-  unit?: string;
+  kind: "requirement" | "scenario_expectation" | "stage";
+  subject: string;
+  target: unknown;
   status: EvidenceStatus;
-  evidence: Evidence | null;
-  note?: string;
+  evidence: Evidence[];
+  message: string;
 }
 
-export interface ReleaseGate {
+export interface Release {
+  schema: string;
   fabrication_ready: boolean;
-  current_fingerprint: string;
   counts: Partial<Record<EvidenceStatus, number>>;
-  items: RequirementEvidence[];
+  blocking: string[];
+  inputs: Fingerprint;
+  items: ReleaseItem[];
 }
 
-export interface StageStatus {
+export interface StageRow {
   stage: string;
-  status: "ok" | "failed" | "missing" | "stale" | "running";
+  status: StageStatusValue | string;
   ok: boolean | null;
-  stale: boolean | null;
-  counts: Partial<Record<Severity, number>>;
+  stale?: boolean | null;
+  counts?: Partial<Record<Severity, number>>;
   duration_s?: number | null;
+  started_at?: number | null;
+  metrics?: Record<string, unknown>;
+  artifacts?: ArtifactRef[];
 }
 
 export interface ProjectDetail {
   id: string;
-  name: string;
-  path: string;
-  spec: {
-    name: string;
-    description?: string;
-    version?: string;
-    requirements: Record<string, unknown>;
-    components: number;
-    harnesses: number;
-    scenarios: string[];
-  };
-  fingerprint: string;
+  /** Absolute project directory. */
+  project: string;
+  robot: { name: string; description?: string; version?: string };
+  fingerprint: Fingerprint;
+  inputs?: Fingerprint;
+  git?: { branch?: string | null; commit?: string | null; dirty_files?: number } | null;
   lock?: Record<string, unknown> | null;
-  stages: StageStatus[];
-  results?: Record<string, StageResult>;
-  report?: { ok: boolean; counts: Partial<Record<Severity, number>>; generated_at?: number } | null;
-  release: ReleaseGate;
-  links?: { onshape?: string | null; github?: string | null };
+  summary: { components?: number; harnesses?: number; wires?: number; boards?: number; bindings?: number; scenarios?: string[] };
+  stages: StageRow[];
+  results: Record<string, StageResult>;
+  report: { ok: boolean; counts: Partial<Record<Severity, number>>; generated_at?: number; [key: string]: unknown } | null;
+  report_url?: string | null;
+  release: Release;
+  links: { onshape?: string | null; github?: string | null };
+  ok?: boolean;
 }
 
 export interface SpecDocument {
   yaml: string;
   sha256: string;
   spec: RobotSpec;
+  path?: string;
 }
 
 export interface SpecPatchResponse {
   ok: boolean;
-  sha256: string;
-  previous_sha256?: string;
+  dry_run?: boolean;
   changed?: boolean;
+  previous_sha256?: string;
+  sha256: string;
+  patched_sha256?: string;
+  preserves_comments?: boolean;
   graph_diagnostics?: Diagnostic[];
+  yaml?: string;
+  spec?: RobotSpec;
 }
 
-// ------------------------------------------------------------------ robot.yaml (JSON form)
-/** Raw robot.yaml values may be quantities ("20 mm") or SI numbers. */
-export type Quantity = number | string;
+// ------------------------------------------------------------------ robot.yaml (parsed, SI)
 export interface RouteHint {
   via?: Quantity[][];
   tie_points?: Quantity[][];
@@ -202,7 +252,7 @@ export interface SpecHarness {
   id: string;
   description?: string;
   connectors: Record<string, { type: string; mates?: string | null }>;
-  splices?: Record<string, { position: Vec3 }>;
+  splices?: Record<string, unknown>;
   wires: SpecWire[];
   route?: RouteHint;
   jacket?: string;
@@ -216,19 +266,27 @@ export interface SpecJoint {
   axis: Vec3;
   limits?: [number, number] | null;
 }
+export interface SpecTransmission {
+  id: string;
+  type: string;
+  actuator?: string;
+  joints: string[];
+  ratio?: number;
+  params?: Record<string, Quantity>;
+}
 export interface SpecBinding {
   interface: string;
   computer: string;
   pins: string[];
   device?: string;
-  channel?: number;
+  channel?: number | null;
   expects?: string[];
   [key: string]: unknown;
 }
 export interface SpecScenario {
   id: string;
   description?: string;
-  duration: number;
+  duration: Quantity;
   expect?: Record<string, unknown>;
   [key: string]: unknown;
 }
@@ -236,11 +294,8 @@ export interface RobotSpec {
   schema?: string;
   robot: { name: string; description?: string; version?: string };
   requirements?: Record<string, unknown>;
-  components: Record<string, { type: string; mount?: string; pose?: { xyz?: Vec3; rpy?: Vec3 } }>;
-  mechanical?: {
-    joints?: SpecJoint[];
-    transmissions?: { id: string; type: string; actuator?: string; joints: string[]; ratio?: number; params?: Record<string, number> }[];
-  };
+  components: Record<string, { type: string; mount?: string | null; pose?: { xyz?: Quantity[]; rpy?: Quantity[] } }>;
+  mechanical?: { joints?: SpecJoint[]; transmissions?: SpecTransmission[] };
   electrical?: { harnesses?: SpecHarness[]; ground_net?: string; direct_mates?: { a: string; b: string }[] };
   software?: {
     modules?: { name: string; language?: string; runs_on?: string; entrypoint?: string }[];
@@ -252,33 +307,27 @@ export interface RobotSpec {
 }
 
 // ------------------------------------------------------------------ catalog
+/** `GET .../catalog` component row (api.list_catalog), SI units. */
 export interface CatalogComponent {
   id: string;
   kind: string;
   name: string;
-  description?: string;
-  manufacturer?: string;
   part_number?: string;
-  mechanical?: {
-    shape?: string;
-    /** SI numbers from the API, or raw YAML quantities ("46.5 mm") from the catalog files. */
-    size?: (number | string)[];
-    mass?: number | string;
-    material?: string;
-    density?: number;
-    color?: string;
-    moving?: boolean;
-    provenance?: { status?: string; source?: string; notes?: string };
-  };
-  pins?: Record<string, Record<string, unknown>>;
-  connectors?: Record<string, { type: string; position?: Vec3; direction?: Vec3; pins?: Record<string, string> }>;
-  interfaces?: Record<string, { kind: string; origin?: Vec3; z?: Vec3; x?: Vec3; params?: Record<string, unknown> }>;
-  [key: string]: unknown;
+  mass: number | null;
+  size: number[] | null;
+  shape: string | null;
+  /** connector name -> connector type */
+  connectors: Record<string, string>;
+  /** pin name -> role */
+  pins: Record<string, string>;
+  behavior?: string | null;
+  /** provenance status: datasheet | measured | estimated | ... */
+  provenance?: string | null;
 }
-export interface Catalog {
-  components: Record<string, CatalogComponent>;
-  connectors: Record<string, Record<string, unknown>>;
-  wires: Record<string, Record<string, unknown>>;
+export interface CatalogResponse {
+  components: CatalogComponent[];
+  connectors: Record<string, unknown>[];
+  wires: Record<string, unknown>[];
 }
 
 // ------------------------------------------------------------------ model
@@ -320,26 +369,41 @@ export interface ModelGraph {
   endpoints?: Record<string, GraphEndpoint>;
   nets: Record<string, string[]>;
   net_names: Record<string, string>;
+  edges?: { a: string; b: string; kind: string; link_kind?: string; ref?: string; value?: number }[];
   pins?: Record<string, { role: string; passthrough: boolean; connector_pins: string[] }>;
   rails?: { source: string; nominal: number; min: number; max: number; sinks: string[] }[];
   interference?: { a: string; b: string; center: Vec3; extent: Vec3; volume: number }[];
-  mass?: { total: number; limit?: number; by_component?: Record<string, { mass: number; source: string }> };
+  mass?: { total: number; limit?: number; estimated_fraction?: number; by_component?: Record<string, { mass: number; source: string }> };
   diagnostics?: Diagnostic[];
 }
 /** `build/model/assembly.json` (assembly stage; absent for specs without `assembly:`). */
 export interface AssemblyJson {
   root?: string;
-  joins?: { id: string; a: string; b: string; kind: string; joint?: string | null; frame?: { origin: Vec3; z: Vec3; x?: Vec3 } }[];
-  interfaces?: Record<string, { component: string; kind: string; origin: Vec3; z: Vec3; x?: Vec3 }>;
+  joins?: { id: string; a: string; b: string; kind: string; joint?: string | null }[];
+  interfaces?: Record<string, { component?: string; kind?: string; origin: Vec3; z: Vec3; x?: Vec3 }>;
   [key: string]: unknown;
 }
+export interface ModelComponent {
+  type: string;
+  pose: { xyz: Vec3; rpy: Vec3 };
+  mount: string | null;
+  label?: string | null;
+  kind: string | null;
+  name: string | null;
+  shape: string | null;
+  size: number[] | null;
+  mass: number | null;
+}
 export interface ModelResponse {
-  graph: ModelGraph;
+  graph: ModelGraph | null;
   assembly: AssemblyJson | null;
-  /** Compiled poses (robot frame) per component. */
-  poses: Record<string, { xyz: Vec3; rpy: Vec3 }>;
+  components: Record<string, ModelComponent>;
   joints: SpecJoint[];
-  transmissions?: NonNullable<RobotSpec["mechanical"]>["transmissions"];
+  derived_joints: SpecJoint[];
+  compiled?: boolean;
+  images: FileLink[];
+  results?: Record<string, StageResult | null>;
+  missing: string[];
 }
 
 // ------------------------------------------------------------------ cad
@@ -364,8 +428,10 @@ export interface CadResponse {
   } | null;
   /** component id -> URL of its STL (robot frame, metres). */
   meshes: Record<string, string>;
-  onshape_url?: string | null;
-  views?: { name: string; url: string }[];
+  onshape: { document?: string | null; part_studio?: string | null; lock?: Record<string, unknown> };
+  views: FileLink[];
+  result?: StageResult | null;
+  missing: string[];
 }
 
 // ------------------------------------------------------------------ wiring
@@ -404,16 +470,27 @@ export interface SlackSim {
   worst?: { wire: string; min_distance: number; component: string; time: number };
   profile?: Record<string, number>;
   wires: Record<string, { min_distance: number; component: string; time: number; sags_into_moving?: boolean; below_requirement?: boolean }>;
-  /** Optional cable timeline (same shape as playback cables) when the API provides it. */
-  timeline?: { t: number[]; cables: PlaybackCable[] };
 }
 export interface WiringResponse {
   routes: RoutesJson | null;
   routing_detail: RoutingDetail | null;
-  bom: Record<string, string>[];
-  clearances: RoutesJson["clearances"];
+  bom: Record<string, string | number>[] | null;
+  bom_url?: string | null;
+  clearances: {
+    static: RoutesJson["clearances"];
+    /** wire id -> min clearance to moving parts, m */
+    moving: Record<string, number> | null;
+    worst_static: { wire: string; distance: number; component: string } | null;
+    worst_dynamic: { wire: string; min_distance: number; component: string; time: number } | null;
+    requirement: number;
+  };
   slack_sim: SlackSim | null;
-  images?: { name: string; url: string }[];
+  /** Cable timeline of the slack sim, `null` until the wiring stage persists it. */
+  slack_timeline: { t: number[]; cables: Record<string, { rgba?: number[] | null; points: Vec3[][] }> } | null;
+  harnesses: Record<string, { index: number; wires: string[]; connectors: string[]; route: RouteHint; jacket?: string }>;
+  images: FileLink[];
+  result?: StageResult | null;
+  missing: string[];
 }
 
 // ------------------------------------------------------------------ electrical
@@ -430,78 +507,141 @@ export interface OperatingPoint {
   pin_currents?: Record<string, number>;
   events?: unknown[];
 }
+export interface RuntimeInfo {
+  runtime: number;
+  requirement: number;
+  capacity_ah?: number;
+  cutoff_voltage?: number;
+  curve?: { soc: number; time: number; average_current: number; cruise_voltage: number; full_throttle_voltage: number }[];
+}
 export interface OperatingPointsJson {
   schema?: string;
   operating_points: Record<string, OperatingPoint>;
-  worst_case?: { wires?: Record<string, { continuous_current: number; continuous_point: string; ampacity: number; burst_current?: number; burst_point?: string; burst_ratio?: number; awg: number; harness: string }> };
-  runtime?: { runtime: number; requirement: number; capacity_ah?: number; cutoff_voltage?: number; curve?: { soc: number; time: number; average_current: number; cruise_voltage: number; full_throttle_voltage: number }[] };
+  worst_case?: {
+    wires?: Record<string, { continuous_current: number; continuous_point: string; ampacity: number; burst_current?: number; burst_point?: string; burst_ratio?: number; awg: number; harness: string }>;
+    connectors?: Record<string, { continuous_current: number; continuous_point: string; rating: number; burst_rating?: number; burst_current?: number; burst_point?: string }>;
+  };
+  runtime?: RuntimeInfo;
   thermal?: Record<string, Record<string, unknown>>;
   brownout?: Record<string, unknown>;
   fuses?: Record<string, Record<string, unknown>>;
+  battery_states?: Record<string, number>;
   [key: string]: unknown;
 }
-export interface CurrentRating {
+/** `wires[]` / `connectors[]` rows of the electrical view (worst_case entries plus ratios). */
+export interface CurrentRow {
   id: string;
-  kind: "wire" | "connector";
-  harness?: string;
-  current: number;
-  rating: number;
-  point: string;
-  burst_current?: number;
-  burst_rating?: number;
+  continuous_current: number;
+  continuous_point?: string;
+  continuous_ratio: number | null;
+  burst_current?: number | null;
   burst_point?: string;
+  burst_ratio?: number | null;
+  /** wires */
+  ampacity?: number;
+  awg?: number;
+  harness?: string;
+  /** connectors */
+  rating?: number;
+  burst_rating?: number;
 }
-export interface PowerTree {
-  nodes: { id: string; label: string; kind: string }[];
-  edges: { from: string; to: string; rail: string; nominal?: number }[];
+export interface ElectricalTableRow {
+  id: string;
+  operating_point: string;
+  battery_state: string;
+  kind: string;
+  soc: number;
+  battery_current: number | null;
+  battery_voltage: number | null;
+  motor_current: number | null;
+  rails: Record<string, number> | null;
+}
+export interface Rail {
+  source: string;
+  nominal: number;
+  min: number;
+  max: number;
+  sinks: string[];
 }
 export interface ElectricalResponse {
   operating_points: OperatingPointsJson | null;
-  wires: CurrentRating[];
-  connectors: CurrentRating[];
-  power_tree: PowerTree;
-  rails: NonNullable<ModelGraph["rails"]>;
-  images?: { name: string; url: string }[];
+  table: ElectricalTableRow[];
+  wires: CurrentRow[];
+  connectors: CurrentRow[];
+  power_tree: { rails: Rail[]; fuses?: unknown; brownout?: unknown; harness_voltage_drop?: unknown };
+  runtime: RuntimeInfo | null;
+  thermal: Record<string, Record<string, unknown>> | null;
+  images: FileLink[];
+  result?: StageResult | null;
+  missing: string[];
 }
 
 // ------------------------------------------------------------------ pcb
-export interface PcbBoard {
+export interface PcbBoardJson {
   board: string;
   component: string;
   outline?: { width: number; height: number };
   nets?: Record<string, string[]>;
-  connectors: Record<string, Record<string, string>>;
-  erc?: { errors: number | null; warnings: number | null; source?: string };
-  drc?: { errors: number | null; warnings?: number | null; source?: string };
+  connectors?: Record<string, Record<string, string>>;
   validation?: Record<string, unknown>;
-  renders: Record<string, string>;
-  gerber_url?: string | null;
-  bom: Record<string, string>[];
-  /** Connector pin -> board net vs the catalog's pin -> net map. */
-  pin_map: { connector: string; pin: string; board_net: string | null; catalog_net: string | null; match: boolean }[];
-  diagnostics?: Diagnostic[];
+  [key: string]: unknown;
+}
+export interface PcbCheck {
+  errors: number | null;
+  warnings?: number | null;
+  source?: string;
+}
+export interface PcbBoard {
+  board: string;
+  component: string;
+  spec: Record<string, unknown>;
+  board_json: PcbBoardJson | null;
+  renders: FileLink[];
+  erc: PcbCheck | null;
+  drc: PcbCheck | null;
+  /** board pin -> net, per connector */
+  connectors: Record<string, Record<string, string>> | null;
+  /** catalog connector pin number -> component pin name */
+  catalog_connectors: Record<string, Record<string, string>>;
+  bom: Record<string, string | number>[] | null;
+  gerbers_url: string | null;
+  files: FileLink[];
+  missing: string[];
 }
 export interface PcbResponse {
   boards: PcbBoard[];
+  result?: StageResult | null;
 }
 
 // ------------------------------------------------------------------ software
-export interface BindingChain {
+export interface BindingPin {
+  pin: string;
+  node?: string;
+  net?: string;
+  net_name?: string;
+  /** component pins on the same net */
+  devices?: string[];
+  /** component pins reached through internal links (series resistors) */
+  reaches?: string[];
+  error?: string;
+}
+export interface Binding extends SpecBinding {
   handle: string;
-  interface: string;
-  computer: string;
-  device?: string;
-  channel?: number | null;
-  pins: { pin: string; logical?: string | null; net: string | null; devices: string[] }[];
-  expects: string[];
-  ok: boolean;
+  pin_map: BindingPin[];
+  expects_reached: { pin: string; reached: boolean }[];
+}
+export interface FirmwareLogLine {
+  t: number;
+  level: string;
+  message: string;
+  fields?: Record<string, unknown>;
 }
 export interface SoftwareResponse {
-  bindings: BindingChain[];
-  modules: { name: string; language?: string; runs_on?: string; entrypoint?: string; path?: string; files?: string[] }[];
-  firmware_logs: { t: number; level: string; message: string; fields?: Record<string, unknown> }[];
-  logs_source?: string | null;
-  software_log?: string | null;
+  bindings: Binding[];
+  modules: { name: string; language?: string; runs_on?: string; entrypoint?: string; path?: string; exists?: boolean; files?: string[] }[];
+  config?: Record<string, unknown>;
+  firmware_logs: { scenario: string; firmware_logs: FirmwareLogLine[]; software?: unknown; software_log_url?: string | null; software_log_tail?: string }[];
+  deploy_log_url?: string | null;
 }
 
 // ------------------------------------------------------------------ simulation
@@ -512,91 +652,131 @@ export interface ScenarioCheck {
   pass: boolean;
   detail?: string;
 }
-export interface ScenarioSummary {
-  scenario: string;
-  description?: string;
-  passed: boolean;
-  duration: number;
-  checks: ScenarioCheck[];
-  metrics: Record<string, number | string | boolean | null>;
-  firmware_logs?: SoftwareResponse["firmware_logs"];
-  diagnostics?: Diagnostic[];
-  inputs?: Record<string, string | null>;
-  [key: string]: unknown;
+export interface ScenarioLast {
+  passed: boolean | null;
+  checks: ScenarioCheck[] | null;
+  metrics: Record<string, unknown> | null;
+  fallbacks?: Record<string, unknown> | null;
+  stale: boolean;
+  inputs?: Record<string, string> | null;
+  summary_url?: string;
+  plots: FileLink[];
+  renders: FileLink[];
+  clip_url: string | null;
+  recording: boolean;
+  diagnostics: Diagnostic[];
 }
-export interface ScenarioListItem {
-  id: string;
-  description?: string;
-  duration: number;
-  expect?: Record<string, unknown>;
-  last: { passed: boolean; checks: ScenarioCheck[]; metrics?: Record<string, unknown>; stale?: boolean } | null;
+export interface ScenarioListItem extends SpecScenario {
+  last: ScenarioLast | null;
 }
-export interface PlaybackCable {
-  id: string;
-  harness?: string;
-  wires?: string[];
-  colors?: string[];
-  od?: number;
-  /** Per frame, the cable body positions in world (m). */
-  points: Vec3[][];
+export interface SimListResponse {
+  scenarios: ScenarioListItem[];
+  result?: StageResult | null;
+  overview_url?: string | null;
+}
+export interface PlaybackFrames {
+  t: number[];
+  format?: string;
+  /** body -> per-frame world pose */
+  bodies: Record<string, Pose7[]>;
+  /** component -> MuJoCo body that carries it */
+  component_bodies: Record<string, string>;
+  /** cable span (e.g. cable00s0) -> colour and per-frame body positions */
+  cables: Record<string, { rgba: number[] | null; points: Vec3[][] }> | null;
+  /** Body rest poses (q = 0), when the server provides them. */
+  rest?: Record<string, Pose7>;
+  error?: string;
 }
 export interface PlaybackRecording {
-  schema?: string;
-  scenario: string;
   hz: number;
   duration: number;
-  series: Record<string, number[]> & { t: number[] };
-  bodies: { names: string[]; nominal: Record<string, Pose7>; t: number[]; poses: Record<string, Pose7[]> };
-  cables: PlaybackCable[];
-  firmware_logs?: SoftwareResponse["firmware_logs"];
+  channels: string[];
+  series: Record<string, (number | null)[]> & { t: number[] };
+  firmware_logs?: FirmwareLogLine[];
   events?: unknown[];
+  frames: PlaybackFrames | null;
 }
 export interface ScenarioResponse {
-  summary: ScenarioSummary;
+  scenario: SpecScenario | { id: string };
+  last: ScenarioLast | null;
+  summary: Record<string, unknown> | null;
   recording: PlaybackRecording | null;
-  renders: { name: string; url: string }[];
-  clip_url?: string | null;
+}
+
+// ------------------------------------------------------------------ diagnostics
+export interface DiagnosticsResponse {
+  diagnostics: Diagnostic[];
+  counts?: Partial<Record<Severity, number>>;
+  by_stage?: Record<string, Record<Severity, number>>;
+  stages?: unknown[];
+  inputs?: Fingerprint;
 }
 
 // ------------------------------------------------------------------ runs & events
 export interface RunRequest {
   stages?: string[];
   scenario?: string;
+  scenarios?: string[];
+}
+export interface RunCreated {
+  run_id: string;
+  status: string;
+  events_url: string;
+  status_url: string;
 }
 export interface RunInfo {
   run_id: string;
   project: string;
-  status: RunStatus;
-  stages?: string[];
-  scenario?: string | null;
-  created_at?: number;
-  started_at?: number | null;
-  finished_at?: number | null;
-  current_stage?: string | null;
+  kind: string;
+  status: RunStatusValue;
+  stages: string[] | null;
+  scenarios: string[] | null;
+  current_stage: string | null;
+  created_at: number;
+  started_at: number | null;
+  finished_at: number | null;
+  events: number;
+  result: Record<string, unknown> | null;
 }
-export type RunEventType = "stage_started" | "log" | "progress" | "diagnostic" | "stage_finished" | "run_finished";
+export type RunEventType = "run_queued" | "run_started" | "stage_started" | "log" | "progress" | "diagnostic" | "stage_finished" | "run_finished";
+/** SSE `data`: {seq, type, time, run_id, ...payload}; see docs/architecture/api.md "Run events". */
 export interface RunEvent {
   type: RunEventType | string;
+  seq?: number;
+  time?: number;
   run_id?: string;
   stage?: string;
-  message?: string;
+  index?: number;
+  total?: number;
+  stream?: "stdout" | "stderr" | "logging";
+  line?: string;
   level?: string;
-  fraction?: number;
+  message?: string;
   ok?: boolean;
-  status?: RunStatus;
+  status?: string;
+  counts?: Partial<Record<Severity, number>>;
   diagnostic?: Diagnostic;
-  t?: number;
+  release?: { fabrication_ready: boolean; counts: Record<string, number>; blocking: string[] };
+  error?: { type?: string; message?: string; traceback?: string };
   [key: string]: unknown;
 }
 
 export interface DeployRequest {
   target: "sim" | "fleet";
   confirm?: boolean;
+  scenarios?: string[];
+  force?: boolean;
 }
 export interface DeployResponse {
   ok: boolean;
-  target: string;
+  target: "sim" | "fleet";
   run_id?: string | null;
+  events_url?: string;
+  command?: string[] | string;
+  returncode?: number;
+  log?: string;
+  stdout_tail?: string;
+  stderr_tail?: string;
   message?: string;
   [key: string]: unknown;
 }
@@ -607,21 +787,67 @@ export interface AgentRequest {
   provider: AgentProvider;
   model?: string;
 }
+export interface AgentCreated {
+  session_id: string;
+  status: string;
+  provider: string;
+  events_url: string;
+}
+export interface AgentStatus {
+  session_id: string;
+  project: string;
+  provider: string;
+  model: string | null;
+  prompt: string;
+  status: "starting" | "running" | "completed" | "failed" | "cancelled";
+  created_at: number;
+  finished_at: number | null;
+  returncode: number | null;
+  result: string;
+  error: string | null;
+  events: number;
+}
 export type AgentEventType =
-  | "session_started" | "message" | "tool_call" | "tool_result" | "run_started" | "run_finished"
-  | "spec_changed" | "error" | "session_finished";
+  | "session_started" | "message" | "tool_call" | "tool_result" | "run_started" | "run_finished" | "spec_changed"
+  | "usage" | "stderr" | "raw" | "session_finished";
+/** SSE `data` of an agent session; see docs/architecture/api.md "Agent events". */
 export interface AgentEvent {
   type: AgentEventType | string;
+  seq?: number;
+  time?: number;
   session_id?: string;
-  role?: "assistant" | "user" | "system";
+  role?: "assistant" | "user" | "system" | "thinking" | "error" | "output";
   text?: string;
-  tool?: string;
+  /** tool_call / tool_result */
+  id?: string;
+  name?: string;
+  server?: string | null;
   input?: unknown;
-  output?: unknown;
-  is_error?: boolean;
-  run_id?: string;
+  ok?: boolean;
+  content?: string;
+  /** run_started / run_finished (runs the agent started through MCP) */
+  tool_call_id?: string;
+  tool?: string;
+  stages?: string[];
+  scenarios?: string[];
+  counts?: Partial<Record<Severity, number>>;
+  /** spec_changed / session_finished */
+  previous_sha256?: string;
   sha256?: string;
+  diff?: string;
+  cumulative_diff?: string;
+  spec_changed?: boolean;
   status?: string;
-  t?: number;
+  returncode?: number | null;
+  result?: string;
+  error?: string | null;
+  line?: string;
+  provider?: string;
+  model?: string | null;
+  cwd?: string;
+  command?: string[] | string;
+  input_tokens?: number;
+  output_tokens?: number;
+  cost_usd?: number;
   [key: string]: unknown;
 }

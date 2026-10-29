@@ -24,7 +24,7 @@ interface ChartDef {
 export function chartDefs(recording: PlaybackRecording, minClearance?: number): ChartDef[] {
   const s = recording.series;
   const line = (key: string, label: string, color: string, unit: string, scale = 1, dash = false): ChartSeries | null =>
-    s[key] ? { label, values: scale === 1 ? s[key]! : s[key]!.map((v) => v * scale), color, unit, dash } : null;
+    s[key] ? { label, values: scale === 1 ? s[key]! : s[key]!.map((v) => (v === null ? null : v * scale)), color, unit, dash } : null;
   const defs: (ChartDef | null)[] = [
     { title: "Speed", unit: "m/s", series: [line("speed", "speed", "var(--series-1)", "m/s")].filter((x) => !!x) },
     { title: "Battery voltage", unit: "V", series: [line("battery_v", "pack", "var(--series-1)", "V")].filter((x) => !!x) },
@@ -55,8 +55,8 @@ function ScenarioCard({ item, selected, onSelect, onRun, busy }: {
       </div>
       <span className="small secondary" style={{ minHeight: 34 }}>{item.description}</span>
       <div className="row small">
-        <span className="muted">{fmt(item.duration, "s")}</span>
-        {last && <span className="muted">{last.checks.filter((c) => c.pass).length}/{last.checks.length} checks</span>}
+        <span className="muted">{fmt(quantity(item.duration), "s")}</span>
+        {last?.checks && <span className="muted">{last.checks.filter((c) => c.pass).length}/{last.checks.length} checks</span>}
         <span className="spacer" style={{ flex: 1 }} />
         <button className="small" disabled={busy} onClick={(e) => { e.stopPropagation(); onRun(); }}><Icon name="play" size={11} />Run</button>
       </div>
@@ -81,21 +81,25 @@ function ScenarioDetail({ pid, response }: { pid: string; response: ScenarioResp
   const recording = response.recording;
   const t = recording?.series.t ?? [];
   const start = t[0] ?? 0;
-  const end = t[t.length - 1] ?? response.summary.duration;
+  const end = t[t.length - 1] ?? recording?.duration ?? 0;
   const playback = usePlayback(start, end);
   const [follow, setFollow] = useState(true);
   const spec = useSpec(pid);
   const minClearance = quantity(spec.data?.spec.requirements?.min_wire_clearance_moving);
   const charts = useMemo(() => (recording ? chartDefs(recording, Number.isFinite(minClearance) ? minClearance : undefined) : []), [recording, minClearance]);
   const scrub = (value: number) => { playback.pause(); playback.seek(value); };
-  const summary = response.summary;
+  const last = response.last;
+  const frames = recording?.frames;
   return (
     <div className="stack" style={{ gap: 16 }}>
       <div className="grid side">
-        <Card flush title={`Playback · ${summary.scenario}`} subtitle={recording ? `${recording.bodies.names.length} bodies · ${recording.cables.length} cables · ${recording.bodies.t.length} frames at ${recording.hz} Hz` : "no recording"}
+        <Card flush title={`Playback · ${response.scenario.id}`}
+              subtitle={frames && !frames.error ? `${Object.keys(frames.bodies).length} bodies · ${Object.keys(frames.cables ?? {}).length} cable spans · ${frames.t.length} frames at ≤${recording?.hz} Hz`
+                : frames?.error ?? (recording ? "time series only (no body frames)" : "no recording")}
               actions={<label className="check small"><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />Follow vehicle</label>}>
           <div style={{ height: 470 }}>
             {!recording ? <Empty title="No recording">The scenario summary exists but recording.npz is missing.</Empty>
+              : !frames || frames.error ? <Empty title="No 3D frames">{frames?.error ?? "The API returned no body frames (MuJoCo unavailable on the server?)."}</Empty>
               : !data ? <div className="skeleton" style={{ height: "100%" }} />
               : <RobotViewer data={data} playback={{ recording, t: playback.t, follow }} showJointPanel={false} />}
           </div>
@@ -105,7 +109,7 @@ function ScenarioDetail({ pid, response }: { pid: string; response: ScenarioResp
           <Card title="Checks">
             <table>
               <tbody>
-                {summary.checks.map((c) => (
+                {(last?.checks ?? []).map((c) => (
                   <tr key={c.key}>
                     <td>{c.pass ? <Chip tone="good">pass</Chip> : <Chip tone="critical">fail</Chip>}</td>
                     <td><span className="mono">{c.key}</span>{c.detail && <div className="muted small">{c.detail}</div>}</td>
@@ -117,12 +121,12 @@ function ScenarioDetail({ pid, response }: { pid: string; response: ScenarioResp
           </Card>
           <Card title="Metrics">
             <dl className="kv">
-              {Object.entries(summary.metrics).filter(([, v]) => typeof v !== "object" || v === null).slice(0, 18).map(([k, v]) => (
+              {Object.entries(last?.metrics ?? {}).filter(([, v]) => typeof v !== "object" || v === null).slice(0, 18).map(([k, v]) => (
                 <div key={k} style={{ display: "contents" }}><dt>{humanize(k)}</dt><dd>{typeof v === "number" ? fmt(v) : String(v)}</dd></div>
               ))}
             </dl>
           </Card>
-          {response.clip_url && <Card title="MP4 clip" subtitle="MuJoCo offscreen render, synced to the timeline"><ClipPlayer url={response.clip_url} playback={playback} duration={end} /></Card>}
+          {last?.clip_url && <Card title="MP4 clip" subtitle="MuJoCo offscreen render, synced to the timeline"><ClipPlayer url={last.clip_url} playback={playback} duration={end} /></Card>}
         </div>
       </div>
 
@@ -135,7 +139,7 @@ function ScenarioDetail({ pid, response }: { pid: string; response: ScenarioResp
           </div>
         </Card>
       )}
-      <Card title="Renders"><Gallery images={response.renders} /></Card>
+      <Card title="Renders and plots"><Gallery images={[...(last?.renders ?? []), ...(last?.plots ?? [])]} /></Card>
     </div>
   );
 }
@@ -146,9 +150,11 @@ export function SimulationPage() {
   const [params, setParams] = useSearchParams();
   const { start, active } = useProjectRuns(pid);
   const [error, setError] = useState<unknown>(null);
-  const firstRun = scenarios.data?.find((s) => s.last)?.id ?? scenarios.data?.[0]?.id ?? null;
+  const list = scenarios.data?.scenarios ?? [];
+  const firstRun = list.find((s) => s.last?.recording)?.id ?? list.find((s) => s.last)?.id ?? list[0]?.id ?? null;
   const selected = params.get("scenario") ?? firstRun;
-  const scenario = useScenario(pid, selected && scenarios.data?.find((s) => s.id === selected)?.last ? selected : null);
+  const selectedItem = list.find((s) => s.id === selected);
+  const scenario = useScenario(pid, selected && selectedItem?.last ? selected : null);
   const run = (id: string) => { setError(null); start({ stages: ["sim"], scenario: id }).catch(setError); };
   return (
     <div className="page">
@@ -160,14 +166,14 @@ export function SimulationPage() {
       </div>
       {error ? <ErrorBox error={error} /> : null}
       <QueryView query={scenarios} height={120}>
-        {(list) => (
+        {({ scenarios: items }) => (
           <div className="grid cols-4">
-            {list.map((s) => <ScenarioCard key={s.id} item={s} selected={s.id === selected} busy={!!active}
+            {items.map((s) => <ScenarioCard key={s.id} item={s} selected={s.id === selected} busy={!!active}
                                            onSelect={() => setParams({ scenario: s.id }, { replace: true })} onRun={() => run(s.id)} />)}
           </div>
         )}
       </QueryView>
-      {selected && !scenarios.data?.find((s) => s.id === selected)?.last ? (
+      {selected && scenarios.data && !selectedItem?.last ? (
         <Card><Empty title={`${selected} has not been run`}><button className="primary" onClick={() => run(selected)} disabled={!!active}>Run {selected}</button></Empty></Card>
       ) : selected ? (
         <QueryView query={scenario} height={480}>{(response) => <ScenarioDetail key={selected} pid={pid} response={response} />}</QueryView>

@@ -16,11 +16,12 @@ export function DeployPage() {
   const [target, setTarget] = useState<"sim" | "fleet">("sim");
   const [confirming, setConfirming] = useState(false);
   const [typed, setTyped] = useState("");
+  const [force, setForce] = useState(false);
   const deploy = useMutation({
-    mutationFn: (confirm: boolean) => api.deploy(pid, { target, confirm }),
+    mutationFn: (confirm: boolean) => api.deploy(pid, { target, confirm, ...(target === "fleet" && force ? { force } : {}) }),
     onSuccess: (result) => { if (result.run_id) follow(pid, result.run_id); },
   });
-  const name = project.data?.name ?? pid;
+  const name = project.data?.robot.name ?? pid;
   const ready = project.data?.release.fabrication_ready;
   return (
     <div className="page" style={{ maxWidth: 900 }}>
@@ -50,12 +51,25 @@ export function DeployPage() {
         </div>
       </Card>
       {deploy.isError && <ErrorBox error={deploy.error} />}
-      {deploy.isSuccess && <Card><div className="row"><Chip tone="good">accepted</Chip><span>{deploy.data.message ?? `deploy to ${deploy.data.target} started`}</span>{deploy.data.run_id && <code>{deploy.data.run_id}</code>}</div></Card>}
+      {deploy.isSuccess && (
+        <Card>
+          <div className="stack">
+            <div className="row"><Chip tone={deploy.data.ok ? "good" : "critical"}>{deploy.data.ok ? "accepted" : "failed"}</Chip>
+              <span>{deploy.data.target === "sim" ? "simulation deploy queued; follow it in the run panel" : `fleet deploy finished (exit ${deploy.data.returncode ?? "?"})`}</span>
+              {deploy.data.run_id && <code>{deploy.data.run_id}</code>}</div>
+            {(deploy.data.stdout_tail || deploy.data.log) && <pre className="code">{deploy.data.stdout_tail ?? deploy.data.log}</pre>}
+            {deploy.data.stderr_tail && <pre className="code">{deploy.data.stderr_tail}</pre>}
+          </div>
+        </Card>
+      )}
       <div className="row">
         <button className={target === "fleet" ? "danger solid" : "primary"} disabled={deploy.isPending} onClick={() => { setTyped(""); setConfirming(true); }}>
           <Icon name="rocket" size={14} />Deploy to {target}
         </button>
         {deploy.error instanceof ApiError && deploy.error.code === "confirmation_required" && <span className="small muted">The API asked for explicit confirmation.</span>}
+        {deploy.error instanceof ApiError && deploy.error.code === "validation_required" && target === "fleet" && (
+          <label className="check small"><input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />Deploy without a clean validation (force)</label>
+        )}
       </div>
       {confirming && (
         <ConfirmDialog title={target === "fleet" ? "Deploy to the real fleet?" : "Deploy to the simulation?"} danger={target === "fleet"}

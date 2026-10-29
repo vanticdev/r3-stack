@@ -1,14 +1,12 @@
-"""Convert a scenario's ``recording.npz`` into the web playback JSON.
+"""Convert a scenario's ``recording.npz`` into the API's playback JSON (dev mock data).
 
-The API contract (``GET /api/projects/{pid}/sim/{scenario}?hz=30``) returns a
-downsampled recording: the scalar time series plus per-frame world poses of
-every MuJoCo body, so the browser can replay the vehicle without MuJoCo. The
-recording stores raw ``qpos`` snapshots, so world poses come from MuJoCo's own
-forward kinematics (``mj_kinematics``) on the scenario's ``vehicle.xml``.
-
-Cable bodies (``cableNNsK_B_*``) are returned as polylines per bundle; bundle
-metadata (harness, wires, colors) comes from ``r3_wiring.mujoco_cables.plan_cables``
-when the R3 packages are importable, and is omitted otherwise.
+``GET /api/projects/{pid}/sim/{scenario}?hz=30`` returns ``recording`` in the shape documented in
+docs/architecture/api.md: ``{hz, duration, channels, series, firmware_logs, events, frames}``, where
+``series`` resamples every 1-D channel to ``hz`` and ``frames`` holds per-frame world poses of every
+MuJoCo body (``bodies``), the body carrying each component (``component_bodies``) and cable polylines
+(``cables``). The recording stores raw ``qpos`` snapshots, so poses come from MuJoCo's own forward
+kinematics (``mj_kinematics``) on the scenario's ``vehicle.xml``. ``frames.rest`` (an addition) holds
+each body's pose at ``qpos0``, the frame the robot-frame CAD meshes are authored in.
 
 Usage (shared venv, repository root on PYTHONPATH as for the r3 CLI):
     python apps/web/scripts/convert_recording.py examples/robots/rc-car full_throttle --hz 30 [--out file.json]
@@ -18,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -25,9 +24,8 @@ from typing import Any
 
 import numpy as np
 
-CABLE_BODY = re.compile(r"^(cable\d+)(s\d+)_B_(first|last|\d+)$")
+CABLE_BODY = re.compile(r"^(cable\w*?)_B_")
 POSITION_DECIMALS = 5  # 10 µm
-QUAT_DECIMALS = 5
 
 
 def _downsample_indices(times: np.ndarray, hz: float) -> np.ndarray:
@@ -44,90 +42,73 @@ def _round(values: np.ndarray, decimals: int) -> list[Any]:
     return np.round(values.astype(float), decimals).tolist()
 
 
-def _cable_order(suffix: str) -> int:
-    return -1 if suffix == "first" else 10**9 if suffix == "last" else int(suffix)
-
-
-def _bundle_meta(project_root: Path) -> dict[str, dict[str, Any]]:
-    try:
-        from r3_model.project import Project
-        from r3_wiring.mujoco_cables import plan_cables
-    except ImportError:
-        return {}
-    routes_path = project_root / "build" / "wiring" / "routes.json"
-    if not routes_path.exists():
-        return {}
-    try:
-        plan = plan_cables(Project.load(project_root), json.loads(routes_path.read_text()))
-    except Exception as error:  # metadata is optional; playback still works without it
-        print(f"warning: cable metadata unavailable ({error})", file=sys.stderr)
-        return {}
-    return {b.id: {"harness": b.harness, "wires": list(b.wires), "colors": list(b.colors), "od": float(b.od)}
-            for b in plan.bundles}
-
-
 def convert(project_root: Path, scenario: str, hz: float = 30.0) -> dict[str, Any]:
     import mujoco
 
     scenario_dir = project_root / "build" / "sim" / scenario
     recording = np.load(scenario_dir / "recording.npz", allow_pickle=False)
-    summary_path = scenario_dir / "summary.json"
-    summary = json.loads(summary_path.read_text()) if summary_path.exists() else {}
-
     times = recording["t"]
-    series_index = _downsample_indices(times, hz)
-    scalar_keys = [k for k in recording.files
-                   if recording[k].ndim == 1 and recording[k].shape == times.shape and recording[k].dtype.kind == "f"]
-    series = {k: _round(recording[k][series_index], 6) for k in scalar_keys}
+    hz = min(max(hz, 0.5), 200.0)
+    duration = float(times[-1]) if len(times) else 0.0
+    grid = np.arange(0.0, duration + 1e-9, 1.0 / hz)
+    series: dict[str, list[Any]] = {"t": _round(grid, 4)}
+    for key in recording.files:
+        values = recording[key]
+        if key == "t" or values.ndim != 1 or values.shape != times.shape or values.dtype.kind not in "fiu":
+            continue
+        series[key] = [v if math.isfinite(v) else None for v in _round(np.interp(grid, times, values.astype(float)), 6)]
 
     model = mujoco.MjModel.from_xml_path(str(scenario_dir / "vehicle.xml"))
     data = mujoco.MjData(model)
     names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, i) or f"body{i}" for i in range(model.nbody)]
-    rigid = [i for i, n in enumerate(names) if i > 0 and not CABLE_BODY.match(n)]
-    cable_bodies: dict[str, dict[str, list[tuple[int, int]]]] = {}
-    for i, name in enumerate(names):
+    rigid: list[int] = []
+    cable_ids: dict[str, list[int]] = {}
+    for i, name in enumerate(names[1:], start=1):
         match = CABLE_BODY.match(name)
         if match:
-            bundle, span, suffix = match.groups()
-            cable_bodies.setdefault(bundle, {}).setdefault(span, []).append((_cable_order(suffix), i))
+            cable_ids.setdefault(match.group(1), []).append(i)
+        else:
+            rigid.append(i)
+    component_bodies: dict[str, str] = {}
+    for g in range(model.ngeom):
+        geom = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, g) or ""
+        if geom.startswith("vis_"):
+            component_bodies[geom[4:]] = names[model.geom_bodyid[g]]
+    rgba = {}
+    for cable, ids in cable_ids.items():
+        geoms = [g for g in range(model.ngeom) if model.geom_bodyid[g] == ids[0]]
+        rgba[cable] = _round(model.geom_rgba[geoms[0]], 3) if geoms else None
 
-    # Nominal pose: forward kinematics at qpos0 (the q = 0 robot-frame layout the meshes are authored in).
+    def pose(i: int) -> list[float]:
+        return _round(np.concatenate([data.xpos[i], data.xquat[i]]), POSITION_DECIMALS)
+
     data.qpos[:] = model.qpos0
     mujoco.mj_kinematics(model, data)
-    nominal = {names[i]: _round(np.concatenate([data.xpos[i], data.xquat[i]]), POSITION_DECIMALS) for i in rigid}
+    rest = {names[i]: pose(i) for i in rigid}
 
     snapshot_t = recording["snapshot_t"]
     snapshot_qpos = recording["snapshot_qpos"]
     if snapshot_qpos.shape[1] != model.nq:
         raise ValueError(f"recording qpos width {snapshot_qpos.shape[1]} != model nq {model.nq}")
     frame_index = _downsample_indices(snapshot_t, hz)
-    poses: dict[str, list[list[float]]] = {names[i]: [] for i in rigid}
-    cable_points: dict[str, list[list[list[float]]]] = {b: [] for b in cable_bodies}
+    bodies: dict[str, list[list[float]]] = {names[i]: [] for i in rigid}
+    cables: dict[str, list[list[list[float]]]] = {c: [] for c in cable_ids}
     for k in frame_index:
         data.qpos[:] = snapshot_qpos[k]
         mujoco.mj_kinematics(model, data)
         for i in rigid:
-            poses[names[i]].append(np.round(np.concatenate([data.xpos[i], np.round(data.xquat[i], QUAT_DECIMALS)]),
-                                            POSITION_DECIMALS).tolist())
-        for bundle, spans in cable_bodies.items():
-            ordered = [i for span in sorted(spans) for _, i in sorted(spans[span])]
-            cable_points[bundle].append(_round(data.xpos[ordered], POSITION_DECIMALS))
+            bodies[names[i]].append(pose(i))
+        for cable, ids in cable_ids.items():
+            cables[cable].append(_round(data.xpos[ids], 4))
 
-    meta = _bundle_meta(project_root) if cable_bodies else {}
-    cables = [{"id": bundle, **meta.get(bundle, {}), "points": cable_points[bundle]} for bundle in sorted(cable_bodies)]
     logs = [json.loads(line) for line in recording["firmware_logs"].tolist() if line] if "firmware_logs" in recording.files else []
     events = [json.loads(e) for e in recording["events"].tolist() if e] if "events" in recording.files else []
     return {
-        "schema": "r3/web-playback@1",
-        "scenario": scenario,
-        "hz": hz,
-        "duration": float(summary.get("duration", float(times[-1]))),
-        "series": {"t": _round(times[series_index], 6), **{k: v for k, v in series.items() if k != "t"}},
-        "bodies": {"names": [names[i] for i in rigid], "nominal": nominal,
-                   "t": _round(snapshot_t[frame_index], 6), "poses": poses},
-        "cables": cables,
-        "firmware_logs": logs,
-        "events": events,
+        "hz": hz, "duration": duration, "channels": sorted(k for k in series if k != "t"), "series": series,
+        "firmware_logs": logs[:2000], "events": events[:2000],
+        "frames": {"t": _round(snapshot_t[frame_index], 4), "format": "x y z qw qx qy qz (world frame)", "bodies": bodies,
+                   "component_bodies": component_bodies, "rest": rest,
+                   "cables": {c: {"rgba": rgba[c], "points": cables[c]} for c in sorted(cable_ids)}},
     }
 
 

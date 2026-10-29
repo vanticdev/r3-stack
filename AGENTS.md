@@ -10,7 +10,8 @@ simulation, and a single web application; they contain documentation only.
 
 ## Project layout
 
-- `apps/web/`: the single future web interface for the robotics platform.
+- `apps/web/`: the single web interface for the robotics platform (Vite + React +
+  three.js; talks only to the `r3 serve` HTTP API).
 - `services/`: planned orchestration and simulation worker entrypoints.
 - `packages/`: planned robot model, component catalog, wiring, simulation, and
   hardware interface libraries.
@@ -87,8 +88,16 @@ and the distinction between existing functionality and reserved folders.
   `.venv/bin/python -m pytest path/to/test_file.py`.
 - Run `make test` when changing shared deployment or watchdog behavior.
 - Run `make generate` after changing protobuf definitions.
-- `apps/web/` has no implementation or build commands yet. Define its validation
-  commands when the web application is introduced.
+- Web app (`apps/web/`, Node >= 22.18), from `apps/web/` after `npm ci`:
+  - `npm run typecheck`: strict TypeScript over the app, the mock layer and the e2e tests.
+  - `npm test`: vitest unit tests for the data transforms.
+  - `npm run build`: production bundle in `apps/web/dist`, which `r3 serve` serves.
+  - `npm run test:e2e`: Playwright headless-Chromium smoke test. It loads every page
+    against the build/-artifact mock API, asserts there are no console errors, and saves
+    screenshots to `apps/web/test-results/screenshots/`. Set `R3_E2E_BASE_URL` to test a
+    running `r3 serve`.
+  - `node --test apps/web/tests/loader.test.mjs`: also run by
+    `tests/test_orchestrator_report.py`.
 
 ## Style
 

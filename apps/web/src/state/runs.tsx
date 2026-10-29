@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { api } from "../api/client.ts";
 import { invalidateProject } from "../api/hooks.ts";
 import { streamEvents, type StreamHandle } from "../api/sse.ts";
-import type { RunEvent, RunRequest, RunStatus } from "../api/types.ts";
+import type { RunEvent, RunRequest, RunStatusValue as RunStatus } from "../api/types.ts";
 
 export interface TrackedRun {
   runId: string;
@@ -14,7 +14,9 @@ export interface TrackedRun {
   request: RunRequest;
   status: RunStatus;
   stage: string | null;
-  stagesDone: { stage: string; ok: boolean }[];
+  stagesDone: { stage: string; ok: boolean; status?: string }[];
+  /** Stages in this run (from run_queued / run_started), for progress. */
+  total: number;
   progress: number;
   events: RunEvent[];
   error?: string;
@@ -33,13 +35,21 @@ const RunsContext = createContext<RunsContextValue | null>(null);
 /** Applies one SSE event to a tracked run (pure; exported for tests). */
 export function reduceRun(run: TrackedRun, event: RunEvent): TrackedRun {
   const next: TrackedRun = { ...run, events: [...run.events, event].slice(-500) };
+  const stages = Array.isArray(event.stages) ? (event.stages as string[]) : null;
   switch (event.type) {
-    case "stage_started":
-      return { ...next, status: "running", stage: event.stage ?? null };
-    case "progress":
-      return { ...next, progress: typeof event.fraction === "number" ? event.fraction : run.progress };
-    case "stage_finished":
-      return { ...next, stagesDone: [...run.stagesDone, { stage: event.stage ?? "?", ok: event.ok !== false }] };
+    case "run_queued":
+      return { ...next, total: stages?.length ?? run.total };
+    case "run_started":
+      return { ...next, status: "running", total: stages?.length ?? run.total };
+    case "stage_started": {
+      const total = typeof event.total === "number" ? event.total : run.total;
+      const index = typeof event.index === "number" ? event.index : run.stagesDone.length;
+      return { ...next, status: "running", stage: event.stage ?? null, total, progress: total ? index / total : run.progress };
+    }
+    case "stage_finished": {
+      const done = [...run.stagesDone, { stage: event.stage ?? "?", ok: event.ok !== false, status: event.status }];
+      return { ...next, stagesDone: done, progress: run.total ? done.length / run.total : run.progress };
+    }
     case "run_finished":
       return { ...next, status: (event.status as RunStatus) ?? (event.ok === false ? "failed" : "succeeded"), stage: null, progress: 1 };
     default:
@@ -59,7 +69,7 @@ export function RunsProvider({ children }: { children: ReactNode }) {
   const follow = useCallback((pid: string, runId: string, request: RunRequest = {}) => {
     if (streams.current.has(runId)) return;
     setRuns((list) => list.some((r) => r.runId === runId) ? list : [
-      { runId, pid, request, status: "queued" as RunStatus, stage: null, stagesDone: [], progress: 0, events: [], startedAt: Date.now() },
+      { runId, pid, request, status: "queued" as RunStatus, stage: null, stagesDone: [], total: 0, progress: 0, events: [], startedAt: Date.now() },
       ...list,
     ].slice(0, 12));
     const handle = streamEvents<RunEvent>(api.runEventsUrl(runId), (event) => {

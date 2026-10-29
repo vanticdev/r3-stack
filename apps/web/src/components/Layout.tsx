@@ -25,7 +25,7 @@ const PROJECT_NAV: { to: string; label: string; icon: IconName }[] = [
 
 function ProjectNav({ pid }: { pid: string }) {
   const diagnostics = useDiagnostics(pid);
-  const counts = severityCounts(diagnostics.data ?? []);
+  const counts = diagnostics.data?.counts ?? severityCounts(diagnostics.data?.diagnostics ?? []);
   return (
     <nav className="nav-section nav" aria-label="Project">
       <h3>Project</h3>
@@ -33,7 +33,7 @@ function ProjectNav({ pid }: { pid: string }) {
         <NavLink key={item.to} to={`/p/${encodeURIComponent(pid)}/${item.to}`}>
           <Icon name={item.icon} />
           {item.label}
-          {item.to === "diagnostics" && counts.error > 0 && <span className="badge critical" title={`${counts.error} errors`}>{counts.error}</span>}
+          {item.to === "diagnostics" && !!counts.error && <span className="badge critical" title={`${counts.error} errors`}>{counts.error}</span>}
         </NavLink>
       ))}
     </nav>
@@ -94,7 +94,7 @@ function RunStatus({ run, onDismiss }: { run: TrackedRun; onDismiss: () => void 
         <div className="card" style={{ position: "absolute", right: 0, top: 34, width: 520, zIndex: 20, boxShadow: "var(--shadow)" }}>
           <div className="card-head"><h2>Run {run.runId}</h2><div className="spacer" />{!running && <button className="small ghost" onClick={onDismiss}>Dismiss</button>}</div>
           <div className="card-body stack">
-            <div className="row">{run.stagesDone.map((s) => <StageChip key={s.stage} stage={s.stage} status={s.ok ? "ok" : "failed"} />)}
+            <div className="row">{run.stagesDone.map((s) => <StageChip key={s.stage} stage={s.stage} status={s.status ?? (s.ok ? "ok" : "failed")} />)}
               {run.stage && <StageChip stage={run.stage} status="running" />}</div>
             <RunLog run={run} />
           </div>
@@ -109,11 +109,13 @@ export function RunLog({ run }: { run: TrackedRun }) {
     <div className="run-log" aria-label="Run log">
       {run.events.length === 0 && <span className="muted">waiting for events…</span>}
       {run.events.map((e, i) => (
-        <div key={i} className={e.type === "diagnostic" || e.ok === false ? "err" : ""}>
+        <div key={i} className={e.type === "diagnostic" || e.ok === false || e.stream === "stderr" ? "err" : ""}>
           <span className="muted">{e.stage ? `[${e.stage}] ` : ""}</span>
-          {e.type === "log" ? e.message : e.type === "diagnostic" ? `${e.diagnostic?.code}: ${e.diagnostic?.message}`
-            : e.type === "stage_finished" ? `finished ${e.ok === false ? "with errors" : "ok"}` : e.type === "run_finished" ? `run ${e.status ?? ""}`
-            : e.type === "progress" ? `progress ${Math.round((e.fraction ?? 0) * 100)}%` : humanize(e.type)}
+          {e.type === "log" ? (e.line ?? e.message) : e.type === "diagnostic" ? `${e.diagnostic?.code}: ${e.diagnostic?.message}`
+            : e.type === "stage_started" ? `started${typeof e.index === "number" && e.total ? ` (${e.index + 1}/${e.total})` : ""}`
+            : e.type === "stage_finished" ? `finished: ${e.status ?? (e.ok === false ? "failed" : "ok")}${e.counts?.error ? `, ${e.counts.error} errors` : ""}`
+            : e.type === "run_finished" ? `run ${e.status ?? ""}${e.error?.message ? `: ${e.error.message}` : ""}`
+            : e.type === "progress" ? (e.message ?? "progress") : humanize(e.type)}
         </div>
       ))}
       {run.error && <div className="err">stream error: {run.error}</div>}
@@ -133,12 +135,14 @@ export function ProjectLayout() {
     <>
       <header className="topbar">
         <div className="title">
-          <h1>{project.data?.name ?? pid}</h1>
-          <span className="ellipsis" style={{ maxWidth: 520 }}>{project.data?.path ?? "…"} · fingerprint <code>{project.data?.fingerprint ?? "…"}</code></span>
+          <h1>{project.data?.robot.name ?? pid}</h1>
+          <span className="ellipsis" style={{ maxWidth: 520 }} title={project.data?.project}>
+            {pid}{project.data?.git?.branch ? ` · ${project.data.git.branch}` : ""} · inputs <code>{project.data?.fingerprint.robot_yaml_sha256 ?? "…"}</code>
+          </span>
         </div>
         <div className="row" aria-label="Stage status">
           {project.data?.stages.filter((s) => s.stage !== "report").map((s) => (
-            <StageChip key={s.stage} stage={s.stage} status={active?.stage === s.stage ? "running" : s.status} />
+            <StageChip key={s.stage} stage={s.stage} status={active?.stage === s.stage ? "running" : s.stale && s.status !== "missing" ? "stale" : s.status} />
           ))}
         </div>
         <div className="spacer" />

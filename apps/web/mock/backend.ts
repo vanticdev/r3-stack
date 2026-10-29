@@ -48,8 +48,10 @@ export function backendMiddleware(options: BackendOptions): Connect.NextHandleFu
 
   return (req, res, next) => {
     if (!req.url?.startsWith("/api")) return next();
+    // Hold the body until we know where it goes; otherwise it may end before it can be piped upstream.
+    req.pause();
     void useProxy().then((proxy) => {
-      if (!proxy) return mock(req, res, next);
+      if (!proxy) { req.resume(); return mock(req, res, next); }
       const upstream = http.request(
         { host: target.hostname, port: target.port || 80, method: req.method, path: req.url, headers: { ...req.headers, host: target.host } },
         (response) => {
@@ -63,7 +65,8 @@ export function backendMiddleware(options: BackendOptions): Connect.NextHandleFu
         res.writeHead(502, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ code: "backend_unreachable", message: `r3 serve at ${target.origin}: ${error.message}`, data: {} }));
       });
-      req.on("close", () => { if (!res.writableEnded) upstream.destroy(); });
+      // The client went away (e.g. an SSE stream was closed): stop the upstream request too.
+      res.on("close", () => { if (!res.writableFinished) upstream.destroy(); });
       req.pipe(upstream);
     });
   };

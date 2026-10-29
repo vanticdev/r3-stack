@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { Pose7, SpecJoint, Vec3 } from "../api/types.ts";
 import {
   ackermann, ancestry, bodyDelta, bounds, chainMatrix, clampJoint, componentBody, explodeOffsets, frameAt, interpolatePoints,
-  interpolatePose, jointChains, jointMatrix, mountTree, poseMatrix, resamplePolyline, rpyQuaternion,
+  interpolatePose, jointChains, jointMatrix, mountTree, poseMatrix, resamplePolyline, restPoses, rpyQuaternion,
 } from "./transforms.ts";
 
 const apply = (m: ReturnType<typeof poseMatrix>, p: Vec3) => new Vector3(...p).applyMatrix4(m).toArray();
@@ -44,6 +44,25 @@ describe("playback body poses", () => {
   it("identity when the body is at its nominal pose", () => {
     const pose: Pose7 = [0.1, -0.2, 0.3, 0.9238795, 0, 0.3826834, 0];
     close(apply(bodyDelta(pose, pose), [0.4, 0.5, 0.6]), [0.4, 0.5, 0.6], 6);
+  });
+
+  it("restPoses: server-provided rest poses win; otherwise bodies relative to the root at frame 0", () => {
+    const s = Math.SQRT1_2;
+    // At t0 the car already sits at (5, 1) yawed 90°; the wheel is 0.1 m to the car's left (+y) => world -x.
+    const frames = {
+      bodies: {
+        chassis: [[5, 1, 0, s, 0, 0, s], [6, 1, 0, s, 0, 0, s]] as Pose7[],
+        wheel: [[4.9, 1, 0.055, s, 0, 0, s]] as Pose7[],
+      },
+    };
+    const rest = restPoses(frames, "chassis");
+    expect(rest.chassis).toEqual([0, 0, 0, 1, 0, 0, 0]);
+    close(rest.wheel!.slice(0, 3), [0, 0.1, 0.055], 9);
+    close(rest.wheel!.slice(3), [1, 0, 0, 0], 9);
+    // Placing the wheel mesh (authored at rest) with bodyDelta lands it on the recorded pose.
+    close(apply(bodyDelta(rest.wheel!, frames.bodies.wheel[0]!), [0, 0.1, 0.055]), [4.9, 1, 0.055]);
+    const given = { ...frames, rest: { chassis: [0, 0, 0.0005, 1, 0, 0, 0] as Pose7 } };
+    expect(restPoses(given, "chassis")).toBe(given.rest);
   });
 
   it("frameAt brackets and clamps", () => {

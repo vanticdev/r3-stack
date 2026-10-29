@@ -4,7 +4,7 @@ import { useParams } from "react-router-dom";
 import { useCatalog } from "../api/hooks.ts";
 import { DiagnosticList } from "../components/DiagnosticList.tsx";
 import { Chip, Empty } from "../components/ui.tsx";
-import { fmt, humanize, quantity } from "../lib/units.ts";
+import { fmt, humanize } from "../lib/units.ts";
 import type { Selection } from "./RobotViewer.tsx";
 import type { RobotData } from "./useRobotScene.ts";
 
@@ -58,9 +58,9 @@ export function Inspector({ data, selection, onClear }: { data: RobotData; selec
   }
   const c = data.components.find((x) => x.id === selection.id);
   const part = data.cadParts[selection.id];
-  const entry = c ? catalog.data?.components[c.type] : undefined;
-  const provenance = entry?.mechanical?.provenance;
+  const entry = c ? catalog.data?.components.find((x) => x.id === c.type) : undefined;
   const pinDiagnostics = Object.entries(data.bySubject).filter(([s]) => s.startsWith(`${selection.id}.`)).flatMap(([, d]) => d);
+  const source = data.massSource[selection.id] ?? part?.mass_status ?? "catalog";
   return (
     <div className="inspector" aria-label="Inspector" data-testid="inspector">
       <section>
@@ -78,10 +78,10 @@ export function Inspector({ data, selection, onClear }: { data: RobotData; selec
         <h3>Mass</h3>
         <Kv rows={[
           ["Mass", fmt(part?.mass ?? c?.mass, "kg")],
-          ["Source", <Chip key="s" tone={(data.massSource[selection.id] ?? part?.mass_status ?? "").startsWith("cad") ? "good" : "warning"}>{data.massSource[selection.id] ?? part?.mass_status ?? "catalog"}</Chip>],
-          ["CAD status", part?.mass_status], ["Material", part?.material ?? entry?.mechanical?.material],
-          ["Density", part?.density ? `${part.density} kg/m³` : null], ["Mesh", part?.mesh ? `${part.mesh_triangles ?? "?"} triangles` : "catalog envelope"],
-          ["Catalog mass", fmt(quantity(entry?.mechanical?.mass), "kg")],
+          ["Source", <Chip key="s" tone={source.startsWith("cad") ? "good" : "warning"}>{source}</Chip>],
+          ["CAD status", part?.mass_status], ["Material", part?.material],
+          ["Density", part?.density ? `${part.density.toFixed(0)} kg/m³` : null], ["Mesh", part?.mesh ? `${part.mesh_triangles ?? "?"} triangles` : "catalog envelope"],
+          ["Catalog mass", fmt(entry?.mass ?? null, "kg")],
         ]} />
       </section>
       <section>
@@ -89,27 +89,24 @@ export function Inspector({ data, selection, onClear }: { data: RobotData; selec
         {catalog.isPending ? <div className="skeleton" style={{ height: 60 }} /> : entry ? (
           <>
             <Kv rows={[
-              ["Manufacturer", entry.manufacturer], ["Part number", entry.part_number],
-              ["Envelope", entry.mechanical?.size ? `${entry.mechanical.shape} ${entry.mechanical.size.map((v) => (quantity(v) * 1000).toFixed(1)).join(" × ")} mm` : null],
-              ["Provenance", provenance?.status ? <Chip key="p" tone={provenance.status === "datasheet" ? "good" : "warning"}>{provenance.status}</Chip> : null],
+              ["Name", entry.name], ["Part number", entry.part_number || null],
+              ["Envelope", entry.size ? `${entry.shape ?? ""} ${entry.size.map((v) => (v * 1000).toFixed(1)).join(" × ")} mm` : null],
+              ["Behavior model", entry.behavior ? <code key="b">{entry.behavior}</code> : null],
+              ["Provenance", entry.provenance ? <Chip key="p" tone={entry.provenance === "datasheet" || entry.provenance === "measured" ? "good" : "warning"}>{entry.provenance}</Chip> : null],
             ]} />
-            {provenance?.source && <span className="small muted">{provenance.source}</span>}
-            {provenance?.notes && <span className="small muted">{provenance.notes}</span>}
-            {entry.description && <p className="small secondary">{entry.description}</p>}
-            {entry.connectors && (
+            {Object.keys(entry.connectors).length > 0 && (
               <div className="small">
                 <strong>Connectors</strong>
-                {Object.entries(entry.connectors).map(([id, conn]) => (
-                  <div key={id} className="row" style={{ justifyContent: "space-between" }}><code>{id}</code><span className="muted">{conn.type} · {Object.keys(conn.pins ?? {}).length} pins</span></div>
+                {Object.entries(entry.connectors).map(([id, type]) => (
+                  <div key={id} className="row" style={{ justifyContent: "space-between" }}><code>{id}</code><span className="muted">{type}</span></div>
                 ))}
               </div>
             )}
-            {entry.pins && (
+            {Object.keys(entry.pins).length > 0 && (
               <div className="small">
                 <strong>Pins</strong>
-                {Object.entries(entry.pins).slice(0, 14).map(([id, pin]) => (
-                  <div key={id} className="row" style={{ justifyContent: "space-between" }}><code>{id}</code>
-                    <span className="muted">{humanize(String(pin.role ?? ""))}{pin.current_max ? ` · ${String(pin.current_max)} A` : ""}{pin.voltage_max ? ` · ≤${String(pin.voltage_max)} V` : ""}</span></div>
+                {Object.entries(entry.pins).slice(0, 16).map(([id, role]) => (
+                  <div key={id} className="row" style={{ justifyContent: "space-between" }}><code>{id}</code><span className="muted">{humanize(role)}</span></div>
                 ))}
               </div>
             )}

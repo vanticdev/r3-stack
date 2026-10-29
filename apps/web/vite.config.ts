@@ -10,11 +10,11 @@ import { backendMiddleware } from "./mock/backend.ts";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
 
-/** /api -> `r3 serve` (R3_API_URL, default http://127.0.0.1:8000) or the mock layer when it is down. */
+/** /api -> `r3 serve` (R3_API_URL, default http://127.0.0.1:8321) or the mock layer when it is down. */
 function r3Api(): Plugin {
   const options = () => ({
     repoRoot,
-    target: process.env.R3_API_URL ?? "http://127.0.0.1:8000",
+    target: process.env.R3_API_URL ?? "http://127.0.0.1:8321",
     mode: (process.env.R3_API ?? "auto") as "auto" | "mock" | "proxy",
     cacheDir: path.join(here, ".mock-cache"),
   });

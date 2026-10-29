@@ -9,7 +9,7 @@ import { fmt } from "../lib/units.ts";
 
 export interface ChartSeries {
   label: string;
-  values: readonly number[];
+  values: readonly (number | null)[];
   /** CSS colour or a var(--series-n) reference. */
   color: string;
   unit?: string;
@@ -25,7 +25,7 @@ function resolveColor(color: string): string {
 export function seriesRange(series: readonly ChartSeries[], limits: readonly number[] = []): [number, number] | null {
   let lo = Infinity;
   let hi = -Infinity;
-  for (const s of series) for (const v of s.values) if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  for (const s of series) for (const v of s.values) if (typeof v === "number" && Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
   for (const l of limits) if (Number.isFinite(l)) { lo = Math.min(lo, l); hi = Math.max(hi, l); }
   if (!Number.isFinite(lo)) return null;
   const pad = (hi - lo) * 0.08 || Math.abs(hi) * 0.1 || 1;
@@ -59,7 +59,7 @@ export function TimeChart({ title, t, series, cursorT, onScrub, height = 150, sy
     if (cursorT === undefined || !t.length || !series[0]) return null;
     let i = 0;
     while (i < t.length - 1 && t[i + 1]! <= cursorT) i++;
-    return series.map((s) => s.values[i]);
+    return series.map((s) => s.values[i] ?? null);
   }, [cursorT, t, series]);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export function TimeChart({ title, t, series, cursorT, onScrub, height = 150, sy
     const grid = cssVar("--line");
     const playhead = cssVar("--accent");
     const limitColor = cssVar("--critical");
-    const data: uPlot.AlignedData = [Float64Array.from(t), ...series.map((s) => Float64Array.from(s.values, (v) => (Number.isFinite(v) ? v : NaN)))];
+    const data: uPlot.AlignedData = [Float64Array.from(t), ...series.map((s) => Float64Array.from(s.values, (v) => (typeof v === "number" && Number.isFinite(v) ? v : NaN)))];
     let dragging = false;
     const scrubAt = (u: uPlot, clientX: number) => {
       const rect = u.over.getBoundingClientRect();

@@ -5,7 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client.ts";
 import { keys, useProjects } from "../api/hooks.ts";
 import { Icon } from "../components/icons.tsx";
-import { Card, Chip, ConfirmDialog, Empty, ErrorBox, QueryView } from "../components/ui.tsx";
+import { Card, Chip, ConfirmDialog, Empty, ErrorBox, QueryView, StageChip } from "../components/ui.tsx";
 import { timeAgo } from "../lib/units.ts";
 
 export function ProjectsPage() {
@@ -21,7 +21,7 @@ export function ProjectsPage() {
         </div>
         <div className="grid side">
           <QueryView query={projects} height={200}>
-            {(list) => list.length ? (
+            {({ projects: list }) => list.length ? (
               <div className="grid cols-2">
                 {list.map((p) => (
                   <Link key={p.id} to={`/p/${encodeURIComponent(p.id)}/overview`} className="card project-card" data-testid="project-card">
@@ -29,22 +29,27 @@ export function ProjectsPage() {
                       <span className="brand-mark" style={{ width: 30, height: 30 }}><Icon name="cube" size={16} /></span>
                       <div className="stack" style={{ gap: 0 }}>
                         <h2>{p.name}</h2>
-                        <span className="muted small mono">{p.path}</span>
+                        <span className="muted small mono ellipsis" title={p.path}>{p.id}{p.version ? ` · v${p.version}` : ""}</span>
                       </div>
                     </div>
                     {p.description && <p className="secondary">{p.description}</p>}
+                    {p.error && <span className="small" style={{ color: "var(--critical)" }}>{p.error}</span>}
                     <div className="row small">
-                      {p.ok === true && <Chip tone="good">checks pass</Chip>}
-                      {p.ok === false && <Chip tone="critical">{p.counts?.error ?? 0} errors</Chip>}
-                      {!!p.counts?.warning && <Chip tone="warning">{p.counts.warning} warnings</Chip>}
-                      <span className="muted">last run {p.last_run ? `${p.last_run.status} · ${timeAgo(p.last_run.finished_at)}` : "never"}</span>
+                      {Object.entries(p.stages).filter(([, v]) => v !== "missing").map(([stage, status]) => <StageChip key={stage} stage={stage} status={status} />)}
+                    </div>
+                    <div className="row small">
+                      {p.last_run?.status === "ok" && <Chip tone="good">checks pass</Chip>}
+                      {p.last_run?.status === "failed" && <Chip tone="critical">{p.last_run.counts?.error ?? 0} errors</Chip>}
+                      {!!p.last_run?.counts?.warning && <Chip tone="warning">{p.last_run.counts.warning} warnings</Chip>}
+                      {p.last_run?.stale && <Chip tone="stale">stale results</Chip>}
+                      <span className="muted">last run {p.last_run ? timeAgo(p.last_run.finished_at) : "never"}</span>
                     </div>
                   </Link>
                 ))}
               </div>
             ) : <Card><Empty title="No projects yet">Create one from a template.</Empty></Card>}
           </QueryView>
-          <CreateProject templates={(projects.data ?? []).map((p) => p.id)} />
+          <CreateProject templates={projects.data?.templates ?? []} />
         </div>
       </div>
     </div>
@@ -67,13 +72,13 @@ function CreateProject({ templates }: { templates: string[] }) {
     },
   });
   const options = [...new Set(["rc-car", "blank", ...templates])];
-  const valid = /^[a-z0-9][a-z0-9-]*$/.test(name);
+  const valid = /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name);
   return (
     <Card title="New project" subtitle="Scaffold from a template (r3_github)">
       <form className="stack" onSubmit={(e) => { e.preventDefault(); if (github) setConfirming(true); else create.mutate(); }}>
         <label className="stack" style={{ gap: 4 }}>
           <span className="small secondary">Name</span>
-          <input type="text" value={name} placeholder="my-rover" onChange={(e) => setName(e.target.value.toLowerCase())} aria-label="Project name" />
+          <input type="text" value={name} placeholder="my-rover" onChange={(e) => setName(e.target.value)} aria-label="Project name" />
         </label>
         <label className="stack" style={{ gap: 4 }}>
           <span className="small secondary">Template</span>
@@ -85,7 +90,7 @@ function CreateProject({ templates }: { templates: string[] }) {
         {github && <label className="check" style={{ marginLeft: 22 }}><input type="checkbox" checked={isPrivate} onChange={(e) => setPrivate(e.target.checked)} />Private</label>}
         {create.isError && <ErrorBox error={create.error} />}
         <div className="row"><button className="primary" type="submit" disabled={!valid || create.isPending}><Icon name="plus" size={14} />Create</button>
-          {!valid && name && <span className="small muted">lowercase letters, digits and dashes</span>}</div>
+          {!valid && name && <span className="small muted">letters, digits, ".", "_" or "-"</span>}</div>
       </form>
       {confirming && (
         <ConfirmDialog title="Create a GitHub repository?" confirmLabel="Create repository" onCancel={() => setConfirming(false)}

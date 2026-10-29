@@ -11,10 +11,10 @@ import {
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 
 import type { PlaybackRecording, Vec3 } from "../api/types.ts";
-import { resolveSubjects, wireColor, type SceneComponent, type SceneWire } from "../lib/scene.ts";
+import { resolveSubjects, type SceneComponent, type SceneWire } from "../lib/scene.ts";
 import {
   ackermann, bodyDelta, bounds, chainMatrix, clampJoint, componentBody, explodeOffsets, frameAt, interpolatePoints,
-  interpolatePose, poseMatrix,
+  interpolatePose, poseMatrix, restPoses,
 } from "../lib/transforms.ts";
 import { humanize } from "../lib/units.ts";
 import { cssVar, useThemeVersion } from "../state/prefs.ts";
@@ -270,7 +270,8 @@ function CameraRig({ focus, fitKey, data }: { focus: Vec3[]; fitKey: string; dat
   return null;
 }
 
-/** Imperatively poses part groups and cables from the recording at time `t` (no React re-render per frame). */
+/** Imperatively poses part groups and cables from the recording at time `t` (no React re-render per frame).
+ * A part authored in the robot frame is placed by its body's motion since rest: pose(t) · rest⁻¹. */
 function PlaybackDriver({ playback, data, groups, cableMeshes }: {
   playback: PlaybackState; data: RobotData; groups: React.MutableRefObject<Map<string, Group>>;
   cableMeshes: React.MutableRefObject<Map<string, Mesh>>;
@@ -278,18 +279,20 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
   const { camera, controls, invalidate } = useThree();
   const last = useRef<Vector3 | null>(null);
   const { recording, t, follow } = playback;
-  const bodySet = useMemo(() => new Set(recording.bodies.names), [recording]);
-  const fallbackBody = bodySet.has("chassis") ? "chassis" : recording.bodies.names[0] ?? null;
-  const assignment = useMemo(() => Object.fromEntries(data.components.map((c) => [c.id, componentBody(data.tree, c.id, bodySet, fallbackBody)])),
-                             [data, bodySet, fallbackBody]);
+  const frames = recording.frames!;
+  const root = frames.component_bodies?.chassis ?? (frames.bodies.chassis ? "chassis" : Object.keys(frames.bodies)[0] ?? null);
+  const rest = useMemo(() => (root ? restPoses(frames, root) : {}), [frames, root]);
+  const assignment = useMemo(() => {
+    const bodies = new Set(Object.keys(frames.bodies));
+    return Object.fromEntries(data.components.map((c) => [c.id, frames.component_bodies?.[c.id] ?? componentBody(data.tree, c.id, bodies, root)]));
+  }, [data, frames, root]);
   useEffect(() => invalidate(), [t, invalidate]);
   useFrame(() => {
-    const cursor = frameAt(recording.bodies.t, t);
+    const cursor = frameAt(frames.t, t);
     const deltas: Record<string, Matrix4> = {};
-    for (const name of recording.bodies.names) {
-      const poses = recording.bodies.poses[name];
-      const nominal = recording.bodies.nominal[name];
-      if (!poses?.length || !nominal) continue;
+    for (const [name, poses] of Object.entries(frames.bodies)) {
+      const nominal = rest[name];
+      if (!poses.length || !nominal) continue;
       deltas[name] = bodyDelta(nominal, interpolatePose(poses[cursor.i0]!, poses[cursor.i1]!, cursor.alpha));
     }
     for (const [id, group] of groups.current) {
@@ -297,15 +300,15 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
       group.matrix.copy((body && deltas[body]) || IDENTITY);
       group.matrixWorldNeedsUpdate = true;
     }
-    for (const cable of recording.cables) {
-      const mesh = cableMeshes.current.get(cable.id);
+    for (const [id, cable] of Object.entries(frames.cables ?? {})) {
+      const mesh = cableMeshes.current.get(id);
       const a = cable.points[cursor.i0];
       const b = cable.points[cursor.i1] ?? a;
       if (!mesh || !a || a.length < 2) continue;
       mesh.geometry.dispose();
-      mesh.geometry = tubeGeometry(interpolatePoints(a, b!, cursor.alpha), (cable.od ?? 0.003) / 2, 6);
+      mesh.geometry = tubeGeometry(interpolatePoints(a, b!, cursor.alpha), CABLE_RADIUS, 6);
     }
-    const chassis = fallbackBody ? deltas[fallbackBody] : null;
+    const chassis = root ? deltas[root] : null;
     const orbit = controls as unknown as { target: Vector3; update(): void } | null;
     if (chassis && orbit) {
       const p = new Vector3().setFromMatrixPosition(chassis);
@@ -321,12 +324,20 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
   return null;
 }
 
+/** Cable polylines carry no diameter in the recording; draw them at a typical bundle size. */
+const CABLE_RADIUS = 0.0014;
+
+function rgbaColor(rgba: number[] | null | undefined): Color {
+  const [r, g, b] = rgba ?? [];
+  return r !== undefined && g !== undefined && b !== undefined ? new Color(r, g, b) : new Color("#999999");
+}
+
 function PlaybackCables({ recording, meshes }: { recording: PlaybackRecording; meshes: React.MutableRefObject<Map<string, Mesh>> }) {
   return (
     <group>
-      {recording.cables.map((cable) => (
-        <mesh key={cable.id} ref={(m) => { if (m) meshes.current.set(cable.id, m); else meshes.current.delete(cable.id); }}>
-          <meshStandardMaterial color={wireColor(cable.colors?.[0])} roughness={0.5} />
+      {Object.entries(recording.frames?.cables ?? {}).map(([id, cable]) => (
+        <mesh key={id} ref={(m) => { if (m) meshes.current.set(id, m); else meshes.current.delete(id); }}>
+          <meshStandardMaterial color={rgbaColor(cable.rgba)} roughness={0.5} />
         </mesh>
       ))}
     </group>
@@ -338,7 +349,10 @@ function Trajectory({ recording }: { recording: PlaybackRecording }) {
     const { x = [], y = [] } = recording.series;
     const out: Vec3[] = [];
     const step = Math.max(1, Math.floor(x.length / 600));
-    for (let i = 0; i < x.length; i += step) out.push([x[i]!, y[i]!, 0.0008]);
+    for (let i = 0; i < x.length; i += step) {
+      const px = x[i], py = y[i];
+      if (typeof px === "number" && typeof py === "number") out.push([px, py, 0.0008]);
+    }
     return out;
   }, [recording]);
   return points.length > 1 ? <Line points={points} color="#f97316" lineWidth={2} transparent opacity={0.8} /> : null;
@@ -346,7 +360,7 @@ function Trajectory({ recording }: { recording: PlaybackRecording }) {
 
 // ------------------------------------------------------------------ the viewer
 
-export function RobotViewer({ data, highlight = [], selected = null, onSelect, playback = null, editor = null,
+export function RobotViewer({ data, highlight = [], selected = null, onSelect, playback: playbackProp = null, editor = null,
                               initialOptions, showJointPanel = true, toolbarExtra, status }: {
   data: RobotData;
   highlight?: string[];
@@ -359,6 +373,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
   toolbarExtra?: ReactNode;
   status?: ReactNode;
 }) {
+  const playback = playbackProp?.recording.frames && !playbackProp.recording.frames.error ? playbackProp : null;
   const themeVersion = useThemeVersion();
   const [options, setOptions] = useState<ViewOptions>({ ...DEFAULT_OPTIONS, ...initialOptions });
   const [positions, setPositions] = useState<Record<string, number>>({});
@@ -371,6 +386,8 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
 
   const focus = useMemo(() => resolveSubjects(highlight, data), [highlight, data]);
   const focusKey = [...focus.components, ...focus.wires].sort().join(",");
+  const errorParts = useMemo(() => resolveSubjects(data.diagnostics.filter((d) => d.severity === "error").flatMap((d) => d.subjects), data).components,
+                             [data]);
   const anyFocus = focus.components.size + focus.wires.size > 0;
 
   const explode = useMemo(() => explodeOffsets(
@@ -398,15 +415,13 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
   }, [focus, data]);
 
   const steerJoints = useMemo(() => {
-    const steering = data.transmissions?.find((t) => t.type === "ackermann_steering");
+    const steering = data.steering;
     if (!steering) return null;
     const joints = steering.joints.map((id) => data.joints.find((j) => j.id === id)).filter((j) => !!j);
     const left = joints.find((j) => j.origin[1] > 0);
     const right = joints.find((j) => j.origin[1] <= 0);
-    const wheelbase = Number(steering.params?.wheelbase ?? 0);
-    const track = Number(steering.params?.kingpin_track ?? 0);
-    const max = Number(steering.params?.max_steer ?? left?.limits?.[1] ?? 0.45);
-    return left && right ? { left, right, wheelbase, track, max } : null;
+    const max = Number.isFinite(steering.maxSteer) ? steering.maxSteer : left?.limits?.[1] ?? 0.45;
+    return left && right ? { left, right, wheelbase: steering.wheelbase, track: steering.track, max } : null;
   }, [data]);
 
   const setSteerAngle = (delta: number) => {
@@ -489,9 +504,9 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
 
         {data.components.map((c) => (
           <Part key={c.id} c={c} url={data.meshes[c.id]} matrix={playback ? IDENTITY : matrices[c.id] ?? IDENTITY} state={stateOf(c.id)}
-                xray={options.xray} error={options.issues && c.severity === "error"} edge={dark ? "#77766f" : "#3a3a36"} register={register} onSelect={onSelect} onHover={setHover} />
+                xray={options.xray} error={options.issues && errorParts.has(c.id)} edge={dark ? "#77766f" : "#3a3a36"} register={register} onSelect={onSelect} onHover={setHover} />
         ))}
-        {!playback && options.wires && data.wires.map((w) => (
+        {!playback && options.wires && options.explode < 0.02 && data.wires.map((w) => (
           <WireTube key={w.id} w={w} state={stateOf(w.id, true)} onSelect={onSelect} onHover={setHover} />
         ))}
         {!playback && data.interference.map((o, i) => (
@@ -535,6 +550,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         )}
         {options.interfaces && <span><span className="swatch" style={{ background: "#3987e5" }} /> component connector <span className="swatch" style={{ background: "#199e70" }} /> harness connector</span>}
         {options.joins && <span><span className="swatch" style={{ background: "#c98500" }} /> mount join <span className="swatch" style={{ background: "#9085e9" }} /> CAD contact</span>}
+        {options.explode >= 0.02 && options.wires && !playback && <span className="muted">harness routes hidden while exploded</span>}
       </div>
       {status && <div className="viewer-status">{status}</div>}
     </div>

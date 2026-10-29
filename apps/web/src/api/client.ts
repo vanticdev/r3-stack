@@ -1,10 +1,10 @@
 // Typed client for the R3 API. Same origin by default: `r3 serve` hosts the built app,
 // and the Vite dev/preview server proxies /api to it (or to the mock layer, see mock/).
 import type {
-  AgentRequest, ApiErrorBody, Catalog, CadResponse, CreateProjectRequest, CreateProjectResponse, DeployRequest,
-  DeployResponse, Diagnostic, DoctorPayload, ElectricalResponse, ModelResponse, PcbResponse, ProjectDetail,
-  ProjectSummary, RunInfo, RunRequest, ScenarioListItem, ScenarioResponse, SoftwareResponse, SpecDocument,
-  SpecPatchResponse, WiringResponse,
+  AgentCreated, AgentProviderInfo, AgentRequest, AgentStatus, ApiErrorBody, CadResponse, CatalogResponse, CreateProjectRequest,
+  CreateProjectResponse, DeployRequest, DeployResponse, DiagnosticsResponse, DoctorPayload, ElectricalResponse, ModelResponse,
+  PcbResponse, ProjectDetail, ProjectList, RunCreated, RunInfo, RunRequest, ScenarioResponse, SimListResponse, SoftwareResponse,
+  SpecDocument, SpecPatchResponse, WiringResponse,
 } from "./types.ts";
 
 export class ApiError extends Error {
@@ -78,40 +78,39 @@ async function request<T>(method: string, path: string, body?: unknown, signal?:
 const enc = encodeURIComponent;
 const project = (pid: string) => `/api/projects/${enc(pid)}`;
 
-/** Normalizes list endpoints that may return either a bare array or `{<key>: [...]}`. */
-function list<T>(payload: unknown, key: string): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-  const value = payload && typeof payload === "object" ? (payload as Record<string, unknown>)[key] : null;
-  return Array.isArray(value) ? (value as T[]) : [];
+/** Agent CLI availability: the doctor reports a provider list (or, from older servers, a map). */
+export function agentProviders(doctor: DoctorPayload | undefined): AgentProviderInfo[] {
+  const agents = doctor?.agents;
+  if (!agents) return [];
+  return Array.isArray(agents) ? agents : Object.entries(agents).map(([provider, info]) => ({ provider, ...info }));
 }
 
 export const api = {
-  doctor: (signal?: AbortSignal) => request<DoctorPayload>("GET", "/api/doctor", undefined, signal),
-  projects: async (signal?: AbortSignal) => list<ProjectSummary>(await request("GET", "/api/projects", undefined, signal), "projects"),
+  doctor: (signal?: AbortSignal, refresh = false) => request<DoctorPayload>("GET", `/api/doctor${refresh ? "?refresh=true" : ""}`, undefined, signal),
+  projects: (signal?: AbortSignal) => request<ProjectList>("GET", "/api/projects", undefined, signal),
   createProject: (body: CreateProjectRequest) => request<CreateProjectResponse>("POST", "/api/projects", body),
   project: (pid: string, signal?: AbortSignal) => request<ProjectDetail>("GET", project(pid), undefined, signal),
   spec: (pid: string, signal?: AbortSignal) => request<SpecDocument>("GET", `${project(pid)}/spec`, undefined, signal),
-  patchSpec: (pid: string, patch: Record<string, unknown>, sha256: string) =>
-    request<SpecPatchResponse>("PATCH", `${project(pid)}/spec`, { patch, sha256 }),
-  catalog: (pid: string, signal?: AbortSignal) => request<Catalog>("GET", `${project(pid)}/catalog`, undefined, signal),
+  patchSpec: (pid: string, patch: Record<string, unknown>, sha256: string, dryRun = false) =>
+    request<SpecPatchResponse>("PATCH", `${project(pid)}/spec`, { patch, sha256, dry_run: dryRun }),
+  catalog: (pid: string, signal?: AbortSignal) => request<CatalogResponse>("GET", `${project(pid)}/catalog`, undefined, signal),
   model: (pid: string, signal?: AbortSignal) => request<ModelResponse>("GET", `${project(pid)}/model`, undefined, signal),
   cad: (pid: string, signal?: AbortSignal) => request<CadResponse>("GET", `${project(pid)}/cad`, undefined, signal),
   wiring: (pid: string, signal?: AbortSignal) => request<WiringResponse>("GET", `${project(pid)}/wiring`, undefined, signal),
   electrical: (pid: string, signal?: AbortSignal) => request<ElectricalResponse>("GET", `${project(pid)}/electrical`, undefined, signal),
   pcb: (pid: string, signal?: AbortSignal) => request<PcbResponse>("GET", `${project(pid)}/pcb`, undefined, signal),
   software: (pid: string, signal?: AbortSignal) => request<SoftwareResponse>("GET", `${project(pid)}/software`, undefined, signal),
-  scenarios: async (pid: string, signal?: AbortSignal) =>
-    list<ScenarioListItem>(await request("GET", `${project(pid)}/sim`, undefined, signal), "scenarios"),
+  scenarios: (pid: string, signal?: AbortSignal) => request<SimListResponse>("GET", `${project(pid)}/sim`, undefined, signal),
   scenario: (pid: string, scenario: string, hz = 30, signal?: AbortSignal) =>
     request<ScenarioResponse>("GET", `${project(pid)}/sim/${enc(scenario)}?hz=${hz}`, undefined, signal),
-  diagnostics: async (pid: string, signal?: AbortSignal) =>
-    list<Diagnostic>(await request("GET", `${project(pid)}/diagnostics`, undefined, signal), "diagnostics"),
+  diagnostics: (pid: string, signal?: AbortSignal) => request<DiagnosticsResponse>("GET", `${project(pid)}/diagnostics`, undefined, signal),
   artifactUrl: (pid: string, path: string) => apiUrl(`${project(pid)}/artifacts/${path.split("/").map(enc).join("/")}`),
-  startRun: (pid: string, body: RunRequest) => request<{ run_id: string }>("POST", `${project(pid)}/runs`, body),
+  startRun: (pid: string, body: RunRequest) => request<RunCreated>("POST", `${project(pid)}/runs`, body),
   run: (rid: string, signal?: AbortSignal) => request<RunInfo>("GET", `/api/runs/${enc(rid)}`, undefined, signal),
+  cancelRun: (rid: string) => request<RunInfo>("POST", `/api/runs/${enc(rid)}/cancel`, {}),
   runEventsUrl: (rid: string) => apiUrl(`/api/runs/${enc(rid)}/events`),
   deploy: (pid: string, body: DeployRequest) => request<DeployResponse>("POST", `${project(pid)}/deploy`, body),
-  startAgent: (pid: string, body: AgentRequest) => request<{ session_id: string }>("POST", `${project(pid)}/agent`, body),
+  startAgent: (pid: string, body: AgentRequest) => request<AgentCreated>("POST", `${project(pid)}/agent`, body),
   agentEventsUrl: (sid: string) => apiUrl(`/api/agent/${enc(sid)}/events`),
-  cancelAgent: (sid: string) => request<{ ok: boolean }>("POST", `/api/agent/${enc(sid)}/cancel`, {}),
+  cancelAgent: (sid: string) => request<AgentStatus>("POST", `/api/agent/${enc(sid)}/cancel`, {}),
 };

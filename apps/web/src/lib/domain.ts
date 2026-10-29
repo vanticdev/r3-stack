@@ -1,62 +1,34 @@
-// Pure data transforms for the domain pages (also used by the dev mock layer to build API
-// responses from build/ artifacts). No DOM, no three.js.
+// Pure data transforms for the domain pages, also used by the dev mock layer to build API responses
+// from build/ artifacts. No DOM, no three.js.
 import type {
-  BindingChain, CurrentRating, Diagnostic, EvidenceStatus, ModelGraph, OperatingPointsJson, PowerTree, RequirementEvidence,
-  Severity, SpecBinding,
+  Binding, Diagnostic, Evidence, EvidenceStatus, ModelGraph, Rail, ReleaseItem, Severity, SpecBinding,
 } from "../api/types.ts";
 
 // ------------------------------------------------------------------ electrical
-
-/** Worst continuous (and burst) current of every wire against its ampacity. */
-export function wireRatings(op: OperatingPointsJson | null): CurrentRating[] {
-  const worst = op?.worst_case?.wires ?? {};
-  return Object.entries(worst)
-    .map(([id, w]) => ({
-      id, kind: "wire" as const, harness: w.harness,
-      current: Math.abs(w.continuous_current), rating: w.ampacity, point: w.continuous_point,
-      ...(w.burst_current !== undefined ? { burst_current: Math.abs(w.burst_current) } : {}),
-      // Ampacity is a continuous rating; short bursts are judged on temperature (burst_ratio is reported separately).
-      ...(w.burst_point ? { burst_point: w.burst_point } : {}),
-    }))
-    .sort((a, b) => b.current / b.rating - a.current / a.rating);
-}
-
-/** Peak |current| of every connector contact over the continuous and burst operating points. */
-export function connectorRatings(op: OperatingPointsJson | null): CurrentRating[] {
-  const out = new Map<string, CurrentRating>();
-  for (const [pointId, point] of Object.entries(op?.operating_points ?? {})) {
-    const burst = point.kind === "burst";
-    for (const [id, contact] of Object.entries(point.contacts ?? {})) {
-      const current = Math.abs(contact.current);
-      const row = out.get(id) ?? { id, kind: "connector" as const, current: 0, rating: contact.rating, point: "" };
-      if (!burst && current >= row.current) Object.assign(row, { current, point: pointId });
-      if (burst && current >= (row.burst_current ?? 0)) {
-        Object.assign(row, { burst_current: current, burst_point: pointId, burst_rating: contact.burst_rating ?? contact.rating });
-      }
-      out.set(id, row);
-    }
-  }
-  return [...out.values()].sort((a, b) => b.current / b.rating - a.current / a.rating);
-}
 
 export function ratio(value: number, limit: number): number {
   return limit > 0 ? value / limit : 0;
 }
 
-/** Power tree from the graph's rails: source component -> sink components, labelled by rail. */
-export function powerTree(graph: Pick<ModelGraph, "rails" | "components"> | null): PowerTree {
+export interface PowerTree {
+  nodes: { id: string; label: string; kind: string }[];
+  edges: { from: string; to: string; source: string; sink: string; nominal: number }[];
+}
+
+/** Power tree from the graph's rails: source component -> sink components, one edge per sink pin. */
+export function powerTree(rails: readonly Rail[], components: ModelGraph["components"] | null = null): PowerTree {
   const nodes = new Map<string, PowerTree["nodes"][number]>();
   const edges: PowerTree["edges"] = [];
   const node = (pin: string) => {
     const id = pin.split(".")[0]!;
-    if (!nodes.has(id)) nodes.set(id, { id, label: graph?.components?.[id]?.name ?? id, kind: graph?.components?.[id]?.kind ?? "" });
+    if (!nodes.has(id)) nodes.set(id, { id, label: components?.[id]?.name ?? id, kind: components?.[id]?.kind ?? "" });
     return id;
   };
-  for (const rail of graph?.rails ?? []) {
+  for (const rail of rails) {
     const from = node(rail.source);
     for (const sink of rail.sinks) {
       const to = node(sink);
-      if (to !== from) edges.push({ from, to, rail: `${rail.source} → ${sink}`, nominal: rail.nominal });
+      if (to !== from) edges.push({ from, to, source: rail.source, sink, nominal: rail.nominal });
     }
   }
   return { nodes: [...nodes.values()], edges };
@@ -92,7 +64,20 @@ export function layoutTree(tree: PowerTree): Record<string, { depth: number; row
 
 export const OPERATING_POINT_ORDER = ["idle", "cruise", "full_throttle", "motor_stall", "servo_stall_compute"];
 
-// ------------------------------------------------------------------ software bindings
+/** Rows of one battery state, in the canonical idle → stall order. */
+export function rowsForState<T extends { operating_point: string; battery_state: string }>(rows: readonly T[], state: string): T[] {
+  const rank = (name: string) => { const i = OPERATING_POINT_ORDER.indexOf(name); return i < 0 ? 99 : i; };
+  return rows.filter((r) => r.battery_state === state).sort((a, b) => rank(a.operating_point) - rank(b.operating_point));
+}
+
+/** Battery states present in the table, ordered full → minimum by their state of charge. */
+export function batteryStates(rows: readonly { battery_state: string; soc: number }[]): { state: string; soc: number }[] {
+  const seen = new Map<string, number>();
+  for (const r of rows) if (!seen.has(r.battery_state)) seen.set(r.battery_state, r.soc);
+  return [...seen.entries()].map(([state, soc]) => ({ state, soc })).sort((a, b) => b.soc - a.soc);
+}
+
+// ------------------------------------------------------------------ nets and software bindings
 
 /** Net representative that contains a graph node such as "C:pi.GPIO18". */
 function netOf(graph: Pick<ModelGraph, "nets">, node: string): string | null {
@@ -100,41 +85,47 @@ function netOf(graph: Pick<ModelGraph, "nets">, node: string): string | null {
   return null;
 }
 
-/** Software handle -> computer pin -> net -> device pins, following series resistors on the way. */
-export function bindingChains(bindings: Record<string, SpecBinding>,
-                              graph: Pick<ModelGraph, "nets" | "net_names" | "pins"> & { edges?: { a: string; b: string; kind: string; link_kind?: string; ref?: string; value?: number }[] }): BindingChain[] {
+/** Name of the net a component pin (e.g. "hat.5V") sits on. */
+export function pinNet(graph: Pick<ModelGraph, "nets" | "net_names">, pin: string): string | null {
+  const rep = netOf(graph, `C:${pin}`);
+  return rep ? graph.net_names[rep] ?? rep : null;
+}
+
+/** Binding view in the API's shape (api/projects.py software_view): each computer pin's net, the device
+ * pins on it, the pins reached through internal series links, and whether each expected pin is reached. */
+export function bindingPinMaps(bindings: Record<string, SpecBinding>, graph: Pick<ModelGraph, "nets" | "net_names" | "pins" | "edges">): Binding[] {
   const logicalByConnectorPin = new Map<string, string>();
   for (const [logical, info] of Object.entries(graph.pins ?? {})) for (const cp of info.connector_pins) logicalByConnectorPin.set(cp, logical);
   const series = (graph.edges ?? []).filter((e) => e.kind === "internal" && e.link_kind === "series_resistor");
-  return Object.entries(bindings).map(([handle, b]) => {
-    const pins = b.pins.map((pin) => {
-      const logical = logicalByConnectorPin.get(pin) ?? null;
-      const start = logical ? netOf(graph, `C:${logical}`) : null;
-      // Walk the net plus nets joined through series resistors (signal paths through the HAT).
-      const nets = new Set<string>();
-      const queue = start ? [start] : [];
-      while (queue.length) {
-        const rep = queue.shift()!;
-        if (nets.has(rep)) continue;
-        nets.add(rep);
-        for (const e of series) {
-          const members = graph.nets[rep] ?? [];
-          if (members.includes(e.a)) { const n = netOf(graph, e.b); if (n) queue.push(n); }
-          if (members.includes(e.b)) { const n = netOf(graph, e.a); if (n) queue.push(n); }
-        }
+  const componentPins = (rep: string) => (graph.nets[rep] ?? []).filter((m) => m.startsWith("C:")).map((m) => m.slice(2));
+  const reachable = (start: string) => {
+    const nets = new Set<string>();
+    const queue = [start];
+    while (queue.length) {
+      const rep = queue.shift()!;
+      if (nets.has(rep)) continue;
+      nets.add(rep);
+      const members = graph.nets[rep] ?? [];
+      for (const e of series) {
+        if (members.includes(e.a)) { const n = netOf(graph, e.b); if (n) queue.push(n); }
+        if (members.includes(e.b)) { const n = netOf(graph, e.a); if (n) queue.push(n); }
       }
-      const devices = [...nets].flatMap((rep) => (graph.nets[rep] ?? []).filter((m) => m.startsWith("C:")).map((m) => m.slice(2)))
-        .filter((m) => m !== logical && !m.startsWith(`${b.computer}.`));
-      const named = start ? graph.net_names[start] ?? start : null;
-      const last = [...nets].pop();
-      return { pin, logical, net: last ? graph.net_names[last] ?? last : named, devices: [...new Set(devices)] };
+    }
+    return nets;
+  };
+  return Object.entries(bindings).map(([handle, b]) => {
+    const notComputer = (p: string) => !p.startsWith(`${b.computer}.`);
+    const reachedPins = new Set<string>();
+    const pinMap = b.pins.map((pin) => {
+      const logical = logicalByConnectorPin.get(pin);
+      const net = logical ? netOf(graph, `C:${logical}`) : null;
+      if (!logical || !net) return { pin, error: `${pin} is not a mapped connector pin` };
+      const reaches = [...reachable(net)].flatMap(componentPins).filter(notComputer).sort();
+      reaches.forEach((p) => reachedPins.add(p));
+      return { pin, node: `C:${logical}`, net, net_name: graph.net_names[net] ?? net, devices: componentPins(net).filter(notComputer), reaches };
     });
-    const expects = (b.expects ?? []).map((e) => logicalByConnectorPin.get(e) ?? e);
-    const reached = new Set(pins.flatMap((p) => p.devices));
-    return {
-      handle, interface: b.interface, computer: b.computer, device: b.device, channel: (b.channel as number | undefined) ?? null,
-      pins, expects, ok: expects.every((e) => reached.has(e)),
-    };
+    const expects = (b.expects ?? []).map((pin) => ({ pin, reached: reachedPins.has(logicalByConnectorPin.get(pin) ?? pin) }));
+    return { ...b, handle, pin_map: pinMap, expects_reached: expects };
   });
 }
 
@@ -146,11 +137,11 @@ export interface DiagnosticGroup {
   items: Diagnostic[];
 }
 
-/** stage -> worst-first groups of diagnostics (by code), for the diagnostics page. */
+/** Worst-first groups of diagnostics by stage, severity or subject. */
 export function groupDiagnostics(diagnostics: readonly Diagnostic[], by: "stage" | "severity" | "subject"): DiagnosticGroup[] {
   const groups = new Map<string, Diagnostic[]>();
   for (const d of diagnostics) {
-    const keys = by === "stage" ? [d.stage] : by === "severity" ? [d.severity] : d.subjects.length ? d.subjects : ["(no subject)"];
+    const keys = by === "stage" ? [d.stage || "general"] : by === "severity" ? [d.severity] : d.subjects.length ? d.subjects : ["(no subject)"];
     for (const key of keys) (groups.get(key) ?? groups.set(key, []).get(key)!).push(d);
   }
   const rank: Record<string, number> = { error: 0, warning: 1, info: 2 };
@@ -171,13 +162,22 @@ export function severityCounts(diagnostics: readonly Pick<Diagnostic, "severity"
 
 export const EVIDENCE_ORDER: EvidenceStatus[] = ["failed", "stale", "estimated", "not_run", "verified"];
 
-export function evidenceCounts(items: readonly RequirementEvidence[]): Record<EvidenceStatus, number> {
+/** Item status from its evidence, in release.py's precedence: failed > stale > not_run > estimated > verified. */
+export function itemStatus(evidence: readonly Pick<Evidence, "passed" | "stale" | "estimated">[]): EvidenceStatus {
+  if (evidence.some((e) => !e.stale && e.passed === false)) return "failed";
+  if (evidence.some((e) => e.stale)) return "stale";
+  if (!evidence.length || evidence.every((e) => e.passed === null)) return "not_run";
+  if (evidence.some((e) => e.estimated)) return "estimated";
+  return "verified";
+}
+
+export function evidenceCounts(items: readonly Pick<ReleaseItem, "status">[]): Record<EvidenceStatus, number> {
   const counts: Record<EvidenceStatus, number> = { verified: 0, estimated: 0, failed: 0, not_run: 0, stale: 0 };
   for (const item of items) counts[item.status] += 1;
   return counts;
 }
 
-export function fabricationReady(items: readonly RequirementEvidence[]): boolean {
+export function fabricationReady(items: readonly Pick<ReleaseItem, "status">[]): boolean {
   return items.length > 0 && items.every((i) => i.status === "verified");
 }
 
@@ -213,7 +213,7 @@ export function parseCsv(text: string): Record<string, string>[] {
 
 export type DiffLine = { op: " " | "+" | "-"; text: string; a?: number; b?: number };
 
-/** Line diff (LCS) of two texts, for the live robot.yaml diff. */
+/** Line diff (LCS) of two texts, deletions before insertions. */
 export function diffLines(before: string, after: string): DiffLine[] {
   const a = before.split("\n");
   const b = after.split("\n");
@@ -264,6 +264,51 @@ export function diffHunks(lines: readonly DiffLine[], context = 3): (DiffLine | 
   return out;
 }
 
+/** Unified diff text (as in the API's `spec_changed.diff`). */
+export function unifiedDiff(before: string, after: string, name = "robot.yaml", context = 3): string {
+  const hunks = diffHunks(diffLines(before, after), context);
+  if (!hunks.some((l) => l && l.op !== " ")) return "";
+  const out = [`--- a/${name}`, `+++ b/${name}`];
+  let block: DiffLine[] = [];
+  const flush = () => {
+    if (!block.length) return;
+    const aStart = block.find((l) => l.a !== undefined)?.a ?? 0;
+    const bStart = block.find((l) => l.b !== undefined)?.b ?? 0;
+    const aLen = block.filter((l) => l.op !== "+").length;
+    const bLen = block.filter((l) => l.op !== "-").length;
+    out.push(`@@ -${aStart},${aLen} +${bStart},${bLen} @@`, ...block.map((l) => `${l.op}${l.text}`));
+    block = [];
+  };
+  for (const line of hunks) {
+    if (line === null) flush();
+    else block.push(line);
+  }
+  flush();
+  return `${out.join("\n")}\n`;
+}
+
+/** Unified diff text -> numbered lines for display (null = hunk break). */
+export function parseUnifiedDiff(text: string): (DiffLine | null)[] {
+  const out: (DiffLine | null)[] = [];
+  let a = 0;
+  let b = 0;
+  for (const raw of text.split("\n")) {
+    if (raw.startsWith("--- ") || raw.startsWith("+++ ") || raw === "" || raw.startsWith("\\")) continue;
+    const hunk = raw.match(/^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+    if (hunk) {
+      if (out.length) out.push(null);
+      a = Number(hunk[1]);
+      b = Number(hunk[2]);
+      continue;
+    }
+    const text = raw.slice(1);
+    if (raw[0] === "+") out.push({ op: "+", text, b: b++ });
+    else if (raw[0] === "-") out.push({ op: "-", text, a: a++ });
+    else out.push({ op: " ", text, a: a++, b: b++ });
+  }
+  return out;
+}
+
 // ------------------------------------------------------------------ wiring
 
 export interface WireRow {
@@ -292,7 +337,7 @@ export function wireRows(input: {
   detail: { wires: Record<string, { harness: string; color: string; signal?: string; failed?: boolean;
                                     bends?: { radius: number; required: number }[] }>;
             wire_min_clearance?: Record<string, { distance: number; component: string }> } | null;
-  currents: readonly CurrentRating[];
+  currents: readonly { id: string; continuous_current: number; ampacity?: number }[];
   slack: { wires: Record<string, { min_distance: number; component: string }> } | null;
 }): WireRow[] {
   const ids = new Set([...Object.keys(input.routes?.wires ?? {}), ...Object.keys(input.detail?.wires ?? {})]);
@@ -308,7 +353,7 @@ export function wireRows(input: {
     return {
       id, harness: route?.harness ?? detail?.harness ?? "", awg: route?.awg ?? 0, color: detail?.color ?? "", signal: detail?.signal ?? "",
       routedLength: route?.routed_length ?? null, cutLength: route?.cut_length ?? null,
-      current: current?.current ?? null, ampacity: current?.rating ?? null,
+      current: current ? Math.abs(current.continuous_current) : null, ampacity: current?.ampacity ?? null,
       clearance: clearance?.distance ?? null, clearanceComponent: clearance?.component ?? null,
       bendRadius: tightest?.radius ?? null, bendRequired: tightest?.required ?? null,
       slackClearance: slack && slack.component ? slack.min_distance : null, slackComponent: slack?.component || null,
@@ -317,15 +362,31 @@ export function wireRows(input: {
   });
 }
 
-/** Name of the net a component pin (e.g. "hat.5V") sits on. */
-export function pinNet(graph: Pick<ModelGraph, "nets" | "net_names">, pin: string): string | null {
-  const rep = netOf(graph, `C:${pin}`);
-  return rep ? graph.net_names[rep] ?? rep : null;
+// ------------------------------------------------------------------ pcb
+
+export interface PinMapRow {
+  connector: string;
+  pin: string;
+  boardNet: string | null;
+  catalogPin: string | null;
+  match: boolean;
 }
 
-/** Operating points of one battery state, in the canonical idle → stall order. */
-export function pointsForState(op: OperatingPointsJson | null, state: string): [string, OperatingPointsJson["operating_points"][string]][] {
-  const entries = Object.entries(op?.operating_points ?? {}).filter(([, p]) => p.battery_state === state);
-  const rank = (name: string) => { const i = OPERATING_POINT_ORDER.indexOf(name); return i < 0 ? 99 : i; };
-  return entries.sort((a, b) => rank(a[1].operating_point) - rank(b[1].operating_point));
+/** Board connector pin -> net (board.json) against the catalog's pin -> component pin. A pin matches when
+ * the board net carries the catalog pin's name; catalog-unassigned pins only need to be unconnected or
+ * pass-through (they match). */
+export function pcbPinMap(connectors: Record<string, Record<string, string>> | null,
+                          catalog: Record<string, Record<string, string>>): PinMapRow[] {
+  const names = [...new Set([...Object.keys(connectors ?? {}), ...Object.keys(catalog)])].sort();
+  return names.flatMap((connector) => {
+    const board = connectors?.[connector] ?? {};
+    const expected = catalog[connector] ?? {};
+    const pins = [...new Set([...Object.keys(board), ...Object.keys(expected)])]
+      .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b));
+    return pins.map((pin) => {
+      const boardNet = board[pin] ?? null;
+      const catalogPin = expected[pin] ?? null;
+      return { connector, pin, boardNet, catalogPin, match: catalogPin === null || boardNet === catalogPin || boardNet?.endsWith(`.${catalogPin}`) === true };
+    });
+  });
 }

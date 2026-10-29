@@ -59,7 +59,7 @@ export function EvidenceChip({ status }: { status: EvidenceStatus }) {
 
 export function StageChip({ status, stage }: { status: string; stage: string }) {
   const tone: Tone = status === "ok" ? "good" : status === "failed" ? "critical" : status === "stale" ? "stale"
-    : status === "running" ? "running" : "muted";
+    : status === "running" ? "running" : status === "unavailable" ? "warning" : "muted";
   return <Chip tone={tone} title={`${stage}: ${status}`}>{stage}</Chip>;
 }
 
@@ -90,7 +90,7 @@ export function QueryView<T>({ query, children, empty, height = 160 }: {
   if (query.isPending) return <div className="skeleton" style={{ height }} />;
   if (query.isError) {
     const error = query.error;
-    if (error instanceof ApiError && (error.code === "artifact_missing" || error.code === "scenario_not_run")) {
+    if (error instanceof ApiError && (error.code === "artifact_missing" || error.code === "scenario_not_found")) {
       return <Empty icon="inbox" title={error.message}>{empty}</Empty>;
     }
     return <ErrorBox error={error} />;

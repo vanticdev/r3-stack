@@ -1,63 +1,71 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api/client.ts";
-import { useDoctor, useProject } from "../api/hooks.ts";
-import type { EvidenceStatus, RequirementEvidence } from "../api/types.ts";
+import { useDoctor, useProject, useSpec } from "../api/hooks.ts";
+import type { EvidenceStatus, ReleaseItem } from "../api/types.ts";
 import { Icon } from "../components/icons.tsx";
-import { Card, Chip, EvidenceChip, QueryView, Segmented, StageChip } from "../components/ui.tsx";
 import { RunLog } from "../components/Layout.tsx";
+import { Card, Chip, EvidenceChip, QueryView, Segmented, StageChip } from "../components/ui.tsx";
 import { EVIDENCE_ORDER } from "../lib/domain.ts";
-import { fmt, humanize, quantity } from "../lib/units.ts";
+import { formatTarget, formatValue, itemUnit, KIND_LABEL } from "../lib/release.ts";
+import { humanize } from "../lib/units.ts";
 import { useProjectRuns } from "../state/runs.tsx";
 
-function evidenceValue(item: RequirementEvidence): string {
-  const v = item.evidence?.value;
-  if (v === null || v === undefined) return "—";
-  if (typeof v !== "number") return String(v);
-  // Scenario expectation keys carry their unit as a suffix (min_wire_clearance_m, min_battery_voltage_v).
-  const suffix = item.id.match(/_(m|v|mps|s)$/)?.[1];
-  const unit = item.evidence?.unit || item.unit || (suffix ? ({ m: "m", v: "V", mps: "m/s", s: "s" } as Record<string, string>)[suffix]! : "");
-  if (unit === "s") return fmt(v, "s");
-  if (unit === "m") return fmt(v, "m");
-  if (unit === "" && item.id.includes("fraction")) return `${(v * 100).toFixed(2)}%`;
-  return fmt(v, unit);
-}
+type KindFilter = "all" | ReleaseItem["kind"];
 
-function requirementText(item: RequirementEvidence): string {
-  const r = item.requirement;
-  if (r === null || r === undefined) return "—";
-  if (typeof r === "number" && item.id.includes("fraction")) return `${(r * 100).toFixed(1)}%`;
-  return String(r);
+function EvidenceCell({ pid, item }: { pid: string; item: ReleaseItem }) {
+  if (!item.evidence.length) return <span className="muted">{item.message || "no evidence yet"}</span>;
+  return (
+    <div className="stack" style={{ gap: 4 }}>
+      {item.evidence.map((e, i) => (
+        <div key={i} className="stack" style={{ gap: 0 }}>
+          <span className="row" style={{ gap: 6 }}>
+            <strong>{e.stage}</strong><code>{e.check}</code>
+            {e.estimated && <Chip tone="warning">estimated</Chip>}
+            {e.stale && <Chip tone="stale">stale inputs</Chip>}
+          </span>
+          {e.artifact && <a href={api.artifactUrl(pid, e.artifact)} target="_blank" rel="noreferrer" className="mono">{e.artifact}</a>}
+          {e.inputs?.robot_yaml_sha256 && <span className="muted">inputs <code>{e.inputs.robot_yaml_sha256}</code></span>}
+          {e.detail && <span className="muted">{e.detail}</span>}
+        </div>
+      ))}
+      {item.message && !item.evidence.some((e) => e.detail === item.message) && <span className="muted">{item.message}</span>}
+    </div>
+  );
 }
 
 export function OverviewPage() {
   const { pid = "" } = useParams();
   const project = useProject(pid);
+  const spec = useSpec(pid);
   const doctor = useDoctor();
   const { runs, active, start } = useProjectRuns(pid);
   const [filter, setFilter] = useState<"all" | EvidenceStatus>("all");
+  const [kind, setKind] = useState<KindFilter>("all");
 
   return (
     <QueryView query={project} height={400}>
       {(p) => {
         const items = p.release.items.slice().sort((a, b) => EVIDENCE_ORDER.indexOf(a.status) - EVIDENCE_ORDER.indexOf(b.status));
-        const shown = filter === "all" ? items : items.filter((i) => i.status === filter);
+        const shown = items.filter((i) => (filter === "all" || i.status === filter) && (kind === "all" || i.kind === kind));
         const warnings = (doctor.data?.stages ?? []).filter((s) => s.level !== "full");
+        const verified = p.release.counts.verified ?? 0;
         return (
           <div className="page">
-            <div className="grid cols-4">
+            <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))" }}>
               <div className="card kpi" data-testid="release-gate">
                 <span className="label">Release gate</span>
-                <span className="value">{p.release.fabrication_ready ? "Ready" : "Not ready"}</span>
+                <span className="value">{p.release.fabrication_ready ? "Fabrication ready" : "Not ready"}</span>
                 <span className="sub row">
-                  {p.release.fabrication_ready ? <Chip tone="good">fabrication ready</Chip> : <Chip tone="critical">blocked</Chip>}
-                  <span>{p.release.counts.verified ?? 0}/{p.release.items.length} verified</span>
+                  {p.release.fabrication_ready ? <Chip tone="good">all verified</Chip> : <Chip tone="critical">{p.release.blocking.length} blocking</Chip>}
+                  <span>{verified}/{p.release.items.length} verified</span>
                 </span>
               </div>
               {(["failed", "stale", "estimated", "not_run"] as EvidenceStatus[]).map((s) => (
                 s === "stale" && !p.release.counts.stale ? null : (
-                  <button key={s} className="card kpi" style={{ textAlign: "left", cursor: "pointer" }} onClick={() => setFilter(filter === s ? "all" : s)}>
+                  <button key={s} className={`card kpi${filter === s ? " selected" : ""}`} style={{ textAlign: "left", cursor: "pointer" }}
+                          onClick={() => setFilter(filter === s ? "all" : s)} aria-pressed={filter === s}>
                     <span className="label">{humanize(s)}</span>
                     <span className="value">{p.release.counts[s] ?? 0}</span>
                     <span className="sub"><EvidenceChip status={s} /></span>
@@ -67,35 +75,37 @@ export function OverviewPage() {
             </div>
 
             <div className="grid side">
-              <Card title="Requirement evidence" subtitle={`Every requirement and scenario expectation, with the check that proves it · inputs ${p.release.current_fingerprint}`}
-                    actions={<Segmented label="Filter" value={filter} onChange={setFilter}
-                                        options={[{ value: "all", label: "All" }, ...EVIDENCE_ORDER.map((s) => ({ value: s, label: humanize(s) }))]} />}
+              <Card title="Requirement evidence"
+                    subtitle={<>Every requirement, scenario expectation and stage, with the check that proves it · inputs <code>{p.release.inputs.robot_yaml_sha256}</code></>}
+                    actions={
+                      <div className="row">
+                        <Segmented label="Kind" value={kind} onChange={setKind}
+                                   options={[{ value: "all", label: "All" }, { value: "requirement", label: "Requirements" },
+                                             { value: "scenario_expectation", label: "Scenarios" }, { value: "stage", label: "Stages" }]} />
+                        <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Status filter">
+                          <option value="all">all statuses</option>
+                          {EVIDENCE_ORDER.map((s) => <option key={s} value={s}>{humanize(s)}</option>)}
+                        </select>
+                      </div>
+                    }
                     flush>
-                <div className="table-wrap" style={{ maxHeight: 560 }}>
+                <div className="table-wrap" style={{ maxHeight: 620 }}>
                   <table data-testid="evidence-matrix">
-                    <thead><tr><th>Status</th><th>Requirement</th><th className="num">Required</th><th className="num">Measured</th><th>Evidence</th></tr></thead>
+                    <thead><tr><th>Status</th><th>Item</th><th className="num">Target</th><th className="num">Measured</th><th>Evidence</th></tr></thead>
                     <tbody>
                       {shown.map((item) => (
                         <tr key={item.id}>
                           <td><EvidenceChip status={item.status} /></td>
                           <td>
-                            <div>{item.label}</div>
-                            <div className="muted small mono">{item.id}</div>
+                            <div>{humanize(item.subject)}</div>
+                            <div className="muted small"><span className="badge">{KIND_LABEL[item.kind]}</span> <span className="mono">{item.id}</span></div>
                           </td>
-                          <td className="num">{requirementText(item)}</td>
-                          <td className="num">{evidenceValue(item)}</td>
-                          <td className="small">
-                            {item.evidence ? (
-                              <div className="stack" style={{ gap: 0 }}>
-                                <span><strong>{item.evidence.stage}</strong> · <code>{item.evidence.check}</code></span>
-                                {item.evidence.artifact && <a href={api.artifactUrl(pid, item.evidence.artifact)} target="_blank" rel="noreferrer" className="mono">{item.evidence.artifact}</a>}
-                                {item.evidence.fingerprint && <span className="muted">inputs <code>{item.evidence.fingerprint}</code></span>}
-                              </div>
-                            ) : <span className="muted">{item.note ?? (item.scenario ? `run scenario ${item.scenario}` : "no evidence yet")}</span>}
-                            {item.evidence && item.note && <div className="muted">{item.note}</div>}
-                          </td>
+                          <td className="num">{formatTarget(item)}</td>
+                          <td className="num">{item.evidence.length ? item.evidence.map((e, i) => <div key={i}>{formatValue(e.value, itemUnit(item))}</div>) : "—"}</td>
+                          <td className="small"><EvidenceCell pid={pid} item={item} /></td>
                         </tr>
                       ))}
+                      {!shown.length && <tr><td colSpan={5} className="muted">No items match.</td></tr>}
                     </tbody>
                   </table>
                 </div>
@@ -107,9 +117,9 @@ export function OverviewPage() {
                   <div className="stack">
                     {p.stages.map((s) => (
                       <div key={s.stage} className="row" style={{ justifyContent: "space-between" }}>
-                        <StageChip stage={s.stage} status={active?.stage === s.stage ? "running" : s.status} />
+                        <StageChip stage={s.stage} status={active?.stage === s.stage ? "running" : s.stale && s.status !== "missing" ? "stale" : s.status} />
                         <span className="small muted">
-                          {s.counts.error ? `${s.counts.error} E ` : ""}{s.counts.warning ? `${s.counts.warning} W ` : ""}
+                          {s.counts?.error ? `${s.counts.error} E ` : ""}{s.counts?.warning ? `${s.counts.warning} W ` : ""}
                           {s.duration_s ? `· ${s.duration_s.toFixed(1)} s` : s.status === "missing" ? "not run" : ""}
                         </span>
                         <button className="small ghost" disabled={!!active} onClick={() => void start({ stages: [s.stage] })} aria-label={`Run ${s.stage}`}>
@@ -122,8 +132,9 @@ export function OverviewPage() {
                 </Card>
                 <Card title="Links">
                   <div className="stack small">
-                    <LinkRow label="Onshape document" href={p.links?.onshape} />
-                    <LinkRow label="GitHub repository" href={p.links?.github} />
+                    <LinkRow label="Onshape document" href={p.links.onshape} />
+                    <LinkRow label="GitHub repository" href={p.links.github} />
+                    <LinkRow label="HTML report" href={p.report_url} />
                     <Link to={`/p/${encodeURIComponent(pid)}/diagnostics`}>All diagnostics →</Link>
                   </div>
                 </Card>
@@ -140,7 +151,17 @@ export function OverviewPage() {
                     </div>
                   ) : <Chip tone="good">all stages at full fidelity</Chip>}
                 </Card>
-                <RequirementsCard requirements={p.spec.requirements} />
+                <Card title="robot.yaml">
+                  <dl className="kv">
+                    <dt>Components</dt><dd>{p.summary.components ?? "—"}</dd>
+                    <dt>Harnesses / wires</dt><dd>{p.summary.harnesses ?? "—"} / {p.summary.wires ?? "—"}</dd>
+                    <dt>Bindings</dt><dd>{p.summary.bindings ?? "—"}</dd>
+                    <dt>Scenarios</dt><dd>{p.summary.scenarios?.length ?? "—"}</dd>
+                    {Object.entries(spec.data?.spec.requirements ?? {}).map(([k, v]) => (
+                      <div key={k} style={{ display: "contents" }}><dt>{humanize(k)}</dt><dd>{String(v)}</dd></div>
+                    ))}
+                  </dl>
+                </Card>
               </div>
             </div>
           </div>
@@ -156,21 +177,5 @@ function LinkRow({ label, href }: { label: string; href?: string | null }) {
       <span className="secondary">{label}</span>
       {href ? <a href={href} target="_blank" rel="noreferrer" className="row">open <Icon name="external" size={12} /></a> : <span className="muted">not linked</span>}
     </div>
-  );
-}
-
-function RequirementsCard({ requirements }: { requirements: Record<string, unknown> }) {
-  const rows = useMemo(() => Object.entries(requirements), [requirements]);
-  return (
-    <Card title="robot.yaml requirements">
-      <dl className="kv">
-        {rows.map(([k, v]) => (
-          <div key={k} style={{ display: "contents" }}>
-            <dt>{humanize(k)}</dt>
-            <dd title={Number.isFinite(quantity(v)) ? `${quantity(v)} SI` : undefined}>{String(v)}</dd>
-          </div>
-        ))}
-      </dl>
-    </Card>
   );
 }
