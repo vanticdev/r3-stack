@@ -62,6 +62,98 @@ export function layoutTree(tree: PowerTree): Record<string, { depth: number; row
   return out;
 }
 
+/** Orthogonal top-down drawing of a power tree: sources above their loads, one bus per supply pin
+ * (stem down from the source, horizontal bus, arrowed drops to each load) with a junction dot at every
+ * branch. Edges that feed back up the tree (e.g. the Pi's 3V3 into the HAT) run in a lane to the right. */
+export interface TreeDrawing {
+  width: number;
+  height: number;
+  nodes: { id: string; x: number; y: number }[];
+  buses: { source: string; nominal: number; stem: [number, number][]; bus: [number, number][] | null; junctions: [number, number][];
+           drops: { sink: string; to: string; path: [number, number][] }[]; labelAt: [number, number] }[];
+  backEdges: { source: string; sink: string; to: string; nominal: number; path: [number, number][]; labelAt: [number, number] }[];
+}
+
+export function drawPowerTree(tree: PowerTree, box = { w: 112, h: 38, gx: 20, gy: 64 }): TreeDrawing {
+  const { w: W, h: H, gx: GX, gy: GY } = box;
+  // Breadth-first from the nodes nothing feeds, so loads sit under their supply and siblings stay together.
+  const incoming = new Set(tree.edges.map((e) => e.to));
+  const roots = tree.nodes.filter((n) => !incoming.has(n.id)).map((n) => n.id);
+  const order: string[] = [];
+  const depth = new Map<string, number>();
+  const queue = roots.length ? [...roots] : tree.nodes.slice(0, 1).map((n) => n.id);
+  for (const r of queue) depth.set(r, 0);
+  while (queue.length) {
+    const id = queue.shift()!;
+    order.push(id);
+    for (const e of tree.edges) if (e.from === id && !depth.has(e.to)) { depth.set(e.to, depth.get(id)! + 1); queue.push(e.to); }
+  }
+  for (const n of tree.nodes) if (!depth.has(n.id)) { depth.set(n.id, 0); order.push(n.id); }
+  // Tidy layout on the breadth-first spanning tree: leaves take consecutive columns and each supply is
+  // centred over its loads, so sibling subtrees never interleave and buses never overlap.
+  const parent = new Map<string, string>();
+  for (const id of order) for (const e of tree.edges) if (e.from === id && depth.get(e.to) === depth.get(id)! + 1 && !parent.has(e.to)) parent.set(e.to, id);
+  const children = (id: string) => order.filter((c) => parent.get(c) === id);
+  const column = new Map<string, number>();
+  let next = 0;
+  const place = (id: string): number => {
+    const kids = children(id);
+    const col = kids.length ? (() => { const cols = kids.map(place); return (cols[0]! + cols[cols.length - 1]!) / 2; })() : next++;
+    column.set(id, col);
+    return col;
+  };
+  for (const id of order) if (!parent.has(id) && !column.has(id)) place(id);
+  const widest = Math.max(1, next);
+  const pos = new Map<string, { x: number; y: number }>();
+  for (const id of order) pos.set(id, { x: 12 + column.get(id)! * (W + GX), y: 12 + depth.get(id)! * (H + GY) });
+  const right = 12 + widest * (W + GX) - GX;
+  const buses: TreeDrawing["buses"] = [];
+  const backEdges: TreeDrawing["backEdges"] = [];
+  const sources = [...new Set(tree.edges.map((e) => e.source))];
+  const railsPerNode = new Map<string, number>();
+  let lane = 0;
+  for (const source of sources) {
+    const edges = tree.edges.filter((e) => e.source === source);
+    const from = edges[0]!.from;
+    const a = pos.get(from)!;
+    const forward = edges.filter((e) => depth.get(e.to)! > depth.get(from)!);
+    const back = edges.filter((e) => depth.get(e.to)! <= depth.get(from)!);
+    if (forward.length) {
+      const k = railsPerNode.get(from) ?? 0;
+      railsPerNode.set(from, k + 1);
+      const cx = a.x + W / 2 + k * 14;
+      const busY = a.y + H + GY / 2 - 6 + k * 10;
+      const xs = forward.map((e) => pos.get(e.to)!.x + W / 2);
+      const lo = Math.min(cx, ...xs), hi = Math.max(cx, ...xs);
+      buses.push({
+        source, nominal: forward[0]!.nominal,
+        stem: [[cx, a.y + H], [cx, busY]],
+        bus: hi - lo > 0.5 ? [[lo, busY], [hi, busY]] : null,
+        junctions: forward.length > 1 || xs[0] !== cx ? [[cx, busY], ...xs.filter((x) => x !== cx).map((x): [number, number] => [x, busY])] : [],
+        drops: forward.map((e) => { const b = pos.get(e.to)!; const x = b.x + W / 2; return { sink: e.sink, to: e.to, path: [[x, busY], [x, b.y]] as [number, number][] }; }),
+        labelAt: [cx + 6, a.y + H + 13],
+      });
+    }
+    for (const e of back) {
+      const b = pos.get(e.to)!;
+      const laneX = right + 18 + lane * 14;
+      lane += 1;
+      backEdges.push({
+        source, sink: e.sink, to: e.to, nominal: e.nominal,
+        path: [[a.x + W - 12, a.y + H], [a.x + W - 12, a.y + H + 10], [laneX, a.y + H + 10], [laneX, b.y + H / 2], [b.x + W, b.y + H / 2]],
+        labelAt: [laneX + 4, (a.y + b.y + H) / 2],
+      });
+    }
+  }
+  const depthMax = Math.max(0, ...depth.values());
+  return {
+    width: right + 12 + (lane ? 18 + lane * 14 + 48 : 0),
+    height: 24 + (depthMax + 1) * (H + GY) - GY,
+    nodes: [...pos.entries()].map(([id, p]) => ({ id, ...p })),
+    buses, backEdges,
+  };
+}
+
 export const OPERATING_POINT_ORDER = ["idle", "cruise", "full_throttle", "motor_stall", "servo_stall_compute"];
 
 /** Rows of one battery state, in the canonical idle → stall order. */
@@ -389,4 +481,31 @@ export function pcbPinMap(connectors: Record<string, Record<string, string>> | n
       return { connector, pin, boardNet, catalogPin, match: catalogPin === null || boardNet === catalogPin || boardNet?.endsWith(`.${catalogPin}`) === true };
     });
   });
+}
+
+// ------------------------------------------------------------------ rail tolerances
+
+export interface RailLimits {
+  lo: number;
+  hi: number;
+  /** whether the graph states each side; an unstated side uses ±`assumed` of nominal */
+  loStated: boolean;
+  hiStated: boolean;
+}
+
+/** Tolerance band of a rail. The graph gives min = max = nominal when no tolerance is specified. */
+export function railLimits(rail: Pick<Rail, "nominal" | "min" | "max">, assumed = 0.05): RailLimits {
+  const loStated = rail.min < rail.nominal;
+  const hiStated = rail.max > rail.nominal;
+  return {
+    lo: loStated ? rail.min : rail.nominal * (1 - assumed),
+    hi: hiStated ? rail.max : rail.nominal * (1 + assumed),
+    loStated, hiStated,
+  };
+}
+
+/** "low" / "high" when a calculated rail voltage leaves its band (both directions are checked). */
+export function railFlag(voltage: number | null | undefined, limits: RailLimits): "low" | "high" | null {
+  if (voltage === null || voltage === undefined || !Number.isFinite(voltage)) return null;
+  return voltage < limits.lo ? "low" : voltage > limits.hi ? "high" : null;
 }

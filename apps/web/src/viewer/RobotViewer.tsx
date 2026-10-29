@@ -17,6 +17,8 @@ import {
   interpolatePose, poseMatrix, restPoses,
 } from "../lib/transforms.ts";
 import { humanize } from "../lib/units.ts";
+import { Icon } from "../components/icons.tsx";
+import { Popover } from "../components/ui.tsx";
 import { cssVar, useThemeVersion } from "../state/prefs.ts";
 import { ConnectorLayer, detailedComponents } from "./ConnectorLayer.tsx";
 import { RouteEditor, type RouteEditState } from "./RouteEditor.tsx";
@@ -50,6 +52,26 @@ export interface PlaybackState {
   t: number;
   follow: boolean;
 }
+
+/** A point of interest drawn on top of the model (minimum-clearance point, diagnostic location). */
+export interface Marker {
+  position: Vec3;
+  label?: string;
+  color?: string;
+}
+
+/** Layers of the "Show" menu. Features that add overlays (e.g. connector pins) append an entry here
+ * and a matching boolean to ViewOptions. `available` hides layers the data cannot draw. */
+export const SHOW_LAYERS: { key: keyof ViewOptions; label: string; available?: (data: RobotData, playback: boolean) => boolean; count?: (data: RobotData) => number }[] = [
+  { key: "wires", label: "Wires", available: (_d, playback) => !playback },
+  { key: "hardware", label: "Fasteners", available: (d) => d.hardware.length > 0, count: (d) => d.hardware.length },
+  { key: "interfaces", label: "Connector frames" },
+  { key: "joins", label: "Mounts and contacts" },
+  { key: "joints", label: "Joint axes", available: (_d, playback) => !playback },
+  { key: "issues", label: "Error highlights" },
+  { key: "connectors", label: "Connectors and pins", available: (d, playback) => !!d.connectors && !playback },
+  { key: "interference", label: "Interferences", available: (d, playback) => d.interference.length > 0 && !playback, count: (d) => d.interference.length },
+];
 
 const DEFAULT_OPTIONS: ViewOptions = { wires: true, hardware: true, interference: false, interfaces: false, joins: false, joints: false, xray: false, issues: false, connectors: true, explode: 0 };
 const IDENTITY = new Matrix4();
@@ -180,7 +202,9 @@ function HardwarePart({ id, owner, url, matrix, state, register, onSelect }: {
 function WireTube({ w, state, onSelect, onHover }: {
   w: SceneWire; state: PartState; onSelect?: (s: Selection) => void; onHover: (id: string | null) => void;
 }) {
-  const geometry = useMemo(() => tubeGeometry(w.path, w.radius), [w]);
+  // The wires in focus are drawn thicker so a harness reads against the robot.
+  const emphasis = state === "highlight" || state === "selected" ? 1.8 : 1;
+  const geometry = useMemo(() => tubeGeometry(w.path, w.radius * emphasis), [w, emphasis]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   const material = useMaterial(w.color, state);
   material.transparent = material.transparent || !w.routed;
@@ -268,6 +292,34 @@ function JointsOverlay({ data, positions }: { data: RobotData; positions: Record
           </group>
         );
       })}
+    </group>
+  );
+}
+
+/** Interference regions as outlined boxes (edges plus a faint fill); clicking one reports the part pair. */
+function InterferenceBox({ center, extent, selected, onClick }: { center: Vec3; extent: Vec3; selected: boolean; onClick?: () => void }) {
+  const size = extent.map((v) => Math.max(v, 0.0008)) as Vec3;
+  return (
+    <mesh position={center} onClick={(e) => { e.stopPropagation(); onClick?.(); }}>
+      <boxGeometry args={size} />
+      <meshBasicMaterial color="#d03b3b" transparent opacity={selected ? 0.28 : 0.1} depthWrite={false} />
+      <Edges color="#d03b3b" lineWidth={selected ? 2.4 : 1.4} depthTest={false} renderOrder={11} />
+    </mesh>
+  );
+}
+
+function MarkerPoint({ marker }: { marker: Marker }) {
+  return (
+    <group position={marker.position}>
+      <mesh renderOrder={12}>
+        <sphereGeometry args={[0.0032, 16, 12]} />
+        <meshBasicMaterial color={marker.color ?? "#d03b3b"} depthTest={false} transparent />
+      </mesh>
+      <mesh renderOrder={12}>
+        <ringGeometry args={[0.005, 0.0062, 32]} />
+        <meshBasicMaterial color={marker.color ?? "#d03b3b"} depthTest={false} transparent side={DoubleSide} />
+      </mesh>
+      {marker.label && <Html center position={[0, 0, 0.012]} style={{ pointerEvents: "none" }}><div className="viewer-label">{marker.label}</div></Html>}
     </group>
   );
 }
@@ -387,7 +439,8 @@ function Trajectory({ recording }: { recording: PlaybackRecording }) {
 // ------------------------------------------------------------------ the viewer
 
 export function RobotViewer({ data, highlight = [], selected = null, onSelect, playback: playbackProp = null, editor = null,
-                              initialOptions, showJointPanel = true, toolbarExtra, status }: {
+                              initialOptions, showJointPanel = true, toolbarExtra, toolbarStart, status, markers = [], fitRequest = 0,
+                              onInterference, selectedInterference = null }: {
   data: RobotData;
   highlight?: string[];
   selected?: Selection | null;
@@ -396,8 +449,18 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
   editor?: RouteEditState | null;
   initialOptions?: Partial<ViewOptions>;
   showJointPanel?: boolean;
+  /** extra controls after the view controls */
   toolbarExtra?: ReactNode;
+  /** page-specific primary controls before the Show menu (e.g. Fit harness / Edit route) */
+  toolbarStart?: ReactNode;
   status?: ReactNode;
+  /** points drawn on top of the model */
+  markers?: Marker[];
+  /** increment to re-fit the camera to the current highlight */
+  fitRequest?: number;
+  /** clicking an interference region reports its index into `data.interference` */
+  onInterference?: (index: number) => void;
+  selectedInterference?: number | null;
 }) {
   const playback = playbackProp?.recording.frames && !playbackProp.recording.frames.error ? playbackProp : null;
   const themeVersion = useThemeVersion();
@@ -406,6 +469,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
   const [steer, setSteer] = useState(0);
   const [hover, setHover] = useState<string | null>(null);
   const [fitNonce, setFitNonce] = useState(0);
+  const [moveJoints, setMoveJoints] = useState(false);
   const groups = useRef(new Map<string, Group>());
   const cableMeshes = useRef(new Map<string, Mesh>());
   const toggle = (key: keyof ViewOptions) => setOptions((o) => ({ ...o, [key]: !o[key] }));
@@ -470,41 +534,41 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
   const showConnectors = !!data.connectors && options.connectors && !playback;
   const detailed = useMemo(() => (showConnectors ? detailedComponents(data.connectors ?? null) : new Set<string>()), [showConnectors, data.connectors]);
   const selectedHarness = selected?.kind === "wire" ? data.connectors?.wires[selected.id]?.harness ?? null : null;
+  const layers = SHOW_LAYERS.filter((l) => l.available?.(data, !!playback) ?? true);
 
   return (
     <div className="viewer" data-testid="robot-viewer">
       <div className="viewer-toolbar">
-        <div className="group" role="toolbar" aria-label="Overlays">
-          {!playback && <button className={options.wires ? "on" : ""} onClick={() => toggle("wires")} title="Harness routes">Wires</button>}
-          {data.hardware.length > 0 && <button className={options.hardware ? "on" : ""} onClick={() => toggle("hardware")} title={`${data.hardware.length} CAD fasteners`}>Fasteners</button>}
-          <button className={options.interfaces ? "on" : ""} onClick={() => toggle("interfaces")} title="Connector / assembly interfaces">Interfaces</button>
-          <button className={options.joins ? "on" : ""} onClick={() => toggle("joins")} title="Mount joins and CAD contacts">Joins</button>
-          {!playback && <button className={options.joints ? "on" : ""} onClick={() => toggle("joints")} title="Joint axes and sliders">Joints</button>}
-          <button className={options.xray ? "on" : ""} onClick={() => toggle("xray")} title="See-through parts">X-ray</button>
-          <button className={options.issues ? "on" : ""} onClick={() => toggle("issues")} title="Tint parts with error diagnostics">Issues</button>
-          {data.connectors && !playback && (
-            <button className={options.connectors ? "on" : ""} onClick={() => toggle("connectors")}
-                    title="Vendor/KiCad models, connector bodies and individual pins (hover a pin for its signal)">Pins</button>
-          )}
-          {data.interference.length > 0 && !playback && (
-            <button className={options.interference ? "on" : ""} onClick={() => toggle("interference")} title="Envelope overlaps found by the model stage">
-              Interference <span className="badge critical">{data.interference.length}</span>
-            </button>
+        {toolbarStart}
+        <div className="group">
+          <Popover label="Show layers" trigger={() => <span className="menu-trigger">Show<Icon name="chevron" size={12} /></span>}>
+            <div className="layer-menu" role="group" aria-label="Layers">
+              {layers.map((l) => (
+                <label key={l.key} className="check">
+                  <input type="checkbox" checked={!!options[l.key]} onChange={() => toggle(l.key)} />
+                  {l.label}{l.count ? <span className="muted"> · {l.count(data)}</span> : null}
+                </label>
+              ))}
+            </div>
+          </Popover>
+          {showJointPanel && !playback && data.joints.length > 0 && (
+            <button className={moveJoints ? "on" : ""} aria-pressed={moveJoints} onClick={() => setMoveJoints((m) => !m)}>Move joints</button>
           )}
         </div>
-        {!playback && (
-          <div className="group">
+        <div className="group" role="toolbar" aria-label="View">
+          <button className={options.xray ? "on" : ""} aria-pressed={options.xray} onClick={() => toggle("xray")} title="See-through parts">X-ray</button>
+          {!playback && (
             <label>Explode
               <input type="range" min={0} max={1} step={0.01} value={options.explode} aria-label="Exploded view"
-                     onChange={(e) => setOptions((o) => ({ ...o, explode: Number(e.target.value) }))} style={{ width: 90 }} />
+                     onChange={(e) => setOptions((o) => ({ ...o, explode: Number(e.target.value) }))} style={{ width: 80 }} />
             </label>
-          </div>
-        )}
-        <div className="group"><button onClick={() => setFitNonce((n) => n + 1)} title="Fit view">Fit</button></div>
+          )}
+          <button onClick={() => setFitNonce((n) => n + 1)} title="Fit the view to the model or the highlight">Fit</button>
+        </div>
         {toolbarExtra}
       </div>
 
-      {showJointPanel && options.joints && !playback && (
+      {showJointPanel && moveJoints && !playback && (
         <div className="joint-panel" aria-label="Joint positions">
           <div className="row"><strong className="small">Joints</strong><span className="spacer" style={{ flex: 1 }} />
             <button className="small ghost" onClick={() => { setPositions({}); setSteer(0); }}>Reset</button></div>
@@ -553,17 +617,16 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         {!playback && options.wires && options.explode < 0.02 && data.wires.map((w) => (
           <WireTube key={w.id} w={w} state={stateOf(w.id, true)} onSelect={onSelect} onHover={setHover} />
         ))}
-        {!playback && options.interference && data.interference
-          .filter((o) => !anyFocus || focus.components.has(o.a) || focus.components.has(o.b)).map((o, i) => (
-          <mesh key={`int${i}`} position={o.center}>
-            <boxGeometry args={o.extent.map((v) => Math.max(v, 0.0006)) as Vec3} />
-            <meshBasicMaterial color="#d03b3b" transparent opacity={0.45} depthWrite={false} />
-          </mesh>
+        {!playback && options.interference && data.interference.map((o, i) => (
+          !anyFocus || focus.components.has(o.a) || focus.components.has(o.b) || selectedInterference === i
+            ? <InterferenceBox key={`int${i}`} center={o.center} extent={o.extent} selected={selectedInterference === i} onClick={onInterference ? () => onInterference(i) : undefined} />
+            : null
         ))}
         {showConnectors && data.connectors && data.connectorAsset && (
           <ConnectorLayer data={data.connectors} assetUrl={data.connectorAsset} matrices={matrices} harness={selectedHarness}
                           showBodies showPins={options.explode < 0.02} ghost={(id) => stateOf(id) === "ghost" || (options.xray && stateOf(id) === "normal")} />
         )}
+        {!playback && markers.map((m, i) => <MarkerPoint key={`mk${i}`} marker={m} />)}
         {options.interfaces && <InterfacesOverlay data={data} matrices={playback ? {} : matrices} />}
         {options.joins && <JoinsOverlay data={data} matrices={playback ? {} : matrices} />}
         {!playback && options.joints && <JointsOverlay data={data} positions={positions} />}
@@ -583,7 +646,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         })}
 
         <OrbitControls makeDefault target={[0.13, 0, 0.05]} enableDamping={false} minDistance={0.02} maxDistance={60} />
-        <CameraRig focus={focusPoints} fitKey={`${focusKey}#${fitNonce}`} data={data} />
+        <CameraRig focus={focusPoints} fitKey={`${focusKey}#${fitNonce}#${fitRequest}`} data={data} />
         <GizmoHelper alignment="bottom-right" margin={[54, 54]}>
           <GizmoViewport axisColors={["#e34948", "#1baf7a", "#2a78d6"]} labelColor={dark ? "#0b0b0b" : "#ffffff"} />
         </GizmoHelper>
@@ -593,13 +656,16 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         {hovered ? (
           <span><strong>{hovered.id}</strong> · {"name" in hovered ? hovered.name : `${(hovered as SceneWire).harness} · ${(hovered as SceneWire).awg} AWG ${humanize((hovered as SceneWire).colorName)}`}</span>
         ) : anyFocus ? (
-          <span><span className="swatch" style={{ background: "#f97316" }} /> {focus.components.size} part(s), {focus.wires.size} wire(s) highlighted</span>
+          <span><span className="swatch" style={{ background: "#f97316" }} /> Highlighted: {[focus.components.size ? `${focus.components.size} part${focus.components.size === 1 ? "" : "s"}` : "", focus.wires.size ? `${focus.wires.size} wire${focus.wires.size === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ")}</span>
         ) : (
-          <span>{meshCount}/{data.components.length} parts from CAD meshes{meshCount < data.components.length ? " (rest: catalog envelopes)" : ""}{data.hardware.length ? ` + ${data.hardware.length} fasteners` : ""} · {data.wires.length} wires · click to inspect</span>
+          <span>{meshCount === data.components.length ? "All parts from CAD" : `${meshCount} of ${data.components.length} parts from CAD, the rest as catalog envelopes`} · click a part to inspect</span>
         )}
+        {options.issues && !anyFocus && <span><span className="swatch" style={{ background: "#d03b3b" }} /> part with an error</span>}
+        {options.interference && !playback && data.interference.length > 0 && <span><span className="swatch outline" style={{ borderColor: "#d03b3b" }} /> interference region ({data.interference.length})</span>}
+        {markers.length > 0 && !playback && <span><span className="swatch round" style={{ background: markers[0]!.color ?? "#d03b3b" }} /> {markers[0]!.label ?? "marked point"}</span>}
         {options.interfaces && <span><span className="swatch" style={{ background: "#3987e5" }} /> component connector <span className="swatch" style={{ background: "#199e70" }} /> harness connector</span>}
-        {options.joins && <span><span className="swatch" style={{ background: "#c98500" }} /> mount join <span className="swatch" style={{ background: "#9085e9" }} /> CAD contact</span>}
-        {options.explode >= 0.02 && options.wires && !playback && <span className="muted">harness routes hidden while exploded</span>}
+        {options.joins && <span><span className="swatch" style={{ background: "#c98500" }} /> mount <span className="swatch" style={{ background: "#9085e9" }} /> CAD contact</span>}
+        {options.explode >= 0.02 && options.wires && !playback && <span className="muted">wires hidden while exploded</span>}
       </div>
       {status && <div className="viewer-status">{status}</div>}
     </div>

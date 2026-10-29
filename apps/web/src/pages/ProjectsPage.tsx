@@ -4,59 +4,72 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { api } from "../api/client.ts";
 import { keys, useProjects } from "../api/hooks.ts";
+import type { ProjectSummary } from "../api/types.ts";
 import { Icon } from "../components/icons.tsx";
-import { Card, Chip, ConfirmDialog, Empty, ErrorBox, QueryView, StageChip } from "../components/ui.tsx";
+import { Card, Dialog, Empty, ErrorBox, QueryView } from "../components/ui.tsx";
+import { stageLabel } from "../lib/labels.ts";
+import { countsText, listLabels } from "../lib/status.ts";
 import { timeAgo } from "../lib/units.ts";
 
-export function ProjectsPage() {
-  const projects = useProjects();
+const TEMPLATES: Record<string, { label: string; description: string }> = {
+  "rc-car": { label: "RC car", description: "The 1/10 reference car: Raspberry Pi 5, carrier HAT, brushed motor and ESC, steering servo, radio and GPS." },
+  blank: { label: "Empty project", description: "A robot.yaml with the schema header and no components." },
+};
+
+function ProjectStatusLine({ p }: { p: ProjectSummary }) {
+  const run = p.last_run;
+  const failed = Object.entries(p.stages).filter(([, s]) => s === "failed").map(([stage]) => stageLabel(stage));
+  const to = `/p/${encodeURIComponent(p.id)}`;
+  if (p.error) return <div className="status"><span style={{ color: "var(--critical)" }}>{p.error}</span></div>;
+  if (!run) return <div className="status"><span className="muted">Not run yet</span></div>;
   return (
-    <div className="content">
-      <div className="page">
-        <div className="page-head">
-          <div className="stack" style={{ gap: 2 }}>
-            <h1>Projects</h1>
-            <p>Robots described once in <code>robot.yaml</code>; every domain is built and checked from it.</p>
-          </div>
-        </div>
-        <div className="grid side">
-          <QueryView query={projects} height={200}>
-            {({ projects: list }) => list.length ? (
-              <div className="grid cols-2">
-                {list.map((p) => (
-                  <Link key={p.id} to={`/p/${encodeURIComponent(p.id)}/overview`} className="card project-card" data-testid="project-card">
-                    <div className="row">
-                      <span className="brand-mark" style={{ width: 30, height: 30 }}><Icon name="cube" size={16} /></span>
-                      <div className="stack" style={{ gap: 0 }}>
-                        <h2>{p.name}</h2>
-                        <span className="muted small mono ellipsis" title={p.path}>{p.id}{p.version ? ` · v${p.version}` : ""}</span>
-                      </div>
-                    </div>
-                    {p.description && <p className="secondary">{p.description}</p>}
-                    {p.error && <span className="small" style={{ color: "var(--critical)" }}>{p.error}</span>}
-                    <div className="row small">
-                      {Object.entries(p.stages).filter(([, v]) => v !== "missing").map(([stage, status]) => <StageChip key={stage} stage={stage} status={status} />)}
-                    </div>
-                    <div className="row small">
-                      {p.last_run?.status === "ok" && <Chip tone="good">checks pass</Chip>}
-                      {p.last_run?.status === "failed" && <Chip tone="critical">{p.last_run.counts?.error ?? 0} errors</Chip>}
-                      {!!p.last_run?.counts?.warning && <Chip tone="warning">{p.last_run.counts.warning} warnings</Chip>}
-                      {p.last_run?.stale && <Chip tone="stale">stale results</Chip>}
-                      <span className="muted">last run {p.last_run ? timeAgo(p.last_run.finished_at) : "never"}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : <Card><Empty title="No projects yet">Create one from a template.</Empty></Card>}
-          </QueryView>
-          <CreateProject templates={projects.data?.templates ?? []} />
-        </div>
-      </div>
+    <div className="status">
+      {run.stale ? <strong>Results out of date</strong> : run.status === "ok" ? <strong>All checks pass</strong> : <strong>Checks failing</strong>}
+      <span className="secondary">{run.stale ? "Previous run" : "Last run"} {timeAgo(run.finished_at)}: {countsText(run.counts ?? {})}</span>
+      {failed.length > 0 && <span className="secondary">Failed: {listLabels(failed, 4)}</span>}
+      {!!run.counts?.error && <Link to={`${to}/diagnostics`}>View errors</Link>}
     </div>
   );
 }
 
-function CreateProject({ templates }: { templates: string[] }) {
+export function ProjectsPage() {
+  const projects = useProjects();
+  const [creating, setCreating] = useState(false);
+  return (
+    <div className="content">
+      <div className="page" style={{ maxWidth: 1080 }}>
+        <div className="page-head">
+          <h1>Projects</h1>
+          <button className="primary" onClick={() => setCreating(true)}><Icon name="plus" size={14} />New project</button>
+        </div>
+        <QueryView query={projects} height={160}>
+          {({ projects: list }) => (
+            <Card flush>
+              {list.length ? (
+                <div className="list">
+                  {list.map((p) => (
+                    <div key={p.id} className="project-row" data-testid="project-card">
+                      <div className="stack" style={{ gap: 2, minWidth: 0 }}>
+                        <Link to={`/p/${encodeURIComponent(p.id)}/overview`} className="name">{p.name}</Link>
+                        <span className="muted small">{p.id}{p.version ? ` · v${p.version}` : ""}</span>
+                      </div>
+                      <div className="actions"><Link className="button" to={`/p/${encodeURIComponent(p.id)}/overview`}>Open</Link></div>
+                      {p.description && <span className="desc" title={p.description}>{p.description.split("\n")[0]}</span>}
+                      <ProjectStatusLine p={p} />
+                    </div>
+                  ))}
+                </div>
+              ) : <Empty title="No projects yet"><button className="primary" onClick={() => setCreating(true)}>New project</button></Empty>}
+            </Card>
+          )}
+        </QueryView>
+      </div>
+      {creating && <CreateProjectDialog templates={projects.data?.templates ?? []} onClose={() => setCreating(false)} />}
+    </div>
+  );
+}
+
+function CreateProjectDialog({ templates, onClose }: { templates: string[]; onClose: () => void }) {
   const client = useQueryClient();
   const navigate = useNavigate();
   const [name, setName] = useState("");
@@ -73,31 +86,53 @@ function CreateProject({ templates }: { templates: string[] }) {
   });
   const options = [...new Set(["rc-car", "blank", ...templates])];
   const valid = /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name);
+  const submit = () => { if (github && !confirming) setConfirming(true); else create.mutate(); };
   return (
-    <Card title="New project" subtitle="Scaffold from a template (r3_github)">
-      <form className="stack" onSubmit={(e) => { e.preventDefault(); if (github) setConfirming(true); else create.mutate(); }}>
-        <label className="stack" style={{ gap: 4 }}>
-          <span className="small secondary">Name</span>
-          <input type="text" value={name} placeholder="my-rover" onChange={(e) => setName(e.target.value)} aria-label="Project name" />
-        </label>
-        <label className="stack" style={{ gap: 4 }}>
-          <span className="small secondary">Template</span>
-          <select value={template} onChange={(e) => setTemplate(e.target.value)} aria-label="Template">
-            {options.map((t) => <option key={t}>{t}</option>)}
-          </select>
-        </label>
-        <label className="check"><input type="checkbox" checked={github} onChange={(e) => setGithub(e.target.checked)} />Also create a GitHub repository</label>
-        {github && <label className="check" style={{ marginLeft: 22 }}><input type="checkbox" checked={isPrivate} onChange={(e) => setPrivate(e.target.checked)} />Private</label>}
+    <Dialog title={confirming ? "Create the GitHub repository?" : "New project"} onClose={onClose} wide
+            footer={<>
+              <button onClick={confirming ? () => setConfirming(false) : onClose}>{confirming ? "Back" : "Cancel"}</button>
+              <button className="primary" type="submit" form="create-project" disabled={!valid || create.isPending}>
+                {create.isPending ? "Creating…" : confirming ? "Create project and repository" : "Create project"}
+              </button>
+            </>}>
+      <form id="create-project" className="stack" style={{ gap: 14 }} onSubmit={(e) => { e.preventDefault(); if (valid) submit(); }}>
+        {confirming ? (
+          <p>This creates <strong>{isPrivate ? "a private" : "a public"}</strong> repository <code>{name}</code> under the GitHub account signed in to the
+            <code> gh</code> CLI on the server, and pushes the new project to it.</p>
+        ) : (
+          <>
+            <label className="field">
+              <span>Name</span>
+              <input type="text" value={name} placeholder="my-rover" onChange={(e) => setName(e.target.value)} aria-label="Project name" autoFocus />
+              {!valid && name && <span className="small muted">Use letters, digits, ".", "_" or "-", starting with a letter or digit.</span>}
+            </label>
+            <div className="field" role="radiogroup" aria-label="Template">
+              <span>Start from</span>
+              <div className="choices">
+                {options.map((t) => (
+                  <label key={t} className="choice">
+                    <input type="radio" name="template" value={t} checked={template === t} onChange={() => setTemplate(t)} />
+                    <span className="text"><strong>{TEMPLATES[t]?.label ?? t}</strong>{TEMPLATES[t] && <span>{TEMPLATES[t].description}</span>}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="field">
+              <label className="check"><input type="checkbox" checked={github} onChange={(e) => setGithub(e.target.checked)} />Also create a GitHub repository</label>
+              {github && (
+                <div className="stack small" style={{ marginLeft: 22, gap: 6 }}>
+                  <span className="muted">Owner: the account signed in to <code>gh</code> on the server</span>
+                  <div className="row" role="radiogroup" aria-label="Visibility">
+                    <label className="check"><input type="radio" name="visibility" checked={isPrivate} onChange={() => setPrivate(true)} />Private</label>
+                    <label className="check"><input type="radio" name="visibility" checked={!isPrivate} onChange={() => setPrivate(false)} />Public</label>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
         {create.isError && <ErrorBox error={create.error} />}
-        <div className="row"><button className="primary" type="submit" disabled={!valid || create.isPending}><Icon name="plus" size={14} />Create</button>
-          {!valid && name && <span className="small muted">letters, digits, ".", "_" or "-"</span>}</div>
       </form>
-      {confirming && (
-        <ConfirmDialog title="Create a GitHub repository?" confirmLabel="Create repository" onCancel={() => setConfirming(false)}
-                       onConfirm={() => { setConfirming(false); create.mutate(); }}>
-          <p>This creates <strong>{isPrivate ? "a private" : "a public"}</strong> repository named <code>{name}</code> on GitHub with the <code>gh</code> CLI and pushes the scaffold.</p>
-        </ConfirmDialog>
-      )}
-    </Card>
+    </Dialog>
   );
 }

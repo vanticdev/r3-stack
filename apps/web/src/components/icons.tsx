@@ -30,6 +30,9 @@ const PATHS = {
   download: "M8 2v8.5M4.5 7L8 10.5 11.5 7M2.5 13.5h11",
   target: "M8 14A6 6 0 108 2a6 6 0 000 12zM8 11a3 3 0 100-6 3 3 0 000 6z",
   stop: "M4 4h8v8H4z",
+  menu: "M2.5 4h11M2.5 8h11M2.5 12h11",
+  chevron: "M4.5 6.5L8 10l3.5-3.5",
+  search: "M7 12a5 5 0 100-10 5 5 0 000 10zM10.6 10.6L14 14",
 } as const;
 
 export type IconName = keyof typeof PATHS;

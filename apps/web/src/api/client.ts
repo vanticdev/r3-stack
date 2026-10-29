@@ -110,6 +110,7 @@ export const api = {
   cancelRun: (rid: string) => request<RunInfo>("POST", `/api/runs/${enc(rid)}/cancel`, {}),
   runEventsUrl: (rid: string) => apiUrl(`/api/runs/${enc(rid)}/events`),
   deploy: (pid: string, body: DeployRequest) => request<DeployResponse>("POST", `${project(pid)}/deploy`, body),
+  agentSessions: (pid: string, signal?: AbortSignal) => request<AgentStatus[]>("GET", `${project(pid)}/agent`, undefined, signal),
   startAgent: (pid: string, body: AgentRequest) => request<AgentCreated>("POST", `${project(pid)}/agent`, body),
   agentEventsUrl: (sid: string) => apiUrl(`/api/agent/${enc(sid)}/events`),
   cancelAgent: (sid: string) => request<AgentStatus>("POST", `/api/agent/${enc(sid)}/cancel`, {}),
