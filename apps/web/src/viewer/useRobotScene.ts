@@ -8,6 +8,8 @@ import { quantity } from "../lib/units.ts";
 
 export interface RobotData {
   components: SceneComponent[];
+  /** CAD-only parts (fasteners) drawn with their owner component. */
+  hardware: { id: string; owner: string; url: string; kind: string }[];
   wires: SceneWire[];
   graphComponents: Record<string, GraphComponent>;
   meshes: Record<string, string>;
@@ -62,6 +64,11 @@ export function useRobotScene(pid: string) {
     for (const [id, m] of Object.entries(graph.mass?.by_component ?? {})) massSource[id] = m.source;
     return {
       components: scene.components, wires: scene.wires, graphComponents: graph.components,
+      hardware: Object.entries(cadParts).flatMap(([id, part]) => {
+        const url = cad.data?.meshes[id];
+        const owner = part.owner && part.owner in graph.components ? part.owner : null;
+        return url && owner && !(id in graph.components) ? [{ id, owner, url, kind: part.kind ?? "hardware" }] : [];
+      }),
       meshes: cad.data?.meshes ?? {}, cadParts, joints, steering,
       tree, chains: jointChains(tree, joints), centers,
       endpoints: graph.endpoints ?? {}, contacts: contactList.map((c) => [c[0], c[1]] as [string, string]),

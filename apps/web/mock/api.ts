@@ -767,6 +767,7 @@ export function createMockApi(options: MockOptions) {
         const run = runs.get(run_id)!;
         while (!run.done && !session.cancelled) await sleep(delay);
         await step({ type: "run_finished", tool_call_id: "t3", tool: "r3_run_stage", ok: run.info.status === "succeeded", stages: ["wiring", "electrical"] });
+        await step({ type: "tool_result", id: "t3", name: "r3_run_stage", ok: true, content: JSON.stringify({ run: run.info.status, stages: ["wiring", "electrical"] }) });
         await step({ type: "message", role: "assistant", text: `Set ${lead.id} route slack to 10 mm and re-ran wiring + electrical (mock replay of the existing results).` });
       }
       const final = unifiedDiff(baseline, specText(pid));

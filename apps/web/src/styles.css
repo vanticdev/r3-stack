@@ -336,7 +336,8 @@ pre.code {
 :root[data-theme="dark"] .run-log .err { color: #f08a8a; }
 
 .power-tree text { fill: var(--text-primary); font: 12px var(--font); }
-.power-tree .sub { fill: var(--text-muted); font-size: 11px; }
+.power-tree .sub { fill: var(--text-muted); font-size: 11px; paint-order: stroke; stroke: var(--surface-1); stroke-width: 4px; stroke-linejoin: round; }
+.power-tree .node-sub { fill: var(--text-muted); font-size: 11px; }
 .power-tree rect { fill: var(--surface-2); stroke: var(--line-strong); }
 .power-tree rect.selected { stroke: var(--accent); stroke-width: 2; }
 .power-tree path { fill: none; stroke: var(--text-muted); stroke-width: 1.5; }

@@ -146,7 +146,8 @@ e2e/            Playwright smoke test;  tests/  Node loader test used by tests/t
   joints and exploded view, the diagnostic highlight, route editing, the slack playback, the
   simulation scrubber, a pipeline run, an agent session, the light theme and the fleet deploy
   confirmation.
-  - Screenshots go to `test-results/screenshots/*.png`.
+  - Screenshots go to `test-results/screenshots/*.png`. Set `R3_E2E_SCREENSHOTS` to change the
+    directory, which is relative to `apps/web`.
   - To test a running server instead, set `R3_E2E_BASE_URL`, for example `http://127.0.0.1:8321`
     for `r3 serve` with a built `dist/`. Against a real server the run/agent test is skipped,
     because it would execute stages and use your Claude/Codex subscription.

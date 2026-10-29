@@ -71,7 +71,7 @@ export function DiagnosticsPage() {
         })}
       </div>
       {data ? (
-        <RobotViewer data={data} highlight={highlight} showJointPanel={false} initialOptions={{ issues: true }}
+        <RobotViewer data={data} highlight={highlight} showJointPanel={false} initialOptions={{ issues: true, interference: true }}
                      toolbarExtra={selected ? (
                        <div className="group">
                          <span className="small" style={{ padding: "0 6px" }}>{selected.code}</span>

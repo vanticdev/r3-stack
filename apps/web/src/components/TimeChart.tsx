@@ -32,6 +32,16 @@ export function seriesRange(series: readonly ChartSeries[], limits: readonly num
   return [lo - pad, hi + pad];
 }
 
+/** Tick labels with just enough decimals for the tick spacing (no duplicate labels, no "-0"). */
+export function tickLabels(values: readonly number[]): string[] {
+  const step = values.length > 1 ? Math.abs(values[1]! - values[0]!) : Math.abs(values[0] ?? 1);
+  const decimals = step > 0 ? Math.min(8, Math.max(0, -Math.floor(Math.log10(step) + 1e-9))) : 0;
+  return values.map((v) => {
+    const text = v.toFixed(decimals);
+    return Number(text) === 0 ? "0" : text;
+  });
+}
+
 export function TimeChart({ title, t, series, cursorT, onScrub, height = 150, syncKey = "r3-sim", limit, unit, xUnit = "s" }: {
   title: string;
   t: readonly number[];
@@ -85,13 +95,14 @@ export function TimeChart({ title, t, series, cursorT, onScrub, height = 150, sy
       scales: { x: { time: false }, y: { range: () => range } },
       axes: [
         { stroke: text, grid: { stroke: grid, width: 1 }, ticks: { show: false }, size: 26, font: "11px system-ui", values: (_u, v) => v.map((x) => `${x} ${xUnit}`) },
-        { stroke: text, grid: { stroke: grid, width: 1 }, ticks: { show: false }, size: 52, font: "11px system-ui" },
+        { stroke: text, grid: { stroke: grid, width: 1 }, ticks: { show: false }, size: 58, font: "11px system-ui", values: (_u, v) => tickLabels(v) },
       ],
       series: [{}, ...series.map((s) => ({ label: s.label, stroke: resolveColor(s.color), width: 2, dash: s.dash ? [5, 4] : undefined, points: { show: false } }))],
       hooks: {
         draw: [(u) => {
           const ctx = u.ctx;
           ctx.save();
+          ctx.setLineDash([]); // dashed series styles must not leak onto the overlays
           if (limit) {
             const y = u.valToPos(limit.value, "y", true);
             ctx.strokeStyle = limitColor;

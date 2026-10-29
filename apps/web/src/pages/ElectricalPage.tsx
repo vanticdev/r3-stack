@@ -50,7 +50,7 @@ function PowerTreeDiagram({ tree, point, graph }: { tree: PowerTree; point: Oper
             <g key={n.id}>
               <rect x={p.x} y={p.y} width={W} height={H} rx={6} />
               <text x={p.x + 10} y={p.y + 18} fontWeight={600}>{n.id}{powered === 0 ? " · OFF" : ""}</text>
-              <text x={p.x + 10} y={p.y + 33} className="sub">{n.label.length > 23 ? `${n.label.slice(0, 22)}…` : n.label}</text>
+              <text x={p.x + 10} y={p.y + 33} className="node-sub">{n.label.length > 23 ? `${n.label.slice(0, 22)}…` : n.label}</text>
             </g>
           );
         })}

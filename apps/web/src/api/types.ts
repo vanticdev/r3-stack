@@ -409,6 +409,9 @@ export interface ModelResponse {
 // ------------------------------------------------------------------ cad
 export interface CadPart {
   part_name?: string;
+  /** "fastener" for screws/nuts; those are not graph components and carry their `owner`. */
+  kind?: string;
+  owner?: string;
   mass: number;
   com?: Vec3;
   inertia?: number[];

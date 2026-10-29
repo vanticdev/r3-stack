@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { expect, request, test, type Page } from "@playwright/test";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const shots = path.resolve(here, "..", "test-results", "screenshots");
+const shots = path.resolve(here, "..", process.env.R3_E2E_SCREENSHOTS ?? "test-results/screenshots");
 mkdirSync(shots, { recursive: true });
 const pid = process.env.R3_E2E_PROJECT ?? "rc-car";
 

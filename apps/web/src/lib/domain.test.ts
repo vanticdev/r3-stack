@@ -248,3 +248,13 @@ describe("live updates", () => {
     expect(run.events).toHaveLength(4);
   });
 });
+
+describe("charts", async () => {
+  const { tickLabels } = await import("../components/TimeChart.tsx");
+  it("tick labels use the tick spacing's precision", () => {
+    expect(tickLabels([0.7285, 0.729, 0.7295, 0.73])).toEqual(["0.7285", "0.7290", "0.7295", "0.7300"]);
+    expect(tickLabels([-0.00001, 0, 0.00001])).toEqual(["-0.00001", "0", "0.00001"]);
+    expect(tickLabels([0, 2, 4])).toEqual(["0", "2", "4"]);
+    expect(tickLabels([-0.0000001, 0.5])).toEqual(["-0.0", "0.5"].map((x) => (Number(x) === 0 ? "0" : x)));
+  });
+});

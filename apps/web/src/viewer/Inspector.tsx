@@ -27,7 +27,9 @@ export function Inspector({ data, selection, onClear }: { data: RobotData; selec
           <h3>Robot</h3>
           <Kv rows={[
             ["Parts", data.components.length],
-            ["CAD meshes", `${Object.keys(data.meshes).length} / ${data.components.length}`],
+            ["CAD meshes", `${data.components.filter((c) => data.meshes[c.id]).length} / ${data.components.length}`],
+            ["Fasteners (CAD)", data.hardware.length],
+            ["Interference regions", data.interference.length],
             ["Wires", data.wires.length],
             ["Joints", data.joints.length],
             ["Error diagnostics", errors],

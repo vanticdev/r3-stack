@@ -30,6 +30,10 @@ export interface Selection {
 
 export interface ViewOptions {
   wires: boolean;
+  /** CAD fasteners (screws, nuts) */
+  hardware: boolean;
+  /** Envelope interference regions from the model stage */
+  interference: boolean;
   interfaces: boolean;
   joins: boolean;
   joints: boolean;
@@ -44,7 +48,7 @@ export interface PlaybackState {
   follow: boolean;
 }
 
-const DEFAULT_OPTIONS: ViewOptions = { wires: true, interfaces: false, joins: false, joints: false, xray: false, issues: false, explode: 0 };
+const DEFAULT_OPTIONS: ViewOptions = { wires: true, hardware: true, interference: false, interfaces: false, joins: false, joints: false, xray: false, issues: false, explode: 0 };
 const IDENTITY = new Matrix4();
 const HIGHLIGHT = new Color("#f97316");
 const SELECTED = new Color("#3987e5");
@@ -148,6 +152,24 @@ function Part({ c, url, matrix, state, xray, error, edge, register, onSelect, on
           </Suspense>
         </MeshBoundary>
       ) : envelope}
+    </group>
+  );
+}
+
+/** A fastener or other CAD-only part, drawn in its owner's frame. */
+function HardwarePart({ id, owner, url, matrix, state, register, onSelect }: {
+  id: string; owner: string; url: string; matrix: Matrix4; state: PartState;
+  register: (id: string, group: Group | null) => void; onSelect?: (s: Selection) => void;
+}) {
+  const material = useMaterial("#a7adb4", state, { metal: true });
+  const click = (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onSelect?.({ kind: "component", id: owner }); };
+  return (
+    <group ref={(g) => register(id, g)} matrixAutoUpdate={false} matrix={matrix} name={id}>
+      <MeshBoundary fallback={null}>
+        <Suspense fallback={null}>
+          <StlMesh url={url} material={material} outline={null} onClick={click} onHover={() => undefined} />
+        </Suspense>
+      </MeshBoundary>
     </group>
   );
 }
@@ -284,7 +306,8 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
   const rest = useMemo(() => (root ? restPoses(frames, root) : {}), [frames, root]);
   const assignment = useMemo(() => {
     const bodies = new Set(Object.keys(frames.bodies));
-    return Object.fromEntries(data.components.map((c) => [c.id, frames.component_bodies?.[c.id] ?? componentBody(data.tree, c.id, bodies, root)]));
+    const of = (id: string) => frames.component_bodies?.[id] ?? componentBody(data.tree, id, bodies, root);
+    return Object.fromEntries([...data.components.map((c) => [c.id, of(c.id)]), ...data.hardware.map((h) => [h.id, of(h.owner)])]);
   }, [data, frames, root]);
   useEffect(() => invalidate(), [t, invalidate]);
   useFrame(() => {
@@ -447,11 +470,17 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
       <div className="viewer-toolbar">
         <div className="group" role="toolbar" aria-label="Overlays">
           {!playback && <button className={options.wires ? "on" : ""} onClick={() => toggle("wires")} title="Harness routes">Wires</button>}
+          {data.hardware.length > 0 && <button className={options.hardware ? "on" : ""} onClick={() => toggle("hardware")} title={`${data.hardware.length} CAD fasteners`}>Fasteners</button>}
           <button className={options.interfaces ? "on" : ""} onClick={() => toggle("interfaces")} title="Connector / assembly interfaces">Interfaces</button>
           <button className={options.joins ? "on" : ""} onClick={() => toggle("joins")} title="Mount joins and CAD contacts">Joins</button>
           {!playback && <button className={options.joints ? "on" : ""} onClick={() => toggle("joints")} title="Joint axes and sliders">Joints</button>}
           <button className={options.xray ? "on" : ""} onClick={() => toggle("xray")} title="See-through parts">X-ray</button>
           <button className={options.issues ? "on" : ""} onClick={() => toggle("issues")} title="Tint parts with error diagnostics">Issues</button>
+          {data.interference.length > 0 && !playback && (
+            <button className={options.interference ? "on" : ""} onClick={() => toggle("interference")} title="Envelope overlaps found by the model stage">
+              Interference <span className="badge critical">{data.interference.length}</span>
+            </button>
+          )}
         </div>
         {!playback && (
           <div className="group">
@@ -504,15 +533,21 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
 
         {data.components.map((c) => (
           <Part key={c.id} c={c} url={data.meshes[c.id]} matrix={playback ? IDENTITY : matrices[c.id] ?? IDENTITY} state={stateOf(c.id)}
-                xray={options.xray} error={options.issues && errorParts.has(c.id)} edge={dark ? "#77766f" : "#3a3a36"} register={register} onSelect={onSelect} onHover={setHover} />
+                xray={options.xray} error={options.issues && !anyFocus && errorParts.has(c.id)} edge={dark ? "#77766f" : "#3a3a36"} register={register} onSelect={onSelect} onHover={setHover} />
+        ))}
+        {options.hardware && data.hardware.map((h) => (
+          <HardwarePart key={h.id} id={h.id} owner={h.owner} url={h.url} matrix={playback ? IDENTITY : matrices[h.owner] ?? IDENTITY}
+                        state={anyFocus || selected ? (stateOf(h.owner) === "ghost" ? "ghost" : "normal") : "normal"}
+                        register={register} onSelect={onSelect} />
         ))}
         {!playback && options.wires && options.explode < 0.02 && data.wires.map((w) => (
           <WireTube key={w.id} w={w} state={stateOf(w.id, true)} onSelect={onSelect} onHover={setHover} />
         ))}
-        {!playback && data.interference.map((o, i) => (
+        {!playback && options.interference && data.interference
+          .filter((o) => !anyFocus || focus.components.has(o.a) || focus.components.has(o.b)).map((o, i) => (
           <mesh key={`int${i}`} position={o.center}>
             <boxGeometry args={o.extent.map((v) => Math.max(v, 0.0006)) as Vec3} />
-            <meshBasicMaterial color="#d03b3b" transparent opacity={0.6} depthTest={false} />
+            <meshBasicMaterial color="#d03b3b" transparent opacity={0.45} depthWrite={false} />
           </mesh>
         ))}
         {options.interfaces && <InterfacesOverlay data={data} matrices={playback ? {} : matrices} />}
@@ -546,7 +581,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         ) : anyFocus ? (
           <span><span className="swatch" style={{ background: "#f97316" }} /> {focus.components.size} part(s), {focus.wires.size} wire(s) highlighted</span>
         ) : (
-          <span>{meshCount}/{data.components.length} parts from CAD meshes{meshCount < data.components.length ? " (rest: catalog envelopes)" : ""} · {data.wires.length} wires · click to inspect</span>
+          <span>{meshCount}/{data.components.length} parts from CAD meshes{meshCount < data.components.length ? " (rest: catalog envelopes)" : ""}{data.hardware.length ? ` + ${data.hardware.length} fasteners` : ""} · {data.wires.length} wires · click to inspect</span>
         )}
         {options.interfaces && <span><span className="swatch" style={{ background: "#3987e5" }} /> component connector <span className="swatch" style={{ background: "#199e70" }} /> harness connector</span>}
         {options.joins && <span><span className="swatch" style={{ background: "#c98500" }} /> mount join <span className="swatch" style={{ background: "#9085e9" }} /> CAD contact</span>}
