@@ -794,8 +794,11 @@ class CoSimKernel:
         dt, t1 = self.dt, self.t
         position = state.position()
         rotation = state.rotation()
-        # 5. cables: stepped inside MuJoCo (step 4); clearance from this step's contact data.
+        # 5. cables: stepped inside MuJoCo (step 4); clearance from this step's contact data (captured by
+        # Vehicle.complete_step in the overlapped loop and measured here, while the next mj_step1 runs).
         if self.vehicle.cables is not None:
+            if self.vehicle.cables.pending:
+                self.vehicle.cables.update()
             if float(self.vehicle.cables.current.min()) < self.min_wire_clearance[0]:
                 self._update_min_clearance()
             if t1 + 1e-9 >= self._next_cable:

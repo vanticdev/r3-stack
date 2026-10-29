@@ -88,16 +88,17 @@ print(kernel.vehicle.overlapped, digest.hexdigest(), repr(kernel.min_wire_cleara
 
 
 def test_overlapped_stepping_is_bit_identical(routed):
-    """Serial (R3_SIM_OVERLAP=0) and overlapped stepping give identical recordings. Each run is
-    its own process: libngspice is process-global, so a second circuit in one process starts
-    from different library state."""
+    """Serial stepping without MuJoCo's thread pool (R3_SIM_OVERLAP=0, R3_MUJOCO_THREADS=0) and overlapped
+    stepping with it (cable clearance measured while the next mj_step1 runs) give identical recordings. Each
+    run is its own process: libngspice is process-global, so a second circuit in one process starts from
+    different library state."""
     import os
     import subprocess
 
     project, _ = routed
     results = []
-    for overlap in ("0", "1"):
-        env = {**os.environ, "R3_SIM_OVERLAP": overlap, "PYTHONPATH": os.pathsep.join(sys.path)}
+    for overlap, threads in (("0", "0"), ("1", "4")):
+        env = {**os.environ, "R3_SIM_OVERLAP": overlap, "R3_MUJOCO_THREADS": threads, "PYTHONPATH": os.pathsep.join(sys.path)}
         run = subprocess.run([sys.executable, "-c", _RUN, str(project.root)], env=env, capture_output=True, text=True,
                              timeout=600)
         assert run.returncode == 0, run.stderr[-2000:]
