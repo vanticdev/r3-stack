@@ -1,0 +1,148 @@
+# Wire-end termination data per cable-side connector type (keyed by the catalog
+# connector id). Lengths in m, forces in N.
+#
+# method:            crimp | solder_cup | bullet_solder | component_lead | splice
+# housing:           cable-side housing part
+# contact:           terminal / contact part (one per conductor)
+# strip:             [nominal, +-tolerance] insulation strip length
+# insertion:         conductor length (insulated) consumed inside the housing behind the strip,
+#                    from the housing rear face (where the router's path starts) to the
+#                    insulation crimp / cup rim
+# rework:            extra length kept in the service loop for one re-termination
+# contact_retention: force the contact latch holds in the housing (pull along the wire)
+# tool:              crimp or solder tooling
+# Status: MPNs follow the vendor catalogues; strip / insertion / retention are
+# engineering estimates unless the provenance says datasheet.
+terminations:
+  xt60-male:
+    method: solder_cup
+    housing: {mpn: XT60H-M, manufacturer: AMASS, description: "XT60 male plug with sheath"}
+    contact: null
+    strip: [6.0 mm, 0.5 mm]
+    insertion: 0 mm
+    rework: 6 mm
+    contact_retention: 80 N
+    tool: {description: "60-80 W soldering iron, 1.5 mm chisel tip; 6 mm heat-shrink over each cup"}
+    heat_shrink: {description: "Polyolefin heat-shrink 6.4 mm, 2:1", length: 12 mm}
+    provenance: {status: estimated, source: "AMASS XT60H solder cup ~5 mm deep (catalogue drawing); strip/rework estimated"}
+  xt60-female:
+    method: solder_cup
+    housing: {mpn: XT60H-F, manufacturer: AMASS, description: "XT60 female socket with sheath"}
+    contact: null
+    strip: [6.0 mm, 0.5 mm]
+    insertion: 0 mm
+    rework: 6 mm
+    contact_retention: 80 N
+    tool: {description: "60-80 W soldering iron, 1.5 mm chisel tip; 6 mm heat-shrink over each cup"}
+    heat_shrink: {description: "Polyolefin heat-shrink 6.4 mm, 2:1", length: 12 mm}
+    provenance: {status: estimated, source: "AMASS XT60H solder cup; strip/rework estimated"}
+  xt30-male:
+    method: solder_cup
+    housing: {mpn: XT30U-M, manufacturer: AMASS, description: "XT30 male plug"}
+    contact: null
+    strip: [4.5 mm, 0.5 mm]
+    insertion: 0 mm
+    rework: 5 mm
+    contact_retention: 40 N
+    tool: {description: "60 W soldering iron, 1.2 mm chisel tip; 4.8 mm heat-shrink over each cup"}
+    heat_shrink: {description: "Polyolefin heat-shrink 4.8 mm, 2:1", length: 10 mm}
+    provenance: {status: estimated, source: "AMASS XT30U; strip/rework estimated"}
+  xt30-female:
+    method: solder_cup
+    housing: {mpn: XT30U-F, manufacturer: AMASS, description: "XT30 female socket"}
+    contact: null
+    strip: [4.5 mm, 0.5 mm]
+    insertion: 0 mm
+    rework: 5 mm
+    contact_retention: 40 N
+    tool: {description: "60 W soldering iron, 1.2 mm chisel tip; 4.8 mm heat-shrink over each cup"}
+    heat_shrink: {description: "Polyolefin heat-shrink 4.8 mm, 2:1", length: 10 mm}
+    provenance: {status: estimated, source: "AMASS XT30U; strip/rework estimated"}
+  bullet-3.5-female:
+    method: bullet_solder
+    housing: {mpn: null, manufacturer: generic, description: "3.5 mm gold bullet, female, solder cup"}
+    contact: null
+    strip: [6.0 mm, 0.5 mm]
+    insertion: 0 mm
+    rework: 6 mm
+    contact_retention: 60 N
+    tool: {description: "60-80 W soldering iron; 6.4 mm heat-shrink, 20 mm, over the bullet body"}
+    heat_shrink: {description: "Polyolefin heat-shrink 6.4 mm, 2:1", length: 20 mm}
+    provenance: {status: estimated, source: "Generic 3.5 mm bullet; no MPN assigned"}
+  bullet-3.5-male:
+    method: bullet_solder
+    housing: {mpn: null, manufacturer: generic, description: "3.5 mm gold bullet, male, solder cup"}
+    contact: null
+    strip: [6.0 mm, 0.5 mm]
+    insertion: 0 mm
+    rework: 6 mm
+    contact_retention: 60 N
+    tool: {description: "60-80 W soldering iron; 6.4 mm heat-shrink over the bullet body"}
+    heat_shrink: {description: "Polyolefin heat-shrink 6.4 mm, 2:1", length: 20 mm}
+    provenance: {status: estimated, source: "Generic 3.5 mm bullet; no MPN assigned"}
+  jst-xh-3-housing:
+    method: crimp
+    housing: {mpn: XHP-3, manufacturer: JST, description: "XH 2.50 mm 3-way receptacle housing"}
+    contact: {mpn: SXH-001T-P0.6, manufacturer: JST, description: "XH socket contact, AWG 28-22"}
+    strip: [2.3 mm, 0.3 mm]
+    insertion: 4.5 mm
+    rework: 8 mm
+    contact_retention: 9.8 N
+    tool: {mpn: WC-110, manufacturer: JST, description: "JST hand crimp tool for XH contacts (verify die vs. AWG)"}
+    provenance: {status: estimated, source: "JST XH (eXH.pdf) housing/contact MPNs; strip, insertion, retention and tool estimated"}
+  jst-gh-4-housing:
+    method: crimp
+    housing: {mpn: GHR-04V-S, manufacturer: JST, description: "GH 1.25 mm 4-way receptacle housing"}
+    contact: {mpn: SSHL-002T-P0.2, manufacturer: JST, description: "GH socket contact, AWG 30-26"}
+    strip: [1.4 mm, 0.2 mm]
+    insertion: 3.0 mm
+    rework: 6 mm
+    contact_retention: 4.9 N
+    tool: {mpn: null, manufacturer: JST, description: "JST GH hand crimp tool (see JST GH crimp spec)"}
+    provenance: {status: estimated, source: "JST GH (eGH.pdf) housing/contact MPNs; strip, insertion, retention and tool estimated"}
+  servo-3-female:
+    method: crimp
+    housing: {mpn: 50-57-9403, manufacturer: Molex, description: "SL 2.54 mm 3-way receptacle housing"}
+    contact: {mpn: 16-02-0103, manufacturer: Molex, description: "SL crimp socket, AWG 24-22"}
+    strip: [2.5 mm, 0.3 mm]
+    insertion: 5.0 mm
+    rework: 8 mm
+    contact_retention: 13 N
+    tool: {mpn: 63811-1000, manufacturer: Molex, description: "Molex hand crimp tool for SL contacts (verify)"}
+    provenance: {status: estimated, source: "Molex SL 2.54 mm family as the Futaba-J-compatible servo housing; MPNs to verify, dimensions estimated"}
+  integral:
+    method: component_lead
+    housing: null
+    contact: null
+    strip: [0 mm, 0 mm]
+    insertion: 0 mm
+    rework: 0 mm
+    contact_retention: null
+    tool: null
+    provenance: {status: estimated, source: "The conductor is the component's own lead; its length is a purchasing requirement"}
+  splice:
+    method: splice
+    housing: {mpn: null, manufacturer: generic, description: "Solder splice with adhesive-lined heat-shrink (3:1)"}
+    contact: null
+    strip: [8.0 mm, 1.0 mm]
+    insertion: 0 mm
+    rework: 5 mm
+    contact_retention: null
+    tool: {description: "Soldering iron + hot-air gun; adhesive-lined 3:1 heat-shrink, 25 mm"}
+    heat_shrink: {description: "Adhesive-lined polyolefin heat-shrink, 3:1, sized to the splice", length: 25 mm}
+    provenance: {status: estimated, source: "Lineman/inline solder splice practice; strip length estimated"}
+# Minimum pull-out force of a termination by conductor size (crimped or soldered), from the
+# UL 486A-486B pull-out test table (lbf converted to N). Used as the terminal pull limit.
+pull_out_by_awg:
+  30: 6.7
+  28: 8.9
+  26: 13.3
+  24: 22.2
+  22: 35.6
+  20: 57.8
+  18: 89.0
+  16: 133.4
+  14: 222.4
+  12: 311.4
+  10: 355.9
+pull_out_provenance: {status: standard, source: "UL 486A-486B pull-out test values (30 AWG 1.5 lbf ... 10 AWG 80 lbf); verify against the current edition"}

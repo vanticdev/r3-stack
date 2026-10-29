@@ -221,15 +221,22 @@ def build_passive_network(project: Any, routes: dict[str, Any] | None) -> Passiv
             insulation = math.pi * (gauge.outer_diameter ** 2 - gauge.conductor_diameter ** 2) / 4.0
             r_per_m = gauge.resistance_per_m
             hot_r = r_per_m * (1.0 + COPPER_ALPHA * (25.0 + RATED_RISE_K - 20.0))
-            rth_per_m = RATED_RISE_K / (gauge.ampacity ** 2 * hot_r)  # K m / W
+            # Installed rating from the wiring stage (bundling and enclosure temperature derating,
+            # r3_wiring.bundles); bundling also reduces cooling: the rated rise is reached at
+            # bundle_factor x the free-air ampacity, so R_th grows by 1 / bundle_factor^2.
+            rating = float(route.get("installed_ampacity") or gauge.ampacity)
+            bundle_factor = float((route.get("derating") or {}).get("bundle_factor") or 1.0)
+            rth_per_m = RATED_RISE_K / ((gauge.ampacity * bundle_factor) ** 2 * hot_r)  # K m / W
             cth_per_m = COPPER_VOLUMETRIC_HEAT * area + SILICONE_VOLUMETRIC_HEAT * insulation
             branch = Branch(
                 key=wire.id, kind="wire", a=a, b=b, node_a=edge.a, node_b=edge.b,
                 resistance_ref=r_per_m * length, temperature_coefficient=COPPER_ALPHA,
                 thermal_resistance=rth_per_m / length, heat_capacity=cth_per_m * length,
-                rating=gauge.ampacity, burst_rating=None,
+                rating=rating, burst_rating=None,
                 meta={"harness": harness.id, "awg": wire.awg, "length": length, "length_source": source,
-                      "signal": wire.signal, "area": area, "resistance_per_m": r_per_m, "ampacity": gauge.ampacity})
+                      "signal": wire.signal, "area": area, "resistance_per_m": r_per_m, "ampacity": rating,
+                      "free_air_ampacity": gauge.ampacity, "bundle_factor": bundle_factor,
+                      "rating_source": "installed (wiring stage)" if route.get("installed_ampacity") else "free air"})
             lengths[wire.id] = {"length": length, "source": source}
         elif edge.kind == "mate":
             left, right = edge.ref.split("|")

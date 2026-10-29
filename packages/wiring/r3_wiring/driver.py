@@ -77,11 +77,13 @@ class DriveResult:
     max_strain: float  # largest pin give (m)
     profile: DriveProfile = field(default_factory=DriveProfile)
     assumptions: list[tuple[str, str]] = field(default_factory=list)
+    # wire -> {"end_tension": [start, end] peak N, "time": [s, s]}: cable force at the terminations
+    terminal_loads: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def summary(self) -> dict[str, Any]:
         return {"requirement": self.requirement, "worst": self.worst, "snapshot_time": self.snapshot_time,
                 "max_segment_speed": self.max_speed, "max_pin_error_m": self.max_strain,
-                "profile": self.profile.__dict__,
+                "profile": self.profile.__dict__, "terminal_loads": self.terminal_loads,
                 "wires": {w: {**v, "sags_into_moving": self.sags_into_moving[w],
                               "below_requirement": self.below_requirement[w]} for w, v in self.min_clearance.items()}}
 
@@ -125,6 +127,8 @@ def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet |
     pre_bump: dict[str, np.ndarray] | None = None
     best_sag, snapshot, snapshot_time = -math.inf, sim.positions(), 0.0
     max_speed = max_strain = 0.0
+    bundles = len(sim.plan.bundles)
+    peak_tension, peak_time = np.zeros((bundles, 2)), np.zeros((bundles, 2))
     for k in range(steps):
         t = (k + 1) * profile.dt
         steer = max_steer * profile.steer_fraction(t)
@@ -136,6 +140,10 @@ def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet |
         clearance.append(min(d for d, _ in report.min_clearance.values()))
         accel.append(a_z)
         steer_log.append(steer)
+        tension = sim.monitor.end_tension()
+        if tension.size:
+            better = tension > peak_tension
+            peak_tension[better], peak_time[better] = tension[better], t
         max_speed = max(max_speed, report.max_speed)
         max_strain = max(max_strain, report.max_strain)
         if pre_bump is None and t >= profile.bump_time - profile.dt:
@@ -151,11 +159,14 @@ def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet |
     worst = {"wire": worst_wire, "min_distance": history[worst_wire][0] if worst_wire else math.inf,
              "component": history[worst_wire][1] if worst_wire else "",
              "time": history[worst_wire][2] if worst_wire else 0.0}
+    index = {b.id: i for i, b in enumerate(sim.plan.bundles)}
+    terminal_loads = {wire: {"end_tension": peak_tension[index[b]].tolist(), "time": peak_time[index[b]].tolist()}
+                      for wire, b in sim.plan.wire_bundle.items()}
     return DriveResult(min_clearance, {w: v["min_distance"] < 0 for w, v in min_clearance.items()},
                        {w: v["min_distance"] < requirement for w, v in min_clearance.items()}, worst, snapshot,
                        snapshot_time, {"time": np.asarray(times), "min_clearance": np.asarray(clearance),
                                        "accel_z": np.asarray(accel), "steer": np.asarray(steer_log)},
-                       requirement, max_speed, max_strain, profile, list(sim.plan.assumptions))
+                       requirement, max_speed, max_strain, profile, list(sim.plan.assumptions), terminal_loads)
 
 
 def main(argv: list[str] | None = None) -> int:
