@@ -7,6 +7,7 @@ import { OverviewPage } from "./pages/OverviewPage.tsx";
 import { ElectricalPage } from "./pages/ElectricalPage.tsx";
 import { PcbPage } from "./pages/PcbPage.tsx";
 import { SoftwarePage } from "./pages/SoftwarePage.tsx";
+import { PartsPage } from "./pages/PartsPage.tsx";
 import { AgentPage } from "./pages/AgentPage.tsx";
 import { DeployPage } from "./pages/DeployPage.tsx";
 import { SettingsPage } from "./pages/SettingsPage.tsx";
@@ -38,6 +39,7 @@ const router = createHashRouter([
           { path: "electrical", element: <ElectricalPage /> },
           { path: "pcb", element: <PcbPage /> },
           { path: "software", element: <SoftwarePage /> },
+          { path: "parts", element: <PartsPage /> },
           { path: "sim", element: lazyPage(<SimulationPage />) },
           { path: "diagnostics", element: lazyPage(<DiagnosticsPage />) },
           { path: "agent", element: <AgentPage /> },

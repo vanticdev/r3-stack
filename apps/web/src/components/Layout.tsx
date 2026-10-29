@@ -15,6 +15,7 @@ const PROJECT_NAV: { to: string; label: string; icon: IconName }[] = [
   { to: "wiring", label: "Wiring", icon: "wire" },
   { to: "electrical", label: "Electrical", icon: "bolt" },
   { to: "pcb", label: "PCB", icon: "chip" },
+  { to: "parts", label: "Parts", icon: "folder" },
   { to: "software", label: "Software", icon: "code" },
   { to: "sim", label: "Simulation", icon: "play" },
   { to: "diagnostics", label: "Diagnostics", icon: "pulse" },
