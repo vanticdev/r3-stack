@@ -1,7 +1,8 @@
 # Orchestrator (`r3_orchestrator`)
 
 The `r3` CLI and the R3 MCP server that humans, CI, Codex and Claude Code use
-to work on a robot project. Both expose the same operations (`api.py`) and
+to work on a robot project, plus the HTTP API behind the web app (`r3 serve`).
+All three expose the same operations (`api/__init__.py`) and
 return the same structured diagnostics. GitHub is the source of truth
 (`integrations/github`); this package schedules stages, persists results
 under `build/<stage>/result.json`, and writes the report.
@@ -42,6 +43,8 @@ r3 diagnose          # errors grouped by subject, with hints
 r3 deploy --target sim [--scenario id]
 r3 deploy --target fleet --yes [--force] [-- <backend/deploy.py args>]
 r3 create <name> [--from rc-car|blank] [--dir .] [--github [--private|--public]]
+r3 status --release  # release gate: requirement evidence matrix; exit 1 unless fabrication ready
+r3 serve [--host 127.0.0.1] [--port 8321] [--projects-root DIR]   # HTTP API + apps/web/dist
 ```
 
 `--project/-C` selects the project (default `$R3_PROJECT`, then the nearest
@@ -54,8 +57,8 @@ validation required before a fleet deploy).
 `python -m r3_orchestrator.mcp_server` (stdio). Tools: `r3_status`,
 `r3_validate`, `r3_run_stage`, `r3_get_diagnostics`, `r3_diagnose`,
 `r3_get_spec`, `r3_patch_spec`, `r3_list_catalog`, `r3_run_scenario`,
-`r3_get_artifact`, `r3_create_project`, and the gated `deploy_fleet` and
-`create_github_repo`.
+`r3_get_artifact`, `r3_release_status`, `r3_doctor`, `r3_create_project`, and
+the gated `deploy_fleet` and `create_github_repo` (`mcp_server.TOOL_TIERS`).
 
 - Design and simulation tools are free. `deploy_fleet` (physical robots) and
   `create_github_repo` (external account) refuse unless `confirm=true`, and
@@ -88,9 +91,25 @@ codex mcp add r3 --env R3_PROJECT=$PWD/examples/robots/rc-car -- \
 or append [`examples/codex-config.toml`](examples/codex-config.toml) to
 `~/.codex/config.toml`.
 
+## Release gate
+
+`r3_orchestrator/release.py` classifies every `requirements:` entry, every
+scenario `expect` key and every stage as `verified`, `estimated`, `failed`,
+`stale` or `not_run`, with evidence (stage, check, value, limit, artifact,
+input fingerprint). `fabrication_ready` requires all `verified`. Shared by
+`r3 status --release`, the MCP tool `r3_release_status` and the HTTP API.
+
+## HTTP API and agents
+
+`r3 serve` (needs the `api` extra) serves the API at `/api` (OpenAPI at
+`/api/openapi.json`) and the built web app. Runs execute in worker processes,
+one at a time per project, streamed as SSE. Headless Claude Code / Codex
+sessions run in the project directory with the R3 MCP server configured; gated
+tools are never pre-approved. See [docs/architecture/api.md](../../docs/architecture/api.md).
+
 ## Tests
 
 ```bash
-.venv/bin/python -m pytest tests/test_orchestrator_*.py
+.venv/bin/python -m pytest tests/test_orchestrator_*.py tests/test_api_*.py
 node --test apps/web/tests/loader.test.mjs
 ```

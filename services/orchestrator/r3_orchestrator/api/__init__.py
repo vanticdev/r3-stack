@@ -19,8 +19,8 @@ from typing import Any
 from r3_model.diagnostics import Diagnostic, Severity, StageResult
 from r3_model.project import Project
 
-from . import stages as stage_runner
-from .hints import hint_for
+from .. import stages as stage_runner
+from ..hints import hint_for
 
 PROJECT_ENV = "R3_PROJECT"
 MAX_INLINE_ARTIFACT = 2_000_000  # bytes returned inline by get_artifact
@@ -151,6 +151,13 @@ def status(project_path: str | Path | None = None) -> dict[str, Any]:
     }
 
 
+def release(project_path: str | Path | None = None) -> dict[str, Any]:
+    """Requirement evidence matrix and ``fabrication_ready`` (see ``r3_orchestrator.release``)."""
+    from ..release import evaluate
+
+    return evaluate(load_project(project_path))
+
+
 def list_catalog(project_path: str | Path | None = None, kind: str | None = None, query: str | None = None) -> dict[str, Any]:
     project = load_project(project_path)
     catalog = project.catalog
@@ -173,12 +180,19 @@ def list_catalog(project_path: str | Path | None = None, kind: str | None = None
     return {"ok": True, "components": components, "connectors": connectors, "wires": wires}
 
 
+def resolve_artifact(root: str | Path, path: str) -> Path | None:
+    """``build/<path>`` resolved (symlinks included), or None if it escapes ``build/``."""
+    build = (Path(root) / "build").resolve()
+    target = (build / path.removeprefix("build/")).resolve()
+    return target if build in (target, *target.parents) else None
+
+
 def get_artifact(project_path: str | Path | None, path: str) -> dict[str, Any]:
     """Read a file under ``build/``. JSON is parsed, text returned, images base64-encoded."""
     project = load_project(project_path)
     build = (project.root / "build").resolve()
-    target = (build / path.removeprefix("build/")).resolve()
-    if build not in (target, *target.parents):
+    target = resolve_artifact(project.root, path)
+    if target is None:
         return {"ok": False, "code": "artifact_outside_build", "path": path}
     if not target.exists():
         available = sorted(str(p.relative_to(build)) for p in build.rglob("*") if p.is_file())[:200] if build.exists() else []

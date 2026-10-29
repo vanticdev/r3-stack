@@ -53,6 +53,11 @@ def _print_results(payload: dict[str, Any]) -> None:
 
 
 def _print_status(payload: dict[str, Any]) -> None:
+    if payload.get("view") == "release":
+        from .release import print_release
+
+        print_release(payload)
+        return
     robot, summary = payload["robot"], payload["summary"]
     print(f"{robot['name']} v{robot['version']}  ({payload['project']})")
     git = payload.get("git") or {}
@@ -115,6 +120,8 @@ def _single(stage: str) -> Callable[[argparse.Namespace], dict[str, Any]]:
 
 
 def cmd_status(args: argparse.Namespace) -> dict[str, Any]:
+    if args.release:
+        return {**api.release(args.project), "view": "release"}
     return api.status(args.project)
 
 
@@ -131,6 +138,16 @@ def cmd_deploy(args: argparse.Namespace) -> dict[str, Any]:
 def cmd_create(args: argparse.Namespace) -> dict[str, Any]:
     return api.create_project(args.name, parent=args.dir, template=args.template, github=args.github, private=args.private,
                               confirm=args.github, platform_url=args.platform_url)
+
+
+def cmd_serve(args: argparse.Namespace) -> dict[str, Any]:
+    try:
+        from .api.server import serve
+    except ImportError as error:
+        return {"ok": False, "code": "api_unavailable",
+                "message": f"r3 serve needs the api extra (pip install 'r3-platform[api]'): {error}"}
+    serve(host=args.host, port=args.port, projects_roots=args.projects_root, web_dist=args.web_dist)
+    return {"ok": True, "code": "", "served": f"http://{args.host}:{args.port}"}
 
 
 def cmd_doctor(args: argparse.Namespace) -> dict[str, Any]:
@@ -184,7 +201,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.set_defaults(func=_single("sim"))
 
     sub.add_parser("report", parents=[common], help="Regenerate build/report from stored results.").set_defaults(func=_single("report"))
-    sub.add_parser("status", parents=[common], help="Project, revision and stage status.").set_defaults(func=cmd_status)
+    p = sub.add_parser("status", parents=[common], help="Project, revision and stage status.")
+    p.add_argument("--release", action="store_true",
+                   help="Release gate: requirement evidence matrix (verified/estimated/failed/stale/not_run); exit 1 unless fabrication ready.")
+    p.set_defaults(func=cmd_status)
     p = sub.add_parser("diagnose", parents=[common], help="Errors grouped by subject with hints.")
     p.add_argument("--errors-only", action="store_true")
     p.set_defaults(func=cmd_diagnose)
@@ -201,6 +221,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--require", action="append", metavar="STAGE",
                    help="Exit 1 unless these stages (repeatable or comma separated) can run headless.")
     p.set_defaults(func=cmd_doctor)
+
+    p = sub.add_parser("serve", parents=[common], help="Serve the HTTP API and the web app (apps/web/dist).")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8321)
+    p.add_argument("--projects-root", action="append", metavar="DIR",
+                   help="Directory containing projects (repeatable; default: examples/robots).")
+    p.add_argument("--web-dist", default=None, help="Built web app to serve (default: apps/web/dist).")
+    p.set_defaults(func=cmd_serve)
 
     p = sub.add_parser("create", parents=[common], help="Scaffold a new R3 robot project repository.")
     p.add_argument("name")
@@ -236,6 +264,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"  {error}", file=sys.stderr)
     else:
         PRINTERS.get(args.command, _print_generic)(payload)
+    if payload.get("view") == "release":
+        return EXIT_OK if payload["fabrication_ready"] else EXIT_ERRORS
     if payload.get("ok"):
         return EXIT_OK
     if payload.get("code") in ("confirmation_required", "usage_error", "project_not_found", "validation_required"):

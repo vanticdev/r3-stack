@@ -18,7 +18,7 @@ import time
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 from r3_model.diagnostics import Diagnostic, Severity, StageResult
 from r3_model.project import Project
@@ -139,15 +139,30 @@ def load_results(project: Project) -> dict[str, StageResult]:
     return results
 
 
-def validate(project: Project, stages: list[str] | None = None, report: bool = True, **options: Any) -> list[StageResult]:
-    """Run the requested stages (default: all) in pipeline order, then the report."""
+#: ``listener(stage, result)`` is called with ``result=None`` before a stage runs and with its result after.
+StageListener = Callable[[str, "StageResult | None"], None]
+
+
+def plan(stages: list[str] | None = None, report: bool = True) -> list[str]:
+    """Stage names ``validate`` would run, in pipeline order."""
     wanted = stages or stage_names()
     unknown = [s for s in wanted if s not in ALL_STAGES]
     if unknown:
         raise KeyError(f"unknown stage(s): {', '.join(unknown)}; known: {', '.join(ALL_STAGES)}")
-    results = [run_stage(project, s.name, **options) for s in STAGES if s.name in wanted]
-    if report or "report" in wanted:
-        results.append(run_stage(project, "report"))
+    return [s.name for s in STAGES if s.name in wanted] + (["report"] if report or "report" in wanted else [])
+
+
+def validate(project: Project, stages: list[str] | None = None, report: bool = True, listener: StageListener | None = None,
+             **options: Any) -> list[StageResult]:
+    """Run the requested stages (default: all) in pipeline order, then the report."""
+    results = []
+    for name in plan(stages, report):
+        if listener:
+            listener(name, None)
+        result = run_stage(project, name, **(options if name != "report" else {}))
+        if listener:
+            listener(name, result)
+        results.append(result)
     return results
 
 
