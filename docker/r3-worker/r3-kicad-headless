@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# Start the KiCad GUI app headless (under Xvfb) with its IPC API server enabled.
+#
+#   r3-kicad-headless [--app kicad|pcbnew|eeschema] [--timeout SECONDS] [FILE] [-- COMMAND...]
+#
+# With a COMMAND, KiCad is started, COMMAND runs with KICAD_API_SOCKET set,
+# and KiCad and Xvfb are stopped when it exits; the exit code is COMMAND's.
+# Without one, the launcher prints the socket and keeps KiCad in the foreground
+# until it is interrupted.
+#
+# kicad-cli covers ERC/DRC/exports without any of this. The IPC API (used by
+# kicad-python / kipy) is served only by the running GUI app, so a server needs
+# a virtual X display. The script also seeds a first-run configuration (global
+# library tables, API server enabled) so no modal dialog blocks startup.
+set -euo pipefail
+
+app="kicad"
+timeout=90
+file=""
+command=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --app) app="$2"; shift 2 ;;
+    --timeout) timeout="$2"; shift 2 ;;
+    --) shift; command=("$@"); break ;;
+    -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) file="$1"; shift ;;
+  esac
+done
+
+version="$(kicad-cli version 2>/dev/null | head -n1 | cut -d. -f1-2)"
+version="${version:-10.0}"
+config_root="${KICAD_CONFIG_HOME:-${XDG_CONFIG_HOME:-$HOME/.config}/kicad}"
+config="$config_root/$version"
+mkdir -p "$config"
+share="${KICAD_SHARE:-/usr/share/kicad}"
+for table in sym-lib-table fp-lib-table design-block-lib-table; do
+  if [[ ! -f "$config/$table" ]]; then
+    if [[ -f "$share/template/$table" ]]; then
+      cp "$share/template/$table" "$config/$table"
+    else
+      # KiCad 10's first-run wizard ("KiCad Setup") opens when any global table is
+      # missing; an empty table is valid and keeps it closed.
+      printf '(%s\n\t(version 7)\n)\n' "${table//-/_}" > "$config/$table"
+    fi
+  fi
+done
+# Settings the first-run wizard would ask for: API server on, prompts already
+# answered, no update checks (a server should not phone home or show a dialog).
+python3 - "$config" <<'PY'
+import json, pathlib, sys
+config = pathlib.Path(sys.argv[1])
+
+def update(name, changes):
+    path = config / name
+    data = json.loads(path.read_text()) if path.exists() else {}
+    for dotted, value in changes.items():
+        node = data
+        *parents, key = dotted.split(".")
+        for parent in parents:
+            node = node.setdefault(parent, {})
+        node[key] = value
+    path.write_text(json.dumps(data, indent=2))
+
+update("kicad_common.json", {"api.enable_server": True,
+                             "do_not_show_again.data_collection_prompt": True,
+                             "do_not_show_again.update_check_prompt": True})
+update("kicad.json", {"system.check_for_kicad_updates": False, "pcm.check_for_updates": False})
+PY
+
+runtime="${XDG_RUNTIME_DIR:-/tmp/r3-kicad-$$}"
+mkdir -p "$runtime" && chmod 700 "$runtime"
+export XDG_RUNTIME_DIR="$runtime"
+socket_dir="/tmp/kicad"
+mkdir -p "$socket_dir"
+# KiCad listens on /tmp/kicad/api.sock, or api-<pid>.sock if that is taken.
+before="$(ls "$socket_dir" 2>/dev/null || true)"
+
+xvfb_pid=""
+if [[ -z "${DISPLAY:-}" ]]; then
+  display_number=99
+  while [[ -e "/tmp/.X11-unix/X$display_number" || -e "/tmp/.X$display_number-lock" ]]; do
+    display_number=$((display_number + 1))
+  done
+  Xvfb ":$display_number" -screen 0 1920x1080x24 -nolisten tcp > "$runtime/xvfb.log" 2>&1 &
+  xvfb_pid=$!
+  export DISPLAY=":$display_number"
+  for _ in $(seq 1 50); do
+    [[ -e "/tmp/.X11-unix/X$display_number" ]] && break
+    sleep 0.1
+  done
+fi
+
+kicad_pid=""
+cleanup() {
+  [[ -n "$kicad_pid" ]] && kill "$kicad_pid" 2>/dev/null && wait "$kicad_pid" 2>/dev/null || true
+  [[ -n "$xvfb_pid" ]] && kill "$xvfb_pid" 2>/dev/null && wait "$xvfb_pid" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+args=()
+[[ -n "$file" ]] && args+=("$file")
+"$app" "${args[@]}" > "$runtime/kicad.log" 2>&1 &
+kicad_pid=$!
+
+socket=""
+deadline=$((SECONDS + timeout))
+while (( SECONDS < deadline )); do
+  if ! kill -0 "$kicad_pid" 2>/dev/null; then
+    echo "r3-kicad-headless: $app exited early; log:" >&2
+    cat "$runtime/kicad.log" >&2
+    exit 1
+  fi
+  for candidate in "$socket_dir"/api*.sock; do
+    [[ -S "$candidate" ]] || continue
+    if [[ "$candidate" == "$socket_dir/api.sock" ]] || ! grep -qx "$(basename "$candidate")" <<<"$before"; then
+      socket="$candidate"
+    fi
+  done
+  [[ -n "$socket" ]] && break
+  sleep 0.5
+done
+if [[ -z "$socket" ]]; then
+  echo "r3-kicad-headless: no KiCad API socket after ${timeout}s; log:" >&2
+  cat "$runtime/kicad.log" >&2
+  exit 1
+fi
+export KICAD_API_SOCKET="ipc://$socket"
+echo "KICAD_API_SOCKET=$KICAD_API_SOCKET DISPLAY=$DISPLAY pid=$kicad_pid" >&2
+
+if [[ ${#command[@]} -gt 0 ]]; then
+  set +e
+  "${command[@]}"
+  status=$?
+  set -e
+  exit "$status"
+fi
+wait "$kicad_pid"
