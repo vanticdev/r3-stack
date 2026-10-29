@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import socket
 from typing import Any
 from urllib.parse import urlparse
 
-from .api import Clock, Edge, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart
+from .api import Camera, Clock, Edge, Frame, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart
 
 PROTOCOL = "r3-hal/1"
 
@@ -112,6 +113,24 @@ class _Uart(Uart):
         return bytes(self._conn.call("uart.read", device=self._device, max=max_bytes, timeout=timeout)["data"])
 
 
+class _Camera(Camera):
+    """Frames rendered by the twin (MuJoCo offscreen) at the catalog intrinsics and mount pose."""
+
+    def __init__(self, conn: _Connection, port: str, reply: dict[str, Any]) -> None:
+        self._conn, self._port = conn, port
+        self.width, self.height = int(reply["width"]), int(reply["height"])
+        self.fps, self.format = float(reply["fps"]), str(reply["format"])
+        self.intrinsics: dict[str, Any] = dict(reply.get("intrinsics") or {})
+
+    def capture(self, timeout: float = 1.0) -> Frame:
+        reply = self._conn.call("camera.capture", port=self._port, timeout=timeout)
+        return Frame(float(reply["frame_t"]), int(reply["sequence"]), int(reply["width"]), int(reply["height"]),
+                     str(reply["format"]), base64.b64decode(reply["data"]), float(reply.get("exposure_s", 0.0)))
+
+    def close(self) -> None:
+        self._conn.call("camera.close", port=self._port)
+
+
 class VirtualHal(Hal):
     def __init__(self, endpoint: str, module: str = "") -> None:
         self._conn = _Connection(endpoint)
@@ -137,6 +156,11 @@ class VirtualHal(Hal):
     def uart(self, device: str, baud: int) -> Uart:
         self._conn.call("uart.configure", device=device, baud=baud)
         return _Uart(self._conn, device)
+
+    def camera(self, port: str = "cam0", width: int = 640, height: int = 480, fps: float = 30.0,
+               format: str = "rgb888") -> Camera:
+        reply = self._conn.call("camera.configure", port=port, width=int(width), height=int(height), fps=float(fps), format=format)
+        return _Camera(self._conn, port, reply)
 
     def log(self, level: str, message: str, **fields: object) -> None:
         self._conn.call("log", level=level, message=message, fields=fields)

@@ -273,6 +273,8 @@ class CoSimKernel:
                                                 f"{self.hat_supply_wire or 'board input'}); it does not see ESC/motor current."))
 
         self.gpio_lines: dict[tuple[str, int], GpioLineState] = {}
+        # CSI port -> r3_sim.devices.camera.VirtualCamera, created by the HAL server on camera.configure.
+        self.cameras: dict[str, Any] = {}
         self.encoder_line: tuple[str, int] | None = None
         self.encoder: HallEncoder | None = None
         self.encoder_joint: str | None = None
@@ -662,6 +664,8 @@ class CoSimKernel:
                         line.pending_edges.append((t_edge, rising))
         for uart in self.uarts.values():
             uart.deliver(t1)
+        for camera in self.cameras.values():
+            camera.sample(t1, state)
         # 8. record.
         if t1 + 1e-9 >= self._next_record:
             self._next_record += RECORD_PERIOD

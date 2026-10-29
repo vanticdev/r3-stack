@@ -33,6 +33,7 @@ MODELS: dict[str, Callable[..., BehaviorModel]] = {
     "gps.nmea": _constant("gps.nmea"),
     "encoder.hall": _constant("encoder.hall"),
     "imu.mpu6050": _constant("imu.mpu6050"),
+    "camera.csi": _constant("camera.csi"),
     "power_monitor.ina226": _constant("power_monitor.ina226"),
 }
 

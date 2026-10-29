@@ -7,6 +7,8 @@
 * UART: termios raw mode; non-standard rates (CRSF 420000 baud) use ``termios2``
   with ``BOTHER`` via ``TCGETS2``/``TCSETS2``.
 * SPI: spidev ``SPI_IOC_MESSAGE(1)``.
+* Camera: libcamera through ``picamera2`` (Raspberry Pi OS package ``python3-picamera2``),
+  imported only when a camera is opened.
 * Clock: ``time.monotonic`` (CLOCK_MONOTONIC, the same clock as GPIO edge timestamps).
 
 Struct layouts follow the Linux UAPI headers (``linux/i2c-dev.h``, ``linux/i2c.h``,
@@ -26,7 +28,7 @@ import threading
 import time
 from pathlib import Path
 
-from .api import Clock, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart
+from .api import Camera, Clock, Frame, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart
 
 IS_LINUX = sys.platform.startswith("linux")
 
@@ -527,6 +529,65 @@ class LinuxSpi(SpiDevice):
         os.close(self._fd)
 
 
+# Raspberry Pi 5 CSI ports: libcamera camera ids contain the RP1 I2C controller of the port
+# (CAM/DISP 0: i2c@88000, CAM/DISP 1: i2c@80000; Raspberry Pi 5 device tree).
+PI5_CSI_I2C = {"cam0": "i2c@88000", "cam1": "i2c@80000"}
+
+
+def _boottime_to_monotonic(ns: int) -> float:
+    """libcamera ``SensorTimestamp`` is CLOCK_BOOTTIME ns; the HAL clock is CLOCK_MONOTONIC."""
+    offset = time.clock_gettime(time.CLOCK_BOOTTIME) - time.monotonic() if hasattr(time, "CLOCK_BOOTTIME") else 0.0
+    return ns * 1e-9 - offset
+
+
+class LinuxCamera(Camera):
+    """picamera2 video stream at a fixed frame duration (``FrameDurationLimits``)."""
+
+    def __init__(self, port: str, width: int, height: int, fps: float, format: str) -> None:
+        try:
+            from picamera2 import Picamera2  # type: ignore[import-not-found]
+        except ImportError as error:
+            raise HalError("not_supported", f"picamera2 is not installed (apt install python3-picamera2): {error}") from None
+        if format not in ("rgb888", "gray8"):
+            raise HalError("bad_format", f"{format!r}; use rgb888 or gray8")
+        cameras = Picamera2.global_camera_info()
+        wanted = PI5_CSI_I2C.get(port, "")
+        index = next((i for i, info in enumerate(cameras) if wanted and wanted in str(info.get("Id", ""))), None)
+        if index is None:
+            index = int(port[-1]) if port[-1:].isdigit() and int(port[-1]) < len(cameras) else None
+        if index is None:
+            raise HalError("no_such_device", f"no camera on {port} (libcamera sees {len(cameras)})")
+        self.width, self.height, self.fps, self.format = int(width), int(height), float(fps), format
+        self._camera = Picamera2(index)
+        frame_us = int(round(1e6 / self.fps))
+        # picamera2 "BGR888" is stored [R, G, B] per pixel (its "RGB888" is [B, G, R]).
+        config = self._camera.create_video_configuration(main={"size": (self.width, self.height), "format": "BGR888"},
+                                                         controls={"FrameDurationLimits": (frame_us, frame_us)})
+        self._camera.configure(config)
+        self._camera.start()
+
+    def capture(self, timeout: float = 1.0) -> Frame:
+        job = self._camera.capture_request(wait=False)
+        request = self._camera.wait(job, timeout=timeout)
+        if request is None:
+            raise HalError("timeout", f"no frame within {timeout} s")
+        try:
+            image = request.make_array("main")
+            metadata = request.get_metadata()
+        finally:
+            request.release()
+        if self.format == "gray8":
+            image = (image[..., 0] * 0.299 + image[..., 1] * 0.587 + image[..., 2] * 0.114).astype("uint8")
+        stamp = metadata.get("SensorTimestamp")
+        t = _boottime_to_monotonic(int(stamp)) if stamp else time.monotonic()
+        return Frame(t, int(metadata.get("FrameCount", 0) or 0), self.width, self.height, self.format, image.tobytes(),
+                     float(metadata.get("ExposureTime", 0)) * 1e-6)
+
+    def close(self) -> None:
+        self._camera.stop()
+        self._camera.close()
+
+
 class LinuxHal(Hal):
     """Real-hardware HAL. ``bindings()`` is empty: on the Pi, bindings come from the
     module's deployed configuration."""
@@ -559,6 +620,12 @@ class LinuxHal(Hal):
         port = LinuxUart(device, baud)
         self._open.append(port)
         return port
+
+    def camera(self, port: str = "cam0", width: int = 640, height: int = 480, fps: float = 30.0,
+               format: str = "rgb888") -> Camera:
+        camera = LinuxCamera(port, width, height, fps, format)
+        self._open.append(camera)
+        return camera
 
     def close(self) -> None:
         for handle in reversed(self._open):

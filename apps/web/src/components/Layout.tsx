@@ -155,6 +155,8 @@ export function outcomeText(s: StageState): string {
     case "passed": return s.counts.warning ? `Passed · ${countsText(s.counts)}` : "Passed";
     case "running": return "Running…";
     case "unavailable": return "Unavailable here";
+    case "not_configured": return "Not configured yet";
+    case "not_applicable": return "Not applicable";
     default: return "Not run";
   }
 }

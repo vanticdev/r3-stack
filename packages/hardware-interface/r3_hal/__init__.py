@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 
-from .api import Clock, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart
+from .api import Camera, Clock, Frame, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart
 
 
 def open_hal(module: str = "") -> Hal:
@@ -22,4 +22,4 @@ def open_hal(module: str = "") -> Hal:
     raise HalError("unknown_backend", f"R3_HAL={backend!r}")
 
 
-__all__ = ["Clock", "GpioLine", "Hal", "HalError", "I2cBus", "PwmChannel", "SpiDevice", "Uart", "open_hal"]
+__all__ = ["Camera", "Clock", "Frame", "GpioLine", "Hal", "HalError", "I2cBus", "PwmChannel", "SpiDevice", "Uart", "open_hal"]

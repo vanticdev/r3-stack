@@ -423,6 +423,35 @@ components:
       GPIO18: {role: pwm_out, logic_level: 3.3, functions: [pwm0_ch2], current_max: 0.016}
       GPIO19: {role: pwm_out, logic_level: 3.3, functions: [pwm0_ch3], current_max: 0.016}
       GPIO27: {role: gpio, logic_level: 3.3, functions: [gpio], current_max: 0.016}
+      # MIPI CSI-2 camera ports CAM/DISP 0 and 1 (22-pin 0.5 mm; 4 data lanes each). Lanes are passive in the DC model.
+      CAM0_D0_N: {role: passive, net: CAM0_D0_N}
+      CAM0_D0_P: {role: passive, net: CAM0_D0_P}
+      CAM0_D1_N: {role: passive, net: CAM0_D1_N}
+      CAM0_D1_P: {role: passive, net: CAM0_D1_P}
+      CAM0_CK_N: {role: passive, net: CAM0_CK_N}
+      CAM0_CK_P: {role: passive, net: CAM0_CK_P}
+      CAM0_D2_N: {role: passive, net: CAM0_D2_N}
+      CAM0_D2_P: {role: passive, net: CAM0_D2_P}
+      CAM0_D3_N: {role: passive, net: CAM0_D3_N}
+      CAM0_D3_P: {role: passive, net: CAM0_D3_P}
+      CAM0_IO0: {role: gpio, logic_level: 3.3, functions: [gpio], current_max: 0.016}
+      CAM0_IO1: {role: gpio, logic_level: 3.3, functions: [gpio], current_max: 0.016}
+      CAM0_SDA: {role: i2c_sda, logic_level: 3.3, functions: [i2c_cam0_sda]}
+      CAM0_SCL: {role: i2c_scl, logic_level: 3.3, functions: [i2c_cam0_scl]}
+      CAM1_D0_N: {role: passive, net: CAM1_D0_N}
+      CAM1_D0_P: {role: passive, net: CAM1_D0_P}
+      CAM1_D1_N: {role: passive, net: CAM1_D1_N}
+      CAM1_D1_P: {role: passive, net: CAM1_D1_P}
+      CAM1_CK_N: {role: passive, net: CAM1_CK_N}
+      CAM1_CK_P: {role: passive, net: CAM1_CK_P}
+      CAM1_D2_N: {role: passive, net: CAM1_D2_N}
+      CAM1_D2_P: {role: passive, net: CAM1_D2_P}
+      CAM1_D3_N: {role: passive, net: CAM1_D3_N}
+      CAM1_D3_P: {role: passive, net: CAM1_D3_P}
+      CAM1_IO0: {role: gpio, logic_level: 3.3, functions: [gpio], current_max: 0.016}
+      CAM1_IO1: {role: gpio, logic_level: 3.3, functions: [gpio], current_max: 0.016}
+      CAM1_SDA: {role: i2c_sda, logic_level: 3.3, functions: [i2c_cam1_sda]}
+      CAM1_SCL: {role: i2c_scl, logic_level: 3.3, functions: [i2c_cam1_scl]}
     connectors:
       J8:
         type: header-2x20-2.54
@@ -434,6 +463,14 @@ components:
         pins: {"1": 3V3, "2": 5V, "3": GPIO2, "4": 5V, "5": GPIO3, "6": GND, "7": GPIO4, "8": GPIO14, "9": GND, "10": GPIO15,
                "11": GPIO17, "12": GPIO18, "13": GPIO27, "14": GND, "17": 3V3, "20": GND, "25": GND, "29": GPIO5, "30": GND,
                "34": GND, "35": GPIO19, "39": GND}
+      # CSI connectors on the board edge between the USB-C and micro-HDMI side (positions estimated from the
+      # mechanical drawing; the FFC leaves along -y through the ZIF latch). Pinout: Raspberry Pi 5 22-pin mini CSI.
+      CAM0: {type: fpc-22p-0.5mm-socket, position: [2 mm, -26.5 mm, 2.8 mm], direction: [0, 0, 1], x: [1, 0, 0],
+             source: "estimated: Raspberry Pi 5 mechanical drawing (CAM/DISP 0)",
+             pins: {"1": GND, "2": CAM0_D0_N, "3": CAM0_D0_P, "4": GND, "5": CAM0_D1_N, "6": CAM0_D1_P, "7": GND, "8": CAM0_CK_N, "9": CAM0_CK_P, "10": GND, "11": CAM0_D2_N, "12": CAM0_D2_P, "13": GND, "14": CAM0_D3_N, "15": CAM0_D3_P, "16": GND, "17": CAM0_IO0, "18": CAM0_IO1, "19": GND, "20": CAM0_SCL, "21": CAM0_SDA, "22": 3V3}}
+      CAM1: {type: fpc-22p-0.5mm-socket, position: [-8.5 mm, -26.5 mm, 2.8 mm], direction: [0, 0, 1], x: [1, 0, 0],
+             source: "estimated: Raspberry Pi 5 mechanical drawing (CAM/DISP 1)",
+             pins: {"1": GND, "2": CAM1_D0_N, "3": CAM1_D0_P, "4": GND, "5": CAM1_D1_N, "6": CAM1_D1_P, "7": GND, "8": CAM1_CK_N, "9": CAM1_CK_P, "10": GND, "11": CAM1_D2_N, "12": CAM1_D2_P, "13": GND, "14": CAM1_D3_N, "15": CAM1_D3_P, "16": GND, "17": CAM1_IO0, "18": CAM1_IO1, "19": GND, "20": CAM1_SCL, "21": CAM1_SDA, "22": 3V3}}
     behavior:
       model: load.computer
       params: {power_idle: 2.7, power_active: 6.5, brownout_voltage: 4.63, boot_time: 18 s, rail_3v3_max: 0.5}

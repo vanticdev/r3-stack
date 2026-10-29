@@ -1,0 +1,200 @@
+# Cameras and their flat cables (MIPI CSI-2). Research notes with every source:
+# .r3-runs/lane-d-research/camera-uc717.md.
+#
+# Camera component frame: origin at the bottom-centre of the PCB (the FPC
+# connector side), +z out of the lens (the optical axis), +y toward the image
+# top (the FPC connector sits on the -y edge, so the image is upright when the
+# cable leaves downward). behavior.params feed the twin's virtual camera
+# (r3_sim.devices.camera): fields of view, sensor modes, lens position.
+#
+# A flat cable is a `cable` component: its two ends are connectors whose pins
+# carry the same names (same node), it mates the camera and the computer with
+# electrical.direct_mates, and joins the camera's `csi` connector body in the
+# assembly at one end only (the cable is flexible). `behavior.params.length` is
+# checked against the straight distance between the two sockets it mates
+# (model stage, `cable_too_short`).
+components:
+  - id: arducam-b0445-imx296
+    kind: camera
+    cad_name: Arducam IMX296 GS camera
+    name: Arducam 1.58 MP IMX296 colour global-shutter camera, M12 6 mm lens (board UC-717)
+    manufacturer: Arducam
+    part_number: B0445
+    description: >
+      Board code UC-717 (Arducam staff: "UC-717 Rev.D1 is using the Sony IMX296 sensor, 2-lane MIPI CSI-2").
+      38 x 38 mm board, 22-pin 0.5 mm FPC on the back, M12 x0.5 lens holder (13 mm) with the M2506ZH04 6 mm F2.0 lens.
+      Ships with a 150 mm 22-22 pin cable (Pi 5 / Zero / CM) and a 150 mm 15-22 pin cable (Pi 4 and older).
+      Raspberry Pi OS: `camera_auto_detect=0` and `dtoverlay=imx296,cam0` (CAM0 on a Pi 5) in /boot/firmware/config.txt.
+      CONFIRM with the owner: colour (B0445) vs mono (B0619) and the lens actually fitted.
+    mechanical:
+      shape: custom
+      size: [38 mm, 38 mm, 24.6 mm]
+      mass: 0.015
+      color: "#1e5a32"
+      solids:
+        - {kind: box, name: pcb, position: [0, 0, 0.8 mm], size: [38 mm, 38 mm, 1.6 mm]}
+        - {kind: box, name: lens holder, position: [0, 0, 8.1 mm], size: [16 mm, 16 mm, 13 mm]}
+        - {kind: cylinder, name: lens, position: [0, 0, 14.6 mm], axis: [0, 0, 1], diameter: 14 mm, length: 10 mm}
+      features:
+        - {id: hole_1, kind: clearance_hole, position: [15 mm, 15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm,
+           provenance: {status: estimated, source: "No official drawing (forum.arducam.com/t/10317); 38 x 38 Pi camera footprint of the RPi GS camera drawing (4x 2.5 mm on 30 mm pitch). MEASURE before printing a bracket"}}
+        - {id: hole_2, kind: clearance_hole, position: [-15 mm, 15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm}
+        - {id: hole_3, kind: clearance_hole, position: [15 mm, -15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm}
+        - {id: hole_4, kind: clearance_hole, position: [-15 mm, -15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm}
+      provenance:
+        status: vendor
+        source: "https://www.uctronics.com/1-58mp-imx296-color-global-shutter-camera-module-with-m12-lens-for-raspberry-pi.html (Arducam store: 38 x 38 mm board, 13 mm lens holder); lens 14 mm dia (RobotShop M2506ZH04 listing)"
+        notes: "PCB 1.6 mm, lens protrusion (10 mm) and mass (15 g) are estimates; no STEP model is published"
+    interfaces:
+      # Four M2 / M2.5 screws through the board corners into a printed bracket (seat = PCB bottom face).
+      mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
+              params: {holes: [[15 mm, 15 mm, 2.5 mm, clearance, 1.6 mm], [-15 mm, 15 mm, 2.5 mm, clearance, 1.6 mm],
+                               [15 mm, -15 mm, 2.5 mm, clearance, 1.6 mm], [-15 mm, -15 mm, 2.5 mm, clearance, 1.6 mm]]},
+              description: "4x 2.5 mm on a 30 mm square (estimated footprint); board bottom face"}
+      front: {kind: face_mount, origin: [0, 0, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], description: "Board top (lens side) face, for a bezel"}
+      csi: {kind: connector_body, origin: [0, -17 mm, 0], z: [0, -1, 0], x: [1, 0, 0], params: {type: fpc-22p-0.5mm-socket},
+            description: "22-pin FPC ZIF on the back at the -y edge; the cable leaves toward -y"}
+    pins:
+      GND: {role: ground}
+      D0_N: {role: passive}
+      D0_P: {role: passive}
+      D1_N: {role: passive}
+      D1_P: {role: passive}
+      CK_N: {role: passive}
+      CK_P: {role: passive}
+      IO0: {role: gpio, logic_level: 3.3, voltage_max: 3.6}
+      IO1: {role: gpio, logic_level: 3.3, voltage_max: 3.6}
+      SCL: {role: i2c_scl, logic_level: 3.3, voltage_max: 3.6}
+      SDA: {role: i2c_sda, logic_level: 3.3, voltage_max: 3.6}
+      3V3: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.1, voltage_max: 3.6, current_max: 0.3}
+    connectors:
+      # 2-lane camera on a 22-pin (4-lane) connector: lanes 2 and 3 (pins 11, 12, 14, 15) are not connected.
+      J1: {type: fpc-22p-0.5mm-socket, position: [0, -17 mm, 0], direction: [0, -1, 0], x: [1, 0, 0],
+           source: "estimated: back-side 22-pin FPC at the board edge (forum.arducam.com/t/10317)",
+           pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
+                  "13": GND, "16": GND, "17": IO0, "18": IO1, "19": GND, "20": SCL, "21": SDA, "22": 3V3}}
+    behavior:
+      model: camera.csi
+      params:
+        sensor: Sony IMX296LQR-C
+        shutter: global
+        resolution: [1456, 1088]          # libcamera full mode (1440 x 1080 effective)
+        pixel_size: 3.45 um
+        focal_length: 6 mm
+        f_number: 2.0
+        hfov: 45 deg
+        vfov: 33 deg
+        dfov: 55 deg
+        modes: [{width: 1456, height: 1088, fps: 60.38, format: SRGGB10}]
+        lens_position: [0, 0, 24.6 mm]    # front of the lens on the optical axis (estimated, focus dependent)
+        optical_axis: [0, 0, 1]
+        image_up: [0, 1, 0]
+        current: 0.15                     # A at 3.3 V (estimated: not published; budget 1 W)
+        read_noise_dn: 2.0                # 8-bit DN (estimate)
+        csi_lanes: 2
+        dtoverlay: "imx296,cam0"
+      provenance:
+        status: datasheet
+        source: "https://docs.arducam.com/Raspberry-Pi-Camera/Native-camera/Global-Shutter/1.58MP-IMX296/ (1440 x 1080, 60 fps, 55(D) x 45(H) x 33(V) deg, 6 mm, dtoverlay=imx296); mode 1456x1088 @ 60.38 fps from rpicam --list-cameras on a Pi 5 (forum.arducam.com/t/9520)"
+        notes: "Supply current, lens position and read noise are estimates"
+    software:
+      - {bus: i2c, address: 0x1a, protocol: imx296-cci, params: {libcamera: imx296, port_overlay: "dtoverlay=imx296,cam0 (CAM0) / dtoverlay=imx296 (CAM1)"}}
+    thermal: {theta_ja_c_per_w: 30.0, max_temp_c: 70}
+    provenance: {status: datasheet, source: "https://forum.arducam.com/t/10328 (UC-717 = IMX296, Arducam staff)"}
+
+  - id: arducam-fpc-22-22-150mm
+    kind: cable
+    cad_name: CSI cable 22-22
+    name: Camera FFC, 22-pin 0.5 mm to 22-pin 0.5 mm, 150 mm (included with Arducam B0445; for a Raspberry Pi 5)
+    manufacturer: Arducam
+    description: >
+      Straight 22-way 0.5 mm FFC. Frame at the camera-end contacts (end A); the cable runs along -y. Mind the
+      orientation: the contacts face the PCB at both ends (Arducam staff note "straight" vs "opposite" cables).
+    mechanical:
+      shape: custom
+      size: [11.5 mm, 4 mm, 0.3 mm]
+      mass: 0.001
+      color: "#d9a441"
+      keepout_margin: 0
+      solids:
+        # The stiffened end just outside the socket (beside the board edge, in the board plane); the flat cable bends.
+        - {kind: box, name: cable end, position: [0, -4 mm, 0.15 mm], size: [11.5 mm, 4 mm, 0.3 mm]}
+      provenance: {status: vendor, source: "uctronics.com B0445 listing: 150 mm 22pin-22pin FPC included; envelope = the end stiffener only (the flat cable bends)"}
+    interfaces:
+      end_a: {kind: connector_body, origin: [0, 0, 0], z: [0, 1, 0], x: [1, 0, 0], params: {type: fpc-22p-0.5mm-cable}}
+    pins:
+      GND: {role: passive}
+      D0_N: {role: passive}
+      D0_P: {role: passive}
+      D1_N: {role: passive}
+      D1_P: {role: passive}
+      CK_N: {role: passive}
+      CK_P: {role: passive}
+      D2_N: {role: passive}
+      D2_P: {role: passive}
+      D3_N: {role: passive}
+      D3_P: {role: passive}
+      IO0: {role: passive}
+      IO1: {role: passive}
+      SCL: {role: passive}
+      SDA: {role: passive}
+      3V3: {role: passive, current_max: 0.5}
+    connectors:
+      A: {type: fpc-22p-0.5mm-cable, position: [0, 0, 0], direction: [0, 1, 0], x: [1, 0, 0],
+          pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
+                 "11": D2_N, "12": D2_P, "13": GND, "14": D3_N, "15": D3_P, "16": GND, "17": IO0, "18": IO1, "19": GND,
+                 "20": SCL, "21": SDA, "22": 3V3}}
+      B: {type: fpc-22p-0.5mm-cable, position: [0, -150 mm, 0], direction: [0, -1, 0], x: [1, 0, 0],
+          pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
+                 "11": D2_N, "12": D2_P, "13": GND, "14": D3_N, "15": D3_P, "16": GND, "17": IO0, "18": IO1, "19": GND,
+                 "20": SCL, "21": SDA, "22": 3V3}}
+    behavior:
+      model: passive
+      params: {length: 150 mm, min_bend_radius: 1 mm}
+      provenance: {status: vendor, source: "uctronics.com B0445 listing (150 mm)"}
+
+  - id: rpi-camera-cable-standard-mini-200mm
+    kind: cable
+    cad_name: CSI cable 15-22
+    name: Raspberry Pi Camera Cable Standard-Mini, 15-way 1.0 mm to 22-way 0.5 mm, 200 mm (SC1128)
+    manufacturer: Raspberry Pi Ltd
+    part_number: SC1128
+    description: >
+      For a camera board with the standard 15-pin 1.0 mm connector on a Raspberry Pi 5 (22-pin mini). End A is the
+      15-way camera end, end B the 22-way Pi end. Also sold as 300 mm (SC1129) and 500 mm (SC1130).
+    mechanical:
+      shape: custom
+      size: [16 mm, 4 mm, 0.3 mm]
+      mass: 0.002
+      color: "#d9a441"
+      keepout_margin: 0
+      solids:
+        # The stiffened end just outside the socket (beside the board edge, in the board plane); the flat cable bends.
+        - {kind: box, name: cable end, position: [0, -4 mm, 0.15 mm], size: [16 mm, 4 mm, 0.3 mm]}
+      provenance: {status: vendor, source: "https://www.adafruit.com/product/5818 ; https://www.pakronics.com.au/products/raspberry-pi-camera-cable-standard-mini-200mm-rpi-sc1128"}
+    interfaces:
+      end_a: {kind: connector_body, origin: [0, 0, 0], z: [0, 1, 0], x: [1, 0, 0], params: {type: fpc-15p-1.0mm-cable}}
+    pins:
+      GND: {role: passive}
+      D0_N: {role: passive}
+      D0_P: {role: passive}
+      D1_N: {role: passive}
+      D1_P: {role: passive}
+      CK_N: {role: passive}
+      CK_P: {role: passive}
+      IO0: {role: passive}
+      IO1: {role: passive}
+      SCL: {role: passive}
+      SDA: {role: passive}
+      3V3: {role: passive, current_max: 0.5}
+    connectors:
+      A: {type: fpc-15p-1.0mm-cable, position: [0, 0, 0], direction: [0, 1, 0], x: [1, 0, 0],
+          pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
+                 "11": IO0, "12": IO1, "13": SCL, "14": SDA, "15": 3V3}}
+      B: {type: fpc-22p-0.5mm-cable, position: [0, -200 mm, 0], direction: [0, -1, 0], x: [1, 0, 0],
+          pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
+                 "13": GND, "16": GND, "17": IO0, "18": IO1, "19": GND, "20": SCL, "21": SDA, "22": 3V3}}
+    behavior:
+      model: passive
+      params: {length: 200 mm, min_bend_radius: 1 mm}
+      provenance: {status: vendor, source: "Raspberry Pi SC1128 200 mm (vendor listings above)"}

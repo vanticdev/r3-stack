@@ -14,6 +14,7 @@ unknown fields are unaffected.
 
 from __future__ import annotations
 
+import base64
 import json
 import socket
 from typing import Any
@@ -46,6 +47,7 @@ class TwinHalServer:
         self.ended = False  # scenario finished (bye or duration reached)
         self.bye = False
         self.errors: dict[str, int] = {}
+        self._camera_ports: dict[str, Any] | None = None  # CSI port -> VirtualCamera, built on first use
         self.bad_lines: list[bytes] = []
         computer = kernel.computer
         spec = kernel.project.spec
@@ -200,6 +202,8 @@ class TwinHalServer:
             raise HalRequestError("no_such_device", f"no SPI device on {req.get('bus')}")
         if op.startswith("uart."):
             return self._uart(op, req)
+        if op.startswith("camera."):
+            return self._camera(op, req)
         if op == "log":
             k.log(str(req.get("level", "info")), str(req.get("message", "")), dict(req.get("fields") or {}))
             return {}, "ok"
@@ -295,4 +299,47 @@ class TwinHalServer:
             data = bytes(uart.ready[:maximum])
             del uart.ready[:maximum]
             return {"data": list(data)}, "ok"
+        raise HalRequestError("unknown_op", op)
+
+    def _camera(self, op: str, req: dict[str, Any]) -> tuple[dict[str, Any], str]:
+        """CSI cameras: frames rendered by MuJoCo at the exposure instants (``r3_sim.devices.camera``)."""
+        from .devices.camera import CameraError, cameras_for
+
+        k = self.kernel
+        port = str(req.get("port", "cam0"))
+        if self._camera_ports is None:
+            self._camera_ports, problems = cameras_for(k.project, k.computer, k.vehicle.model, k.seed)
+            for problem in problems:
+                k.recorder.events.append({"t": k.t, "event": "camera_not_connected", "message": problem})
+        camera = self._camera_ports.get(port)
+        if camera is None:
+            raise HalRequestError("no_such_device", f"no camera reachable on {port} (needs a csi binding wired to a camera)")
+        try:
+            if op == "camera.configure":
+                reply = camera.configure(k.t, int(req.get("width", 640)), int(req.get("height", 480)), float(req.get("fps", 30.0)),
+                                         str(req.get("format", "rgb888")))
+                k.cameras[port] = camera
+                return reply, "ok"
+            if op == "camera.close":
+                camera.close()
+                k.cameras.pop(port, None)
+                return {}, "ok"
+            if op == "camera.capture":
+                if camera.mode is None:
+                    raise HalRequestError("not_configured", "call camera.configure first")
+                index = camera.ready_index(k.t)
+                timeout = float(req.get("timeout", 1.0))
+                if index is None:
+                    deadline = min(camera.next_completion(), k.t + timeout)
+                    reason = self._advance(lambda: k.t + 1e-9 >= deadline, deadline=deadline)
+                    if self._blocked(reason):
+                        return {}, reason
+                    index = camera.ready_index(k.t)
+                    if index is None:
+                        raise HalRequestError("timeout", f"no frame within {timeout} s")
+                frame = camera.take(index)
+                image = frame.pop("image")
+                return {**frame, "encoding": "base64", "data": base64.b64encode(image.tobytes()).decode("ascii")}, "ok"
+        except CameraError as error:
+            raise HalRequestError(error.code, error.message) from None
         raise HalRequestError("unknown_op", op)

@@ -78,6 +78,43 @@ class Uart(abc.ABC):
     def read(self, max_bytes: int = 4096, timeout: float = 0.0) -> bytes: ...
 
 
+@dataclass(frozen=True)
+class Frame:
+    """One camera image. ``data`` is row-major, top row first: ``rgb888`` is 3 bytes
+    per pixel (R, G, B), ``gray8`` one. ``t`` is the capture time (start of exposure)
+    on the HAL clock, ``sequence`` the sensor frame counter (gaps = dropped frames)."""
+
+    t: float
+    sequence: int
+    width: int
+    height: int
+    format: str
+    data: bytes
+    exposure_s: float = 0.0
+
+    def array(self):  # -> numpy.ndarray (height, width, channels); numpy is optional for the HAL
+        import numpy as np
+
+        channels = {"rgb888": 3, "gray8": 1}[self.format]
+        return np.frombuffer(self.data, dtype=np.uint8).reshape(self.height, self.width, channels)
+
+
+class Camera(abc.ABC):
+    """A frame-paced camera stream (libcamera semantics): ``capture`` returns the next
+    completed frame, blocking until the sensor delivers it."""
+
+    width: int
+    height: int
+    fps: float
+    format: str
+
+    @abc.abstractmethod
+    def capture(self, timeout: float = 1.0) -> Frame: ...
+
+    def close(self) -> None:
+        pass
+
+
 class Hal(abc.ABC):
     """Factory for interfaces. Arguments mirror ``robot.yaml`` software bindings."""
 
@@ -97,6 +134,11 @@ class Hal(abc.ABC):
 
     @abc.abstractmethod
     def uart(self, device: str, baud: int) -> Uart: ...
+
+    def camera(self, port: str = "cam0", width: int = 640, height: int = 480, fps: float = 30.0,
+               format: str = "rgb888") -> Camera:
+        """Open the camera on a CSI port (``cam0``/``cam1``; robot.yaml ``csi`` binding ``device``)."""
+        raise HalError("not_supported", "this backend has no camera support")
 
     def log(self, level: str, message: str, **fields: object) -> None:
         print(f"[{level}] {message} {fields if fields else ''}", flush=True)

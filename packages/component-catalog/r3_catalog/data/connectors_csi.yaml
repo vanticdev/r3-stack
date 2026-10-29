@@ -1,0 +1,66 @@
+# MIPI CSI-2 camera FPC/FFC connectors (Raspberry Pi camera ecosystem).
+# Board-side ZIF sockets and the matching flat-cable ends. Pin numbers follow
+# the Raspberry Pi camera connector pinouts:
+#   15-pin 1.0 mm (camera boards, Pi 1-4):  1 GND, 2 D0_N, 3 D0_P, 4 GND, 5 D1_N, 6 D1_P, 7 GND, 8 CK_N, 9 CK_P,
+#                                           10 GND, 11 CAM_IO0 (power enable), 12 CAM_IO1, 13 SCL, 14 SDA, 15 3V3
+#   22-pin 0.5 mm (Pi 5, Zero, CM IO):      1 GND, 2 D0_N, 3 D0_P, 4 GND, 5 D1_N, 6 D1_P, 7 GND, 8 CK_N, 9 CK_P,
+#                                           10 GND, 11 D2_N, 12 D2_P, 13 GND, 14 D3_N, 15 D3_P, 16 GND,
+#                                           17 CAM_IO0, 18 CAM_IO1, 19 GND, 20 SCL, 21 SDA, 22 3V3
+# A flat cable has no AWG; awg_min/awg_max are placeholders (FFC conductors are
+# ~0.3 x 0.035 mm copper) and harness wires must not be crimped into these.
+connectors:
+  - id: fpc-15p-1.0mm-socket
+    family: FPC/FFC ZIF 1.0 mm pitch, 15 positions
+    gender: socket
+    mates_with: [fpc-15p-1.0mm-cable]
+    pin_count: 15
+    current_rating_per_pin: 1.0
+    voltage_rating: 50
+    contact_resistance: 20 mohm
+    awg_min: 30
+    awg_max: 30
+    mating_cycles: 20
+    locking: true
+    body_size: [21 mm, 5.5 mm, 2.5 mm]
+    provenance: {status: datasheet, source: "Molex 52271 1.0 mm FFC/FPC ZIF series: 1.0 A per contact, 50 V, 20 mOhm max, 20 cycles",
+                 notes: "Representative 1.0 mm ZIF; the exact socket on a given camera board may differ"}
+  - id: fpc-15p-1.0mm-cable
+    family: FPC/FFC ZIF 1.0 mm pitch, 15 positions
+    gender: none
+    mates_with: [fpc-15p-1.0mm-socket]
+    pin_count: 15
+    current_rating_per_pin: 1.0
+    voltage_rating: 50
+    contact_resistance: 20 mohm
+    awg_min: 30
+    awg_max: 30
+    mating_cycles: 20
+    body_size: [16 mm, 0.3 mm, 4 mm]
+    provenance: {status: datasheet, source: "Raspberry Pi camera cable: 16 mm wide FFC, 1.0 mm pitch, 15 conductors"}
+  - id: fpc-22p-0.5mm-socket
+    family: FPC/FFC ZIF 0.5 mm pitch, 22 positions
+    gender: socket
+    mates_with: [fpc-22p-0.5mm-cable]
+    pin_count: 22
+    current_rating_per_pin: 0.5
+    voltage_rating: 50
+    contact_resistance: 50 mohm
+    awg_min: 30
+    awg_max: 30
+    mating_cycles: 20
+    locking: true
+    body_size: [15.6 mm, 4.4 mm, 1.2 mm]
+    provenance: {status: datasheet, source: "Hirose FH12 0.5 mm FPC series: 0.5 A per contact, 50 V AC, 50 mOhm max; Raspberry Pi 5 CAM/DISP connectors are 22-pin 0.5 mm"}
+  - id: fpc-22p-0.5mm-cable
+    family: FPC/FFC ZIF 0.5 mm pitch, 22 positions
+    gender: none
+    mates_with: [fpc-22p-0.5mm-socket]
+    pin_count: 22
+    current_rating_per_pin: 0.5
+    voltage_rating: 50
+    contact_resistance: 50 mohm
+    awg_min: 30
+    awg_max: 30
+    mating_cycles: 20
+    body_size: [11.5 mm, 0.3 mm, 4 mm]
+    provenance: {status: datasheet, source: "Raspberry Pi 5 camera cable (standard-to-mini): 22-pin 0.5 mm end, 11.5 mm wide"}

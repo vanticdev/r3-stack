@@ -46,6 +46,7 @@ from r3_model.project import Project
 from r3_model.units import to_si
 
 from ..geometry import MassProperties, axis_rotation, box_inertia, combine, cylinder_inertia, rotation_to_quat
+from .scene_visual import add_cameras, add_scene
 from .servo import ackermann_angles
 
 #: Contact bitmasks: robot geoms (1) collide only with the environment (2).
@@ -495,6 +496,8 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
         ET.SubElement(world, "geom", name="radio_tx", type="box", pos=_fmt(tx), size="0.08 0.05 0.04", rgba="0.9 0.1 0.1 1",
                       contype="0", conaffinity="0")
 
+    add_scene(project, mj, asset, world, course, initial_pose, assumptions)
+
     x0, y0, yaw0 = initial_pose
     elements: dict[str, ET.Element] = {}
     geometry: dict[str, dict[str, Any]] = {}
@@ -593,6 +596,7 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
         imu_site = "imu"
         assumptions.append(("sensors", f"IMU axes are aligned with the {imu_component} component frame at its origin."))
     ET.SubElement(elements[root], "site", name="chassis_ref", pos="0 0 0", size="0.003", group="4")
+    add_cameras(project, elements, body_origin, lambda cid: _owner_body(project, cid, joint_children, root), assumptions)
     camera_target = body_props[root].com
     ET.SubElement(elements[root], "camera", name="chase", mode="trackcom", pos=_fmt(camera_target + np.array([-0.9, -0.55, 0.45])),
                   xyaxes="0.52 -0.85 0 0.3 0.18 0.94")

@@ -43,7 +43,7 @@ from r3_model.project import Project
 
 from r3_model.units import to_si
 
-from .geometry import Solid, make_solid, outline_solid, overlap
+from .geometry import Solid, make_solid, outline_solid, overlap, solids_solid
 
 STAGE = "model"
 
@@ -363,6 +363,7 @@ class ModelChecker:
             if len(pwm) > 1:
                 self.add(Diagnostic.error("pwm_output_conflict", f"PWM outputs connected together: {', '.join(p.node[2:] for p in pwm)}",
                                           subjects=[p.node[2:] for p in pwm], data={"outputs": len(pwm)}))
+        unused: list[str] = []
         for info in self.pins.values():
             if info.passthrough or info.role not in INPUT_DRIVERS or not info.exposed:
                 continue
@@ -370,12 +371,31 @@ class ModelChecker:
             root = finder.find(info.node)
             drivers = [p for p in self.pins.values() if p.role in INPUT_DRIVERS[info.role] and not p.passthrough
                        and p.node != info.node and finder.find(p.node) == root]
+            if not drivers and self._unused_computer_input(info):
+                unused.append(info.node[2:])
+                continue
             if not drivers:
                 self.add(Diagnostic.error(
                     "input_without_driver", f"{info.node[2:]} ({info.role}) has no {'/'.join(sorted(INPUT_DRIVERS[info.role]))} on its net",
                     subjects=[info.node[2:]],
                     data={"role": info.role, "net_members": self.net_members(info.node, through_internal=True)},
                     hint="Connect the pin to a source, or check for swapped wires."))
+        if unused:
+            self.add(Diagnostic.info(
+                "computer_inputs_unused", f"{len(unused)} unconnected, unbound computer input pins (spare header pins)",
+                subjects=unused, data={"pins": len(unused)}))
+
+    def _unused_computer_input(self, info: PinInfo) -> bool:
+        """A spare signal input on a computer header: nothing else on its net and no software binding
+        uses it. Its pin muxing leaves it an unused input (no driver needed); a bound or wired one is checked."""
+        comp = self.spec.components.get(info.component)
+        ctype = self.catalog.components.get(comp.type) if comp is not None else None
+        if ctype is None or ctype.kind != "computer" or info.role == "power_in":
+            return False
+        if any(m != info.node[2:] for m in self.net_members(info.node, through_internal=True)):
+            return False
+        bound = {self._resolve(ref) for b in self.spec.software.bindings.values() for ref in b.pins}
+        return info.node not in bound
 
     # ------------------------------------------------------------ voltages
     def check_voltages(self) -> list[dict[str, Any]]:
@@ -479,6 +499,9 @@ class ModelChecker:
                 # Plates authored as an outline polygon: extrude it (convex hull) instead of using the bounding box.
                 result[cid] = outline_solid(cid, [[to_si(a), to_si(b)] for a, b in outline], float(mech.size[2]),
                                             comp.pose.xyz, comp.pose.rpy)
+            elif mech.shape == "custom" and mech.solids and (piecewise := solids_solid(
+                    cid, mech.solids, comp.params, comp.pose.xyz, comp.pose.rpy, comp.params.get("mirror"))) is not None:
+                result[cid] = piecewise  # union of the catalog primitives, not the bounding box
             else:
                 result[cid] = make_solid(cid, mech.shape, list(mech.size), mech.axis, comp.pose.xyz, comp.pose.rpy)
         return result
@@ -499,7 +522,7 @@ class ModelChecker:
                                            "verified_interfaces": len(fit.get("verified_interfaces", []))}))
             return []
         self.result.assume("mechanical", "Interference uses catalog envelopes: boxes exact, cylinders as 48-gon prisms, 'custom' "
-                                         "shapes as their bounding box. Overlaps thinner than 0.1 mm count as contact.")
+                                         "shapes as the union of their catalog solids (concave profiles as their hull). Overlaps thinner than 0.1 mm count as contact.")
         self.result.assume("mechanical", "Static interference at the authored pose only; steering and wheel sweep are checked in simulation.")
         overlaps = []
         for a, b in itertools.combinations(sorted(solids), 2):

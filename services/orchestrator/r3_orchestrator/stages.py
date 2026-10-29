@@ -93,26 +93,40 @@ def _call(run: Any, project: Project, options: dict[str, Any]) -> StageResult:
         return run(project, **kwargs)
 
 
+def _precheck(project: Project, name: str) -> StageResult | None:
+    """``not_configured`` / ``not_applicable`` result when the spec has nothing for this stage yet
+    (:mod:`r3_orchestrator.readiness`); a failing readiness check never hides the stage itself."""
+    from .readiness import precheck
+
+    try:
+        return precheck(project, name)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _execute(stage: StageSpec, project: Project, options: dict[str, Any]) -> StageResult:
+    try:
+        module = importlib.import_module(stage.module)
+    except ModuleNotFoundError as error:
+        return _unavailable(stage, project, error)
+    try:
+        result = _call(module.run, project, options)
+        return result if isinstance(result, StageResult) else StageResult.model_validate(result)
+    except Exception as error:  # a crashing stage must not take down the pipeline
+        result = StageResult(stage=stage.name, inputs=project.fingerprint())
+        result.add(Diagnostic.error(
+            "stage_crashed", f"stage {stage.name} raised {type(error).__name__}: {error}", subjects=[stage.name],
+            data={"exception": type(error).__name__}, hint=traceback.format_exc(limit=6)))
+        return result
+
+
 def run_stage(project: Project, name: str, **options: Any) -> StageResult:
     """Run one stage and persist its result. Never raises for stage failures."""
     stage = ALL_STAGES.get(name)
     if stage is None:
         raise KeyError(f"unknown stage {name!r}; known: {', '.join(ALL_STAGES)}")
     started = time.time()
-    try:
-        module = importlib.import_module(stage.module)
-    except ModuleNotFoundError as error:
-        result = _unavailable(stage, project, error)
-    else:
-        try:
-            result = _call(module.run, project, options)
-            if not isinstance(result, StageResult):
-                result = StageResult.model_validate(result)
-        except Exception as error:  # a crashing stage must not take down the pipeline
-            result = StageResult(stage=name, inputs=project.fingerprint())
-            result.add(Diagnostic.error(
-                "stage_crashed", f"stage {name} raised {type(error).__name__}: {error}", subjects=[name],
-                data={"exception": type(error).__name__}, hint=traceback.format_exc(limit=6)))
+    result = _precheck(project, name) or _execute(stage, project, options)
     result.stage = result.stage or name
     for diagnostic in result.diagnostics:
         diagnostic.stage = diagnostic.stage or result.stage
@@ -180,4 +194,8 @@ def status_of(result: StageResult | None) -> str:
         return "missing"
     if any(d.code == "stage_unavailable" for d in result.diagnostics):
         return "unavailable"
+    if result.ok and any(d.code == "not_configured" for d in result.diagnostics):
+        return "not_configured"  # nothing to check yet (r3_orchestrator.readiness)
+    if result.ok and any(d.code == "not_applicable" for d in result.diagnostics):
+        return "not_applicable"
     return "ok" if result.ok else "failed"

@@ -51,7 +51,8 @@ export interface FileLink {
   name: string;
 }
 
-export type StageStatusValue = "ok" | "failed" | "unavailable" | "missing";
+/** `not_configured`: the spec has nothing for the stage yet (blocks release); `not_applicable`: nothing to build (passes). */
+export type StageStatusValue = "ok" | "failed" | "unavailable" | "missing" | "not_configured" | "not_applicable";
 
 /** `build/<stage>/result.json` plus `status`, `stale`, diagnostic hints and artifact URLs. */
 export interface StageResult {

@@ -35,7 +35,7 @@ def _print_diagnostics(diagnostics: list[dict[str, Any]], show_info: bool = Fals
         if d["severity"] == "info" and not show_info:
             continue
         subjects = f" [{', '.join(d['subjects'])}]" if d["subjects"] else ""
-        print(f"  {_SEVERITY_MARK[d['severity']]} {d['stage']:<10} {d['code']}{subjects}")
+        print(f"  {_SEVERITY_MARK[d['severity']]} {d['stage']:<11} {d['code']}{subjects}")
         print(f"      {d['message']}")
 
 
@@ -43,7 +43,7 @@ def _print_results(payload: dict[str, Any]) -> None:
     print(f"{payload['robot']}  ({payload['project']})")
     for stage in payload["stages"]:
         c = stage.get("counts", {})
-        print(f"  {stage['stage']:<10} {stage['status']:<12} {c.get('error', 0)} errors, {c.get('warning', 0)} warnings"
+        print(f"  {stage['stage']:<11} {stage['status']:<12} {c.get('error', 0)} errors, {c.get('warning', 0)} warnings"
               f"  {stage.get('duration_s', 0):.2f} s")
     if payload["diagnostics"]:
         print("diagnostics:")
@@ -71,10 +71,13 @@ def _print_status(payload: dict[str, Any]) -> None:
     print("stages:")
     for stage in payload["stages"]:
         if stage["status"] == "missing":
-            print(f"  {stage['stage']:<10} not run")
+            print(f"  {stage['stage']:<11} not run")
+            continue
+        if stage["status"] in ("not_configured", "not_applicable"):
+            print(f"  {stage['stage']:<11} {stage['status'].replace('_', ' ')}")
             continue
         c = stage["counts"]
-        print(f"  {stage['stage']:<10} {stage['status']:<12} {c['error']} errors, {c['warning']} warnings"
+        print(f"  {stage['stage']:<11} {stage['status']:<12} {c['error']} errors, {c['warning']} warnings"
               f"{'  (stale: robot.yaml changed)' if stage['stale'] else ''}")
 
 
@@ -282,7 +285,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("create", parents=[common], help="Scaffold a new R3 robot project repository.")
     p.add_argument("name")
-    p.add_argument("--from", dest="template", default="rc-car", help="Template robot (default: rc-car).")
+    p.add_argument("--from", "--template", dest="template", default="rc-car",
+                   help="Template: blank (start from nothing) or an example robot such as rc-car (default: rc-car).")
     p.add_argument("--dir", default=".", help="Parent directory (default: cwd).")
     p.add_argument("--github", action="store_true", help="Also create the GitHub repository with `gh repo create` and push.")
     visibility = p.add_mutually_exclusive_group()

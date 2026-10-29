@@ -4,7 +4,7 @@ import type { ProjectDetail, Severity, StageRow } from "../api/types.ts";
 import { plural, stageLabel, stagePage } from "./labels.ts";
 
 /** What a stage's last result says, independent of whether it is current. */
-export type StageOutcome = "passed" | "failed" | "not_run" | "unavailable" | "running";
+export type StageOutcome = "passed" | "failed" | "not_run" | "unavailable" | "running" | "not_configured" | "not_applicable";
 
 export interface StageState {
   stage: string;
@@ -21,7 +21,8 @@ export interface StageState {
 
 export function stageState(row: Pick<StageRow, "stage" | "status" | "stale" | "counts" | "started_at" | "duration_s">, running = false): StageState {
   const outcome: StageOutcome = running ? "running" : row.status === "ok" ? "passed" : row.status === "failed" ? "failed"
-    : row.status === "unavailable" ? "unavailable" : "not_run";
+    : row.status === "unavailable" ? "unavailable" : row.status === "not_configured" ? "not_configured"
+    : row.status === "not_applicable" ? "not_applicable" : "not_run";
   return {
     stage: row.stage, label: stageLabel(row.stage), page: stagePage(row.stage), outcome,
     outdated: !!row.stale && row.status !== "missing",

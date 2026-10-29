@@ -1,0 +1,513 @@
+# Off-the-shelf parts for a 1/10 RC car with a 3D-printed frame and a BOUGHT drivetrain (no custom gears):
+# the Traxxas Slash 2WD rear driveline, Traxxas SCT wheels, a Savox servo, a Hobbywing brushed ESC with BEC,
+# a Pololu 5 V / 5.5 A buck for the Raspberry Pi 5 (no custom PCB), a SparkFun u-blox M10 GNSS breakout,
+# a Gens Ace 2S LiPo with XT60 and a GY-521 MPU-6050 breakout.
+# Research notes with every source URL: .r3-runs/lane-d-research/drivetrain-parts.md
+#
+# Geometry honesty: Traxxas publishes no drawings or CAD for the Magnum 272 transmission, the driveshafts or
+# the wheel hubs. Those envelopes and interface positions are ESTIMATES laid out for the Slash 2WD geometry
+# (296 mm track, 335 mm wheelbase, 2.2/3.0 in SCT wheels) and are labelled `estimated`; measure the bought
+# parts and override them in the project's catalog/ before printing. Electrical and drive data are
+# datasheet values where published.
+#
+# Frames follow the catalog convention (boxes: bottom-face centre; x/y-axis cylinders: body centre).
+# Drive axes run along y (left = +y). Interfaces: shafts/bores z points out of the part along the axis.
+components:
+  # ------------------------------------------------------------------ transmission + motor
+  - id: traxxas-3695-magnum-272
+    kind: gearbox
+    cad_name: Traxxas Magnum 272
+    name: Traxxas Pro-Built Magnum 272 transmission (2WD, planetary differential, slipper clutch), 23T/86T 48P
+    manufacturer: Traxxas
+    part_number: "3695"
+    description: >
+      Frame at the bottom centre of the case, outputs along y at 30 mm height (left output face y = +38 mm, right
+      output through the gear cover at y = -50 mm). Motor plate on the right (-y) side: the 550 motor sits on the
+      inner (+y) side of the plate, 28.84 mm ahead of the spur axis (23T/86T 48P centre distance), with the pinion
+      and spur inside the gear cover. Final ratio 86/23 x 2.72 = 10.17. In production as 9495 (Magnum 272R).
+      ENVELOPE, MOUNT HOLES AND OUTPUT POSITIONS ARE ESTIMATES (no Traxxas drawing): measure before printing.
+    mechanical:
+      shape: custom
+      size: [100 mm, 88 mm, 64 mm]
+      mass: 0.26
+      material: Glass-filled nylon case, steel gears
+      color: "#2b2d31"
+      moving: true
+      solids:
+        - {kind: box, name: case, position: [0, 0, 32 mm], size: [60 mm, 76 mm, 64 mm]}
+        - {kind: box, name: motor plate, position: [20 mm, -36.5 mm, 30 mm], size: [100 mm, 3 mm, 60 mm]}
+        - {kind: box, name: gear cover, position: [34 mm, -44 mm, 30 mm], size: [72 mm, 12 mm, 56 mm]}
+      provenance: {status: estimated, source: "Envelope estimated for the Slash 2WD layout; https://traxxas.com/products/parts/3695 (no drawing published)"}
+    interfaces:
+      mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
+              params: {holes: [[20 mm, 25 mm, 3 mm, tapped, 8 mm], [-20 mm, 25 mm, 3 mm, tapped, 8 mm],
+                               [20 mm, -25 mm, 3 mm, tapped, 8 mm], [-20 mm, -25 mm, 3 mm, tapped, 8 mm]]},
+              description: "Case bottom, 4x M3 (ESTIMATED pattern 40 x 50 mm; measure the case)"}
+      motor_mount: {kind: hole_pattern, origin: [50.84 mm, -35 mm, 30 mm], z: [0, 1, 0], x: [1, 0, 0],
+                    params: {holes: [[12.5 mm, 0, 3.4 mm, clearance, 3 mm], [-12.5 mm, 0, 3.4 mm, clearance, 3 mm]]},
+                    description: "540/550 motor plate: 2x M3 on 25 mm centres (inner face of the plate)"}
+      pinion: {kind: bore, origin: [50.84 mm, -35 mm, 30 mm], z: [0, 1, 0], x: [0, 0, 1], params: {d: 3.0 mm, depth: 12 mm, flat_offset: 1.25 mm},
+               description: "Traxxas 2423 23T 48P pinion bore (3 mm shaft, set screw on the flat)"}
+      output_l: {kind: bore, origin: [0, 38 mm, 30 mm], z: [0, 1, 0], x: [0, 0, 1], params: {d: 5.0 mm, depth: 10 mm, flat_offset: 2.0 mm},
+                 description: "Left output yoke 4628R; the cross-pin drive is modelled as a flat (estimated)"}
+      output_r: {kind: bore, origin: [0, -50 mm, 30 mm], z: [0, -1, 0], x: [0, 0, 1], params: {d: 5.0 mm, depth: 10 mm, flat_offset: 2.0 mm},
+                 description: "Right output yoke through the gear cover (estimated)"}
+    behavior:
+      model: gearbox.differential
+      params: {ratio: 10.17, efficiency: 0.85, backlash: 0.03, output_inertia: 6.0e-5, pinion_teeth: 23, spur_teeth: 86,
+               diametral_pitch: 48, module: 0.529 mm, center_distance: 28.84 mm, internal_ratio: 2.72}
+      provenance:
+        status: datasheet
+        source: "Traxxas 58234-8 Slash 2WD: internal ratio 2.72, 48P; owner's manual gear chart 23/86 = 10.17 (https://traxxas.com/media/productattach/C-58234-8/2/58234-8-om-en-r00.pdf)"
+        notes: "efficiency, backlash and output inertia are estimates"
+    provenance: {status: datasheet, source: "https://traxxas.com/products/parts/3695"}
+
+  - id: traxxas-3785-titan-12t-550
+    kind: motor
+    cad_name: Traxxas Titan 12T 550
+    name: Traxxas Titan 12T 550 brushed motor, 3 mm shaft, integrated fan
+    manufacturer: Traxxas
+    part_number: "3785"
+    description: Frame at the can centre, axis y; the output face (shaft, mount holes) is at local y = -28.5 mm.
+    mechanical:
+      shape: cylinder
+      axis: y
+      size: [36 mm, 57 mm]
+      mass: 0.24
+      material: Steel can
+      color: "#3c4148"
+      moving: true
+      features:
+        - {id: shaft, kind: d_shaft, position: [0, -28.5 mm, 0], axis: [0, -1, 0], diameter: 3.0 mm, depth: 12 mm, flat_offset: 1.25 mm,
+           flat_normal: [0, 0, 1], provenance: {status: datasheet, source: "Traxxas: 3 mm shaft (pinion 2423 fits 3 mm); exposed length and set-screw flat estimated"}}
+        - {id: mount_a, kind: tapped_hole, position: [12.5 mm, -28.5 mm, 0], axis: [0, 1, 0], depth: 5 mm, thread: shcs-m3,
+           provenance: {status: estimated, source: "550 cans share the 540 face: 2x M3 on 25 mm centres (Mabuchi RS-540 drawing); measure"}}
+        - {id: mount_b, kind: tapped_hole, position: [-12.5 mm, -28.5 mm, 0], axis: [0, 1, 0], depth: 5 mm, thread: shcs-m3}
+        - {id: face, kind: face, position: [0, -28.5 mm, 0], axis: [0, -1, 0]}
+      provenance: {status: datasheet, source: "https://traxxas.com/58234-8-slash-2wd-xl-5-wbattery: 36 mm dia, 57 mm can, 78 mm overall, 240 g"}
+    interfaces:
+      face: {kind: hole_pattern, origin: [0, -28.5 mm, 0], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[12.5 mm, 0, 3 mm, tapped, 5 mm], [-12.5 mm, 0, 3 mm, tapped, 5 mm]]}}
+      shaft: {kind: shaft, origin: [0, -28.5 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 3.0 mm, length: 12 mm, flat_offset: 1.25 mm}}
+    pins:
+      M_POS: {role: motor, voltage_max: 8.4, current_max: 60}
+      M_NEG: {role: motor, voltage_max: 8.4, current_max: 60}
+    connectors:
+      J_POS: {type: integral, position: [0, 28.5 mm, 10 mm], direction: [0, 1, 0], pins: {"1": M_POS}}
+      J_NEG: {type: integral, position: [0, 28.5 mm, -10 mm], direction: [0, 1, 0], pins: {"1": M_NEG}}
+    behavior:
+      model: motor.dc_brushed
+      params: {kv_rpm_per_v: 2600, resistance: 0.07, inductance: 40 uH, no_load_current: 2.0, rotor_inertia: 1.6e-5, brush_drop: 0.2, max_rpm: 24000}
+      provenance: {status: estimated, source: "Traxxas publishes no Kv, resistance or currents for the Titan 12T; typical 12T 550 values (dyno it)",
+                   notes: "Hobbywing 1060 limit on 2S: 540/550 >= 12T, so this motor is at the ESC's limit"}
+    thermal: {theta_ja_c_per_w: 2.5, max_temp_c: 100}
+
+  # ------------------------------------------------------------------ rear driveline (driveshaft + stub axle + 12 mm hex hub)
+  - id: traxxas-rear-halfshaft-l
+    kind: structure
+    cad_name: Rear half-shaft L
+    cad_family: Rear half-shaft
+    name: Traxxas Slash 2WD rear half-shaft, left (6852X driveshaft + 2753X stub axle + pinned 12 mm hex), rigid on a printed frame
+    description: >
+      Frame on the axis at the transmission output face, +y outboard. Inner end 10 mm into the output yoke; 5 mm
+      bearing journal (5 x 11 x 4 bearing in a printed carrier) at 92-96 mm; 12 mm hex at 104-114 mm (wheel hub face
+      at the hex shoulder); M4 stud for the wheel nut. With the left output at y = +38 mm the wheel centre lands at the
+      Slash track (296 mm). LENGTHS ARE ESTIMATES (Traxxas publishes none): measure.
+    mechanical:
+      shape: custom
+      size: [13.9 mm, 132 mm, 13.9 mm]
+      mass: 0.045
+      material: Steel
+      color: "#8d939a"
+      moving: true
+      solids:
+        - {kind: revolve, name: half-shaft, position: [0, 0, 0], axis: [0, 1, 0],
+           profile: [[0, -10 mm], [2.5 mm, -10 mm], [2.5 mm, 0], [4 mm, 0], [4 mm, 92 mm], [2.5 mm, 92 mm], [2.5 mm, 96 mm],
+                     [4 mm, 96 mm], [4 mm, 104 mm], [6.93 mm, 104 mm], [6.93 mm, 114 mm], [2 mm, 114 mm], [2 mm, 122 mm], [0, 122 mm]]}
+      provenance: {status: estimated, source: "Traxxas 6852X/2753X (parts list 58234-8); stub axle 42 mm long, 13 mm max dia (vendor); lengths estimated"}
+    interfaces:
+      output: {kind: shaft, origin: [0, 0, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 5.0 mm, length: 10 mm, flat_offset: 2.0 mm}}
+      bearing_seat: {kind: shaft, origin: [0, 92 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 5.0 mm, length: 4 mm}}
+      hex: {kind: shaft, origin: [0, 104 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 13.86 mm, length: 10 mm, flat_offset: 6.0 mm},
+            description: "12 mm hex modelled as a flat at 6 mm (across flats / 2); 13.86 mm across corners"}
+      nut_thread: {kind: hole_pattern, origin: [0, 114 mm, 0], z: [0, 1, 0], x: [1, 0, 0], params: {holes: [[0, 0, 4 mm, thread, 8 mm]]}}
+  - id: traxxas-rear-halfshaft-r
+    kind: structure
+    cad_name: Rear half-shaft R
+    cad_family: Rear half-shaft
+    name: Traxxas Slash 2WD rear half-shaft, right (6852X + 2753X + 12 mm hex); 12 mm shorter for the gear-cover output
+    description: Frame on the axis at the right output face (y = -50 mm), the shaft runs along -y (outboard right). Lengths estimated.
+    mechanical:
+      shape: custom
+      size: [13.9 mm, 120 mm, 13.9 mm]
+      mass: 0.041
+      material: Steel
+      color: "#8d939a"
+      moving: true
+      solids:
+        - {kind: revolve, name: half-shaft, position: [0, 0, 0], axis: [0, -1, 0],
+           profile: [[0, -10 mm], [2.5 mm, -10 mm], [2.5 mm, 0], [4 mm, 0], [4 mm, 80 mm], [2.5 mm, 80 mm], [2.5 mm, 84 mm],
+                     [4 mm, 84 mm], [4 mm, 92 mm], [6.93 mm, 92 mm], [6.93 mm, 102 mm], [2 mm, 102 mm], [2 mm, 110 mm], [0, 110 mm]]}
+      provenance: {status: estimated, source: "As traxxas-rear-halfshaft-l, 12 mm shorter inboard (right output exits the gear cover)"}
+    interfaces:
+      output: {kind: shaft, origin: [0, 0, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 5.0 mm, length: 10 mm, flat_offset: 2.0 mm}}
+      bearing_seat: {kind: shaft, origin: [0, -80 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 5.0 mm, length: 4 mm}}
+      hex: {kind: shaft, origin: [0, -92 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 13.86 mm, length: 10 mm, flat_offset: 6.0 mm}}
+      nut_thread: {kind: hole_pattern, origin: [0, -102 mm, 0], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[0, 0, 4 mm, thread, 8 mm]]}}
+  - id: traxxas-5116-bearing-5x11x4
+    kind: structure
+    cad_name: Bearing 5x11x4
+    name: Ball bearing 5 x 11 x 4 mm, sealed (Traxxas 5116; ISO 685)
+    description: Frame at the centre, axis y. Press the outer ring into a printed carrier bore (FDM press fit).
+    mechanical:
+      shape: cylinder
+      axis: y
+      size: [11 mm, 4 mm]
+      mass: 0.0017
+      material: Bearing steel 52100
+      color: "#d0d4d8"
+      moving: true
+      features:
+        - {id: bore, kind: bore, position: [0, -2 mm, 0], axis: [0, 1, 0], diameter: 5 mm, depth: 4 mm}
+      provenance: {status: datasheet, source: "ISO 15 bearing 685: d 5, D 11, B 4 mm (Traxxas 5116, parts list 58234-8); mass estimated"}
+    interfaces:
+      outer: {kind: shaft, origin: [0, -2 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 11 mm, length: 4 mm, short_engagement_ok: true}}
+      inner: {kind: bore, origin: [0, -2 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 5 mm, depth: 4 mm, short_engagement_ok: true}}
+  - id: traxxas-front-axle-5mm
+    kind: structure
+    cad_name: Front axle 5 mm
+    name: Front axle, 5 mm steel spindle for 2WD front wheels with bearings (Traxxas 3637 type), M4 thread
+    description: Frame on the axis at the inner end, +y outboard. 10 mm press end for a printed knuckle, 14 mm journal for the wheel's two 5 x 11 x 4 bearings, M4 nut thread. Lengths estimated.
+    mechanical:
+      shape: cylinder
+      axis: y
+      size: [7 mm, 34 mm]
+      mass: 0.006
+      material: Steel
+      color: "#8d939a"
+      solids:
+        - {kind: revolve, name: axle, position: [0, 0, 0], axis: [0, 1, 0],
+           profile: [[0, 0], [2.5 mm, 0], [2.5 mm, 10 mm], [3.5 mm, 10 mm], [3.5 mm, 12 mm], [2.5 mm, 12 mm], [2.5 mm, 26 mm], [2 mm, 26 mm], [2 mm, 34 mm], [0, 34 mm]]}
+      provenance: {status: estimated, source: "Traxxas 3637 front axles (parts list 58234-8); dimensions estimated"}
+    interfaces:
+      press: {kind: shaft, origin: [0, 10 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 5 mm, length: 10 mm}}
+      journal: {kind: shaft, origin: [0, 12 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 5 mm, length: 14 mm}}
+      nut_thread: {kind: hole_pattern, origin: [0, 26 mm, 0], z: [0, 1, 0], x: [1, 0, 0], params: {holes: [[0, 0, 4 mm, thread, 8 mm]]}}
+  - id: traxxas-1747-nut-m4-nyloc
+    kind: structure
+    cad_name: Nyloc nut M4
+    name: Traxxas 1747 4 mm nylon locking nut (wheel nut)
+    description: Frame at the bearing face centre, +z through the nut body.
+    mechanical:
+      shape: custom
+      size: [8.1 mm, 7 mm, 5 mm]
+      mass: 0.0012
+      material: Steel 8
+      color: "#30343a"
+      solids:
+        - {kind: prism, name: hex, position: [0, 0, 0], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 5 mm,
+           profile: [[4.041 mm, 0], [2.021 mm, 3.5 mm], [-2.021 mm, 3.5 mm], [-4.041 mm, 0], [-2.021 mm, -3.5 mm], [2.021 mm, -3.5 mm]]}
+        - {kind: cylinder, op: remove, name: thread bore, position: [0, 0, 0], axis: [0, 0, 1], diameter: 3.3 mm, length: 5 mm}
+      provenance: {status: datasheet, source: "ISO 10511 M4 (s 7, m 5); Traxxas 1747 nuts 4 mm nylon locking (parts list 58234-8)"}
+    interfaces:
+      seat: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
+             params: {holes: [[0, 0, 4 mm, tapped, 5 mm]], fastener: nut-m4-nyloc, through_thread: true}}
+
+  # ------------------------------------------------------------------ wheels
+  - id: traxxas-5878-sct-wheel-rear
+    kind: wheel
+    cad_name: SCT wheel rear
+    cad_family: SCT wheels
+    name: Traxxas 5878-BLK SCT tire and wheel, glued (BFGoodrich KM2, foam inserts), 12 mm hex, rear (2WD rear)
+    manufacturer: Traxxas
+    part_number: 5878-BLK
+    description: >
+      Component frame at the wheel centre, axis +y toward the outer (nut) side; the deep hub recess faces -y. The 12 mm
+      hex hub face sits 6 mm inboard of the centre (estimated) and the nut seat 4 mm outboard.
+    mechanical:
+      shape: cylinder
+      axis: y
+      size: [110 mm, 44 mm]
+      mass: 0.115
+      material: Rubber over nylon rim
+      color: "#1c1c1c"
+      moving: true
+      keepout_margin: 4 mm
+      solids:
+        - {kind: cylinder, name: tire, position: [0, -22 mm, 0], axis: [0, 1, 0], diameter: 110 mm, length: 44 mm}
+      features:
+        - {id: hub_recess, kind: bore, position: [0, -22 mm, 0], axis: [0, 1, 0], diameter: 62 mm, depth: 16 mm,
+           provenance: {status: estimated, source: "SCT wheel inner offset (estimated)"}}
+        - {id: hex_bore, kind: d_bore, position: [0, -6 mm, 0], axis: [0, 1, 0], diameter: 13.9 mm, depth: 10 mm, flat_offset: 6.02 mm,
+           flat_normal: [0, 0, 1], provenance: {status: vendor, source: "12 mm hex (bigboyswithcooltoys.ca TRA6876 listing); depth estimated"}}
+        - {id: nut_seat, kind: bore, position: [0, 22 mm, 0], axis: [0, -1, 0], diameter: 12 mm, depth: 18 mm}
+      provenance: {status: vendor, source: "https://www.bigboyswithcooltoys.ca/products/tra5878-tires-wheels-assembled-glued-sct-satin-chrome-black-beadlock-style-wheels-bfgoodrich-mud-terraintm-km2-tires-foam-inserts-24wd-front-rear-2wd-rear-only (110 x 44 mm)",
+                   notes: "mass estimated (unpublished)"}
+    interfaces:
+      hub: {kind: bore, origin: [0, -6 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 13.9 mm, depth: 10 mm, flat_offset: 6.02 mm},
+            description: "12 mm hex socket (flat model); opens on the inner hub face"}
+    behavior:
+      model: tire.linear
+      params: {radius: 0.055, width: 0.044, friction: 0.9, rolling_resistance: 0.02, torsional_friction: 0.005}
+      provenance: {status: estimated, notes: "friction and rolling resistance for rubber on asphalt (estimates)"}
+  - id: traxxas-5879-sct-wheel-front
+    kind: wheel
+    cad_name: SCT wheel front
+    cad_family: SCT wheels
+    name: Traxxas 5879-BLK SCT tire and wheel, glued, 2WD front (two 5 x 11 x 4 bearings in the hub)
+    manufacturer: Traxxas
+    part_number: 5879-BLK
+    description: Component frame at the wheel centre, axis +y toward the outer (nut) side. The bearings make the hub a 5 mm running bore (14 mm long).
+    mechanical:
+      shape: cylinder
+      axis: y
+      size: [110 mm, 44 mm]
+      mass: 0.11
+      material: Rubber over nylon rim
+      color: "#1c1c1c"
+      moving: true
+      keepout_margin: 4 mm
+      solids:
+        - {kind: cylinder, name: tire, position: [0, -22 mm, 0], axis: [0, 1, 0], diameter: 110 mm, length: 44 mm}
+      features:
+        - {id: hub_recess, kind: bore, position: [0, -22 mm, 0], axis: [0, 1, 0], diameter: 62 mm, depth: 12 mm}
+        - {id: hub_bore, kind: bore, position: [0, -10 mm, 0], axis: [0, 1, 0], diameter: 5.01 mm, depth: 14 mm,
+           provenance: {status: datasheet, source: "Bearings 5 x 11 x 4 mm (Traxxas 5116) in the 2WD front wheel (parts list 58234-8); positions estimated"}}
+        - {id: nut_seat, kind: bore, position: [0, 22 mm, 0], axis: [0, -1, 0], diameter: 12 mm, depth: 18 mm}
+      provenance: {status: vendor, source: "Same wheel as 5878 (110 x 44 mm); mass estimated"}
+    interfaces:
+      hub: {kind: bore, origin: [0, -10 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 5.01 mm, depth: 14 mm}}
+    behavior:
+      model: tire.linear
+      params: {radius: 0.055, width: 0.044, friction: 0.9, rolling_resistance: 0.02, torsional_friction: 0.005}
+      provenance: {status: estimated}
+
+  # ------------------------------------------------------------------ steering servo
+  - id: savox-sc-0251mg
+    kind: servo
+    cad_name: Savox SC-0251MG
+    name: Savox SC-0251MG standard digital metal-gear servo, 16 kg-cm @ 6 V, 25T
+    manufacturer: Savox
+    part_number: SC-0251MG
+    description: Frame at the bottom centre, long side along y; the 25T output is 10 mm off centre toward +y (estimated).
+    mechanical:
+      shape: custom
+      size: [20 mm, 54 mm, 42.4 mm]
+      mass: 0.061
+      color: "#151515"
+      solids:
+        - {kind: box, name: body, position: [0, 0, 21.2 mm], size: [20 mm, 40.7 mm, 42.4 mm]}
+        - {kind: box, name: ears, position: [0, 0, 30.25 mm], size: [20 mm, 54 mm, 2.5 mm]}
+      features:
+        - {id: ear_1, kind: clearance_hole, position: [5 mm, 24.75 mm, 31.5 mm], axis: [0, 0, -1], diameter: 4.2 mm, depth: 2.5 mm,
+           provenance: {status: estimated, source: "Standard-size servo ear pattern 49.5 x 10 mm (unpublished for the SC-0251MG; measure)"}}
+        - {id: ear_2, kind: clearance_hole, position: [-5 mm, 24.75 mm, 31.5 mm], axis: [0, 0, -1], diameter: 4.2 mm, depth: 2.5 mm}
+        - {id: ear_3, kind: clearance_hole, position: [5 mm, -24.75 mm, 31.5 mm], axis: [0, 0, -1], diameter: 4.2 mm, depth: 2.5 mm}
+        - {id: ear_4, kind: clearance_hole, position: [-5 mm, -24.75 mm, 31.5 mm], axis: [0, 0, -1], diameter: 4.2 mm, depth: 2.5 mm}
+      provenance: {status: vendor, source: "https://store.hobbyetc.com/parts/view/168168 (40.7 x 20 x 42.4 mm, 61 g); ear height estimated"}
+    interfaces:
+      ears_a: {kind: hole_pattern, origin: [0, 24.75 mm, 29 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[5 mm, 0, 4.2 mm, clearance, 2.5 mm], [-5 mm, 0, 4.2 mm, clearance, 2.5 mm]]}}
+      ears_b: {kind: hole_pattern, origin: [0, -24.75 mm, 29 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[5 mm, 0, 4.2 mm, clearance, 2.5 mm], [-5 mm, 0, 4.2 mm, clearance, 2.5 mm]]}}
+      output: {kind: bore, origin: [0, 10 mm, 42.4 mm], z: [0, 0, 1], x: [1, 0, 0], params: {d: 6.0 mm, depth: 4 mm}, description: "25T output bushing"}
+    pins:
+      SIG: {role: pwm_in, logic_level: 2.0, voltage_max: 6.0}
+      VCC: {role: power_in, voltage_nominal: 6.0, voltage_min: 4.8, voltage_max: 6.0, current_max: 2.5}
+      GND: {role: ground}
+    connectors:
+      J1: {type: integral, position: [0, -20.35 mm, 10 mm], direction: [0, -1, 0], pins: {"1": SIG, "2": VCC, "3": GND}}
+    behavior:
+      model: servo.pwm
+      params: {stall_torque_at_6v: 1.569, speed_60deg_at_6v: 0.18 s, stall_current_at_6v: 2.5, idle_current: 0.006,
+               min_pulse: 1000 us, max_pulse: 2000 us, travel: 120 deg, deadband: 2 us, frame_rate: 50 Hz}
+      provenance: {status: vendor, source: "https://servodatabase.com/servo/savox/sc0251mg: 16.0 kg-cm / 0.18 s at 6.0 V; 25T",
+                   notes: "stall current, idle current, pulse range and travel are estimates (unpublished)"}
+
+  # ------------------------------------------------------------------ ESC, 5 V supply
+  - id: hobbywing-quicrun-wp-1060
+    kind: esc
+    cad_name: QuicRun WP 1060
+    name: Hobbywing QuicRun WP 1060 brushed ESC, 60 A, 2-3S, 6 V / 3 A switch-mode BEC
+    manufacturer: Hobbywing
+    part_number: "30120200"
+    description: Tape-mount (no holes). Input leads ship with a Tamiya plug; re-terminate them to XT60 (connector swap only).
+    mechanical: {shape: box, size: [36.5 mm, 32 mm, 18 mm], mass: 0.039, color: "#1d1d1d",
+                 provenance: {status: datasheet, source: "https://www.hobbywing.com/en/products/quicrun-wp-1060-brushed55 (36.5 x 32 x 18 mm, 39 g)"}}
+    pins:
+      VIN: {role: power_in, voltage_nominal: 7.4, voltage_min: 5.0, voltage_max: 12.6, current_max: 60}
+      GND: {role: ground}
+      M_A: {role: motor, current_max: 60}
+      M_B: {role: motor, current_max: 60}
+      SIG: {role: pwm_in, voltage_max: 6.0, logic_level: 2.0}
+      BEC: {role: power_out, voltage_nominal: 6.0, current_max: 3.0}
+    connectors:
+      J_PWR: {type: integral, position: [-18.25 mm, 8 mm, 9 mm], direction: [-1, 0, 0], pins: {"1": VIN, "2": GND}}
+      J_MOT: {type: integral, position: [18.25 mm, 0, 9 mm], direction: [1, 0, 0], pins: {"1": M_A, "2": M_B}}
+      J_SIG: {type: integral, position: [-18.25 mm, -8 mm, 12 mm], direction: [-1, 0, 0], pins: {"1": SIG, "2": BEC, "3": GND}}
+    behavior:
+      model: esc.brushed
+      params: {current_continuous: 60, current_burst: 360, r_on: 2 mohm, pwm_frequency: 1 kHz, bec_voltage: 6.0, bec_current: 3.0,
+               bec_type: switching, input_min_pulse: 1000 us, input_max_pulse: 2000 us, neutral_pulse: 1500 us, deadband: 0.03,
+               signal_timeout: 0.5, low_voltage_cutoff_per_cell: 3.0, reverse_delay: 0.1, quiescent_current: 0.04}
+      provenance: {status: datasheet, source: "Hobbywing QuicRun WP 1060 manual (60 A / 360 A, 6 V / 3 A switch BEC, LiPo cutoff 3.0 V/cell): https://www.hobbywing.com/en/uploads/file/20240315/4806bbdbab8eb9fea0bb26da87d81b00.pdf",
+                   notes: "r_on, PWM frequency, deadband, signal timeout and quiescent current are estimates"}
+    thermal: {theta_ja_c_per_w: 9.0, max_temp_c: 105}
+    interfaces:
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {area: 1168 mm^2}}
+  - id: pololu-d36v50f5
+    kind: regulator
+    cad_name: Pololu D36V50F5
+    name: Pololu 5 V 5.5 A step-down regulator D36V50F5 (#4091), powers a Raspberry Pi 5 from 2S without a custom PCB
+    manufacturer: Pololu
+    part_number: "4091"
+    description: >
+      Frame at the bottom centre of the 25.4 x 25.4 mm board. Three 2.18 mm mounting holes (M2) at three corners,
+      2.2 mm from the edges (21.1 mm apart). Feed the Pi's 5 V through J8 pins 2/4 + GND (or the USB-C), which bypasses
+      the Pi's USB-PD negotiation: set usb_max_current_enable=1 in config.txt for full USB current.
+    mechanical:
+      shape: box
+      size: [25.4 mm, 25.4 mm, 9.5 mm]
+      mass: 0.007
+      color: "#1b4f9c"
+      features:
+        - {id: hole_1, kind: clearance_hole, position: [-10.5 mm, -10.5 mm, 1.57 mm], axis: [0, 0, -1], diameter: 2.18 mm, depth: 1.57 mm}
+        - {id: hole_2, kind: clearance_hole, position: [10.5 mm, -10.5 mm, 1.57 mm], axis: [0, 0, -1], diameter: 2.18 mm, depth: 1.57 mm}
+        - {id: hole_3, kind: clearance_hole, position: [-10.5 mm, 10.5 mm, 1.57 mm], axis: [0, 0, -1], diameter: 2.18 mm, depth: 1.57 mm}
+      provenance: {status: datasheet, source: "https://www.pololu.com/file/0J1732/d36v50fx-step-down-voltage-regulator-dimensions.pdf (which three corners carry holes: check the drawing)"}
+    model:
+      source: vendor
+      url: https://www.pololu.com/file/0J1733/d36v50fx-step-down-voltage-regulator.step
+      license: "Pololu product resources (free download)"
+      units: mm
+      provenance: {status: datasheet, source: "https://www.pololu.com/product/4091/resources"}
+    interfaces:
+      mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
+              params: {holes: [[-10.5 mm, -10.5 mm, 2.18 mm, clearance, 1.57 mm], [10.5 mm, -10.5 mm, 2.18 mm, clearance, 1.57 mm],
+                               [-10.5 mm, 10.5 mm, 2.18 mm, clearance, 1.57 mm]]}}
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {area: 645 mm^2}}
+    pins:
+      VIN: {role: power_in, voltage_nominal: 7.4, voltage_min: 5.5, voltage_max: 50.0, current_max: 6.0}
+      GND: {role: ground}
+      VOUT: {role: power_out, voltage_nominal: 5.0, voltage_min: 4.8, voltage_max: 5.2, current_max: 5.5}
+      EN: {role: gpio, logic_level: 1.35, voltage_max: 50.0}
+      PG: {role: gpio, logic_level: 5.0}
+    connectors:
+      J_IN: {type: integral, position: [-12.7 mm, 5 mm, 1.6 mm], direction: [-1, 0, 0], pins: {"1": VIN, "2": GND}}
+      J_OUT: {type: integral, position: [12.7 mm, 5 mm, 1.6 mm], direction: [1, 0, 0], pins: {"1": VOUT, "2": GND}}
+    behavior:
+      model: regulator.buck
+      params: {part: D36V50F5, v_out: 5.0, i_max: 5.5, v_in_min: 5.5, v_in_max: 50.0, v_in_abs_max: 50.0, f_sw: 500 kHz,
+               quiescent_current: 0.004, dropout_voltage: 0.35, dropout_resistance: 0.08, output_resistance: 0.008,
+               efficiency: [[0.1, 0.80], [0.5, 0.90], [1.0, 0.92], [2.0, 0.93], [3.0, 0.92], [5.0, 0.90]]}
+      provenance: {status: datasheet, source: "https://www.pololu.com/product/4091/specs (5.5-50 V in, 5 V +-4 %, 5.5 A typ. max, 4 mA quiescent, ~500 kHz)",
+                   notes: "efficiency table read from the product-page curves; dropout voltage/resistance estimated from the dropout graph"}
+    thermal: {theta_ja_c_per_w: 25.0, max_temp_c: 125}
+
+  # ------------------------------------------------------------------ GNSS
+  - id: sparkfun-max-m10s
+    kind: sensor
+    cad_name: SparkFun MAX-M10S
+    name: SparkFun GNSS Receiver Breakout MAX-M10S (Qwiic), GPS-18037, u-blox M10, SMA antenna
+    manufacturer: SparkFun
+    part_number: GPS-18037
+    description: >
+      38.1 x 30.5 mm board, 4 holes on a 33.0 x 25.4 mm rectangle, 3.3 V only. Needs an external active L1 antenna on
+      the SMA (e.g. SparkFun GPS-14986 molex/u.FL or a puck): place the antenna with a clear sky view on top of the car.
+    mechanical:
+      shape: box
+      size: [38.1 mm, 30.5 mm, 4 mm]
+      mass: 0.006
+      color: "#c42a2a"
+      features:
+        - {id: hole_1, kind: clearance_hole, position: [16.5 mm, 12.7 mm, 1.6 mm], axis: [0, 0, -1], diameter: 3.3 mm, depth: 1.6 mm,
+           provenance: {status: estimated, source: "SparkFun drawing gives the 33.0 x 25.4 mm hole centres; 3.3 mm hole diameter (SparkFun standard) estimated"}}
+        - {id: hole_2, kind: clearance_hole, position: [-16.5 mm, 12.7 mm, 1.6 mm], axis: [0, 0, -1], diameter: 3.3 mm, depth: 1.6 mm}
+        - {id: hole_3, kind: clearance_hole, position: [16.5 mm, -12.7 mm, 1.6 mm], axis: [0, 0, -1], diameter: 3.3 mm, depth: 1.6 mm}
+        - {id: hole_4, kind: clearance_hole, position: [-16.5 mm, -12.7 mm, 1.6 mm], axis: [0, 0, -1], diameter: 3.3 mm, depth: 1.6 mm}
+      provenance: {status: datasheet, source: "https://cdn.sparkfun.com/assets/e/8/8/9/8/SparkFun_u-blox_MAX-M10S_Board_Dimensions.png; height and mass estimated"}
+    interfaces:
+      mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
+              params: {holes: [[16.5 mm, 12.7 mm, 3.3 mm, clearance, 1.6 mm], [-16.5 mm, 12.7 mm, 3.3 mm, clearance, 1.6 mm],
+                               [16.5 mm, -12.7 mm, 3.3 mm, clearance, 1.6 mm], [-16.5 mm, -12.7 mm, 3.3 mm, clearance, 1.6 mm]]}}
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+    pins:
+      3V3: {role: power_in, voltage_nominal: 3.3, voltage_min: 2.7, voltage_max: 3.6, current_max: 0.03}
+      GND: {role: ground}
+      TX: {role: uart_tx, logic_level: 3.3}
+      RX: {role: uart_rx, logic_level: 3.3, voltage_max: 3.6}
+    connectors:
+      J1: {type: integral, position: [-19 mm, 0, 1.6 mm], direction: [-1, 0, 0], pins: {"1": 3V3, "2": RX, "3": TX, "4": GND}}
+    behavior:
+      model: gps.nmea
+      params: {update_rate: 10 Hz, baud: 38400, horizontal_cep: 1.5, velocity_noise: 0.05, cold_start: 29 s, current: 0.025}
+      provenance: {status: datasheet, source: "u-blox MAX-M10S datasheet UBX-20035208 (CEP 1.5 m; 10 Hz with GPS+Galileo, 3 Hz default 4-GNSS); SparkFun hookup guide (38400 baud default)",
+                   notes: "10 Hz needs UBX-CFG to GPS+Galileo; current from SparkFun (6-25 mA)"}
+    software:
+      - {bus: uart, protocol: nmea-0183, params: {baud: 38400, sentences: [GGA, RMC, VTG]}}
+
+  # ------------------------------------------------------------------ battery
+  - id: gensace-5000-2s-60c-xt60
+    kind: battery
+    cad_name: Gens Ace 2S 5000
+    name: Gens Ace 5000 mAh 7.4 V 60C 2S1P LiPo, hard case, XT60 (GEA50002S60X6)
+    manufacturer: Gens Ace
+    part_number: GEA50002S60X6
+    description: 12 AWG leads ending in an XT60 (battery lead harness); JST-XH balance lead.
+    mechanical: {shape: box, size: [135 mm, 42.7 mm, 22.2 mm], mass: 0.247, color: "#2b2b2b",
+                 provenance: {status: vendor, source: "gensace.de (133 x 42 x 20 mm, 247 g); envelope from readymaderc.com (135 x 42.7 x 22.2 mm) for a tray with margin"}}
+    pins:
+      POS: {role: power_out, voltage_nominal: 7.4, voltage_min: 6.0, voltage_max: 8.4, current_max: 300}
+      NEG: {role: ground}
+    connectors:
+      J1: {type: integral, position: [67.5 mm, 10 mm, 11 mm], direction: [1, 0, 0], pins: {"1": POS, "2": NEG}}
+    behavior:
+      model: battery.lipo
+      params:
+        cells_series: 2
+        capacity: 5000 mAh
+        c_rating: 60
+        r_internal_per_cell: 3 mohm
+        rc_pair: {r: 2 mohm, c: 2000}
+        ocv_curve: [[0.0, 3.27], [0.05, 3.61], [0.10, 3.69], [0.20, 3.73], [0.30, 3.77], [0.40, 3.79], [0.50, 3.82],
+                    [0.60, 3.87], [0.70, 3.92], [0.80, 3.97], [0.90, 4.08], [1.0, 4.20]]
+        min_cell_voltage: 3.0
+      provenance: {status: estimated, source: "Capacity, 2S, 60C from gensace.de; internal resistance and OCV curve are generic LiPo estimates"}
+    thermal: {theta_ja_c_per_w: 3.0, max_temp_c: 60, heat_capacity_j_per_k: 240}
+    interfaces:
+      bottom: {kind: face_mount, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      strap_path: {kind: strap_slot, origin: [0, 0, 22.2 mm], z: [0, 0, 1], x: [1, 0, 0], params: {width: 22 mm}}
+
+  # ------------------------------------------------------------------ IMU breakout
+  - id: gy-521-mpu6050
+    kind: sensor
+    cad_name: GY-521 MPU-6050
+    name: GY-521 MPU-6050 6-axis IMU breakout (3.3-5 V regulator on board), I2C 0x68
+    description: >
+      Generic breakout, about 21 x 16 mm with two 3 mm holes along the edge opposite the 8-pin header. Frame at the
+      bottom centre; sensor axes (silkscreen X/Y) along the component x/y. Hole spacing varies by maker: MEASURE.
+    mechanical:
+      shape: box
+      size: [21 mm, 16 mm, 3.2 mm]
+      mass: 0.0018
+      color: "#14549a"
+      features:
+        - {id: hole_1, kind: clearance_hole, position: [7.6 mm, 5.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 3.0 mm, depth: 1.6 mm,
+           provenance: {status: estimated, source: "Typical GY-521 layout (vendor listings give 2 x 3 mm holes; spacing unpublished)"}}
+        - {id: hole_2, kind: clearance_hole, position: [-7.6 mm, 5.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 3.0 mm, depth: 1.6 mm}
+      provenance: {status: vendor, source: "https://openelab.io/products/wheeltec-gy-521-mpu-6050 (about 20.5 x 15.5 mm, 2 x 3.2 mm holes, 1.8 g)"}
+    interfaces:
+      mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
+              params: {holes: [[7.6 mm, 5.5 mm, 3.0 mm, clearance, 1.6 mm], [-7.6 mm, 5.5 mm, 3.0 mm, clearance, 1.6 mm]]}}
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+    pins:
+      VCC: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.0, voltage_max: 5.5, current_max: 0.01}
+      GND: {role: ground}
+      SCL: {role: i2c_scl, logic_level: 3.3, voltage_max: 3.6}
+      SDA: {role: i2c_sda, logic_level: 3.3, voltage_max: 3.6}
+      INT: {role: gpio, logic_level: 3.3}
+    connectors:
+      J1: {type: integral, position: [0, -8 mm, 1.6 mm], direction: [0, -1, 0], pins: {"1": VCC, "2": GND, "3": SCL, "4": SDA, "8": INT}}
+    behavior:
+      model: imu.mpu6050
+      params: {current: 0.0039}
+      provenance: {status: datasheet, source: "InvenSense PS-MPU-6000A-00: 3.9 mA gyro + accelerometer; board regulator/LED extra"}
+    software:
+      - {bus: i2c, address: 0x68, protocol: mpu6050, params: {}}

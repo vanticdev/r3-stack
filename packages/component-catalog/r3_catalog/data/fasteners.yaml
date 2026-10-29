@@ -144,3 +144,15 @@ fasteners:
     across_flats: 10.0 mm
     height: 6.0 mm
     provenance: {status: datasheet, source: "DIN 985 (s 10, h max 6.0); ISO 10511 equivalent; modeled as a plain hexagonal prism"}
+  - id: nut-m4-nyloc
+    kind: nut
+    name: Prevailing-torque hex nut with nylon insert M4
+    standard: ISO 10511 / DIN 985
+    thread: M4
+    d: 4.0 mm
+    pitch: 0.7 mm
+    minor_diameter: 3.242 mm
+    tap_drill: 3.3 mm
+    across_flats: 7.0 mm
+    height: 5.0 mm
+    provenance: {status: datasheet, source: "DIN 985 (s 7, h max 5.0); ISO 10511 equivalent; modeled as a plain hexagonal prism"}

@@ -1,0 +1,21 @@
+# Raspberry Pi 5 RAM variants. Official variants: 1, 2, 4, 8 and 16 GB (there is no 5 GB model; confirm
+# the owner's board, the RAM size is printed on the SDRAM package and in `cat /proc/meminfo`). The boards
+# share the PCB, mounting, GPIO and CSI ports; each entry extends the 8 GB entry (rc_car.yaml) and
+# repeats only what differs. Power figures are the 8 GB board's (lower RAM sizes draw slightly less).
+components:
+  - id: raspberry-pi-5-1gb
+    extends: raspberry-pi-5-8gb
+    name: Raspberry Pi 5 (1 GB)
+    provenance: {status: datasheet, source: "https://www.raspberrypi.com/products/raspberry-pi-5/ (1 GB variant)"}
+  - id: raspberry-pi-5-2gb
+    extends: raspberry-pi-5-8gb
+    name: Raspberry Pi 5 (2 GB)
+    provenance: {status: datasheet, source: "https://www.raspberrypi.com/products/raspberry-pi-5/ (2 GB variant)"}
+  - id: raspberry-pi-5-4gb
+    extends: raspberry-pi-5-8gb
+    name: Raspberry Pi 5 (4 GB)
+    provenance: {status: datasheet, source: "https://www.raspberrypi.com/products/raspberry-pi-5/ (4 GB variant)"}
+  - id: raspberry-pi-5-16gb
+    extends: raspberry-pi-5-8gb
+    name: Raspberry Pi 5 (16 GB)
+    provenance: {status: datasheet, source: "https://www.raspberrypi.com/products/raspberry-pi-5/ (16 GB variant)"}
