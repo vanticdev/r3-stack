@@ -391,9 +391,12 @@ class HarnessChecker:
 
     def _pass_throughs(self) -> None:
         for hole in self.routing.holes:
+            cad = getattr(hole, "kind", "drilled") == "cad_slot"
             self.diagnostics.append(Diagnostic.info(
                 "wire_pass_through",
-                f"drill a {hole.diameter * 1e3:.1f} mm grommeted hole in {hole.plate} for {', '.join(sorted(hole.harnesses))}",
+                (f"{', '.join(sorted(hole.harnesses))} pass through the {hole.label} lead slot in {hole.plate} (grommet edge strip)"
+                 if cad else
+                 f"drill a {hole.diameter * 1e3:.1f} mm grommeted hole in {hole.plate} for {', '.join(sorted(hole.harnesses))}"),
                 subjects=[hole.plate, *sorted(hole.harnesses)],
                 data={"position": hole.center.tolist(), "diameter": hole.diameter, "plate": hole.plate,
                       "axis": "xyz"[hole.axis], "units": "m"}))

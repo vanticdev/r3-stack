@@ -87,6 +87,54 @@ supports:
     permitted_motion: clamped
     access: [7 mm, 60 mm]
     provenance: {status: estimated, source: "Generic nylon P-clip; no MPN assigned (select by bundle OD); retention estimated"}
+  # R3 printed cable saddles: PETG blocks with a tie slot, bonded with VHB, that hold a bundle at the height it
+  # is routed at instead of pulling it down onto a low tie mount (the servo lead leaves the servo 11 mm above
+  # the plate, for example).
+  - id: printed-saddle-6
+    kind: adhesive_tie_mount
+    mpn: null
+    manufacturer: R3 (3D printed, PETG)
+    description: Printed cable saddle, 6 mm, tie slot, 3M VHB 4910 bonded, 14 x 12 mm footprint
+    footprint: [14 mm, 12 mm]
+    height: 6 mm
+    bundle_od: [1.0 mm, 8 mm]
+    tie: plt1m
+    fastener: none
+    retention: 20 N
+    max_temperature_c: 70
+    permitted_motion: pinned
+    access: [16 mm, 20 mm]
+    provenance: {status: estimated, source: "R3 printed part; VHB 4910 on 168 mm^2 holds well above the 15 N PLT1M slip load; retention limited by the tie (estimate)"}
+  - id: printed-saddle-10
+    kind: adhesive_tie_mount
+    mpn: null
+    manufacturer: R3 (3D printed, PETG)
+    description: Printed cable saddle, 10 mm, tie slot, 3M VHB 4910 bonded, 14 x 12 mm footprint
+    footprint: [14 mm, 12 mm]
+    height: 10 mm
+    bundle_od: [1.0 mm, 8 mm]
+    tie: plt1m
+    fastener: none
+    retention: 20 N
+    max_temperature_c: 70
+    permitted_motion: pinned
+    access: [16 mm, 20 mm]
+    provenance: {status: estimated, source: "R3 printed part; as printed-saddle-6, 10 mm tall"}
+  - id: printed-saddle-16
+    kind: adhesive_tie_mount
+    mpn: null
+    manufacturer: R3 (3D printed, PETG)
+    description: Printed cable saddle, 16 mm, tie slot, 3M VHB 4910 bonded, 14 x 16 mm footprint
+    footprint: [14 mm, 16 mm]
+    height: 16 mm
+    bundle_od: [1.0 mm, 8 mm]
+    tie: plt1m
+    fastener: none
+    retention: 20 N
+    max_temperature_c: 70
+    permitted_motion: pinned
+    access: [16 mm, 26 mm]
+    provenance: {status: estimated, source: "R3 printed part; as printed-saddle-6, 16 mm tall, wider base against tipping"}
   - id: tie-to-post
     kind: post_tie
     mpn: PLT1M-C

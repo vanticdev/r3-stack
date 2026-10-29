@@ -74,9 +74,8 @@ class ObstacleSet:
         return [o for o in self.obstacles if o.structure]
 
     def floor(self) -> Obstacle | None:
-        """The lowest static structure (the base plate)."""
-        candidates = self.structures
-        return min(candidates, key=lambda o: o.shape.aabb()[0][2]) if candidates else None
+        """The base plate: see :func:`base_plate`."""
+        return base_plate(self.structures)
 
     def min_distance(self, points: np.ndarray, obstacles: list[Obstacle], swept: bool = False,
                      keepout: bool = False, exclude: set[str] | None = None,
@@ -205,7 +204,7 @@ def build_obstacles(project: Project) -> tuple[ObstacleSet, list[Diagnostic]]:
         obstacles.append(Obstacle(cid, ctype.kind, shape, swept, float(mech.keepout_margin), bool(moving), body,
                                   structure, source=source, color=mech.color))
 
-    floor = min((o for o in obstacles if o.structure), key=lambda o: o.shape.aabb()[0][2], default=None)
+    floor = base_plate([o for o in obstacles if o.structure])
     for obstacle in obstacles:
         if obstacle.structure and obstacle is not floor and isinstance(obstacle.shape, Box):
             rotation = obstacle.shape.rotation
@@ -223,6 +222,20 @@ def build_obstacles(project: Project) -> tuple[ObstacleSet, list[Diagnostic]]:
             hint="Run the cad stage to route against exported meshes and bounding boxes."))
     source = cad.get("source", {}) if isinstance(cad, dict) else {}
     return ObstacleSet(obstacles, kin, estimated, source), diagnostics
+
+
+def base_plate(structures: list[Obstacle]) -> Obstacle | None:
+    """The base plate: the static structure with the largest horizontal footprint (lowest on a tie).
+    Not simply the lowest part: a strap or tie looping under the plate reaches below it, and taking
+    it as the floor would put the routing volume's floor at the top of the strap loop."""
+    if not structures:
+        return None
+
+    def key(o: Obstacle) -> tuple[float, float]:
+        lo, hi = o.shape.aabb()
+        return (-float((hi[0] - lo[0]) * (hi[1] - lo[1])), float(lo[2]))
+
+    return min(structures, key=key)
 
 
 def plate_obstacles(obstacles: ObstacleSet) -> list[Obstacle]:
@@ -243,4 +256,4 @@ def describe(obstacles: ObstacleSet) -> dict[str, Any]:
     return out
 
 
-__all__ = ["Obstacle", "ObstacleSet", "ROOT", "build_obstacles", "describe", "plate_obstacles", "Path"]
+__all__ = ["Obstacle", "ObstacleSet", "ROOT", "base_plate", "build_obstacles", "describe", "plate_obstacles", "Path"]

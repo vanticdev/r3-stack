@@ -55,7 +55,9 @@ def write_bom(path: Path, project: Project, routing: RoutingResult, status: str 
                          "cut_length_mm": f"{route.length * 1e3:.0f}", "notes": ""})
     for hole in routing.holes:
         rows.append({"section": "pass_through", "harness": ";".join(sorted(hole.harnesses)), "item": f"hole{hole.id}",
-                     "description": f"drill {hole.diameter * 1e3:.1f} mm in {hole.plate} + grommet", "awg": "",
+                     "description": (f"grommet edge strip in the {hole.label} lead slot of {hole.plate}"
+                                     if getattr(hole, "kind", "drilled") == "cad_slot"
+                                     else f"drill {hole.diameter * 1e3:.1f} mm in {hole.plate} + grommet"), "awg": "",
                      "color": "", "signal": "", "quantity": "1", "cut_length_mm": "",
                      "notes": "at " + ", ".join(f"{c * 1e3:.1f}" for c in hole.center) + " mm"})
     for (awg, color), length in sorted(totals.items()):

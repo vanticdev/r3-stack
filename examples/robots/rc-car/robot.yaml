@@ -39,7 +39,10 @@ components:
     type: upper-deck-petg
     params:
       # Rear-right notch clears the transmission's gear cover.
-      outline: [[-66 mm, -55 mm], [85 mm, -55 mm], [85 mm, 55 mm], [-85 mm, 55 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
+      # Rear-left tab carries the so_rl standoff behind the motor terminals (3 mm clear of the gear case at y < 30 mm);
+      # the right-edge tab carries the lead post's screw (edge distance) beside the lead slot.
+      outline: [[-66 mm, -55 mm], [-28 mm, -55 mm], [-28 mm, -59 mm], [-16 mm, -59 mm], [-16 mm, -55 mm], [85 mm, -55 mm],
+                [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
   standoff_rl: {type: standoff-m3-47}
   standoff_rr: {type: standoff-m3-47}
   standoff_fl: {type: standoff-m3-47}
@@ -66,7 +69,7 @@ components:
   bs_kr:       {type: ball-stud-m3-5.8x8}
   # Steering linkage: servo on two posts, splined output, horn with two ball studs, tie rods.
   servo_post_a: {type: servo-post-al6061}
-  servo_post_b: {type: servo-post-al6061}
+  servo_post_b: {type: servo-post-al6061-cable}   # lead pocket: the servo lead exits into this post
   servo:       {type: servo-digital-20kg}
   servo_output: {type: servo-output-25t}
   servo_horn:  {type: servo-horn-al7075}
@@ -134,6 +137,7 @@ components:
   gps:         {type: gnss-rtk-zed-f9p}
   tape_rtk_radio: {type: foam-tape-3m-4026, params: {size: [50 mm, 10 mm, 1.6 mm]}}
   rtk_radio:   {type: telemetry-sik-915-100mw}
+  lead_post:   {type: lead-post-petg}   # tie post for the leads climbing to the HAT's top-entry headers
 
 # Join ids name the derived fasteners (<id> or <id>_<n>) and fit interfaces; `verify` holds the exact-geometry limits
 # the CAD fit checks apply (radial clearances/interferences, engagement lengths, retainers).
@@ -264,17 +268,18 @@ assembly:
     - {id: gps_tape_top, a: tape_gps.top, b: gps.bottom}
     - {id: rtk_radio_tape_bottom, a: deck.rtk_radio_pad, b: tape_rtk_radio.bottom}
     - {id: rtk_radio_tape_top, a: tape_rtk_radio.top, b: rtk_radio.side}
+    - {id: lead_post_mount, a: deck.lead_post, b: lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
     # Antenna mast through-bolted to the PETG deck with nylocs underneath; antenna bonded to the mast top.
     - {id: mast_mount, a: deck.mast, b: antenna_mast.flange, clock: 0 deg, fasteners: {type: M3x12, nut: nut-m3-nyloc, head: b}}
     - {id: antenna_bond, a: antenna_mast.antenna_seat, b: rx_antenna.seat}
     # ---- power
     - {id: esc_tape_bottom, a: chassis.esc_pad, b: tape_esc.bottom}
-    - {id: esc_tape_top, a: tape_esc.top, b: esc.bottom}
+    - {id: esc_tape_top, a: tape_esc.top, b: esc.bottom, clock: 180 deg}
     - {id: battery_seat, a: chassis.battery_seat, b: battery.bottom}
     - {id: battery_strap_loop, a: battery.strap_path, b: battery_strap.top,
        verify: {strap: battery_strap, around: battery, through: [chassis]}}
     - {id: battery_strap_slots, a: chassis.strap_slots, b: battery_strap.bottom}
-    - {id: fuse_seat, a: chassis.fuse_seat, b: fuse.bottom, clock: -90 deg}
+    - {id: fuse_seat, a: chassis.fuse_seat, b: fuse.bottom, clock: 180 deg}
     - {id: fuse_tie_loop, a: fuse.tie_path, b: fuse_tie.top, clock: 90 deg, verify: {strap: fuse_tie, around: fuse, through: [chassis]}}
     - {id: fuse_tie_slots, a: chassis.tie_slots, b: fuse_tie.bottom}
 
@@ -296,7 +301,7 @@ mechanical:
       path: [servo_output, horn_spline, bs_hl, bj_hl, bj_kl, bs_kl, bs_hr, bj_hr, bj_kr, bs_kr]
   # Sensing only (not an attachment): checked on exact geometry, axis in the encoder frame (sensor face, facing the ring).
   interfaces:
-    - {id: enc_target, kind: magnetic_target, parts: [enc_ring, encoder], frame: encoder, axis_point: [0, 0, 6 mm], axis_dir: [0, 0, 1],
+    - {id: enc_target, kind: magnetic_target, parts: [enc_ring, encoder], frame: encoder, axis_point: [0, 0, 20 mm], axis_dir: [0, 0, 1],
        params: {magnets: [enc_magnet_1, enc_magnet_2, enc_magnet_3, enc_magnet_4], gap: [0.5 mm, 2.0 mm]}}
 
 electrical:
@@ -322,8 +327,10 @@ electrical:
         F1: {type: integral, mates: fuse.J1}
         F2: {type: integral, mates: fuse.J2}
       splices:
-        SP: {position: [75 mm, 21 mm, 39 mm]}   # 6 mm off the fuse holder input (J1): the fuse sits at the splice
-        SN: {position: [85 mm, -10 mm, 40 mm]}
+        # SP 7 mm off the fuse holder input (J1, its front end on the right of the battery, 15 mm aft of the front
+        # wheels' steering sweep): the fuse sits at the splice. The fused output (J2, aft) turns back under the deck to the deck's power slot below the HAT's XT30.
+        SP: {position: [178 mm, -37 mm, 40 mm]}
+        SN: {position: [178 mm, -25 mm, 47 mm]}
       wires:
         - {id: W_Y_P_IN, from: P1.1, to: SP, awg: 12, color: red, signal: VBAT}
         - {id: W_Y_P_ESC, from: SP, to: P2.1, awg: 12, color: red, signal: VBAT}
@@ -336,7 +343,8 @@ electrical:
     - id: esc_power
       connectors:
         A: {type: integral, mates: esc.J_PWR}
-        B: {type: xt60-male, mates: power_y.P2}
+        # The mated XT60 pair stays beside the battery ahead of the ESC, clear of the front wheels' steering sweep.
+        B: {type: xt60-male, mates: power_y.P2, position: [170 mm, 40 mm, 48 mm]}
       wires:
         - {id: W_ESC_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
         - {id: W_ESC_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
@@ -368,7 +376,10 @@ electrical:
         - {id: W_SRV_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: SERVO_PWM}
         - {id: W_SRV_VCC, from: A.2, to: B.2, awg: 22, color: red, signal: SERVO_6V}
         - {id: W_SRV_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
-      route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr]}
+      # Through servo post B's lead pocket, aft along the plate under the linkage, under the deck and up through
+      # the deck's lead slot beside the HAT.
+      route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr],
+              via: [[150 mm, -42 mm, 68 mm], [98 mm, -42 mm, 76.5 mm]]}
     - id: rx_lead
       connectors:
         A: {type: integral, mates: receiver.J1}
@@ -408,7 +419,9 @@ electrical:
         - {id: W_ENC_VCC, from: A.1, to: B.1, awg: 26, color: red, signal: 3V3}
         - {id: W_ENC_OUT, from: A.2, to: B.2, awg: 26, color: yellow, signal: ENC}
         - {id: W_ENC_GND, from: A.3, to: B.3, awg: 26, color: black, signal: GND}
-      route: {slack: 25 mm, keep_away: [wheel_rl, gearbox]}
+      # The Hall board's lead leaves its lower corner along the plate, away from the spur cover, the magnet carrier
+      # and the rear wheel, and wraps the deck's right edge behind the rear-right standoff (not the HAT lead slot).
+      route: {slack: 25 mm, keep_away: [wheel_rr, gearbox, motor, lead_post]}
 
 pcb:
   boards:
@@ -431,7 +444,7 @@ cad:
     Deck and electronics stack: [standoff_rl, standoff_rr, standoff_fl, standoff_fr, deck, cap_so_rl, cap_so_rr, cap_so_fl, cap_so_fr,
                                  pi_spacer_1, pi_spacer_2, pi_spacer_3, pi_spacer_4, pi, pi_standoff_1, pi_standoff_2, pi_standoff_3,
                                  pi_standoff_4, hat, cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, tape_rx, receiver, antenna_mast,
-                                 rx_antenna, tape_rtk_radio, rtk_radio]
+                                 rx_antenna, tape_rtk_radio, rtk_radio, lead_post]
     Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc]
 
 software:

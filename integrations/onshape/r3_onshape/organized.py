@@ -992,6 +992,12 @@ def sync_organized(project: Project, api: Transport, result: StageResult, attemp
         fixture_dir.mkdir(parents=True, exist_ok=True)
         with gzip.open(fixture_dir / "onshape_local_geometry.json.gz", "wt") as handle:
             json.dump({"parts": fixture, "placements": {k: [v.key, solved.get(k, v.pose).tolist()] for k, v in plan.placements.items()}}, handle)
+        # The plans this geometry was built from: an offline recomposition (r3_onshape.recompose) reuses a part only
+        # while its plan solid is unchanged. A new recording also invalidates the cached part-frame masses.
+        from .recompose import MASS_FIXTURE, record_plans
+
+        record_plans(project, parts, input_digest(project))
+        (build_dir / MASS_FIXTURE).unlink(missing_ok=True)
         materials = {iid: parts[p.key].plan.material for iid, p in plan.placements.items()}
         fit = verify_fit(project, model, materials, result)
         report["fit"] = fit.summary()

@@ -60,6 +60,7 @@ def run(project: Project) -> StageResult:
         (project.build_dir("cad") / "cad_model.json").write_text(json.dumps(existing, indent=1))
         result.add(Diagnostic.info("cad_model_reused", "cad_model.json matches the current generator digest",
                                    data={"document": existing["source"].get("url"), "digest": digest}))
+        _recomposed(existing, result)
         _summarize(project, existing, result)
         result.duration_s = time.time() - started
         return result
@@ -117,6 +118,28 @@ def run(project: Project) -> StageResult:
         project.write_lock("cad", {**(project.lock.get("cad") or {}), "attempt": attempt})
     result.duration_s = time.time() - started
     return result
+
+
+def _recomposed(model: dict, result: StageResult) -> None:
+    """An offline recomposition (:mod:`r3_onshape.recompose`) is reported, with its own
+    findings and every part that still needs its Onshape rebuild."""
+    info = model.get("source", {}).get("recomposed")
+    if not info:
+        return
+    pending = info.get("pending_rebuild") or {}
+    result.add(Diagnostic.info("cad_recomposed", "cad_model.json was recomposed offline from the recorded Onshape Part Studio "
+                               "geometry at the compiled poses; the Onshape assembly is re-mated at the next organized build",
+                               data={"at": info.get("at"), "from_microversion": info.get("from_microversion"),
+                                     "pending_rebuild": len(pending)}))
+    for key, item in sorted(pending.items()):
+        result.add(Diagnostic.warning("cad_part_rebuild_pending",
+                                      f"{key}: {item.get('reason')}; verified on the local plan solid (exact booleans), "
+                                      f"not yet rebuilt in Onshape", subjects=list(item.get("instances") or [key]),
+                                      data={"symmetric_difference_mm3": item.get("symmetric_difference_mm3"),
+                                            "studio": item.get("studio"), "library": item.get("library")},
+                                      hint="Rebuild with R3_CAD_FORCE=1 once the Onshape Part Studio features quota allows."))
+    for raw in info.get("diagnostics") or []:
+        result.add(Diagnostic.model_validate({**raw, "stage": "cad"}))
 
 
 def _views(project: Project, api: Transport | None, source: dict, result: StageResult) -> None:
