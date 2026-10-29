@@ -30,7 +30,7 @@ PROJECT = ROOT / "examples/robots/rc-car"
 FIRMWARE = PROJECT / "backend/python/rc_car_controller/main.py"
 OUT = PROJECT / "build/sim/full_throttle"
 PYTHONPATH = ["packages/robot-model", "packages/component-catalog", "packages/simulation", "packages/hardware-interface",
-              "packages/wiring", "services/simulation-worker", "integrations/onshape", "integrations/kicad",
+              "packages/wiring", "packages/connectors", "services/simulation-worker", "integrations/onshape", "integrations/kicad",
               "services/orchestrator"]
 CAPTION = "rc_car_controller on the R3 twin (MuJoCo + electrical twin + virtual HAL), scenario full_throttle, seed 7"
 

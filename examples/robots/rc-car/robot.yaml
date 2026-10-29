@@ -121,7 +121,7 @@ components:
   pi_spacer_4: {type: spacer-m2.5-ff-10, mount: deck, pose: {xyz: [129 mm, 24.5 mm, 78 mm]}}
   pi:          {type: raspberry-pi-5-8gb, mount: deck, pose: {xyz: [110 mm, 0, 88 mm]}}
   # HAT holes and header coincide with the Pi's (HAT left edge flush with the Pi's left edge).
-  hat:         {type: r3-carrier-hat, mount: pi, pose: {xyz: [100 mm, 0, 100.6 mm]}}
+  hat:         {type: r3-carrier-hat, mount: pi, pose: {xyz: [100 mm, -0.25 mm, 100.6 mm]}}
   tape_rx:     {type: foam-tape-3m-4026, mount: deck, pose: {xyz: [190 mm, 40 mm, 78 mm]}, params: {size: [11 mm, 9 mm, 1.6 mm]}}
   receiver:    {type: elrs-receiver-2g4, mount: tape_rx, pose: {xyz: [190 mm, 40 mm, 79.6 mm]}}
   antenna_mast: {type: antenna-mast-petg, mount: deck, pose: {xyz: [175 mm, 0, 78 mm]}}

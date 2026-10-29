@@ -58,6 +58,11 @@ class Transport:
         raw = self.request(method, path, query, body)
         return json.loads(raw) if raw else None
 
+    def upload(self, path: str, file_path: Path, fields: dict[str, Any], timeout: float = 600.0) -> Any:
+        """``multipart/form-data`` POST of one file plus form fields (Onshape's import/translation
+        endpoints, the same upload the "Import" button makes). Returns the parsed JSON response."""
+        raise NotImplementedError(f"{self.name} transport cannot upload files")
+
 
 def _url(base: str, path: str, query: dict[str, Any] | None) -> str:
     url = base + (path if path.startswith("/api/") else API + path)
@@ -133,6 +138,37 @@ class _HttpTransport(Transport):
                     continue
                 raise OnshapeError(error.code, text) from None
         raise OnshapeError(0, "unreachable")
+
+    def upload(self, path: str, file_path: Path, fields: dict[str, Any], timeout: float = 600.0) -> Any:
+        return _upload(self, path, file_path, fields, timeout)
+
+
+def multipart_body(file_path: Path, fields: dict[str, Any]) -> tuple[bytes, str]:
+    boundary = "r3-" + secrets.token_hex(16)
+    parts: list[bytes] = []
+    for key, value in fields.items():
+        text = str(value).lower() if isinstance(value, bool) else str(value)
+        parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"{key}\"\r\n\r\n{text}\r\n".encode())
+    parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{Path(file_path).name}\"\r\n"
+                 f"Content-Type: application/octet-stream\r\n\r\n".encode() + Path(file_path).read_bytes() + b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
+def _upload(transport: "_HttpTransport", path: str, file_path: Path, fields: dict[str, Any], timeout: float) -> Any:
+    check_request("POST", path, None)
+    data, content_type = multipart_body(file_path, fields)
+    url = _url(transport.base, path, None)
+    headers = {"Accept": "application/json", "Content-Type": content_type,
+               **transport._auth_headers("POST", url, content_type)}
+    req = urllib.request.Request(url, data=data, method="POST", headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            raw = response.read()
+    except urllib.error.HTTPError as error:
+        raise OnshapeError(error.code, error.read().decode(errors="replace")) from None
+    return json.loads(raw) if raw else None
+
 
 
 class NativeBridgeTransport(_HttpTransport):

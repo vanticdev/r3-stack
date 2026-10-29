@@ -208,6 +208,26 @@ class CablePlan:
         return sum(b.mass_per_m * b.free_length for b in self.bundles)
 
 
+def core_path(data: dict[str, Any]) -> np.ndarray:
+    """Bundle-core part of a routed wire: ``path`` without its pin fan-outs
+    (``fanout`` = leading/trailing fan-out vertex counts in ``routes.json``)."""
+    path = np.asarray(data["path"], dtype=float)
+    head, tail = (data.get("fanout") or [0, 0])[:2]
+    core = path[int(head): len(path) - int(tail)]
+    return core if len(core) >= 2 else path
+
+
+def fanout_length(data: dict[str, Any]) -> float:
+    path = np.asarray(data["path"], dtype=float)
+    head, tail = (data.get("fanout") or [0, 0])[:2]
+    length = 0.0
+    if head:
+        length += float(np.linalg.norm(np.diff(path[: int(head) + 1], axis=0), axis=1).sum())
+    if tail:
+        length += float(np.linalg.norm(np.diff(path[len(path) - int(tail) - 1:], axis=0), axis=1).sum())
+    return length
+
+
 def _wire_index(project: Project) -> dict[str, tuple[Any, Any]]:
     return {wire.id: (harness, wire) for harness in project.spec.electrical.harnesses for wire in harness.wires}
 
@@ -332,11 +352,12 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
     for wire_id, data in routes.get("wires", {}).items():
         if wire_id not in wires or len(data.get("path") or []) < 2:
             continue
-        path = np.asarray(data["path"], dtype=float)
+        path = core_path(data)
         for group in groups:
             other = routes["wires"][group[0]]
-            if other["harness"] == data["harness"] and np.shape(other["path"]) == path.shape and \
-                    np.allclose(other["path"], path, atol=1e-9):
+            other_path = core_path(other)
+            if other["harness"] == data["harness"] and np.shape(other_path) == path.shape and \
+                    np.allclose(other_path, path, atol=1e-9):
                 group.append(wire_id)
                 break
         else:
@@ -346,7 +367,7 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
     for index, members in enumerate(groups):
         harness, wire = wires[members[0]]
         data = routes["wires"][members[0]]
-        path = np.asarray(data["path"], dtype=float)
+        path = core_path(data)
         gauges = [catalog.wire(int(routes["wires"][w]["awg"])) for w in members]
         od = bundle_diameter([float(g.outer_diameter) for g in gauges])
         ei = sum(float(g.bending_stiffness) for g in gauges)
@@ -354,7 +375,8 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
         ends = [_end_info(project, kin, harness, ref) for ref in (wire.from_, wire.to)]
         allowance = sum(termination_allowance(catalog, connector) for _, _, connector in ends)
         routed = float(np.linalg.norm(np.diff(path, axis=0), axis=1).sum())
-        free = float(data["cut_length"]) - allowance
+        # The fan-outs from the pins into the bundle are short and held by the housings: not simulated.
+        free = float(data["cut_length"]) - allowance - fanout_length(data)
         stretch = max(free, routed) / max(routed, 1e-9)
         if free <= routed + 1e-6:
             zero_slack.append(members[0])

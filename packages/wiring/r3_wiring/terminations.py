@@ -1,11 +1,15 @@
 """Connector termination geometry and allowances (engineering estimates).
 
-``body_size[2]`` of a catalog connector is its length along the mating axis.
+With catalog connector geometry (``r3_catalog`` ``connector_geometry.yaml``), the
+length of a cable-side half is the distance from its mating face to its
+conductor exits (``wire_entry``); otherwise ``body_size[2]``, its length along
+the mating axis.
 """
 
 from __future__ import annotations
 
 from r3_catalog.schema import Catalog
+from r3_connectors.pins import wire_entry_depth
 
 # Extra conductor length consumed by each termination style (strip length,
 # solder cup or crimp barrel, strain-relief loop). Estimates from common
@@ -41,7 +45,8 @@ def termination_allowance(catalog: Catalog, connector_type: str | None) -> float
 def body_length(catalog: Catalog, connector_type: str) -> float:
     if connector_type == "integral":
         return 0.0
-    return float(catalog.connector(connector_type).body_size[2])
+    depth = wire_entry_depth(catalog, connector_type)
+    return depth if depth is not None else float(catalog.connector(connector_type).body_size[2])
 
 
 def body_width(catalog: Catalog, connector_type: str) -> float:
@@ -59,6 +64,12 @@ def exit_offset(catalog: Catalog, harness_type: str) -> float:
 
 
 def mated_pair_length(catalog: Catalog, type_a: str, type_b: str) -> float:
+    """Conductor exit to conductor exit of a mated pair. With geometry both
+    halves share the mating face, so it is the sum of their exit depths (the
+    telescoping overlap is already inside those depths)."""
+    da, db = wire_entry_depth(catalog, type_a), wire_entry_depth(catalog, type_b)
+    if da is not None and db is not None:
+        return da + db
     la, lb = body_length(catalog, type_a), body_length(catalog, type_b)
     return la + lb - ENGAGEMENT_FRACTION * min(la, lb)
 

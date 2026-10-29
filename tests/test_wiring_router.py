@@ -59,8 +59,13 @@ def test_cut_length_covers_route(blocked):
 
 def test_bundle_shares_one_path(blocked):
     _, _, routing, _ = blocked
-    paths = [w.path for w in routing.wires.values()]
-    assert all(np.allclose(p, paths[0]) for p in paths[1:])
+    # Conductors of one bundle share its core exactly and fan out to their own pins at the ends.
+    cores = [w.core for w in routing.wires.values()]
+    assert all(c.shape == cores[0].shape and np.allclose(c, cores[0]) for c in cores[1:])
+    for w in routing.wires.values():
+        for end, point in zip(w.ends, (w.path[0], w.path[-1])):
+            if end is not None:
+                assert np.linalg.norm(point - end.position) < 1e-9
     assert routing.harnesses["lead"].tie_points, "ties expected along the plate"
 
 

@@ -6,6 +6,8 @@ from typing import Any
 
 import numpy as np
 
+from r3_connectors.pins import PinEnd
+
 from .router import RoutingResult
 
 
@@ -13,11 +15,24 @@ def _pts(points: np.ndarray) -> list[list[float]]:
     return [[round(float(c), 6) for c in p] for p in np.asarray(points)]
 
 
+def end_json(end: PinEnd | None) -> dict[str, Any] | None:
+    if end is None:
+        return None
+    return {"connector": end.connector, "pin": end.pin, "kind": end.kind, "position": _pts([end.position])[0],
+            "direction": _pts([end.direction])[0], "contact": _pts([end.contact])[0]}
+
+
 def routes_json(result: RoutingResult, clearances: list[dict[str, Any]]) -> dict[str, Any]:
-    """Exactly the ``build/wiring/routes.json`` contract (SI units, robot frame)."""
+    """The ``build/wiring/routes.json`` contract (SI units, robot frame).
+
+    ``path`` runs from pin to pin: it starts and ends at the conductor exits of
+    the connector halves (``ends``: connector, pin, exit position and direction,
+    mating contact). ``fanout`` counts the leading/trailing path vertices where
+    the conductor converges from its pin into the shared bundle core."""
     return {
         "wires": {w.wire_id: {"harness": w.harness, "awg": w.awg, "path": _pts(w.path),
-                              "routed_length": round(w.routed_length, 6), "cut_length": round(w.cut_length, 6)}
+                              "routed_length": round(w.routed_length, 6), "cut_length": round(w.cut_length, 6),
+                              "ends": [end_json(e) for e in w.ends], "fanout": list(w.fanout)}
                   for w in result.wires.values()},
         "harnesses": {h.harness: {"bundle_path": _pts(h.bundle_path), "length": round(h.length, 6),
                                   "tie_points": _pts(h.tie_points) if h.tie_points else []}
@@ -36,7 +51,9 @@ def detail_json(result: RoutingResult) -> dict[str, Any]:
                 "component": node.component, "body": node.body,
                 "exit": None if node.exit is None else _pts([node.exit])[0],
                 "direction": None if node.direction is None else _pts([node.direction])[0],
-                "lead_length": round(node.lead_length, 6), "bundle_od": round(node.od, 6)}
+                "lead_length": round(node.lead_length, 6), "bundle_od": round(node.od, 6),
+                "frame": None if node.frame is None else node.frame.to_json(),
+                "fan_length": round(node.fan_length, 6)}
     return {
         "wires": {w.wire_id: {"harness": w.harness, "color": w.color, "signal": w.signal, "from": w.from_node, "to": w.to_node,
                               "od": w.od, "slack": w.slack, "termination_allowance": round(w.termination_allowance, 6),
