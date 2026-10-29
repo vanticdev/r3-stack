@@ -1,4 +1,4 @@
-// Run: node --test apps/web/tests/loader.test.mjs
+// Run: node --test apps/web/tests/loader.test.mjs (Node >= 22.18 strips the TypeScript types)
 // R3_BUILD_DIR selects the build/ directory to load (default: the bundled fixture).
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -6,7 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { buildScene, diagnosticsBySubject, loadBuild, sortedDiagnostics, validateSummary } from "../loader.js";
+import { buildScene, diagnosticsBySubject, loadBuild, sortedDiagnostics, validateSummary } from "../src/lib/scene.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const buildDir = process.env.R3_BUILD_DIR || path.join(here, "fixture-build");
