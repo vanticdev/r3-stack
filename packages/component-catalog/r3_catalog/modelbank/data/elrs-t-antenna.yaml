@@ -38,7 +38,17 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.172558+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: RP1
+  result: Public STEP filename search returned 8 candidates; none established this
+    exact part. No exact RadioMaster T-antenna cable assembly model published in the
+    inspected receiver/hardware libraries. Coax length, heat-shrink and lead routing
+    vary; a generic dipole or printed antenna holder does not model the purchased
+    assembly.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact RadioMaster T-antenna cable assembly model published in the
+  inspected receiver/hardware libraries. Coax length, heat-shrink and lead routing
+  vary; a generic dipole or printed antenna holder does not model the purchased assembly.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

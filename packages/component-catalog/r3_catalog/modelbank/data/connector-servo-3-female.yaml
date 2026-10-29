@@ -25,7 +25,16 @@ searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: modelbank-follow-up-2026-10-29
+  query: JRservo
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact female JR-style servo plug model found in the inspected libraries.
+    Supplier/MPN and polarization are unspecified; a Molex 2.54 mm housing or KiCad
+    pin socket is not proof of this RC cable plug.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact female JR-style servo plug model found in the inspected libraries.
+  Supplier/MPN and polarization are unspecified; a Molex 2.54 mm housing or KiCad
+  pin socket is not proof of this RC cable plug.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

@@ -36,7 +36,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.169863+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: MR106ZZ
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. NSK MR106ZZ is listed by TraceParts, but no anonymous STEP download
+    was obtained (account-gated CAD). Public filename searches found no exact file;
+    flanged MF106 and sealed 2RS variants are not MR106ZZ.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: NSK MR106ZZ is listed by TraceParts, but no anonymous STEP download
+  was obtained (account-gated CAD). Public filename searches found no exact file;
+  flanged MF106 and sealed 2RS variants are not MR106ZZ.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

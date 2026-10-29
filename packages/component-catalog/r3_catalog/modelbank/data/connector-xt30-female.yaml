@@ -1,31 +1,107 @@
 id: connector-xt30-female
 name: xt30-female
-manufacturer: ''
-mpn: ''
+manufacturer: Amass
+mpn: XT30U-F
 aliases:
 - xt30-female
 category: connector
 tags:
 - connector
 - xt30-female
-key_specs: {}
-sources: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0052
+    - 0.0102
+    - 0.0136
+    unit: m
+    source: Amass XT30U-F datasheet dimensions recorded in catalog connector_geometry.yaml;
+      native file axes thickness, width, length. The named public model may be mislabeled
+      legacy XT30-F.
+    status: datasheet
+sources:
+- kind: database
+  url: https://raw.githubusercontent.com/MuratovAS/KiCadLibrary/fcc7ce0e8c0131d43b5f6e334476c2978dacfcd8/MAS_3DModel/xt30u-f.step
+  format: step
+  license: Public model in MuratovAS/KiCadLibrary; model-specific third-party rights
+    unspecified; no cached bytes redistributed.
+  sha256: d5dbe517c4b6246d9dc4f9aa708d4783b143a16c2830f2a4aa517433b408e94c
+  retrieved_at: '2026-10-29T19:31:44.955277+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
 validation:
-  status: unverified
-  bbox_m: null
-  expected_bbox_m: null
+  status: mismatch
+  bbox_m:
+  - 0.005249999929219484
+  - 0.010450000110722613
+  - 0.015600000508129597
+  expected_bbox_m:
+  - 0.0052
+  - 0.0102
+  - 0.0136
   tolerance_m: 0.0015
   key_features: {}
-  date: ''
-  validated_by: ''
-  notes: ''
+  date: '2026-10-29T19:32:21.519172+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
 catalog_component: null
 catalog_aliases: []
 searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: github
+  url: https://github.com/nasa-jpl/open-source-rover/blob/a78f9eb33e8163204e81c86140f751ce04e6538b/electrical/pcb/control_board/3d_models/XT30_F.step
+  result: Downloaded legacy XT30-F; rejected for XT30U-F catalog match (15.6 mm vs
+    13.6 mm). Provenance retained as a rejected candidate.
+  date: '2026-10-29T19:24:14.440762+00:00'
+- provider: github
+  url: https://raw.githubusercontent.com/MuratovAS/KiCadLibrary/fcc7ce0e8c0131d43b5f6e334476c2978dacfcd8/MAS_3DModel/xt30u-f.step
+  result: Public file named XT30U-F fetched anonymously; measured length later
+    rejected as mismatch (15.6 mm vs 13.6 mm). Exact variant remains unqualified.
+  date: '2026-10-29T19:31:44.955277+00:00'
+- provider: nasa-jpl public hardware repository
+  result: 'Rejected XT30_F.step: not an exact XT30U-F match. Original bytes/provenance
+    retained here; not an alternate source for CAD.'
+  date: '2026-10-29T19:24:14.440762+00:00'
+  rejected_source:
+    kind: database
+    url: https://raw.githubusercontent.com/nasa-jpl/open-source-rover/a78f9eb33e8163204e81c86140f751ce04e6538b/electrical/pcb/control_board/3d_models/XT30_F.step
+    format: step
+    license: Public CAD in nasa-jpl/open-source-rover; third-party model rights unspecified,
+      no redistribution permission assumed.
+    sha256: 8d1a179bf29ab0f7761fb3cc1f2c461b10483c77bd2550bb4dbff356851001c7
+    retrieved_at: '2026-10-29T19:24:14.440762+00:00'
+    requires_login: false
+    direct: true
+    member: ''
+    did: ''
+    vid: ''
+    eid: ''
+    part_id: ''
+  validation:
+    status: mismatch
+    bbox_m:
+    - 0.005249999929219484
+    - 0.010450000110722613
+    - 0.01560000004246831
+    expected_bbox_m:
+    - 0.0052
+    - 0.0102
+    - 0.0136
+    tolerance_m: 0.0015
+    key_features: {}
+    date: '2026-10-29T19:37:47.720497+00:00'
+    validated_by: r3/cascadio
+    notes: Axis-specific bbox check; interface features require independent geometry
+      inspection.
+proxy_reason: ''
 placement: null
 interface_frames: {}
+onshape_connectors: {}

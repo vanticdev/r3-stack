@@ -37,10 +37,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.133329+00:00'
-- provider: manufacturer
-  url: https://traxxas.com/products/parts/front
-  result: parts/drawings pointer; no STEP located
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: '3637'
+  result: Public STEP filename search returned 7 candidates; none established this
+    exact part. No exact public STEP found for the catalog 3637-type front spindle
+    assembly. The catalog does not pin a precise SKU/revision; numeric search hits
+    did not establish the spindle shoulder, bearing seats or thread.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact public STEP found for the catalog 3637-type front spindle assembly.
+  The catalog does not pin a precise SKU/revision; numeric search hits did not establish
+  the spindle shoulder, bearing seats or thread.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

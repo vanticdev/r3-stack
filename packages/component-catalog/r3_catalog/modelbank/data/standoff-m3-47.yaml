@@ -36,7 +36,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.144923+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: M3x47
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact downloadable female-female M3 x 47 mm standoff found in the
+    inspected standard hardware libraries. Supplier SKU is unspecified; shorter standoffs
+    and printed spacers are not the purchased part.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact downloadable female-female M3 x 47 mm standoff found in the
+  inspected standard hardware libraries. Supplier SKU is unspecified; shorter standoffs
+  and printed spacers are not the purchased part.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

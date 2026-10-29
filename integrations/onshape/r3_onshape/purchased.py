@@ -85,7 +85,7 @@ def import_studio(api: Any, did: str, wid: str, part: Any) -> Any:
         raise StudioBuildError(part.name, 'model_frame_unverified', 'record the real model placement before inserting it')
     failures = []
     for source in sorted(entry.sources, key=lambda s: {'vendor_step': 0, 'kicad_3d': 1, 'database': 2, 'local': 3, 'onshape_public': 4}[s.kind]):
-        if source.kind == 'onshape_public' or source.format not in ('step', 'stp', 'stp.zip'):
+        if source.kind == 'onshape_public' or source.format not in ('step', 'stp', 'stp.zip', 'stp.rar'):
             continue
         try:
             path, _ = acquire(source)

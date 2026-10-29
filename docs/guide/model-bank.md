@@ -119,9 +119,25 @@ to the bank with provenance and checksum so the next robot reuses the evidence.
 Record failed searches and an honest proxy reason when an exact model is absent.
 Do not sculpt a bought component to hide a sourcing or validation gap.
 
-The CAD generator digest includes bank source, validation and frame records, so a
-new CAD run rebuilds when they change. The shared release fingerprint currently
-covers robot.yaml and pinned lock revisions; the coordinator follow-up in
-`.r3-agents/requests/modelbank.md` adds catalog/bank revisions for immediate release
-staleness after dataset-only edits. Re-run CAD and validation after editing bank
-evidence; an old release report is not new geometry evidence.
+The CAD generator digest includes bank source, validation and frame records. Every
+stage fingerprint also contains `catalog_modelbank_revision`: a SHA-256 of the
+bundled catalog, project catalog overrides and selected model-bank dataset bytes.
+Editing validation evidence, adding/removing a record or changing an envelope
+immediately marks previous release, status and report results stale. File mtimes,
+cache/index contents and checkout paths are excluded. Results made before this
+revision field existed are stale and need to be regenerated.
+
+`mechanical.size` is the overall envelope, including connector protrusions.
+`mechanical.board_outline` optionally records the PCB's [x, y] outline separately;
+`mechanical.envelope_offset` locates the bottom-face centre of a box/custom
+envelope relative to the component frame. Mount-hole/interface coordinates stay
+in that component frame. See the [Pi 5 measurement review](model-bank-pi5-measurement.md).
+
+Manufacturer STEP RAR archives are supported with `--format stp.rar --member
+DS3218.stp`. Install the `models` extra plus a headless RAR reader (`bsdtar`, `unar`,
+`unrar` or `7z`). Original download bytes, including a vendor's HTML-prefixed RAR,
+are checksum-pinned; exactly one bounded STEP member is read to a fixed cache
+filename. No archive-controlled paths are extracted. A download is evidence of a
+source, not of dimensional suitability: new DS3218 and named XT30U-F downloads
+currently fail validation and remain blocked. Full acquisition and gap evidence
+is in the [seed audit](model-bank-seed-audit.md).

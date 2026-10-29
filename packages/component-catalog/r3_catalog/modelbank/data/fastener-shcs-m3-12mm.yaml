@@ -12,16 +12,46 @@ key_specs:
     unit: m
     source: R3 assembly selected length; vendor SKU not pinned
     status: estimated
-sources: []
+  dimensions:
+    value:
+    - 0.0055
+    - 0.0055
+    - 0.015
+    unit: m
+    source: ISO 4762 nominal head diameter/height and under-head length; R3 fasteners.yaml
+      (standard geometry, no supplier strength certification)
+    status: datasheet
+sources:
+- kind: database
+  url: https://raw.githubusercontent.com/FreeCAD/FreeCAD-library/f5ca01cdcaa2f69b9295a6382719c2d90628780c/Mechanical%20Parts/Fasteners/Bolts%20%26%20Screws/Metric/ISO4762%20Hexagon%20socket%20head%20cap%20screws/Screw%20M3x12%20ISO4762%208%2C8%20A2K.step
+  format: step
+  license: CC-BY-3.0, FreeCAD Parts Library assets; individual part author credited
+    in upstream git history. ISO 4762 geometry, not a material/strength certification.
+  sha256: 3fd0f3aeda90b8b1ced06a89ec20660b4ebff5cde87a564c5f22e496e5f29337
+  retrieved_at: '2026-10-29T19:26:10.958306+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
 validation:
   status: unverified
-  bbox_m: null
-  expected_bbox_m: null
+  bbox_m:
+  - 0.005490694660693407
+  - 0.005489566829055548
+  - 0.01500000013038516
+  expected_bbox_m:
+  - 0.0055
+  - 0.0055
+  - 0.015
   tolerance_m: 0.0015
   key_features: {}
-  date: ''
-  validated_by: ''
-  notes: ''
+  date: '2026-10-29T19:27:59.859538+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
 catalog_component: null
 catalog_aliases: []
 searched_sources:
@@ -29,8 +59,12 @@ searched_sources:
   url: https://www.kicad.org/libraries/3dmodels/
   result: mechanical fastener not mapped to an installed STEP; select an exact vendor
     SKU
-proxy_reason: Standard and nominal size known; supplier SKU/model not pinned. Standard-feature
-  CAD remains an explicitly labelled proxy.
+- provider: FreeCAD parts library
+  url: https://raw.githubusercontent.com/FreeCAD/FreeCAD-library/f5ca01cdcaa2f69b9295a6382719c2d90628780c/Mechanical%20Parts/Fasteners/Bolts%20%26%20Screws/Metric/ISO4762%20Hexagon%20socket%20head%20cap%20screws/Screw%20M3x12%20ISO4762%208%2C8%20A2K.step
+  result: Downloaded existing ISO 4762 standard-size STEP. Supplier material/grade
+    still specified by the catalog, not inferred from this model.
+  date: '2026-10-29T19:26:10.958306+00:00'
+proxy_reason: ''
 placement: null
 interface_frames: {}
 onshape_connectors: {}

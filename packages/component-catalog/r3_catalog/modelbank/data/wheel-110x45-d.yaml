@@ -37,7 +37,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.146690+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: 110x45
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact supplier model identified for the generic 110 x 45 mm rear
+    tire/wheel with 6 mm D-bore. Pololu servo wheels and Traxxas hex/bearing wheels
+    use different hubs; no supplier SKU is pinned.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact supplier model identified for the generic 110 x 45 mm rear
+  tire/wheel with 6 mm D-bore. Pololu servo wheels and Traxxas hex/bearing wheels
+  use different hubs; no supplier SKU is pinned.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

@@ -42,7 +42,16 @@ searched_sources:
 - provider: manufacturer
   url: https://forum.arducam.com/t/10317
   result: UC-717 exact STEP not located; other Arducam boards are not substitutes
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: FFC22
+  result: Public STEP filename search returned 1 candidates; none established this
+    exact part. No model of the included Arducam 22-to-22 pin, 150 mm flexible cable
+    assembly published in the inspected resources. KiCad FPC sockets are board connectors,
+    not this cable; cable path/strain relief is not established by a socket model.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No model of the included Arducam 22-to-22 pin, 150 mm flexible cable
+  assembly published in the inspected resources. KiCad FPC sockets are board connectors,
+  not this cable; cable path/strain relief is not established by a socket model.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

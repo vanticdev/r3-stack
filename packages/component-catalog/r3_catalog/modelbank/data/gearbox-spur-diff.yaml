@@ -37,7 +37,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.148393+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: Slashgearbox
+  result: 'Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact published model can be identified: this is a generic spur/differential
+    envelope without a supplier SKU. Pololu gearmotors and Traxxas 3695 transmissions
+    have different cases, outputs and ratios; no substitution made.'
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: 'No exact published model can be identified: this is a generic spur/differential
+  envelope without a supplier SKU. Pololu gearmotors and Traxxas 3695 transmissions
+  have different cases, outputs and ratios; no substitution made.'
 placement: null
 interface_frames: {}
+onshape_connectors: {}

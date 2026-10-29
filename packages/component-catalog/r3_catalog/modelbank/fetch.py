@@ -47,7 +47,7 @@ def acquire(source: Source, *, pin: bool = False, downloader: Callable[..., Path
         raise ValueError('source has no checksum: add/ingest it first to pin the download')
     root = cache_root()
     root.mkdir(parents=True, exist_ok=True)
-    suffix = '.zip' if source.format == 'stp.zip' else '.' + source.format
+    suffix = '.zip' if source.format == 'stp.zip' else '.rar' if source.format == 'stp.rar' else '.' + source.format
     if source.sha256:
         existing = root / source.sha256 / ('source' + suffix)
         if existing.exists() and checksum(existing) == source.sha256:
@@ -58,6 +58,10 @@ def acquire(source: Source, *, pin: bool = False, downloader: Callable[..., Path
             raise ValueError('download is not a STEP file (possibly a login or error page)')
         if pin and source.format == 'stp.zip' and not zipfile.is_zipfile(path):
             raise ValueError('download is not a STEP ZIP archive')
+        if pin and source.format == 'stp.rar':
+            import rarfile
+            if not rarfile.is_rarfile_sfx(path):
+                raise ValueError('download is not a STEP RAR archive')
         actual = checksum(path)
         if source.sha256 and actual != source.sha256:
             raise ValueError(f'sha256 mismatch: {actual} != {source.sha256}')
@@ -69,6 +73,8 @@ def acquire(source: Source, *, pin: bool = False, downloader: Callable[..., Path
 
 
 def unpack(path: Path, source: Source) -> Path:
+    if source.format == 'stp.rar':
+        return unpack_rar(path, source)
     if source.format != 'stp.zip':
         return path
     with zipfile.ZipFile(path) as archive:
@@ -86,11 +92,44 @@ def unpack(path: Path, source: Source) -> Path:
         return target
 
 
+def unpack_rar(path: Path, source: Source) -> Path:
+    """Read one bounded STEP member to a fixed name; never extract archive paths.
+
+    rarfile supports the vendor's HTML-prefixed RAR response (an SFX archive).
+    Compressed members need unrar, unar, bsdtar or 7z on the worker.
+    """
+    import rarfile
+
+    try:
+        archive = rarfile.RarFile(path)
+    except rarfile.Error as error:
+        raise ValueError(f'invalid STEP RAR archive: {error}') from error
+    with archive:
+        members = [m for m in archive.infolist() if not m.isdir() and m.filename.lower().endswith(('.step', '.stp'))]
+        if source.member:
+            members = [m for m in members if m.filename == source.member]
+        if len(members) != 1:
+            raise ValueError('archive has zero or multiple STEP models; specify source.member')
+        member = members[0]
+        if member.file_size > MAX_BYTES:
+            raise ValueError('uncompressed STEP exceeds 256 MiB')
+        try:
+            with archive.open(member) as stream:
+                data = stream.read(MAX_BYTES + 1)
+        except rarfile.Error as error:
+            raise ValueError(f'RAR extraction failed (install bsdtar/unar/unrar/7z): {error}') from error
+        if len(data) > MAX_BYTES:
+            raise ValueError('uncompressed STEP exceeds 256 MiB')
+        target = path.parent / 'model.step'
+        target.write_bytes(data)
+        return target
+
+
 def convert(path: Path, source: Source) -> dict[str, Any]:
     import trimesh
 
     model = unpack(path, source)
-    if source.format in ('step', 'stp', 'stp.zip'):
+    if source.format in ('step', 'stp', 'stp.zip', 'stp.rar'):
         if b'ISO-10303-21' not in model.read_bytes()[:4096]:
             raise ValueError('download is not a STEP file')
         from r3_connectors.models import BOARD_TOLERANCE, step_to_glb

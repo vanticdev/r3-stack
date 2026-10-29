@@ -36,7 +36,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.171698+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: M2.5x10
+  result: Public STEP filename search returned 7 candidates; none established this
+    exact part. Public search finds M2.5 x 10 standoff candidates, but no verified
+    round aluminium 5 mm OD female-female spacer with the catalog end/thread geometry
+    and a supplier SKU. Hex, nylon and male-female standoffs are not an exact match.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: Public search finds M2.5 x 10 standoff candidates, but no verified round
+  aluminium 5 mm OD female-female spacer with the catalog end/thread geometry and
+  a supplier SKU. Hex, nylon and male-female standoffs are not an exact match.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

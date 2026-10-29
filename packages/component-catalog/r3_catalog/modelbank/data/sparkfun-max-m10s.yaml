@@ -39,7 +39,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.140631+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: GPS-18037
+  result: 'Public STEP filename search returned 0 candidates; none established this
+    exact part. The official SparkFun_u-blox_MAX-M10S repository was inspected recursively:
+    Eagle .brd/.sch, Gerbers, PDFs and board-dimension images are published, but no
+    STEP/STL/GLB board assembly. A bare u-blox module cannot replace GPS-18037.'
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: 'The official SparkFun_u-blox_MAX-M10S repository was inspected recursively:
+  Eagle .brd/.sch, Gerbers, PDFs and board-dimension images are published, but no
+  STEP/STL/GLB board assembly. A bare u-blox module cannot replace GPS-18037.'
 placement: null
 interface_frames: {}
+onshape_connectors: {}

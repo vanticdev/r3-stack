@@ -25,7 +25,16 @@ searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: modelbank-follow-up-2026-10-29
+  query: FFC15
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact complete 15-pin 1.0 mm flexible cable/contact model published
+    in the inspected libraries. KiCad TE FPC-15 sockets are not cable ends. Cable
+    manufacturer/series and contact stiffener geometry are unspecified.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact complete 15-pin 1.0 mm flexible cable/contact model published
+  in the inspected libraries. KiCad TE FPC-15 sockets are not cable ends. Cable manufacturer/series
+  and contact stiffener geometry are unspecified.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

@@ -36,7 +36,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.169026+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: ATC
+  result: Public STEP filename search returned 8 candidates; none established this
+    exact part. No exact model published for this inline ATC holder plus 10 A blade
+    fuse assembly in the inspected libraries. The catalog has no holder MPN; a Littelfuse/TE
+    bare fuse or PCB fuse clip is not the complete inline holder.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact model published for this inline ATC holder plus 10 A blade
+  fuse assembly in the inspected libraries. The catalog has no holder MPN; a Littelfuse/TE
+  bare fuse or PCB fuse clip is not the complete inline holder.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

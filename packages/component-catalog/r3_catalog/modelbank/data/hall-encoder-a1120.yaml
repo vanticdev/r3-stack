@@ -36,7 +36,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.168183+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: A1120
+  result: Public STEP filename search returned 3 candidates; none established this
+    exact part. Public models exist for the bare A1120 IC package, but no exact purchased
+    12 x 8 mm encoder board/target assembly is identified or published. An IC model
+    cannot replace the catalog encoder board and magnets.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: Public models exist for the bare A1120 IC package, but no exact purchased
+  12 x 8 mm encoder board/target assembly is identified or published. An IC model
+  cannot replace the catalog encoder board and magnets.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

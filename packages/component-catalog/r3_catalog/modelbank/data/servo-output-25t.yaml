@@ -38,7 +38,17 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.180574+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: DS3218
+  result: Public STEP filename search returned 6 candidates; none established this
+    exact part. The official DS3218 assembly was downloaded, but no independently
+    downloadable/indexed shaft body was published. This record denotes a subpart of
+    the servo, not an independently sourced complete servo model; do not insert the
+    whole servo in place of its shaft.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: The official DS3218 assembly was downloaded, but no independently downloadable/indexed
+  shaft body was published. This record denotes a subpart of the servo, not an independently
+  sourced complete servo model; do not insert the whole servo in place of its shaft.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

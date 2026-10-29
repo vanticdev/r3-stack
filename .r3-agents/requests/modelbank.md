@@ -25,3 +25,25 @@ bank record, so re-running CAD correctly invalidates its mesh cache. Please add 
 model-bank/catalog revision to the shared project fingerprint so editing bank
 validation evidence also marks already stored release evidence stale immediately.
 This branch leaves `r3_model` unchanged per COMMON.md's ownership rule.
+
+## Follow-up on r3/modelbank-2 (2026-10-29)
+
+- The Pi bbox mismatch is resolved without changing tolerance: `board_outline`
+  stores 85 x 56 mm, `size` stores 88.500 x 57.630352 x 18.976 mm, and
+  `envelope_offset` preserves the PCB frame and 58 x 49 mm holes. See
+  `docs/guide/model-bank-pi5-measurement.md` for native STEP and surface-fit evidence.
+- `Project.fingerprint()` now records `catalog_modelbank_revision`, hashing the
+  bundled/local catalog and selected bank bytes. Release/status/report staleness
+  and reuse of CAD/assembly interference proof include this revision.
+- Seed records with downloads increased from 13 to 26; proxies fell from 57 to 44.
+  All active URLs were re-fetched successfully and their SHA-256 checked. Every
+  remaining proxy has a specific current-run search reason in the seed audit.
+- New blockers are explicit: the official DS3218 assembly and a public file named
+  XT30U-F fail envelope validation. RC-car CAD therefore reports the servo error.
+  No tolerance was widened and no purchased part was sculpted. Source acquisition
+  does not approve unreviewed geometry/interface frames.
+- Live Onshape import/assembly remains unproven without API keys. The Pi's nominal
+  1.6 mm mount stack versus its STEP PCB faces at 0.030..1.306 mm needs a physical
+  board/seat review before approving native mate frames. Existing offline plan
+  fits and a separate full-Pi FCL surface check show no interference; they do not
+  certify that nominal face assumption or the other proxy parts.

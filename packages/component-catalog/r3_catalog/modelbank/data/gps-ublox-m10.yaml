@@ -36,7 +36,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.167344+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: GPS-18037
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. The generic 20 x 20 mm breakout has no board vendor or MPN. u-blox
+    MAX/NEO-M10 package CAD would model the soldered module, not this breakout/antenna/connector
+    assembly. No exact board model published in the inspected sources.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: The generic 20 x 20 mm breakout has no board vendor or MPN. u-blox MAX/NEO-M10
+  package CAD would model the soldered module, not this breakout/antenna/connector
+  assembly. No exact board model published in the inspected sources.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

@@ -12,7 +12,7 @@ def resolve_model(component: Any, bank: ModelBank | None = None) -> ModelRef | N
     if entry is None or not entry.available:
         return component.model
     source = next((s for s in entry.sources if s.direct and not s.requires_login and s.kind != 'onshape_public'
-                   and s.format in ('step', 'stp', 'stp.zip') and s.sha256), None)
+                   and s.format in ('step', 'stp', 'stp.zip', 'stp.rar') and s.sha256), None)
     if source is None:
         return component.model
     placement = Placement.model_validate(entry.placement) if entry.placement else Placement()

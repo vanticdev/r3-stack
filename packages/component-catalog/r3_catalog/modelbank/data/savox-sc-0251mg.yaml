@@ -38,7 +38,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.137598+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: SC-0251MG
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. The current official Savox CAD download is SC-0251MG+ (40.75 x 20
+    x 43.4 mm), a revised product; the catalog is SC-0251MG (42.4 mm high). No exact
+    old-variant download found. The Plus model was not silently substituted.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: The current official Savox CAD download is SC-0251MG+ (40.75 x 20 x
+  43.4 mm), a revised product; the catalog is SC-0251MG (42.4 mm high). No exact old-variant
+  download found. The Plus model was not silently substituted.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

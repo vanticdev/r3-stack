@@ -36,7 +36,18 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.159126+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: Quicrun
+  result: Public STEP filename search returned 3 candidates; none established this
+    exact part. No exact manufacturer model found for the catalog QuicRun 1060 variant.
+    The catalog envelope (46.5 x 34 x 35.5 mm) also differs from the vendor 1060 body
+    drawing; a similarly named ESC/mock-up or its mount is insufficient evidence of
+    this assembly.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact manufacturer model found for the catalog QuicRun 1060 variant.
+  The catalog envelope (46.5 x 34 x 35.5 mm) also differs from the vendor 1060 body
+  drawing; a similarly named ESC/mock-up or its mount is insufficient evidence of
+  this assembly.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

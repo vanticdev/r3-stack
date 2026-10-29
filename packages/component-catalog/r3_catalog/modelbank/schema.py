@@ -24,7 +24,7 @@ class Spec(Record):
 class Source(Record):
     kind: Literal['vendor_step', 'onshape_public', 'kicad_3d', 'database', 'local']
     url: str
-    format: Literal['step', 'stp', 'stp.zip', 'wrl', 'glb', 'stl'] = 'step'
+    format: Literal['step', 'stp', 'stp.zip', 'stp.rar', 'wrl', 'glb', 'stl'] = 'step'
     license: str = 'unspecified; verify redistribution terms'
     sha256: str = Field('', pattern=r'^([a-f0-9]{64})?$')
     retrieved_at: str = ''

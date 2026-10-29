@@ -25,7 +25,16 @@ searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: modelbank-follow-up-2026-10-29
+  query: integral
+  result: Public STEP filename search returned 8 candidates; none established this
+    exact part. This is an abstract pigtail/terminal attachment in the wiring graph,
+    not an independently orderable connector. No standalone purchased model can be
+    matched without the owning device and terminal MPN.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: This is an abstract pigtail/terminal attachment in the wiring graph,
+  not an independently orderable connector. No standalone purchased model can be matched
+  without the owning device and terminal MPN.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

@@ -39,10 +39,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.129804+00:00'
-- provider: manufacturer
-  url: https://traxxas.com/products/parts/rear
-  result: parts/drawings pointer; no STEP located
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: 6852X
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact complete 6852X + 2753X stub + pinned hex assembly model found
+    in inspected public resources. Individual driveshaft drawings/replacement prints
+    do not establish this assembled length and its interfaces.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact complete 6852X + 2753X stub + pinned hex assembly model found
+  in inspected public resources. Individual driveshaft drawings/replacement prints
+  do not establish this assembled length and its interfaces.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

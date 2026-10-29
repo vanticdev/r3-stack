@@ -36,7 +36,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.166455+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: RP1
+  result: Public STEP filename search returned 8 candidates; none established this
+    exact part. No RadioMaster RP1 STEP published in the inspected receiver resources
+    or public hardware-model libraries. ExpressLRS hardware files concern other receiver
+    designs; RP1 V2 and HappyModel EP1 are not the pinned RP1 board.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No RadioMaster RP1 STEP published in the inspected receiver resources
+  or public hardware-model libraries. ExpressLRS hardware files concern other receiver
+  designs; RP1 V2 and HappyModel EP1 are not the pinned RP1 board.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

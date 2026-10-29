@@ -34,7 +34,7 @@ def register(sub: Any, common: argparse.ArgumentParser) -> None:
     source.add_argument('--onshape', default='')
     p.add_argument('--id', dest='model_id', default='')
     p.add_argument('--license', default='unspecified; verify redistribution terms')
-    p.add_argument('--format', default='step', choices=['step', 'stp', 'stp.zip', 'glb', 'stl', 'wrl'])
+    p.add_argument('--format', default='step', choices=['step', 'stp', 'stp.zip', 'stp.rar', 'glb', 'stl', 'wrl'])
     p.add_argument('--member', default='')
     p.add_argument('--catalog-component')
     fields = ['name', 'category', 'mpn', 'manufacturer', 'url', 'onshape', 'model_id', 'license', 'format', 'member', 'catalog_component']

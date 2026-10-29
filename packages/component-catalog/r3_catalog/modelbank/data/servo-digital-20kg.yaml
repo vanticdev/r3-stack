@@ -1,6 +1,6 @@
 id: servo-digital-20kg
 name: 20 kg-cm digital steering servo
-manufacturer: ''
+manufacturer: Dongguan City Dsservo Technology Co.Ltd
 mpn: DS3218
 aliases: []
 category: servo
@@ -21,16 +21,38 @@ key_specs:
     source: 'DS3218 datasheet: 40 x 20 x 40.5 mm body, 49.5 x 10 mm ear hole pattern;
       ear height estimated'
     status: datasheet
-sources: []
+sources:
+- kind: vendor_step
+  url: https://www.dsservo.com/down.asp?id=25
+  format: stp.rar
+  license: Copyright Dongguan City Dsservo Technology Co.Ltd; public manufacturer
+    CAD download. Redistribution grant unspecified; retain vendor rights, do not redistribute
+    cached bytes.
+  sha256: 47c8ff34f7657c769ae645acb670d2eacd326f3600986931e70dcc4c6bf3ab8b
+  retrieved_at: '2026-10-29T19:23:04.785844+00:00'
+  requires_login: false
+  direct: true
+  member: DS3218.stp
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
 validation:
-  status: unverified
-  bbox_m: null
-  expected_bbox_m: null
+  status: mismatch
+  bbox_m:
+  - 0.06519170291721821
+  - 0.0480999993160367
+  - 0.02003912813961506
+  expected_bbox_m:
+  - 0.02
+  - 0.054
+  - 0.0455
   tolerance_m: 0.0015
   key_features: {}
-  date: ''
-  validated_by: ''
-  notes: ''
+  date: '2026-10-29T19:23:40.078581+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
 catalog_component: servo-digital-20kg
 catalog_aliases: []
 searched_sources:
@@ -38,7 +60,12 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.161930+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: dsservo
+  url: https://www.dsservo.com/en/download.asp
+  result: Official DS3218-3d listing; STEP member downloaded from the public down.asp
+    link. Server prepends HTML to its RAR.
+  date: '2026-10-29T19:23:04.785844+00:00'
+proxy_reason: ''
 placement: null
 interface_frames: {}
+onshape_connectors: {}

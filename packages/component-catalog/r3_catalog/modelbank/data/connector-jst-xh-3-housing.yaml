@@ -1,31 +1,66 @@
 id: connector-jst-xh-3-housing
 name: jst-xh-3-housing
-manufacturer: ''
-mpn: ''
+manufacturer: JST
+mpn: XHP-3
 aliases:
 - jst-xh-3-housing
 category: connector
 tags:
 - connector
 - jst-xh-3-housing
-key_specs: {}
-sources: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0098
+    - 0.0075
+    - 0.0057
+    unit: m
+    source: https://www.jst-mfg.com/product/pdf/eng/eXH.pdf (XHP-3 9.8 mm wide, 7.5
+      mm high, 5.7 mm deep, model axis order)
+    status: datasheet
+sources:
+- kind: database
+  url: https://raw.githubusercontent.com/LanguidSmartass/altium-libs/5e7cf90145aa20ec79ac2e0d510ccd8ff1f19a19/libs/00_Connectors/CONN%20HEADER%202.50MM%20PITCH/3D%20Models/XHP-3.STEP
+  format: step
+  license: Public model in LanguidSmartass/altium-libs; model-specific redistribution
+    grant not stated. Downloaded for reference; no cached bytes redistributed.
+  sha256: 9a5db55a4125d7b7bcffb46bbdddbcf2f48ddfa177ded9835e31b23de52c2ad5
+  retrieved_at: '2026-10-29T19:26:51.446113+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
 validation:
   status: unverified
-  bbox_m: null
-  expected_bbox_m: null
+  bbox_m:
+  - 0.009800000116229057
+  - 0.00774999987334013
+  - 0.005700000096112489
+  expected_bbox_m:
+  - 0.0098
+  - 0.0075
+  - 0.0057
   tolerance_m: 0.0015
   key_features: {}
-  date: ''
-  validated_by: ''
-  notes: ''
+  date: '2026-10-29T19:28:02.243810+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
 catalog_component: null
 catalog_aliases: []
 searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: github
+  url: https://raw.githubusercontent.com/LanguidSmartass/altium-libs/5e7cf90145aa20ec79ac2e0d510ccd8ff1f19a19/libs/00_Connectors/CONN%20HEADER%202.50MM%20PITCH/3D%20Models/XHP-3.STEP
+  result: Exact standard size / named housing STEP downloaded from public CAD library;
+    independent feature-frame review pending
+  date: '2026-10-29T19:26:51.446113+00:00'
+proxy_reason: ''
 placement: null
 interface_frames: {}
+onshape_connectors: {}

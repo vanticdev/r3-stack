@@ -38,7 +38,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.179661+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: M6nyloc
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact ISO 10511/DIN 985 M6 nylon-insert nut download found in the
+    inspected standard/CAD library. Plain M6 nuts are different geometry; no anonymous
+    exact supplier CAD SKU was pinned.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact ISO 10511/DIN 985 M6 nylon-insert nut download found in the
+  inspected standard/CAD library. Plain M6 nuts are different geometry; no anonymous
+  exact supplier CAD SKU was pinned.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

@@ -36,7 +36,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.178715+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: M2.5x11
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact downloadable brass M2.5 male-female standoff with 11 mm body
+    and 6 mm stud found in the inspected standard/Adafruit libraries. Nylon kit parts
+    and 8 mm standoffs are different geometry/material variants; supplier SKU absent.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact downloadable brass M2.5 male-female standoff with 11 mm body
+  and 6 mm stud found in the inspected standard/Adafruit libraries. Nylon kit parts
+  and 8 mm standoffs are different geometry/material variants; supplier SKU absent.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

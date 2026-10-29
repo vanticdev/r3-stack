@@ -1,31 +1,65 @@
 id: connector-xt30pw-male
 name: xt30pw-male
-manufacturer: ''
-mpn: ''
+manufacturer: Amass
+mpn: XT30PW-M
 aliases:
 - xt30pw-male
 category: connector
 tags:
 - connector
 - xt30pw-male
-key_specs: {}
-sources: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0133
+    - 0.0072
+    - 0.01395
+    unit: m
+    source: https://www.china-amass.com/public/upload/20250828/a57cb37fadb311d9a7d4f497cece9118.pdf
+      (13.30 span, 5.20 body + 2.00 solder leg, 13.95 depth; native STEP axis order)
+    status: datasheet
+sources:
+- kind: database
+  url: https://raw.githubusercontent.com/mjbots/moteus/main/hw/c1/3d/XT30PW-M.step
+  format: step
+  license: Mjbots repository Apache-2.0; Amass third-party CAD rights unspecified.
+    Public reference download; no redistribution permission assumed.
+  sha256: 07feeef65874564b2bea27cf7e6e8ff5aaad157e80c07d0404778b874427112e
+  retrieved_at: '2026-10-29T19:22:54.933623+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
 validation:
   status: unverified
-  bbox_m: null
-  expected_bbox_m: null
+  bbox_m:
+  - 0.013299999758601189
+  - 0.006999999983236194
+  - 0.013950000051409006
+  expected_bbox_m:
+  - 0.0133
+  - 0.0072
+  - 0.01395
   tolerance_m: 0.0015
   key_features: {}
-  date: ''
-  validated_by: ''
-  notes: ''
+  date: '2026-10-29T19:23:39.063111+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
 catalog_component: null
 catalog_aliases: []
 searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: mjbots
+  url: https://github.com/mjbots/moteus/tree/main/hw/c1/3d
+  result: Exact named XT30PW-M STEP, public motor-controller hardware CAD library
+  date: '2026-10-29T19:22:54.933623+00:00'
+proxy_reason: ''
 placement: null
 interface_frames: {}
+onshape_connectors: {}

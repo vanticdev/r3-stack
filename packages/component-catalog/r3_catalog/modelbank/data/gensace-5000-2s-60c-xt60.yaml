@@ -38,7 +38,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.141596+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: GEA50002S60X6
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact GEA50002S60X6 CAD download found in the inspected Gens Ace/vendor
+    resources or public libraries. Vendor pages disagree on hard/soft case and dimensions;
+    no other 2S 5000 mAh battery was substituted.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact GEA50002S60X6 CAD download found in the inspected Gens Ace/vendor
+  resources or public libraries. Vendor pages disagree on hard/soft case and dimensions;
+  no other 2S 5000 mAh battery was substituted.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

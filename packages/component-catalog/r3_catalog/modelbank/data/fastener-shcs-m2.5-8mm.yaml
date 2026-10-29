@@ -12,16 +12,47 @@ key_specs:
     unit: m
     source: R3 assembly selected length; vendor SKU not pinned
     status: estimated
-sources: []
+  dimensions:
+    value:
+    - 0.0105
+    - 0.0045
+    - 0.0045
+    unit: m
+    source: ISO 4762 / DIN 912 nominal dimensions, R3 fasteners.yaml; screw axis is
+      native STEP X (catalog axis Z). Bbox evidence only; placement/interface frames
+      unreviewed.
+    status: datasheet
+sources:
+- kind: database
+  url: https://raw.githubusercontent.com/Nada-Khafagy/Robotics_project/b17c320b4068414e06c227bfe6a7e6086d426ab0/right_arm/Simscape_files/WB_M2.5x8_ISO%204762%20M2.5%20x%208%20---%208N_sldprt.STEP
+  format: step
+  license: Public model in Nada-Khafagy/Robotics_project; model-specific redistribution
+    grant not stated. Downloaded for reference; no cached bytes redistributed.
+  sha256: ced65914ec12664f01798e072a45f7b5a4ec52f71f0ee3f29a79a2f622168729
+  retrieved_at: '2026-10-29T19:26:51.077999+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
 validation:
   status: unverified
-  bbox_m: null
-  expected_bbox_m: null
+  bbox_m:
+  - 0.010499999858438969
+  - 0.0044671897776424885
+  - 0.0044999998062849045
+  expected_bbox_m:
+  - 0.0105
+  - 0.0045
+  - 0.0045
   tolerance_m: 0.0015
   key_features: {}
-  date: ''
-  validated_by: ''
-  notes: ''
+  date: '2026-10-29T19:27:56.688640+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
 catalog_component: null
 catalog_aliases: []
 searched_sources:
@@ -29,8 +60,12 @@ searched_sources:
   url: https://www.kicad.org/libraries/3dmodels/
   result: mechanical fastener not mapped to an installed STEP; select an exact vendor
     SKU
-proxy_reason: Standard and nominal size known; supplier SKU/model not pinned. Standard-feature
-  CAD remains an explicitly labelled proxy.
+- provider: github
+  url: https://raw.githubusercontent.com/Nada-Khafagy/Robotics_project/b17c320b4068414e06c227bfe6a7e6086d426ab0/right_arm/Simscape_files/WB_M2.5x8_ISO%204762%20M2.5%20x%208%20---%208N_sldprt.STEP
+  result: Exact standard size / named housing STEP downloaded from public CAD library;
+    independent feature-frame review pending
+  date: '2026-10-29T19:26:51.077999+00:00'
+proxy_reason: ''
 placement: null
 interface_frames: {}
 onshape_connectors: {}

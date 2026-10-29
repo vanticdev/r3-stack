@@ -37,7 +37,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.145810+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: 110x45
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact supplier model identified for the generic 110 x 45 mm front
+    tire/wheel with 6.05 mm plain hub bore. Pololu wheels and the named Traxxas front
+    wheel are not dimensionally/interface-equivalent.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact supplier model identified for the generic 110 x 45 mm front
+  tire/wheel with 6.05 mm plain hub bore. Pololu wheels and the named Traxxas front
+  wheel are not dimensionally/interface-equivalent.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

@@ -41,7 +41,16 @@ searched_sources:
 - provider: manufacturer
   url: https://traxxas.com/products/parts/3785
   result: parts/drawings pointer; no STEP located
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: '3785'
+  result: Public STEP filename search returned 6 candidates; none established this
+    exact part. No exact Titan 12T 550 / 3785 STEP download found in inspected Traxxas/public
+    CAD resources. Generic 540 motors and other 550 cans do not establish the fan,
+    shaft and mounting interfaces.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact Titan 12T 550 / 3785 STEP download found in inspected Traxxas/public
+  CAD resources. Generic 540 motors and other 550 cans do not establish the fan, shaft
+  and mounting interfaces.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

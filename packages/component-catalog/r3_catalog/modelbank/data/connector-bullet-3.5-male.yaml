@@ -25,7 +25,16 @@ searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: modelbank-follow-up-2026-10-29
+  query: bullet
+  result: Public STEP filename search returned 8 candidates; none established this
+    exact part. No exact free model published in the inspected KiCad/connector libraries
+    for this RC solder-cup 3.5 mm bullet plug. Similar TE crimp contacts are not the
+    specified RC connector; supplier MPN remains unspecified.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact free model published in the inspected KiCad/connector libraries
+  for this RC solder-cup 3.5 mm bullet plug. Similar TE crimp contacts are not the
+  specified RC connector; supplier MPN remains unspecified.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

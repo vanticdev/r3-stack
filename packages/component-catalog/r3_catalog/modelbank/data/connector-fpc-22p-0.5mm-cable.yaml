@@ -25,7 +25,16 @@ searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: modelbank-follow-up-2026-10-29
+  query: FFC22
+  result: Public STEP filename search returned 1 candidates; none established this
+    exact part. No exact complete 22-pin 0.5 mm flexible cable/contact model published
+    in the inspected libraries. The found PCB sockets and 22-pin board models are
+    not this cable-side half; no cable MPN is specified.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact complete 22-pin 0.5 mm flexible cable/contact model published
+  in the inspected libraries. The found PCB sockets and 22-pin board models are not
+  this cable-side half; no cable MPN is specified.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

@@ -1,31 +1,66 @@
 id: connector-xt30-male
 name: xt30-male
-manufacturer: ''
-mpn: ''
+manufacturer: Amass
+mpn: XT30U-M
 aliases:
 - xt30-male
 category: connector
 tags:
 - connector
 - xt30-male
-key_specs: {}
-sources: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0102
+    - 0.0052
+    - 0.0137
+    unit: m
+    source: https://store.comet.bg/download-file.php?id=30575 (Amass XT30U-M drawing,
+      13.70 length, 10.20 width, 5.20 thickness; native axes)
+    status: datasheet
+sources:
+- kind: database
+  url: https://raw.githubusercontent.com/Gold-Rush-Robotics/pcb_2025/35d5e58e05e1176df74084e3fde7b1bf5775003a/3Dmodels/XT30U-M.stp
+  format: stp
+  license: Public CAD in Gold-Rush-Robotics/pcb_2025; third-party Amass model rights
+    unspecified. Reference download only; no cached bytes redistributed.
+  sha256: fb7b01b52979ac0c151231b22ef510a8baa75d0d29c863b49d0b64c9db846664
+  retrieved_at: '2026-10-29T19:28:35.065114+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
 validation:
   status: unverified
-  bbox_m: null
-  expected_bbox_m: null
+  bbox_m:
+  - 0.010200000368058681
+  - 0.005249999929219484
+  - 0.0137000004760921
+  expected_bbox_m:
+  - 0.0102
+  - 0.0052
+  - 0.0137
   tolerance_m: 0.0015
   key_features: {}
-  date: ''
-  validated_by: ''
-  notes: ''
+  date: '2026-10-29T19:31:15.219364+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
 catalog_component: null
 catalog_aliases: []
 searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: github
+  url: https://raw.githubusercontent.com/Gold-Rush-Robotics/pcb_2025/35d5e58e05e1176df74084e3fde7b1bf5775003a/3Dmodels/XT30U-M.stp
+  result: Named XT30U-M native model downloaded from public robotics hardware library;
+    not the legacy XT30-M variant
+  date: '2026-10-29T19:28:35.065114+00:00'
+proxy_reason: ''
 placement: null
 interface_frames: {}
+onshape_connectors: {}

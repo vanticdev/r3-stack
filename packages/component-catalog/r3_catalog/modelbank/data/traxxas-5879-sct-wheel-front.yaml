@@ -40,7 +40,16 @@ searched_sources:
 - provider: manufacturer
   url: https://traxxas.com/products/parts/5879-BLK
   result: parts/drawings pointer; no STEP located
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: '5879'
+  result: Public STEP filename search returned 7 candidates; none established this
+    exact part. No exact 5879-BLK 2WD front wheel/tire/insert STEP found in inspected
+    Traxxas/public resources. Rear 12 mm hex wheels cannot replace the two-bearing
+    front hub variant.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact 5879-BLK 2WD front wheel/tire/insert STEP found in inspected
+  Traxxas/public resources. Rear 12 mm hex wheels cannot replace the two-bearing front
+  hub variant.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

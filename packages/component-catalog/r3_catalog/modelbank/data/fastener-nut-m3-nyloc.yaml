@@ -24,8 +24,16 @@ searched_sources:
   url: https://www.kicad.org/libraries/3dmodels/
   result: mechanical fastener not mapped to an installed STEP; select an exact vendor
     SKU
-proxy_reason: Standard and nominal size known; supplier SKU/model not pinned. Standard-feature
-  CAD remains an explicitly labelled proxy.
+- provider: modelbank-follow-up-2026-10-29
+  query: DIN985
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact publicly downloadable ISO 10511/DIN 985 M3 nylon-insert nut
+    found in the inspected standard fastener library. Plain ISO 4032 nuts and printed
+    nut holders omit the nylon locking collar; supplier CAD SKU not pinned.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact publicly downloadable ISO 10511/DIN 985 M3 nylon-insert nut
+  found in the inspected standard fastener library. Plain ISO 4032 nuts and printed
+  nut holders omit the nylon locking collar; supplier CAD SKU not pinned.
 placement: null
 interface_frames: {}
 onshape_connectors: {}

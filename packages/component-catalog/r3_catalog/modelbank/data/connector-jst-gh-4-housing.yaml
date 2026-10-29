@@ -25,7 +25,18 @@ searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: modelbank-follow-up-2026-10-29
+  query: GHR-04
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. JST officially lists GHR-04V-S STEP, but its public download link
+    returned HTML instead of an archive during this run, even with a normal page session.
+    No exact GHR-04V-S file found in public libraries (GHR-02V-S is only two positions).
+    Keep the published pointer; no usable anonymous model was acquired.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: JST officially lists GHR-04V-S STEP, but its public download link returned
+  HTML instead of an archive during this run, even with a normal page session. No
+  exact GHR-04V-S file found in public libraries (GHR-02V-S is only two positions).
+  Keep the published pointer; no usable anonymous model was acquired.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

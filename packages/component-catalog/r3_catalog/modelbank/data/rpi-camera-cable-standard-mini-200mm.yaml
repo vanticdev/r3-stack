@@ -37,7 +37,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.126822+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: SC1128
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No complete SC1128 Standard-Mini 200 mm cable STEP found in the inspected
+    official Raspberry Pi/accessory and public-model resources. Connector models and
+    other FFC lengths do not establish the purchased cable/stiffener assembly.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No complete SC1128 Standard-Mini 200 mm cable STEP found in the inspected
+  official Raspberry Pi/accessory and public-model resources. Connector models and
+  other FFC lengths do not establish the purchased cable/stiffener assembly.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

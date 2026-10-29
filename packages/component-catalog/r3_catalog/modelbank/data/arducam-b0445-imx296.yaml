@@ -44,7 +44,18 @@ searched_sources:
 - provider: manufacturer
   url: https://forum.arducam.com/t/10317
   result: UC-717 exact STEP not located; other Arducam boards are not substitutes
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: B0445
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No exact UC-717/B0445 STEP download found in the official Arducam
+    resources or public CAD search. The vendor forum mechanical-drawing requests have
+    no published model in the inspected results; direct forum retrieval is blocked
+    by robots/access policy. Other IMX296 cameras and camera cases are different products.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact UC-717/B0445 STEP download found in the official Arducam resources
+  or public CAD search. The vendor forum mechanical-drawing requests have no published
+  model in the inspected results; direct forum retrieval is blocked by robots/access
+  policy. Other IMX296 cameras and camera cases are different products.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

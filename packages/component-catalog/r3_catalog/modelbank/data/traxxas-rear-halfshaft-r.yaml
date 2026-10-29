@@ -39,10 +39,16 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.130863+00:00'
-- provider: manufacturer
-  url: https://traxxas.com/products/parts/rear
-  result: parts/drawings pointer; no STEP located
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: 6852X
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No published model found for the catalog assembled right halfshaft,
+    explicitly 12 mm shorter than the left. A stock 6852X download would not prove
+    the shortened assembly; no bought part was cut/sculpted to manufacture a match.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No published model found for the catalog assembled right halfshaft,
+  explicitly 12 mm shorter than the left. A stock 6852X download would not prove the
+  shortened assembly; no bought part was cut/sculpted to manufacture a match.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

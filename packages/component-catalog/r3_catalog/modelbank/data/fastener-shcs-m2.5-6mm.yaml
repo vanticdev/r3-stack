@@ -12,16 +12,47 @@ key_specs:
     unit: m
     source: R3 assembly selected length; vendor SKU not pinned
     status: estimated
-sources: []
+  dimensions:
+    value:
+    - 0.0085
+    - 0.0045
+    - 0.0045
+    unit: m
+    source: ISO 4762 / DIN 912 nominal dimensions, R3 fasteners.yaml; screw axis is
+      native STEP X (catalog axis Z). Bbox evidence only; placement/interface frames
+      unreviewed.
+    status: datasheet
+sources:
+- kind: database
+  url: https://raw.githubusercontent.com/PA-33/gopro-control-station/0818abe7dfd99d000f1c5328c929c3f35ea65d72/hardware/cad/source/assemblage/din912-m2.5x6.STEP
+  format: step
+  license: Public model in PA-33/gopro-control-station; model-specific redistribution
+    grant not stated. Downloaded for reference; no cached bytes redistributed.
+  sha256: e4f2039774ca65db841347b1e2b3a3e555140f84cbc5c5a12202b8bcd104bbb0
+  retrieved_at: '2026-10-29T19:26:49.521650+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
 validation:
   status: unverified
-  bbox_m: null
-  expected_bbox_m: null
+  bbox_m:
+  - 0.008500000461935997
+  - 0.0044671897776424885
+  - 0.0044999998062849045
+  expected_bbox_m:
+  - 0.0085
+  - 0.0045
+  - 0.0045
   tolerance_m: 0.0015
   key_features: {}
-  date: ''
-  validated_by: ''
-  notes: ''
+  date: '2026-10-29T19:27:55.736625+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
 catalog_component: null
 catalog_aliases: []
 searched_sources:
@@ -29,8 +60,12 @@ searched_sources:
   url: https://www.kicad.org/libraries/3dmodels/
   result: mechanical fastener not mapped to an installed STEP; select an exact vendor
     SKU
-proxy_reason: Standard and nominal size known; supplier SKU/model not pinned. Standard-feature
-  CAD remains an explicitly labelled proxy.
+- provider: github
+  url: https://raw.githubusercontent.com/PA-33/gopro-control-station/0818abe7dfd99d000f1c5328c929c3f35ea65d72/hardware/cad/source/assemblage/din912-m2.5x6.STEP
+  result: Exact standard size / named housing STEP downloaded from public CAD library;
+    independent feature-frame review pending
+  date: '2026-10-29T19:26:49.521650+00:00'
+proxy_reason: ''
 placement: null
 interface_frames: {}
 onshape_connectors: {}

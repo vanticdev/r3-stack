@@ -36,7 +36,17 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.176849+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: ball-stud
+  result: Public STEP filename search returned 0 candidates; none established this
+    exact part. No supplier SKU or exact downloadable model found for the M3 x 6 thread
+    / 5.8 mm ball / collar combination. Generic ball-stud search did not establish
+    the collar, neck and ball-centre geometry; do not substitute a similar RC ball
+    stud.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No supplier SKU or exact downloadable model found for the M3 x 6 thread
+  / 5.8 mm ball / collar combination. Generic ball-stud search did not establish the
+  collar, neck and ball-centre geometry; do not substitute a similar RC ball stud.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

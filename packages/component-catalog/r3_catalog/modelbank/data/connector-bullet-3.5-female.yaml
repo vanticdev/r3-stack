@@ -25,7 +25,17 @@ searched_sources:
 - provider: kicad_3d
   url: https://gitlab.com/kicad/libraries/kicad-packages3D
   result: no installed STEP mapped to this connector
-proxy_reason: No exact model in the installed KiCad library; existing connector geometry
-  is explicitly a datasheet proxy.
+- provider: modelbank-follow-up-2026-10-29
+  query: bullet
+  result: Public STEP filename search returned 8 candidates; none established this
+    exact part. No exact free model published in the inspected KiCad/connector libraries
+    for this RC solder-cup 3.5 mm bullet socket. TE automotive crimp bullets have
+    different contacts and insulators; no supplier MPN identifies this generic RC
+    part.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact free model published in the inspected KiCad/connector libraries
+  for this RC solder-cup 3.5 mm bullet socket. TE automotive crimp bullets have different
+  contacts and insulators; no supplier MPN identifies this generic RC part.
 placement: null
 interface_frames: {}
+onshape_connectors: {}

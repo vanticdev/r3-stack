@@ -36,7 +36,18 @@ searched_sources:
   url: ''
   result: no exact model pinned
   date: '2026-10-29T18:41:35.170784+00:00'
-proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
-  a labelled proxy; do not substitute a similar product.
+- provider: modelbank-follow-up-2026-10-29
+  query: N52
+  result: Public STEP filename search returned 8 candidates; none established this
+    exact part. No exact supplier model found for the unbranded 2 x 1 mm N52 disc
+    in the inspected libraries. Search matches were unrelated packages/parts; no supplier
+    SKU, coating thickness or magnetization frame can be established from a generic
+    disc model.
+  date: '2026-10-29T19:37:47.919393+00:00'
+proxy_reason: No exact supplier model found for the unbranded 2 x 1 mm N52 disc in
+  the inspected libraries. Search matches were unrelated packages/parts; no supplier
+  SKU, coating thickness or magnetization frame can be established from a generic
+  disc model.
 placement: null
 interface_frames: {}
+onshape_connectors: {}
