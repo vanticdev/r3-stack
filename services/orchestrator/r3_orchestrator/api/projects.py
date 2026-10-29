@@ -2,8 +2,10 @@
 
 Every view reads the same files the CLI and MCP server read (``robot.yaml``,
 ``build/<stage>/result.json`` and the stage hand-off JSON of
-``docs/architecture/r3-pipeline.md``); nothing is cached across requests except
-the decoded simulation recordings (keyed by file mtime). Paths to files under
+``docs/architecture/r3-pipeline.md``). Loaded projects are cached keyed on the
+schema code version and the mtimes of every file the load reads (see
+``freshness.py``), and decoded simulation recordings keyed by file mtime; nothing
+else is cached across requests. Paths to files under
 ``build/`` are returned as API URLs (``/api/projects/<pid>/artifacts/<path>``).
 A view never fails because a stage has not run: missing inputs are ``null``
 and listed in ``missing``.
@@ -25,7 +27,8 @@ from r3_model.project import Project
 
 from .. import api, release, spec_ops
 from .. import stages as stage_runner
-from .errors import ApiError
+from . import freshness
+from .errors import ApiError, project_load_error
 
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".svg", ".gif")
 VIDEO_SUFFIXES = (".mp4", ".webm")
@@ -83,11 +86,12 @@ class ProjectRegistry:
 
 
 def load(ref: ProjectRef) -> Project:
+    """The project, from the cache when neither its inputs nor the schema code changed.
+    Load failures are ``project_invalid`` errors with the field paths of every problem."""
     try:
-        return Project.load(ref.root)
+        return freshness.PROJECTS.load(ref.root)
     except Exception as error:  # schema errors, YAML errors, assembly compile errors
-        raise ApiError("project_invalid", f"{ref.root / 'robot.yaml'} does not load: {error}",
-                       {"project": ref.id, "exception": type(error).__name__}) from error
+        raise project_load_error(error, ref.root / "robot.yaml", {"project": ref.id}) from error
 
 
 # ------------------------------------------------------------------ helpers
@@ -173,9 +177,9 @@ def summary_entry(ref: ProjectRef, runs: Any = None) -> dict[str, Any]:
     """One row of ``GET /api/projects``. Unloadable projects are listed with ``error``."""
     entry: dict[str, Any] = {"id": ref.id, "path": str(ref.root), "projects_root": str(ref.projects_root)}
     try:
-        project = Project.load(ref.root)
-    except Exception as error:  # noqa: BLE001 - list it anyway so the UI can show the problem
-        return {**entry, "name": ref.id, "description": "", "version": "", "error": f"{type(error).__name__}: {error}",
+        project = load(ref)
+    except ApiError as error:  # list it anyway so the UI can show the problem
+        return {**entry, "name": ref.id, "description": "", "version": "", "error": error.message, "error_detail": error.body(),
                 "last_run": None}
     fingerprint = project.fingerprint()
     results = stage_runner.load_results(project)
@@ -193,7 +197,7 @@ def summary_entry(ref: ProjectRef, runs: Any = None) -> dict[str, Any]:
     spec = project.spec
     return {**entry, "name": spec.robot.name, "description": spec.robot.description, "version": spec.robot.version,
             "robot_yaml_sha256": fingerprint.get("robot_yaml_sha256"), "stages": stage_status, "last_run": last_run,
-            "onshape_url": (project.lock.get("cad") or {}).get("url"), "error": None}
+            "onshape_url": (project.lock.get("cad") or {}).get("url"), "error": None, "error_detail": None}
 
 
 def detail(ref: ProjectRef) -> dict[str, Any]:
