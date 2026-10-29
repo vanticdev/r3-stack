@@ -533,6 +533,11 @@ def metadata_property_ids(api: Transport, did: str, wid: str, eid: str, part_id:
 def build_studio(api: Transport, did: str, wid: str, eid: str, name: str, parts: list[LocalPart],
                  variables: dict[str, Variable] | None = None, bindings: dict[str, Any] | None = None) -> BuiltStudio:
     builder = PartStudioBuilder(api, did, wid, eid, name, variables, bindings)
+    return populate_studio(builder, parts)
+
+
+def populate_studio(builder: PartStudioBuilder, parts: list[LocalPart]) -> BuiltStudio:
+    """Shared construction order for the real builder and offline write planner."""
     ordered = sorted(parts, key=lambda p: (p.mirror_of is not None, p.name))
     mirrors = [p for p in ordered if p.mirror_of and any(q.key == p.mirror_of for q in ordered)]
     modeled = [p for p in ordered if p not in mirrors]
@@ -544,7 +549,7 @@ def build_studio(api: Transport, did: str, wid: str, eid: str, name: str, parts:
             builder.apply(part, folder)
     for part in mirrors:
         builder.mirror_part(part, part.mirror_of)
-    meta_ids = metadata_property_ids(api, did, wid, eid, next(iter(builder.out.part_ids.values())))
+    meta_ids = metadata_property_ids(builder.api, builder.did, builder.wid, builder.eid, next(iter(builder.out.part_ids.values())))
     for part in ordered:
         builder.properties(part, meta_ids)
         builder.connectors(part)

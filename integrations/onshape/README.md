@@ -82,3 +82,36 @@ On servers and in CI, use the official API keys: `ONSHAPE_ACCESS_KEY` /
 (`r3_onshape.views`) as `build/cad/views/{iso,front,top,right}.png`, never from
 a browser. The `onshape-native` bridge is a local-development convenience only.
 See [headless operation](../../docs/architecture/headless.md).
+
+## Quota planning and resume
+
+Inspect the complete write plan without credentials, transport discovery or Onshape calls:
+
+```sh
+python -m r3_onshape.organized rebuild examples/robots/rc-car --dry-run
+python -m r3_onshape.organized organize examples/robots/rc-car --dry-run
+python -m r3_onshape.negative_organized examples/robots/rc-car --dry-run
+```
+
+`R3_CAD_DRY_RUN=1` exposes the rebuild plan through the normal `cad` stage and saves
+`build/cad/rebuild_dry_run.json`. The plan lists Part Studios, named standard features,
+assembly mates and estimated `/features` calls. Feature creation/renaming is one request
+per feature in Onshape's official API; `quota.update_features` batches existing parameter
+and suppression updates. Hole points and reference-geometry visibility are grouped already.
+Editor organization reads are estimated separately from REST construction and verification.
+
+Every HTTP 429 stops immediately, including reads and cleanup. The result reports
+`onshape_quota_blocked`, the original `retry_after` and an absolute UTC `reset_at` when
+Onshape supplies it. After the reset, rerun the same command (the actual rebuild command
+is `python -m r3_onshape.organized rebuild <project>`). Successful construction requests
+are journaled under `build/cad/`; replaying their responses locally preserves feature IDs,
+parts and imports without sending those requests again. Organization checkpoints skip
+completed folder/visibility tasks. Keep the lock and build journals together when resuming.
+Changing inputs during an unfinished build stops with an explicit error; archive that
+attempt before clearing its `cad_build_pending` / `cad_library_build` lock entry.
+
+Catalog `extends` and `cad_library.aliases` share a CAD identity only when mechanical,
+interface and model inputs agree. Library `part_signatures` include the solid and mate
+frames. An unchanged inherited SKU can keep its existing immutable document/version/part
+reference while other library families rebuild; an unknown or changed signature requires
+a rebuild. `organize` always operates on the pinned documents and never rebuilds a library.

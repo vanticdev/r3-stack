@@ -25,12 +25,22 @@ import time
 from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
 
-from .client import Transport, default_transport
+from .client import OnshapeError, Transport, default_transport
 
 
 def run(project: Project) -> StageResult:
     result = StageResult(stage="cad", inputs=project.fingerprint())
     started = time.time()
+    if os.environ.get("R3_CAD_DRY_RUN") == "1":
+        from .dry_run import rebuild_plan
+        plan = rebuild_plan(project)
+        path = project.build_dir("cad") / "rebuild_dry_run.json"
+        path.write_text(json.dumps(plan, indent=1))
+        result.metrics.update(plan["summary"])
+        result.add(Diagnostic.info("onshape_dry_run", "Offline rebuild plan; no Onshape calls made", data=plan))
+        result.artifact("cad/rebuild_dry_run.json", "json", "Part Studios, features and quota call estimates")
+        result.duration_s = time.time() - started
+        return result
     from .purchased import diagnostics as purchased_diagnostics
     purchased_diagnostics(project, result)
     result.assume("mechanical", "Purchased parts resolve through the model bank and use real vendor geometry with datasheet mass overrides. "
@@ -64,7 +74,15 @@ def run(project: Project) -> StageResult:
         _summarize(project, existing, result)
         result.duration_s = time.time() - started
         return result
-    api = default_transport()
+    try:
+        api = default_transport()
+    except OnshapeError as error:
+        if error.status != 429:
+            raise
+        from .quota import quota_diagnostic
+        quota_diagnostic(error, result)
+        result.duration_s = time.time() - started
+        return result
     if api is None:
         result.add(Diagnostic.warning("cad_geometry_estimated", "no Onshape transport (headless session, onshape-native bridge or API keys); "
                                       "downstream stages use catalog geometry",
@@ -82,8 +100,15 @@ def run(project: Project) -> StageResult:
         result.duration_s = time.time() - started
         return result
     except OnshapeError as error:
-        result.add(Diagnostic.error("cad_api_quota" if error.status == 429 else "onshape_request_failed", str(error),
-                                    subjects=["cad"], data={"status": error.status}))
+        if error.status == 429:
+            from .quota import quota_diagnostic
+            quota_diagnostic(error, result)
+        else:
+            result.add(Diagnostic.error("onshape_request_failed", str(error), subjects=["cad"], data={"status": error.status}))
+        result.duration_s = time.time() - started
+        return result
+    except ValueError as error:
+        result.add(Diagnostic.error("cad_resume_inputs_changed", str(error), subjects=["cad"]))
         result.duration_s = time.time() - started
         return result
     if result.ok and report.get("robot") is not None:
@@ -112,7 +137,12 @@ def run(project: Project) -> StageResult:
                 delete_document(api, old)
                 result.add(Diagnostic.info("cad_previous_document_trashed", "superseded Onshape document moved to trash",
                                            data={"document_id": old}))
-            except Exception as error:  # noqa: BLE001 - report, do not fail a good build
+            except Exception as error:  # noqa: BLE001 - report cleanup failure
+                if getattr(error, "status", None) == 429:
+                    from .quota import quota_diagnostic
+                    quota_diagnostic(error, result)
+                    result.duration_s = time.time() - started
+                    return result
                 result.add(Diagnostic.warning("cad_previous_document_delete_failed", str(error), data={"document_id": old}))
     else:
         project.write_lock("cad", {**(project.lock.get("cad") or {}), "attempt": attempt})

@@ -268,31 +268,34 @@ def build_part_catalog(project: Project) -> tuple[dict[str, LocalPart], dict[str
     spec, catalog = project.spec, project.catalog
     parts: dict[str, LocalPart] = {}
     instance_part: dict[str, str] = {}
-    mirrored = {c.type for c in spec.components.values() if c.params.get("mirror")}
-    plain = {c.type for c in spec.components.values() if not c.params.get("mirror")}
+    from .aliases import geometry_type
+
+    mirrored = {geometry_type(project, c.type) for c in spec.components.values() if c.params.get("mirror")}
+    plain = {geometry_type(project, c.type) for c in spec.components.values() if not c.params.get("mirror")}
     mirrored_types = mirrored & plain  # types used in both hands get "L"/"R" names
     for cid, comp in spec.components.items():
-        ctype = catalog.component(comp.type)
+        type_id = geometry_type(project, comp.type)
+        ctype = catalog.component(type_id)
         mirror = [float(v) for v in comp.params["mirror"]] if comp.params.get("mirror") else None
         variant = _variant_params(comp.params)
-        key = f"{comp.type}{'#R' if mirror else ''}{'@' + _digest(variant) if variant else ''}"
+        key = f"{type_id}{'#R' if mirror else ''}{'@' + _digest(variant) if variant else ''}"
         if key not in parts:
             base = cad_name(ctype)
-            hand = (" R" if mirror else " L") if comp.type in mirrored_types else ""
+            hand = (" R" if mirror else " L") if type_id in mirrored_types else ""
             name = f"{base}{hand}{_suffix(comp.params)}"
             mech = ctype.mechanical
             plan = PartPlan(name=name, kind="fabricated" if mech.fabricated else "purchased",
                             material=mech.material or ctype.name, density=float(mech.density or 0.0),
                             mass=None if mech.fabricated else float(mech.mass), color=_color(mech.color),
-                            ops=component_ops(project, comp.type, comp.params, mirror), owner=cid,
+                            ops=component_ops(project, type_id, comp.params, mirror), owner=cid,
                             mass_source="geometry" if mech.fabricated else "catalog")
             if mech.fabricated and not plan.density:
                 raise PlanError(f"{comp.type}: fabricated part needs a material density")
-            props = {"part_number": ctype.part_number or comp.type, "vendor": ctype.manufacturer or ("R3 (fabricated)" if mech.fabricated else ""),
+            props = {"part_number": ctype.part_number or type_id, "vendor": ctype.manufacturer or ("R3 (fabricated)" if mech.fabricated else ""),
                      "material": mech.material or "", "mass_source": "geometry x density" if mech.fabricated else
-                     f"catalog {mech.mass * 1e3:.2f} g ({mech.provenance.status})", "catalog_type": comp.type}
-            parts[key] = LocalPart(key=key, name=name, studio=ctype.cad_family or cad_name(ctype), type=comp.type, plan=plan,
-                                   connectors=interface_connectors(project, comp.type, mirror),
+                     f"catalog {mech.mass * 1e3:.2f} g ({mech.provenance.status})", "catalog_type": type_id}
+            parts[key] = LocalPart(key=key, name=name, studio=ctype.cad_family or cad_name(ctype), type=type_id, plan=plan,
+                                   connectors=interface_connectors(project, type_id, mirror),
                                    library=not mech.fabricated and ctype.kind != "pcb", mirror=mirror, properties=props)
         if not ctype.mechanical.fabricated and ctype.kind != "pcb":
             from .purchased import bank_entry
