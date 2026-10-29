@@ -968,7 +968,6 @@ components:
     kind: structure
     cad_name: Battery strap
     name: Hook-and-loop battery strap, 20 mm x 1.5 mm
-    description: Loop geometry comes from the instance params (solids); slots in the chassis come from its strap interface.
     description: Closed loop around the battery and the chassis plate (inner 47 x 28 mm); frame at the bottom band's inner face.
     mechanical:
       shape: custom
