@@ -1,10 +1,7 @@
 """Routed harnesses as MuJoCo cables inside the vehicle world, clearance in the kernel,
 overlapped stepping and the explicit headless GL backend."""
 
-import json
-import shutil
 import sys
-from pathlib import Path
 
 import mujoco
 import numpy as np
@@ -13,21 +10,14 @@ import pytest
 from r3_model.project import Project
 from r3_sim.kernel import CoSimKernel
 from r3_sim.vehicle import Vehicle, build_vehicle_model
-from r3_wiring.stage import route_and_check
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
 
 
 @pytest.fixture(scope="module")
-def routed(tmp_path_factory):
-    """The RC car with build/wiring/routes.json (catalog geometry, no CAD export)."""
-    root = tmp_path_factory.mktemp("rc-car-sim-cables")
-    shutil.copy(RC_CAR / "robot.yaml", root / "robot.yaml")
-    project = Project.load(root)
-    routes = route_and_check(project)["routes"]
-    out = project.build_dir("wiring")
-    (out / "routes.json").write_text(json.dumps(routes))
-    return Project.load(root), routes
+def routed(rc_car_wiring):
+    """The RC car with build/wiring/routes.json (catalog geometry, no CAD export; shared stage run)."""
+    assert (rc_car_wiring.root / "build" / "wiring" / "routes.json").exists()
+    return Project.load(rc_car_wiring.root), rc_car_wiring.bundle["routes"]
 
 
 def _scenario(project: Project):

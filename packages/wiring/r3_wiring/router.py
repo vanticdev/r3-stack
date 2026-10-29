@@ -19,6 +19,13 @@ Theta*-style line-of-sight shortcuts that never increase field cost) and every
 corner is replaced by a circular fillet of at least the minimum bend radius
 ``factor * OD_bundle`` where geometry allows. Ties are placed every ~60 mm where
 the bundle runs within reach of static structure.
+
+Every conductor starts and ends on its pin: a fan-out (C1 cubic Hermite from
+the pin's conductor exit, tangent to its wire-entry axis) joins the bundle core
+at a *breakout* point shared by every conductor of the node on that segment.
+Finally the curvature-constrained planner (:func:`r3_wiring.planner.plan_routing`)
+re-plans the bundle cores from those fixed breakouts (``RouterOptions.plan``),
+so router and planner form one pipeline.
 """
 
 from __future__ import annotations
@@ -43,6 +50,7 @@ from .bodies import ROOT
 from .geometry import bundle_diameter, polyline_length, project_to_polyline, resample_polyline
 from .grid import Fields, VoxelGrid, compute_fields
 from .obstacles import ObstacleSet
+from .planner import plan_routing
 from .smoothing import curvature_radius, make_segment, relax
 from .terminations import (body_width, exit_offset, mated_pair_length, termination_allowance)
 
@@ -70,6 +78,7 @@ class RouterOptions:
     relax_spacing: float = 0.002
     relax_iterations: int = 60
     fillet_min_angle: float = math.radians(8.0)  # smaller turns are measured, not filleted
+    plan: bool = True  # run the curvature-constrained planner on the routed bundles (r3_wiring.planner)
 
 
 @dataclass
@@ -196,6 +205,7 @@ class RoutingResult:
     diagnostics: list[Diagnostic]
     grid: VoxelGrid
     stats: dict[str, Any]
+    planning: Any = None  # r3_wiring.planner.PlanningReport of the router's own planning pass
 
 
 @dataclass
@@ -211,6 +221,7 @@ class _Context:
     clear_np: np.ndarray
 
 
+FLOATING_CANDIDATES = 20_000  # voxels tried (cheapest first) when placing a floating mated pair
 _MOVES = [(di, dj, dk) for di in (-1, 0, 1) for dj in (-1, 0, 1) for dk in (-1, 0, 1) if (di, dj, dk) != (0, 0, 0)]
 
 
@@ -224,7 +235,8 @@ class HarnessRouter:
         self.kin = obstacles.kinematics
         self.opt = options or RouterOptions()
         self.grid = VoxelGrid.around(obstacles, self.opt.voxel)
-        self.fields: Fields = compute_fields(self.grid, obstacles)
+        keep = {c for h in self.spec.electrical.harnesses for c in h.route.keep_away}
+        self.fields: Fields = compute_fields(self.grid, obstacles, keep)
         self.c_req = float(self.spec.requirements.min_wire_clearance_moving)
         self.border = self.grid.border()
         self.diagnostics: list[Diagnostic] = []
@@ -293,7 +305,8 @@ class HarnessRouter:
             for cid in components:
                 obstacle = self.obstacles.by_component(cid)
                 if obstacle is not None:
-                    np.minimum(out, obstacle.swept.sdf_bounded(points, 0.05), out=out)
+                    raw = self.fields.by_component.get(cid)  # the same swept SDF, kept by compute_fields
+                    np.minimum(out, raw if raw is not None else obstacle.swept.sdf_bounded(points, 0.05), out=out)
             self._keep_away_cache[components] = out
         return self._keep_away_cache[components]
 
@@ -313,7 +326,10 @@ class HarnessRouter:
         self._size_holes(wires)
         stats = {"voxel": self.opt.voxel, "grid_shape": list(self.grid.shape), "voxels": self.grid.size,
                  "astar_expansions": self.expansions, "relaxed_segments_reverted": self.relax_reverted}
-        return RoutingResult(wires, harnesses, nodes, floating, self.holes, self.diagnostics, self.grid, stats)
+        result = RoutingResult(wires, harnesses, nodes, floating, self.holes, self.diagnostics, self.grid, stats)
+        if self.opt.plan:
+            result.planning = plan_routing(self.project, self, result, obstacles=self.obstacles)
+        return result
 
     # ----------------------------------------------------------------- nodes
     def _wire_od(self, awg: int) -> float:
@@ -503,9 +519,18 @@ class HarnessRouter:
             total[invalid] = np.inf
             _, preds_a = dijkstra(graph, directed=False, indices=heaviest[0], return_predecessors=True)
             _, preds_b = dijkstra(graph, directed=False, indices=heaviest[1], return_predecessors=True)
+            # Straight strain-relief leads out of the two harnesses' connectors are kept free when
+            # possible: a mated pair placed on one makes its conductors double back. If no candidate
+            # clears them, the cheapest otherwise valid placement is used.
+            leads = [(n.exit, n.lead_end, n.od / 2) for h in (ha, hb) for n in nodes[h].values()
+                     if n.kind == "connector" and n.exit is not None and n.lead_end is not None and n.lead_length > 0]
             order = np.argsort(total)
-            chosen = None
-            for voxel in order[:400]:
+            chosen = fallback = None
+            # Cheapest first. The first 400 voxels (a ~2 cm cube around the optimum) are searched for a
+            # lead-clear placement; if no pair body fits there at all, the search continues outward.
+            for rank, voxel in enumerate(order[:FLOATING_CANDIDATES]):
+                if fallback is not None and rank >= 400:
+                    break
                 if not np.isfinite(total[voxel]):
                     break
                 center = self.grid.center(int(voxel))
@@ -518,8 +543,13 @@ class HarnessRouter:
                 static, _ = self.obstacles.min_distance(body, self.obstacles.static, keepout=True)
                 moving, _ = self.obstacles.min_distance(body, self.obstacles.moving, swept=True)
                 if static.min() >= width / 2 and moving.min() >= self.c_req + width / 2:
-                    chosen = (center, axis, float(total[voxel]))
-                    break
+                    if not any(project_to_polyline(np.vstack([a, b]), body[k][None])[0] < width / 2 + r_lead
+                               for a, b, r_lead in leads for k in range(len(body))):
+                        chosen = (center, axis, float(total[voxel]))
+                        break
+                    if fallback is None:
+                        fallback = (center, axis, float(total[voxel]))
+            chosen = chosen or fallback
             if chosen is None:
                 self.diagnostics.append(Diagnostic.error(
                     "floating_mate_unplaced", f"no free position for mated pair {ref_a} / {ref_b}",
@@ -782,6 +812,20 @@ class HarnessRouter:
                     pins_at.setdefault(node_name(ref), {})[ref.split(".", 1)[1]] = self._wire_od(wire.awg)
         for name, by_pin in pins_at.items():
             self._fan_length(nodes[name], by_pin)
+        # One breakout per (node, incident segment): every conductor of the node on that
+        # segment fans out from its pin into the bundle core at the same point and tangent.
+        breakouts: dict[tuple[str, tuple], dict[str, Any]] = {}
+        for canon, segment in segments.items():
+            bos: list[dict[str, Any] | None] = []
+            for end in (0, 1):
+                key_ = canon[0] if end == 0 else canon[-1]
+                node = nodes.get(key_[2:]) if isinstance(key_, str) and key_.startswith("N:") else None
+                pts = segment["points"] if end == 0 else segment["points"][::-1]
+                bo = self._breakout(node, pts) if node is not None else None
+                if bo is not None:
+                    breakouts[(node.name, canon)] = bo
+                bos.append(bo)
+            segment["breakouts"] = bos
         wire_routes: dict[str, WireRoute] = {}
         for key, parts in branch_segments.items():
             for wire in branches[key]:
@@ -807,12 +851,15 @@ class HarnessRouter:
                                                          start_node, end_node, harness_holes)
                 if not forward_wire:
                     path, prad, pcount = path[::-1], prad[::-1], pcount[::-1]
-                core = path.copy()
                 ends = tuple(self._pin_end(nodes[node_name(ref)], ref, pins_at.get(node_name(ref), {}))
                              for ref in (wire.from_, wire.to))
+                first, last = (parts[0][0], parts[-1][0]) if forward_wire else (parts[-1][0], parts[0][0])
+                wire_breakouts = (breakouts.get((node_name(wire.from_), first)),
+                                  breakouts.get((node_name(wire.to), last)))
                 path, prad, pcount, fanout, fan_bends = self._fan_out(
-                    path, prad, pcount, ends, [nodes[node_name(ref)] for ref in (wire.from_, wire.to)],
-                    self._wire_od(wire.awg), self.catalog.wire(wire.awg).min_bend_radius_factor)
+                    path, prad, pcount, ends, wire_breakouts, self._wire_od(wire.awg),
+                    self.catalog.wire(wire.awg).min_bend_radius_factor)
+                core = path[fanout[0]: len(path) - fanout[1]].copy()
                 bends = bends + fan_bends
                 allowance = sum(termination_allowance(self.catalog, nodes[node_name(ref)].connector_type
                                                       if node_name(ref) in harness.connectors else None)
@@ -827,7 +874,7 @@ class HarnessRouter:
         trunk = max(wire_routes.values(), key=lambda w: float(np.sum(w.conductors)), default=None)
         bundle_path = (trunk.core if trunk.core is not None else trunk.path) if trunk is not None else np.zeros((0, 3))
         segment_out = [{"points": s["points"], "wires": sorted(s["wires"]), "od": s["od"], "conductors": s["conductors"],
-                        "min_bend_radius": s["r_min"]} for s in segments.values()]
+                        "min_bend_radius": s["r_min"], "breakouts": s["breakouts"]} for s in segments.values()]
         for hole_id in harness_holes:
             self.holes[hole_id].wires.update(w.id for w in harness.wires)
         return HarnessRoute(harness.id, bundle_path, ties, segment_out, [w.id for w in harness.wires],
@@ -853,53 +900,63 @@ class HarnessRouter:
         lateral = 0.0
         for pin in by_pin:
             end = self._pin_end(node, f"{node.name}.{pin}", by_pin)
-            if end is not None:
-                d = end.position - node.exit
-                lateral = max(lateral, float(np.linalg.norm(d - (d @ node.direction) * node.direction)))
+            if end is None:  # no pin geometry: the conductors end at the bundle exit
+                node.fan_length = 0.0
+                return
+            d = end.position - node.exit
+            lateral = max(lateral, float(np.linalg.norm(d - (d @ node.direction) * node.direction)))
         node.fan_length = max(0.006, 3.0 * lateral + 2.0 * node.od)
 
+    @staticmethod
+    def _breakout(node: NodePoint, points: np.ndarray) -> dict[str, Any] | None:
+        """Breakout of ``node``'s conductors on a bundle segment (``points`` start at the
+        node exit): the point at the node's fan length along the segment (at most 45 %
+        of it), and the segment tangent there, pointing away from the node."""
+        if node.kind not in ("connector", "floating") or node.fan_length <= 0 or len(points) < 2:
+            return None
+        arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))])
+        if arc[-1] < 1e-6:
+            return None
+        b = min(node.fan_length, 0.45 * float(arc[-1]))
+        delta = min(0.001, b, float(arc[-1]) - b)
+        at = lambda s: np.array([np.interp(s, arc, points[:, a]) for a in range(3)])  # noqa: E731
+        q = at(b)
+        tangent = at(b + delta) - at(b - delta)
+        norm = float(np.linalg.norm(tangent))
+        tangent = tangent / norm if norm > 1e-12 else (points[-1] - points[0]) / arc[-1]
+        return {"node": node.name, "position": q, "direction": tangent, "arc": b}
+
     def _fan_out(self, path: np.ndarray, radius: np.ndarray, count: np.ndarray,
-                 ends: tuple[PinEnd | None, PinEnd | None], end_nodes: list[NodePoint], od: float,
-                 bend_factor: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, tuple[int, int], list[Bend]]:
-        """Start and end the conductor exactly at its pins: a C1 cubic Hermite
-        from the pin exit (tangent = wire-entry axis) into the bundle path at the
-        node's fan length. Returns the new path, per-vertex radius/count, the
-        number of fan-out vertices at each end and the fan-outs' tightest bends."""
+                 ends: tuple[PinEnd | None, PinEnd | None], breakouts: tuple[dict[str, Any] | None, ...],
+                 od: float, bend_factor: float
+                 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, tuple[int, int], list[Bend]]:
+        """Start and end the conductor exactly at its pins: a fan-out from the pin exit
+        (tangent = wire-entry axis) into the bundle core at the shared breakout
+        (tangent = core tangent there). Returns the new path, per-vertex radius/count,
+        the number of fan-out vertices at each end and the fan-outs' tightest bends."""
         out, rad, cnt = path, radius, count
         fan = [0, 0]
-        bends: list[Bend | None] = []
         for side in (0, 1):
-            end, node = ends[side], end_nodes[side]
-            if end is None or len(out) < 2:
+            end, bo = ends[side], breakouts[side]
+            if end is None or bo is None or len(out) < 2:
                 continue
             pts = out if side == 0 else out[::-1]
             r = rad if side == 0 else rad[::-1]
             c = cnt if side == 0 else cnt[::-1]
-            seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
-            arc = np.concatenate([[0.0], np.cumsum(seg)])
-            target = min(node.fan_length, 0.45 * float(arc[-1]))
-            k = int(np.searchsorted(arc, target))
-            k = min(max(k, 1), len(pts) - 1)
-            q = pts[k]
-            tangent = pts[min(k + 1, len(pts) - 1)] - pts[k - 1]
-            tangent = tangent / (np.linalg.norm(tangent) or 1.0)
-            p0, d0 = end.position, end.direction
-            span = float(np.linalg.norm(q - p0))
-            n = max(6, int(math.ceil(span / 0.001)))
-            s_ = np.linspace(0.0, 1.0, n + 1)[:-1, None]
-            h00, h10, h01, h11 = 2 * s_**3 - 3 * s_**2 + 1, s_**3 - 2 * s_**2 + s_, -2 * s_**3 + 3 * s_**2, s_**3 - s_**2
-            curve = h00 * p0 + h10 * (d0 * span) + h01 * q + h11 * (tangent * span)
-            if span < 1e-6:
-                curve = p0[None]
-            new = np.vstack([curve, pts[k:]])
-            new_r = np.concatenate([np.full(len(curve), od / 2), r[k:]])
-            new_c = np.concatenate([np.ones(len(curve)), c[k:]])
+            q = np.asarray(bo["position"], float)
+            arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))])
+            _, s_q = project_to_polyline(pts, q[None])
+            keep = np.nonzero(arc > s_q + 1e-7)[0]
+            if not len(keep):
+                continue
+            curve = fan_curve(end, q, np.asarray(bo["direction"], float))
+            k = int(keep[0])
+            new = np.vstack([curve, q[None], pts[k:]])
+            new_r = np.concatenate([np.full(len(curve), od / 2), [r[k]], r[k:]])
+            new_c = np.concatenate([np.ones(len(curve)), [c[k]], c[k:]])
             fan[side] = len(curve)
-            radii = curvature_radius(np.vstack([curve, q[None]])) if len(curve) >= 2 else np.array([np.inf])
-            tight = float(np.min(radii)) if len(radii) else math.inf
-            bends.append(Bend(p0.copy(), tight, bend_factor * od, 1, od) if np.isfinite(tight) else None)
             out, rad, cnt = (new, new_r, new_c) if side == 0 else (new[::-1], new_r[::-1], new_c[::-1])
-        return out, rad, cnt, (fan[0], fan[1]), [b for b in bends if b is not None and b.radius < 4 * b.required]
+        return out, rad, cnt, (fan[0], fan[1]), fan_bends(out, fan, od, bend_factor)
 
     def _corridor(self, node: NodePoint) -> list[int]:
         if node.exit is None or node.lead_end is None or node.direction is None or node.lead_length <= 0:
@@ -1221,6 +1278,37 @@ class HarnessRouter:
         for hole in self.holes:
             ods = [wires[w].od for w in hole.wires if w in wires]
             hole.diameter = bundle_diameter(ods) + self.opt.hole_clearance if ods else 0.0
+
+
+def fan_curve(end: PinEnd, breakout: np.ndarray, tangent: np.ndarray) -> np.ndarray:
+    """Fan-out vertices from the pin exit up to (excluding) the breakout: a C1 cubic
+    Hermite with the wire-entry axis at the pin and the bundle tangent at the breakout,
+    sampled every ~1 mm (at least 6 vertices)."""
+    p0, d0 = np.asarray(end.position, float), np.asarray(end.direction, float)
+    span = float(np.linalg.norm(breakout - p0))
+    if span < 1e-6:
+        return p0[None]
+    n = max(6, int(math.ceil(span / 0.001)))
+    s_ = np.linspace(0.0, 1.0, n + 1)[:-1, None]
+    h00, h10, h01, h11 = 2 * s_**3 - 3 * s_**2 + 1, s_**3 - 2 * s_**2 + s_, -2 * s_**3 + 3 * s_**2, s_**3 - s_**2
+    return h00 * p0 + h10 * (d0 * span) + h01 * breakout + h11 * (tangent * span)
+
+
+def fan_bends(path: np.ndarray, fanout: tuple[int, int] | list[int], od: float, bend_factor: float) -> list[Bend]:
+    """Tightest bend of each fan-out (pin exit through the breakout vertex into the core),
+    recorded at the pin when it is within 4x the conductor's minimum radius."""
+    out = []
+    n = len(path)
+    for side, count in enumerate(fanout):
+        if not count:
+            continue
+        window = path[: count + 2] if side == 0 else path[n - count - 2:]
+        radii = curvature_radius(window)
+        tight = float(np.min(radii)) if len(radii) else math.inf
+        required = bend_factor * od
+        if np.isfinite(tight) and tight < 4 * required:
+            out.append(Bend(np.asarray(path[0 if side == 0 else -1], float).copy(), tight, required, 1, od))
+    return out
 
 
 def route_project(project: Project, obstacles: ObstacleSet, options: RouterOptions | None = None) -> RoutingResult:

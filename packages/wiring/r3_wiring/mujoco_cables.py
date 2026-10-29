@@ -291,26 +291,39 @@ def _equal_chords(path: np.ndarray, segments: int) -> np.ndarray:
     let chords across a tight curl fall below the bending-stability segment length)."""
     dense = _resample(path, max(4 * segments, 200))
     end = dense[-1]
+    pts = dense.tolist()  # the walk is sequential: plain floats, no per-step array overhead
+    last = len(pts) - 1
+    ex, ey, ez = pts[-1]
+    sqrt = math.sqrt
 
-    def walk(chord: float) -> tuple[np.ndarray, float]:
-        out, current, k = [dense[0]], dense[0], 0
+    def walk(chord: float) -> tuple[list[list[float]], float]:
+        cx, cy, cz = pts[0]
+        out, k = [[cx, cy, cz]], 0
+        chord2 = chord * chord
         for _ in range(segments):
-            while k < len(dense) - 1 and np.linalg.norm(dense[k + 1] - current) < chord:
+            while k < last:
+                nx, ny, nz = pts[k + 1]
+                dx, dy, dz = nx - cx, ny - cy, nz - cz
+                if sqrt(dx * dx + dy * dy + dz * dz) >= chord:
+                    break
                 k += 1
-            if k >= len(dense) - 1:
-                out.append(end)
-                current = end
+            if k >= last:
+                out.append([ex, ey, ez])
+                cx, cy, cz = ex, ey, ez
                 continue
             # Point on dense[k] -> dense[k+1] at distance ``chord`` from ``current``.
-            a, b = dense[k], dense[k + 1]
-            d = b - a
-            f = a - current
-            qa, qb, qc = d @ d, 2 * f @ d, f @ f - chord * chord
+            (ax, ay, az), (bx, by, bz) = pts[k], pts[k + 1]
+            dx, dy, dz = bx - ax, by - ay, bz - az
+            fx, fy, fz = ax - cx, ay - cy, az - cz
+            qa = dx * dx + dy * dy + dz * dz
+            qb = 2 * (fx * dx + fy * dy + fz * dz)
+            qc = fx * fx + fy * fy + fz * fz - chord2
             disc = max(qb * qb - 4 * qa * qc, 0.0)
-            t = (-qb + math.sqrt(disc)) / (2 * qa) if qa > 0 else 1.0
-            current = a + d * min(max(t, 0.0), 1.0)
-            out.append(current)
-        return np.asarray(out), float(np.linalg.norm(out[-1] - end))
+            t = min(max((-qb + sqrt(disc)) / (2 * qa) if qa > 0 else 1.0, 0.0), 1.0)
+            cx, cy, cz = ax + dx * t, ay + dy * t, az + dz * t
+            out.append([cx, cy, cz])
+        mx, my, mz = cx - ex, cy - ey, cz - ez
+        return out, sqrt(mx * mx + my * my + mz * mz)
 
     total = float(np.linalg.norm(np.diff(dense, axis=0), axis=1).sum())
     lo, hi = 0.0, total / segments * 1.0000001
@@ -319,7 +332,7 @@ def _equal_chords(path: np.ndarray, segments: int) -> np.ndarray:
         vertices, miss = walk(mid)
         reached = np.allclose(vertices[-1], end) and miss < 1e-12
         lo, hi = (lo, mid) if reached else (mid, hi)
-    vertices, _ = walk(lo)  # the largest chord that does not run past the end; snap the last vertex
+    vertices = np.asarray(walk(lo)[0])  # the largest chord that does not run past the end; snap the last vertex
     vertices[-1] = end
     return vertices
 

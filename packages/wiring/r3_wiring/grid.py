@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -94,9 +94,12 @@ class Fields:
     struct_dist: np.ndarray  # min sdf over static structure (tie/surface preference)
     plates: list[tuple[str, int, np.ndarray, float]]  # (component, normal axis, sdf - keepout, thickness)
     plates_raw: list[np.ndarray]  # raw sdf of each plate (same order)
+    by_component: dict[str, np.ndarray] = field(default_factory=dict)  # raw swept sdf of ``keep`` components
 
 
-def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet) -> Fields:
+def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet, keep: set[str] | frozenset[str] = frozenset()) -> Fields:
+    """All fields in one pass over the obstacles; the raw (swept) field of every component in
+    ``keep`` is kept as well, so per-harness keep-away fields need no second SDF evaluation."""
     points = grid.centers()
     n = len(points)
     static_clear = np.full(n, FIELD_CUTOFF)
@@ -106,8 +109,11 @@ def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet) -> Fields:
     moving_raw = np.full(n, FIELD_CUTOFF)
     struct_dist = np.full(n, FIELD_CUTOFF)
     plates = []
+    by_component: dict[str, np.ndarray] = {}
     for obstacle in obstacles.obstacles:
         raw = obstacle.swept.sdf_bounded(points, FIELD_CUTOFF)
+        if obstacle.component in keep and obstacle.component not in by_component:
+            by_component[obstacle.component] = raw
         if obstacle.moving:
             np.minimum(moving_raw, raw, out=moving_raw)
             np.minimum(moving_keep, raw - obstacle.keepout, out=moving_keep)
@@ -122,4 +128,4 @@ def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet) -> Fields:
         else:
             np.minimum(static_clear, raw - obstacle.keepout, out=static_clear)
             np.minimum(static_raw, raw, out=static_raw)
-    return Fields(static_clear, static_raw, moving_keep, moving_raw, struct_dist, plates, plates_raw)
+    return Fields(static_clear, static_raw, moving_keep, moving_raw, struct_dist, plates, plates_raw, by_component)

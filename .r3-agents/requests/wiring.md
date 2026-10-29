@@ -43,3 +43,17 @@
    Once the connector fan-out lands, the router may call `plan_routing(project, self,
    result)` at the end of `route()` (one line); per-conductor contact frames can then
    become fixed junction axes in `planner._node_junction`.
+
+## Planner + pin terminations (branch r3/planner-pins)
+
+10. **Router hook done.** `HarnessRouter.route()` ends with `plan_routing(project, self, result)`
+    (`RouterOptions.plan`, default on; the report is `RoutingResult.planning`), so router and
+    planner are one pipeline; `stage.route_and_check` adds the supported second pass. Every
+    conductor keeps its pin-level fan-out (pin exit, wire-entry tangent) up to a breakout shared by
+    the node's conductors on that segment; the planner plans bundle cores from those breakouts as
+    fixed junctions (`kind: fanout`, axis = fan-out arrival tangent). Floating pairs that carry
+    fan-outs are no longer moved by the planner, and integral pigtails no longer rotate within
+    `PIGTAIL_CONE` (their conductors leave the grommet along the authored axis). Bundle segments
+    gain an internal `breakouts` entry (not written to `routes.json`). `routes.json` per wire
+    carries `ends`/`fanout` and `valid`/`violations`/`installed_ampacity`/`cut`; please document
+    `ends`, `fanout` with the other optional fields in `docs/architecture/r3-pipeline.md`.

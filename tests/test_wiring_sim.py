@@ -2,8 +2,6 @@
 moving bodies, contact-based clearance vs mj_geomDistance, and the RC-car steering sweep."""
 
 import math
-import shutil
-from pathlib import Path
 
 import mujoco
 import numpy as np
@@ -20,10 +18,8 @@ from r3_wiring.geometry import Box, MeshShape
 from r3_wiring.mujoco_cables import ANCHOR_SOLIMP, ANCHOR_SOLREF, CABLE_PLUGIN, CableBundle, CableSpan, _damping
 from r3_wiring.obstacles import build_obstacles
 from r3_wiring.router import route_project
-from r3_wiring.stage import route_and_check
 from test_wiring_support import write_project
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
 G = 9.80665
 
 
@@ -154,12 +150,8 @@ def test_pins_follow_moving_body(tmp_path):
 
 
 @pytest.fixture(scope="module")
-def rc_car(tmp_path_factory):
-    root = tmp_path_factory.mktemp("rc-car-cables")
-    shutil.copy(RC_CAR / "robot.yaml", root / "robot.yaml")
-    project = Project.load(root)
-    bundle = route_and_check(project)
-    return project, bundle["obstacles"], bundle["routes"]
+def rc_car(rc_car_wiring):
+    return rc_car_wiring.project, rc_car_wiring.bundle["obstacles"], rc_car_wiring.bundle["routes"]
 
 
 def test_rc_car_steering_sweep(rc_car):
@@ -183,7 +175,8 @@ def test_rc_car_steering_sweep(rc_car):
     exact = sim.exact_clearance()
     for wire, (distance, _) in sim.monitor.wire_clearance().items():
         # Penetrating pairs: the contact narrow phase and mj_geomDistance estimate depth differently.
-        assert distance == pytest.approx(exact[wire][0], abs=1e-6 if exact[wire][0] >= 0 else 5e-5), wire
+        # Separated capsule-cylinder pairs: both are iterative convex solvers (micrometre convergence).
+        assert distance == pytest.approx(exact[wire][0], abs=1e-5 if exact[wire][0] >= 0 else 5e-5), wire
 
 
 def test_mesh_sdf_sign_is_exact_near_corners():

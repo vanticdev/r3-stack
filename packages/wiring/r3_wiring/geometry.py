@@ -16,7 +16,7 @@ import math
 import struct
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 import numpy as np
 
@@ -215,6 +215,26 @@ class Cylinder(Shape):
         return lines
 
 
+_POOL: Any = None
+
+
+def _pool() -> Any:
+    """Shared thread pool for chunked array work (winding numbers)."""
+    global _POOL
+    if _POOL is None:
+        import os
+        from concurrent.futures import ThreadPoolExecutor
+
+        _POOL = ThreadPoolExecutor(max_workers=min(8, os.cpu_count() or 1))
+    return _POOL
+
+
+def _workers(count: int) -> int:
+    """KD-tree query threads: all cores for large batches (voxel fields), one for small ones
+    (thread start-up would dominate)."""
+    return -1 if count >= 4096 else 1
+
+
 class MeshShape(Shape):
     """Closed triangle mesh (e.g. a CAD STL export). Distance is measured to a
     dense set of surface samples. The sign is exact for closed meshes: points
@@ -225,14 +245,47 @@ class MeshShape(Shape):
     point is behind."""
 
     def __init__(self, vertices: np.ndarray, faces: np.ndarray, spacing: float = 0.0015,
-                 samples: tuple[np.ndarray, np.ndarray] | None = None) -> None:
-        from scipy.spatial import cKDTree
-
+                 samples: tuple[np.ndarray, np.ndarray] | None = None,
+                 base: "MeshShape | None" = None, pose: tuple[np.ndarray, np.ndarray] | None = None) -> None:
         self.vertices = np.asarray(vertices, dtype=float)
         self.faces = np.asarray(faces, dtype=int)
         self.spacing = spacing
-        self._samples, self._normals = samples if samples is not None else self._sample(spacing)
-        self._tree = cKDTree(self._samples)
+        # A rigidly moved copy (``transformed``) keeps its base mesh and pose (x = R x_base + t):
+        # distances and winding numbers are evaluated on the base in its own frame, so the
+        # hundreds of posed copies of a swept envelope share one sample set and KD-tree.
+        self._base = base
+        self._pose = pose
+        self._local: tuple[np.ndarray, np.ndarray, Any] | None = None
+        if base is None:
+            self._local = (*(samples if samples is not None else self._sample(spacing)), None)
+
+    def _own(self) -> tuple[np.ndarray, np.ndarray, Any]:
+        """World-frame samples, normals and KD-tree (built on first use for posed copies)."""
+        from scipy.spatial import cKDTree
+
+        if self._local is None:
+            rotation, translation = self._pose
+            base_samples, base_normals = self._base._samples, self._base._normals
+            self._local = (base_samples @ rotation.T + translation, base_normals @ rotation.T, None)
+        if self._local[2] is None:
+            self._local = (self._local[0], self._local[1], cKDTree(self._local[0]))
+        return self._local
+
+    @property
+    def _samples(self) -> np.ndarray:
+        if self._local is None:
+            self._own()
+        return self._local[0]
+
+    @property
+    def _normals(self) -> np.ndarray:
+        if self._local is None:
+            self._own()
+        return self._local[1]
+
+    @property
+    def _tree(self) -> Any:
+        return self._own()[2]
 
     def _sample(self, spacing: float) -> tuple[np.ndarray, np.ndarray]:
         """Barycentric grid of each triangle with n = ceil(longest edge / spacing)
@@ -264,7 +317,8 @@ class MeshShape(Shape):
         points = np.atleast_2d(points)
         tri = self.vertices[self.faces]
         out = np.zeros(len(points))
-        for start in range(0, len(points), 256):
+
+        def chunk(start: int) -> None:
             rel = tri[None, :, :, :] - points[start:start + 256, None, None, :]  # (p, f, 3, 3)
             length = np.linalg.norm(rel, axis=3)
             ra, rb, rc = rel[:, :, 0], rel[:, :, 1], rel[:, :, 2]
@@ -273,25 +327,66 @@ class MeshShape(Shape):
             denominator = (la * lb * lc + np.einsum("pfi,pfi->pf", ra, rb) * lc
                            + np.einsum("pfi,pfi->pf", rb, rc) * la + np.einsum("pfi,pfi->pf", rc, ra) * lb)
             out[start:start + 256] = np.arctan2(numerator, denominator).sum(axis=1) / (2.0 * math.pi)
+
+        starts = range(0, len(points), 256)
+        if len(starts) > 1:  # independent chunks; numpy releases the GIL in these array kernels
+            list(_pool().map(chunk, starts))
+        else:
+            for start in starts:
+                chunk(start)
         return out
 
-    def sdf(self, points: np.ndarray) -> np.ndarray:
-        points = np.atleast_2d(points)
-        distance, _ = self._tree.query(points)
+    def _query(self, points: np.ndarray, bound: float = np.inf) -> tuple[np.ndarray, np.ndarray]:
+        """(nearest-sample distance, sign) of world points; distances beyond ``bound`` are inf."""
         lo, hi = self.aabb()
         candidate = np.all((points >= lo) & (points <= hi), axis=1)
+        if self._base is not None:  # evaluate on the base mesh, in its frame (rigid: same distances)
+            rotation, translation = self._pose
+            local = (points - translation) @ rotation
+            distance, _ = self._base._tree.query(local, distance_upper_bound=bound, workers=_workers(len(local)))
+            mesh, query = self._base, local
+        else:
+            distance, _ = self._tree.query(points, distance_upper_bound=bound, workers=_workers(len(points)))
+            mesh, query = self, points
         sign = np.ones(len(points))
         if candidate.any():
-            sign[candidate] = np.where(self.winding_number(points[candidate]) > 0.5, -1.0, 1.0)
+            sign[candidate] = np.where(mesh.winding_number(query[candidate]) > 0.5, -1.0, 1.0)
+        return distance, sign
+
+    def sdf(self, points: np.ndarray) -> np.ndarray:
+        distance, sign = self._query(np.atleast_2d(points))
         return distance * sign
 
+    def sdf_bounded(self, points: np.ndarray, cutoff: float) -> np.ndarray:
+        """``min(sdf, cutoff)`` near the mesh: the KD-tree stops searching at ``cutoff`` (exact,
+        points deeper than ``cutoff`` inside are re-measured without the bound)."""
+        lo, hi = self.aabb()
+        near = np.all((points >= lo - cutoff) & (points <= hi + cutoff), axis=1)
+        out = np.full(len(points), cutoff, dtype=float)
+        if near.any():
+            sub = points[near]
+            distance, sign = self._query(sub, bound=cutoff)
+            deep = ~np.isfinite(distance) & (sign < 0)
+            if deep.any():
+                distance[deep], _ = self._query(sub[deep])
+            values = np.where(np.isfinite(distance), distance * sign, cutoff)
+            out[near] = np.minimum(values, cutoff)
+        return out
+
     def aabb(self) -> tuple[np.ndarray, np.ndarray]:
-        return self.vertices.min(axis=0), self.vertices.max(axis=0)
+        if not hasattr(self, "_aabb"):
+            self._aabb = (self.vertices.min(axis=0), self.vertices.max(axis=0))
+        return self._aabb
 
     def transformed(self, rotation: np.ndarray, translation: np.ndarray) -> "MeshShape":
-        # Rigid motion: move the existing surface samples and normals instead of re-sampling.
-        return MeshShape(self.vertices @ rotation.T + translation, self.faces, self.spacing,
-                         samples=(self._samples @ rotation.T + translation, self._normals @ rotation.T))
+        # Rigid motion: keep the base mesh's surface samples and KD-tree instead of re-sampling.
+        rotation, translation = np.asarray(rotation, float), np.asarray(translation, float)
+        if self._base is not None:
+            r0, t0 = self._pose
+            base, pose = self._base, (rotation @ r0, rotation @ t0 + translation)
+        else:
+            base, pose = self, (rotation, translation)
+        return MeshShape(self.vertices @ rotation.T + translation, self.faces, self.spacing, base=base, pose=pose)
 
     def surface_points(self, spacing: float) -> np.ndarray:
         step = max(1, int(spacing / self.spacing))

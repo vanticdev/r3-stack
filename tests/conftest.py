@@ -1,0 +1,87 @@
+"""Shared, session-scoped fixtures: expensive stages run once into temporary projects.
+
+* ``rc_car_wiring``: the full wiring stage on a fresh copy of the reference RC car's
+  ``robot.yaml`` (catalog geometry; nothing read from ``examples/robots/rc-car/build``).
+  Every test that uses it is marked ``slow`` automatically.
+* ``rc_car_fresh``: a copy of the RC car's sources without ``build/`` (module scope), so
+  simulation tests never pick up stale CAD exports or ``routes.json`` from earlier runs.
+* ``small_wiring`` / ``branch_wiring``: :func:`r3_wiring.stage.route_and_check` on the
+  synthetic projects of :mod:`test_wiring_support` (one connector pair; every
+  termination kind), for fast router/planner tests.
+"""
+
+from __future__ import annotations
+
+import shutil
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+
+
+@dataclass
+class WiringRun:
+    root: Path
+    project: Any  # r3_model.project.Project
+    bundle: dict[str, Any]  # r3_wiring.stage.route_and_check (plus "drive" for full stage runs)
+    result: Any = None  # r3_model.diagnostics.StageResult of a full stage run
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    for item in items:
+        if "rc_car_wiring" in getattr(item, "fixturenames", ()):
+            item.add_marker(pytest.mark.slow)
+
+
+def copy_rc_car(root: Path) -> Path:
+    """A fresh RC-car project: ``robot.yaml`` only (no build artifacts)."""
+    root.mkdir(parents=True, exist_ok=True)
+    shutil.copy(RC_CAR / "robot.yaml", root / "robot.yaml")
+    return root
+
+
+@pytest.fixture(scope="module")
+def rc_car_fresh(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    root = tmp_path_factory.mktemp("rc-car-fresh") / "rc-car"
+    shutil.copytree(RC_CAR, root, ignore=shutil.ignore_patterns("build", "__pycache__"))
+    return root
+
+
+@pytest.fixture(scope="session")
+def rc_car_wiring(tmp_path_factory: pytest.TempPathFactory) -> WiringRun:
+    """The full RC-car wiring stage, once per session (artifacts under ``root/build/wiring``)."""
+    from r3_model.project import Project
+    from r3_wiring.stage import format_diagnostics, run_stage
+
+    root = copy_rc_car(tmp_path_factory.mktemp("rc-car-wiring"))
+    project = Project.load(root)
+    result, bundle = run_stage(project)
+    print("\n" + format_diagnostics(result))
+    print(f"wiring stage: {result.duration_s:.0f} s;", "harness lengths (mm):",
+          {k: round(v * 1e3, 1) for k, v in result.metrics["harness_length"].items()})
+    return WiringRun(root, project, bundle, result)
+
+
+@pytest.fixture(scope="session")
+def small_wiring(tmp_path_factory: pytest.TempPathFactory) -> WiringRun:
+    from r3_model.project import Project
+    from r3_wiring.stage import route_and_check
+    from test_wiring_support import write_project
+
+    root = write_project(tmp_path_factory.mktemp("small-wiring"), block=True, slack="30 mm")
+    project = Project.load(root)
+    return WiringRun(root, project, route_and_check(project))
+
+
+@pytest.fixture(scope="session")
+def branch_wiring(tmp_path_factory: pytest.TempPathFactory) -> WiringRun:
+    from r3_model.project import Project
+    from r3_wiring.stage import route_and_check
+    from test_wiring_support import write_branch_project
+
+    root = write_branch_project(tmp_path_factory.mktemp("branch-wiring"))
+    project = Project.load(root)
+    return WiringRun(root, project, route_and_check(project))
