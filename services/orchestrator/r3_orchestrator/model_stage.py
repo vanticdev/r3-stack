@@ -560,6 +560,16 @@ class ModelChecker:
                                            "verified_fasteners": len(fit.get("verified_fasteners", [])),
                                            "verified_interfaces": len(fit.get("verified_interfaces", []))}))
             return []
+        assembly = self.project.read_build_json("model/assembly.json") or {}
+        current = (assembly.get("inputs") or {}).get("robot_yaml_sha256") == self.project.fingerprint().get("robot_yaml_sha256")
+        if (assembly.get("interference_method") == "exact" and current
+                and set(assembly.get("poses", {})) >= set(self.spec.components)):
+            # The assembly stage intersected the exact part plans (solids, datasheet features, interface-cut
+            # holes and bores, fasteners) at the compiled poses; its object_interference errors are the result.
+            self.add(Diagnostic.info("interference_checked_by_assembly",
+                                     "static interference evaluated on the exact part plans by the assembly stage; envelope check skipped",
+                                     data={"pairs_in_contact": len(assembly.get("interference", []))}))
+            return []
         self.result.assume("mechanical", "Interference uses catalog envelopes: boxes exact, cylinders as 48-gon prisms, 'custom' "
                                          "shapes as the union of their catalog solids (concave profiles as their hull). Overlaps thinner than 0.1 mm count as contact.")
         self.result.assume("mechanical", "Static interference at the authored pose only; steering and wheel sweep are checked in simulation.")

@@ -37,6 +37,23 @@ components:
         - {kind: box, name: case, position: [0, 0, 32 mm], size: [60 mm, 76 mm, 64 mm]}
         - {kind: box, name: motor plate, position: [20 mm, -36.5 mm, 30 mm], size: [100 mm, 3 mm, 60 mm]}
         - {kind: box, name: gear cover, position: [34 mm, -44 mm, 30 mm], size: [72 mm, 12 mm, 56 mm]}
+      features:
+        - {id: output_left, kind: d_bore, position: [0, 38 mm, 30 mm], axis: [0, -1, 0], diameter: 5.05 mm, depth: 10 mm,
+           flat_offset: 2.05 mm, flat_normal: [0, 0, 1], provenance: {status: estimated, source: "4628R output yoke socket (cross-pin drive modelled as a flat)"}}
+        - {id: output_right, kind: d_bore, position: [0, -50 mm, 30 mm], axis: [0, 1, 0], diameter: 5.05 mm, depth: 10 mm,
+           flat_offset: 2.05 mm, flat_normal: [0, 0, 1], provenance: {status: estimated, source: "4628R output yoke socket through the gear cover"}}
+        - {id: motor_axis, kind: bore, position: [50.84 mm, -35 mm, 30 mm], axis: [0, -1, 0], diameter: 8 mm, depth: 15 mm,
+           provenance: {status: estimated, source: "Motor plate bore and the pinion space in the gear cover"}}
+        - {id: motor_hole_a, kind: clearance_hole, position: [63.34 mm, -35 mm, 30 mm], axis: [0, -1, 0], diameter: 3.4 mm, depth: 3 mm}
+        - {id: motor_hole_b, kind: clearance_hole, position: [38.34 mm, -35 mm, 30 mm], axis: [0, -1, 0], diameter: 3.4 mm, depth: 3 mm}
+        - {id: motor_face, kind: face, position: [50.84 mm, -35 mm, 30 mm], axis: [0, 1, 0]}
+        - {id: screw_access_a, kind: bore, position: [63.34 mm, -50 mm, 30 mm], axis: [0, 1, 0], diameter: 6.5 mm, depth: 12 mm,
+           provenance: {status: estimated, source: "Motor screw access through the gear cover (the 550 is fixed from the cover side)"}}
+        - {id: screw_access_b, kind: bore, position: [38.34 mm, -50 mm, 30 mm], axis: [0, 1, 0], diameter: 6.5 mm, depth: 12 mm}
+        - {id: mount_1, kind: tapped_hole, position: [20 mm, 25 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
+        - {id: mount_2, kind: tapped_hole, position: [-20 mm, 25 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
+        - {id: mount_3, kind: tapped_hole, position: [20 mm, -25 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
+        - {id: mount_4, kind: tapped_hole, position: [-20 mm, -25 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
       provenance: {status: estimated, source: "Envelope estimated for the Slash 2WD layout; https://traxxas.com/products/parts/3695 (no drawing published)"}
     interfaces:
       mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
@@ -48,9 +65,9 @@ components:
                     description: "540/550 motor plate: 2x M3 on 25 mm centres (inner face of the plate)"}
       pinion: {kind: bore, origin: [50.84 mm, -35 mm, 30 mm], z: [0, 1, 0], x: [0, 0, 1], params: {d: 3.0 mm, depth: 12 mm, flat_offset: 1.25 mm},
                description: "Traxxas 2423 23T 48P pinion bore (3 mm shaft, set screw on the flat)"}
-      output_l: {kind: bore, origin: [0, 38 mm, 30 mm], z: [0, 1, 0], x: [0, 0, 1], params: {d: 5.0 mm, depth: 10 mm, flat_offset: 2.0 mm},
+      output_l: {kind: bore, origin: [0, 38 mm, 30 mm], z: [0, 1, 0], x: [0, 0, 1], params: {d: 5.05 mm, depth: 10 mm, flat_offset: 2.05 mm},
                  description: "Left output yoke 4628R; the cross-pin drive is modelled as a flat (estimated)"}
-      output_r: {kind: bore, origin: [0, -50 mm, 30 mm], z: [0, -1, 0], x: [0, 0, 1], params: {d: 5.0 mm, depth: 10 mm, flat_offset: 2.0 mm},
+      output_r: {kind: bore, origin: [0, -50 mm, 30 mm], z: [0, -1, 0], x: [0, 0, 1], params: {d: 5.05 mm, depth: 10 mm, flat_offset: 2.05 mm},
                  description: "Right output yoke through the gear cover (estimated)"}
     behavior:
       model: gearbox.differential
@@ -123,6 +140,8 @@ components:
         - {kind: revolve, name: half-shaft, position: [0, 0, 0], axis: [0, 1, 0],
            profile: [[0, -10 mm], [2.5 mm, -10 mm], [2.5 mm, 0], [4 mm, 0], [4 mm, 92 mm], [2.5 mm, 92 mm], [2.5 mm, 96 mm],
                      [4 mm, 96 mm], [4 mm, 104 mm], [6.93 mm, 104 mm], [6.93 mm, 114 mm], [2 mm, 114 mm], [2 mm, 122 mm], [0, 122 mm]]}
+        - {kind: box, op: remove, name: output flat, position: [0, -5 mm, 3 mm], size: [6 mm, 10.2 mm, 2 mm]}
+        - {kind: box, op: remove, name: hex flat, position: [0, 109 mm, 7 mm], size: [15 mm, 10.2 mm, 2 mm]}
       provenance: {status: estimated, source: "Traxxas 6852X/2753X (parts list 58234-8); stub axle 42 mm long, 13 mm max dia (vendor); lengths estimated"}
     interfaces:
       output: {kind: shaft, origin: [0, 0, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 5.0 mm, length: 10 mm, flat_offset: 2.0 mm}}
@@ -147,6 +166,8 @@ components:
         - {kind: revolve, name: half-shaft, position: [0, 0, 0], axis: [0, -1, 0],
            profile: [[0, -10 mm], [2.5 mm, -10 mm], [2.5 mm, 0], [4 mm, 0], [4 mm, 80 mm], [2.5 mm, 80 mm], [2.5 mm, 84 mm],
                      [4 mm, 84 mm], [4 mm, 92 mm], [6.93 mm, 92 mm], [6.93 mm, 102 mm], [2 mm, 102 mm], [2 mm, 110 mm], [0, 110 mm]]}
+        - {kind: box, op: remove, name: output flat, position: [0, 5 mm, 3 mm], size: [6 mm, 10.2 mm, 2 mm]}
+        - {kind: box, op: remove, name: hex flat, position: [0, -97 mm, 7 mm], size: [15 mm, 10.2 mm, 2 mm]}
       provenance: {status: estimated, source: "As traxxas-rear-halfshaft-l, 12 mm shorter inboard (right output exits the gear cover)"}
     interfaces:
       output: {kind: shaft, origin: [0, 0, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 5.0 mm, length: 10 mm, flat_offset: 2.0 mm}}

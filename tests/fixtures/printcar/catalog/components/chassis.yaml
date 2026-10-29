@@ -1,0 +1,40 @@
+components:
+  - id: printcar-chassis-petg
+    kind: structure
+    cad_name: Printcar chassis
+    name: Printcar chassis, PETG printed; rear bearing webs and front axle webs inside the wheel recesses
+    description: Frame at the bottom of the plate below the rear axle (robot z = 20 mm). Rear axle at x = 0, front at x = 335 mm.
+    mechanical:
+      shape: custom
+      size: [400 mm, 268 mm, 45 mm]
+      mass: 0.3
+      material: PETG
+      density: 1270
+      color: "#2c6e9e"
+      fabricated: true
+      solids:
+        - {kind: box, name: plate, position: [160 mm, 0, 2.5 mm], size: [400 mm, 140 mm, 5 mm]}
+        - {kind: box, name: rear arm L, position: [0, 97.5 mm, 15 mm], size: [20 mm, 55 mm, 20 mm]}
+        - {kind: box, name: rear block L, position: [0, 127.5 mm, 18 mm], size: [20 mm, 5 mm, 20 mm]}
+        - {kind: box, name: rear web L, position: [0, 132 mm, 26.5 mm], size: [20 mm, 4 mm, 37 mm]}
+        - {kind: box, name: rear arm R, position: [0, -97.5 mm, 15 mm], size: [20 mm, 55 mm, 20 mm]}
+        - {kind: box, name: rear block R, position: [0, -127.5 mm, 18 mm], size: [20 mm, 5 mm, 20 mm]}
+        - {kind: box, name: rear web R, position: [0, -132 mm, 26.5 mm], size: [20 mm, 4 mm, 37 mm]}
+        - {kind: box, name: front arm L, position: [335 mm, 98 mm, 15 mm], size: [20 mm, 56 mm, 20 mm]}
+        - {kind: box, name: front web L, position: [335 mm, 131 mm, 26.5 mm], size: [20 mm, 10 mm, 37 mm]}
+        - {kind: box, name: front arm R, position: [335 mm, -98 mm, 15 mm], size: [20 mm, 56 mm, 20 mm]}
+        - {kind: box, name: front web R, position: [335 mm, -131 mm, 26.5 mm], size: [20 mm, 10 mm, 37 mm]}
+    interfaces:
+      gearbox: {kind: hole_pattern, origin: [0, 0, 5 mm], z: [0, 0, 1], x: [1, 0, 0],
+                params: {holes: [[20 mm, 25 mm, 3.4 mm, clearance, 5 mm], [-20 mm, 25 mm, 3.4 mm, clearance, 5 mm], [20 mm, -25 mm, 3.4 mm, clearance, 5 mm], [-20 mm, -25 mm, 3.4 mm, clearance, 5 mm]]}}
+      bearing_l: {kind: bore, origin: [0, 130 mm, 35 mm], z: [0, -1, 0], x: [1, 0, 0], params: {d: 10.9 mm, depth: 4 mm}}
+      bearing_r: {kind: bore, origin: [0, -130 mm, 35 mm], z: [0, 1, 0], x: [1, 0, 0], params: {d: 10.9 mm, depth: 4 mm}}
+      axle_fl: {kind: bore, origin: [335 mm, 136 mm, 35 mm], z: [0, 1, 0], x: [0, 0, 1], params: {d: 4.9 mm, depth: 10 mm}}
+      axle_fr: {kind: bore, origin: [335 mm, -136 mm, 35 mm], z: [0, -1, 0], x: [0, 0, 1], params: {d: 4.9 mm, depth: 10 mm}}
+      pi_1: {kind: hole_pattern, origin: [266 mm, -24.5 mm, 5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 5 mm]]}}
+      pi_2: {kind: hole_pattern, origin: [324 mm, -24.5 mm, 5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 5 mm]]}}
+      pi_3: {kind: hole_pattern, origin: [266 mm, 24.5 mm, 5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 5 mm]]}}
+      pi_4: {kind: hole_pattern, origin: [324 mm, 24.5 mm, 5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 5 mm]]}}
+      battery_seat: {kind: face_mount, origin: [175 mm, 0, 5 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      esc_pad: {kind: adhesive_pad, origin: [100 mm, 50 mm, 5 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      bec_pad: {kind: adhesive_pad, origin: [100 mm, -50 mm, 5 mm], z: [0, 0, 1], x: [1, 0, 0]}

@@ -436,6 +436,8 @@ def run(project: Project) -> StageResult:
     payload.update({
         "tolerance": {"position": float(project.spec.assembly.tolerance.position), "angle": float(project.spec.assembly.tolerance.angle)},
         "interference": interference,
+        "interference_method": "envelope" if exact is None else "exact",
+        "inputs": project.fingerprint(),
         "caps": caps,
         "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics],
     })
