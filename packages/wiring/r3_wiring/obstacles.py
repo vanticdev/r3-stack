@@ -124,7 +124,11 @@ def _cad_shape(project: Project, part: dict[str, Any]) -> tuple[Shape, str] | No
             if len(faces):
                 # The CAD export is tessellated for exact fit checks (0.05 mm chord, 2 deg); routing works on 3 mm voxels
                 # and 1.5 mm surface samples, so 1 mm vertex clustering keeps the distance field and cuts winding-number cost.
-                vertices, faces = cluster_decimate(vertices, faces, ROUTING_MESH_CELL)
+                coarse_vertices, coarse_faces = cluster_decimate(vertices, faces, ROUTING_MESH_CELL)
+                # A sub-cell solid can collapse completely. Keep its full CAD
+                # surface instead of dropping the obstacle or sampling an empty mesh.
+                if len(coarse_faces):
+                    vertices, faces = coarse_vertices, coarse_faces
                 return MeshShape(vertices, faces), "cad_mesh"
     if "bbox_min" in part and "bbox_max" in part:
         lo, hi = np.asarray(part["bbox_min"], dtype=float), np.asarray(part["bbox_max"], dtype=float)
