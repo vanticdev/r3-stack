@@ -92,3 +92,24 @@ the headless gap precisely in `docs/architecture/headless.md`.
   browser bridge is available locally, also capture the feature tree / sidebar to show
   the organization.
 - `pytest tests` passes, using `/Users/godbrigero/Documents/r3-stack/.venv/bin/python`.
+
+## 5. Construction geometry: no clutter (user screenshot, 2026-10-29)
+The user's screenshot of the direct-CAD document shows hundreds of visible, labeled
+construction planes (offset cPlanes, roughly one per sketch). They bury the model, make the
+viewport unusable and slow, and "break" the view. Rules:
+- Sketch on existing part faces (by `bodydetails` face id) or the standard
+  Top/Front/Right planes of the object's own Part Studio. Each object is modeled at its own
+  origin, so per-sketch offset planes are unnecessary. Create a plane only when no face or
+  standard plane works.
+- The few reference planes and axes that remain are named ("Deck seat plane") and live in a
+  "Reference geometry" feature folder. They, all sketches and all mate connectors are
+  HIDDEN in the final state, as an engineer leaves a finished part. Set visibility through
+  standard REST/assembly display APIs where they exist; otherwise use the onshape-native
+  `set_visibility`/`display_state` tools locally, and document the headless gap.
+- Add to the organization check:
+  - `cad_visible_construction_geometry`: planes, sketches or mate connectors visible in
+    the final state;
+  - `cad_excess_construction_planes`: more than about 3 planes per Part Studio.
+  A screenshot of each Part Studio and assembly must show only solid parts.
+- Delete the current cluttered document when the phase B build passes. Deleting failed
+  attempts is still required.
