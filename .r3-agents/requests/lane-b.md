@@ -18,3 +18,15 @@
 4. **Fuse/splice.** The fuse holder now sits on the right of the battery (chassis fuse_seat (36, -37) mm,
    clocked 180 deg: input J1 at its front end). SP is 7 mm from J1 as before (queue item 5). Please re-check
    `wire_unprotected_by_fuse` and the 18 AWG lengths in the electrical stage.
+
+## finish-a2: clearance exemption regression fixed; PCB connector relocation blocks release
+
+The router/checker and MuJoCo cable endpoint exemption now covers only the connector owner,
+not its mount ancestors. `tests/test_wiring_termination_exemptions.py` injects a USB-style
+parent block into the cable's first 20 mm: old code hides it; new code reports >9 mm penetration.
+The existing `J_RX`/`J_BATT` +x exit cannot be repaired by a downstream route: the conductor
+exit itself lies in the Pi's USB/Ethernet block. Please relocate these headers to the HAT's
+-y edge (x below the Pi USB block's x=133 mm), with cable axes -y, and use side-entry
+`J_ESC`/`J_SERVO` on that same edge if feasible. Lane A will route and support the resulting
+leads. Keep PCB-native footprint poses and catalog connector frames synchronized. Do not
+raise the whole HAT without a deliberate GPIO engagement design.
