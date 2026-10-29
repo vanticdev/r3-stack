@@ -209,3 +209,19 @@ def test_cross_track_window_starts_on_the_first_segment():
     assert progress.start < 0.5 and 2.0 <= progress.entered <= 2.1
     (check,) = evaluate({"max_cross_track_error_m": 1.5}, rec, {"mission": {"waypoints": waypoints, "laps": 2}})
     assert check.passed and check.measured <= 0.31 and check.data["window_start_t"] == progress.entered
+
+
+def test_stop_distance_is_measured_from_a_software_failsafe_gap_without_receiver_loss():
+    """At the edge of range a 0.65 s frame gap (above the 0.25 s software timeout, below the receiver's 1 s) stops the
+    car while the receiver keeps resyncing; the stop distance is measured from that gap."""
+    t = np.arange(0.0, 20.0, 0.01)
+    speed = np.clip(4.0 - 4.4 * (t - 10.3), 0.0, 4.0)  # 0.3 s detection, then a 4.4 m/s^2 brake: ~2.9 m
+    x = np.cumsum(speed) * 0.01
+    rec = {"t": t, "x": x, "y": np.zeros_like(t), "speed": speed, "tx_distance": x + 2.0}
+    context = {"mission": {"waypoints": [[5, 0], [1500, 0]]}, "failsafe_gaps": [(10.0, 0.65)], "failsafe_timeout": 0.25,
+               "link_lost": None}
+    (check,) = evaluate({"stop_within_m_of_link_loss": 3.0}, rec, context)
+    expected = float(x[np.nonzero((t >= 10.0) & (speed < 0.05))[0][0]] - x[int(np.searchsorted(t, 10.0))])
+    assert check.passed and check.measured == pytest.approx(expected, abs=0.05) and "never declared" in check.detail
+    (unexercised,) = evaluate({"stop_within_m_of_link_loss": 3.0}, rec, {**context, "failsafe_gaps": []})
+    assert not unexercised.passed and unexercised.measured is None

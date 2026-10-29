@@ -63,3 +63,11 @@ All are read today with defaults (recorded as `estimated_parameters` in
   `tests/test_electrical_stage.py` in one process makes the stage's `motor_stall@full` battery current come out
   ~1 A (should be > 10 x cruise). Some state persists across ElectricalSystem instances (ngspice library state, or a
   mutated cached catalog object). Alphabetical order hides it.
+- **top_speed_failsafe now fails, a real finding (lane C: the pilot maps full stick to the CRSF limit 2012 us, item
+  14):** at true full stick the car reaches 8.458 m/s (it was capped at 8.045 m/s by the 2000 us = 97.6 % mapping), and the
+  radio-failsafe stop then takes 9.608 m from 8.45 m/s against `failsafe_stop_distance_at_top_speed: 9 m` (that
+  requirement was derived from 6.0-7.1 m at 8.0 m/s). The requirement was not changed. Options: stronger braking (ESC
+  brake strength / drag brake), a shorter software failsafe, or a manual-mode throttle ceiling. `full_throttle`
+  passes at 8.458 m/s (item 15's margin concern is gone).
+- **pi_hang** still fails: 5.482 m against 3 m (item 21, the arbiter outputs neutral, not brake). **steering_sweep**:
+  W_Y_P_IN to motor clearance -2.2 mm (a lane A route). Both are as found; nothing in lane C changed them.

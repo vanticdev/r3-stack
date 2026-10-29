@@ -189,14 +189,16 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
                                     f"link never lost; max distance {reach:.1f} m", {"max_distance": reach}))
         elif key == "stop_within_m_of_link_loss":
             lost = context.get("link_lost")
-            if lost is None:
+            all_gaps = context.get("failsafe_gaps", [])
+            if lost is None and not any(abs(float(np.interp(g[0], t, speed))) > STOP_SPEED for g in all_gaps):
                 checks.append(Check(key, expected, None, False, "link was never lost; stop distance not exercised"))
                 continue
             # Measure from the last RC frame before the first frame gap longer than the software's failsafe
             # timeout that ends the run or precedes the declared loss: the software brakes on that gap, which can
-            # come well before the receiver declares the link lost (its own, longer timeout).
-            t_loss = lost["t"]
-            gaps = [g for g in context.get("failsafe_gaps", []) if g[0] <= t_loss + 1e-6]
+            # come well before the receiver declares the link lost (its own, longer timeout), or without it ever
+            # doing so (a gap shorter than the receiver timeout, after which a marginal link keeps resyncing).
+            t_loss = lost["t"] if lost is not None else math.inf
+            gaps = [g for g in all_gaps if g[0] <= t_loss + 1e-6]
             moving = [g for g in gaps if abs(float(np.interp(g[0], t, speed))) > STOP_SPEED]
             t0 = moving[0][0] if moving else t_loss
             k0 = int(np.searchsorted(t, t0))
@@ -206,7 +208,9 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
                 continue
             path = float(np.sum(np.hypot(np.diff(x[k0:k1 + 1]), np.diff(y[k0:k1 + 1])))) if k1 > k0 else 0.0
             checks.append(Check(key, expected, round(path, 3), path <= to_si(expected),
-                                f"last frame before the failsafe gap at t={t0:.2f}s (receiver declared loss at t={t_loss:.2f}s); "
+                                f"last frame before the failsafe gap at t={t0:.2f}s ("
+                                + (f"receiver declared loss at t={t_loss:.2f}s" if lost is not None else "receiver never declared loss")
+                                + "); "
                                 f"stopped at t={t[k1]:.2f}s, {t[k1] - t0:.2f}s later",
                                 {"speed_at_loss": float(speed[min(k0, len(speed) - 1)]), "stop_t": float(t[k1]),
                                  "gap_start_t": float(t0)}))
