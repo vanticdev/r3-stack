@@ -113,3 +113,17 @@ viewport unusable and slow, and "break" the view. Rules:
   A screenshot of each Part Studio and assembly must show only solid parts.
 - Delete the current cluttered document when the phase B build passes. Deleting failed
   attempts is still required.
+
+## 6. Screw attachment with caps and minimal 3D-print clearance (user request, 2026-10-29)
+- Every screwed joint uses real fasteners whose heads sit in modeled seats. Where a head would otherwise
+  be exposed or interfere, use a printed cap or boss: the HAT/Pi stack mounting (`board.json`
+  `mounting`), the deck screws and the servo posts. Caps and bosses are fabricated parts with their own
+  Part Studio, and they join through interfaces like any other object.
+- Print-fit clearances for every 3D-printed (PETG/PA12) interface, from a single catalog table:
+  hole-to-screw clearance, press-fit interference, sliding-fit clearance, and cap inner diameter =
+  head + 2 × 0.3 mm (FDM estimate; label it estimated, make it configurable per process: FDM / SLS).
+  The fit checks use these values, not ISO metal fits, for printed parts.
+- Interference: caps and bosses vs. every part AND every routed cable (MuJoCo cable geometry and
+  `routes.json`), including during steering motion.
+- The PCB stage's `board.json` already provides the HAT mounting holes, drill, head and standoff
+  data, and its KiCad keep-out areas; use those, do not duplicate them.
