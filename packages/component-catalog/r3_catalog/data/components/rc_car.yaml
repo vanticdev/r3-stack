@@ -520,7 +520,7 @@ components:
       (VIN UVLO 4.4 V max, 220 uF hold-up) and an LM5175 4-switch buck-boost 6.0 V / 3 A servo rail (no dropout
       down to its 4.18 V UVLO; 4.9-8.8 A current limit, hiccup); 220 uF + ceramic input bulk; SMAJ10A input TVS
       (17.0 V clamp, below the TPS568230's 22 V VIN absolute maximum); keyed external GY-521 I2C header (0x68); ATtiny412 failsafe
-      arbiter between the Pi's ESC PWM and the ESC (active brake, then neutral, 100 ms after the last GPIO27 heartbeat
+      arbiter between the Pi's ESC PWM and the ESC (active brake, then neutral, 60 ms after the last GPIO27 heartbeat
       edge) followed by an ISO6720F digital isolator: J_ESC's PWM and ground are the ESC's side (ESC_GND is not HAT
       GND, so no motor return flows in the signal lead), powered from the ESC BEC (J_ESC.2) by an AP7381 LDO;
       220 Ohm series resistor on the servo PWM; encoder pull-up.
@@ -609,7 +609,7 @@ components:
               source: "kicad:J7 JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal (top)",
               pins: {"1": 3V3, "2": ENC, "3": GND}}
     internal_links:
-      - {a: PI_ESC_PWM, b: ESC_PWM, kind: failsafe_arbiter, value: 0.1}    # value = heartbeat timeout (s)
+      - {a: PI_ESC_PWM, b: ESC_PWM, kind: failsafe_arbiter, value: 0.06}    # value = heartbeat timeout (s)
       - {a: PI_SERVO_PWM, b: SERVO_PWM, kind: series_resistor, value: 220}
     behavior:
       model: board.pcb
@@ -638,8 +638,8 @@ components:
         # Active brake first (QuicRun 1060 Fwd/Rev/Brk: reverse stick after forward = brake), then neutral:
         # r3_kicad.arbiter. brake_hold covers the longest stop (8 m/s top speed); deadband_us and
         # esc_reverse_delay mirror the ESC's own neutral deadband (3 %) and reverse delay.
-        failsafe: {part: ATtiny412, heartbeat: HEARTBEAT, timeout: 0.1, neutral_us: 1500, frame: 0.02, rearm_edges: 3,
-                   rearm_band_us: 50, supply: 3V3, brake_us: 1000, brake_hold: 3.0 s, deadband_us: 15,
+        failsafe: {part: ATtiny412, heartbeat: HEARTBEAT, timeout: 0.06, neutral_us: 1500, frame: 0.02, rearm_edges: 3,
+                   rearm_band_us: 50, supply: 3V3, brake_us: 1000, brake_hold: 3.0 s, brake_pattern_us: [1460, 1484], deadband_us: 15,
                    esc_reverse_delay: 0.1 s}
         reverse_protection: {part: DMP3013SFV, rds_on: 12 mohm}
         tvs: {part: SMAJ10A, v_standoff: 10.0, v_breakdown_min: 11.1, v_breakdown_max: 12.3, v_clamp: 17.0, i_pp: 23.5}
@@ -657,7 +657,7 @@ components:
       provenance: {status: datasheet, source: "TI TPS568230 (SLVSEY5C), LM5175 (SNVSA37A), CSD17577Q3A, ISO6720F, Diodes AP7381, Littelfuse SMAJ series, DMP3013SFV; efficiencies estimated by r3_kicad.regulators (efficiency_curve, buck_boost_efficiency_curve); isolator supply currents estimated"}
     software:
       - {bus: i2c, address: 0x40, protocol: ina226}
-      - {bus: gpio, protocol: heartbeat, params: {pin: HEARTBEAT, min_rate_hz: 100, timeout: 0.1}}
+      - {bus: gpio, protocol: heartbeat, params: {pin: HEARTBEAT, min_rate_hz: 100, timeout: 0.06}}
     thermal: {theta_ja_c_per_w: 55.0, max_temp_c: 125, notes: "TPS568230 on a 2-layer board (estimated); JEDEC 44.9 C/W"}
   - id: elrs-receiver-2g4
     kind: radio

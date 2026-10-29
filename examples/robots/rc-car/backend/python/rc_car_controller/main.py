@@ -321,7 +321,7 @@ class RcCarController:
         # wheel is not "stationary": its throttle is non-zero).
         stationary = wheel_speed == 0.0 and now - self._last_edge_change_t > 0.5 and abs(self.command.throttle) < 0.05
         ground_speed = self.traction.update_speed(self.dt, self.accel_x, signed_speed, self.command.throttle,
-                                                  stationary, self.gps_speed)
+                                                  stationary, self.gps_speed, braking=self.supervisor.braking)
         self.gps_speed = None
         self.estimator.predict(self.dt, self.gyro_z)
         # A slipping wheel is not a speed measurement: de-weight it by the slip the

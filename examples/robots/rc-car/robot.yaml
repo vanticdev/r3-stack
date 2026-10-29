@@ -14,10 +14,8 @@ requirements:
   # Failsafe stop distance from the fault (link loss, hung software) to standstill, at the autonomous
   # maximum cruise speed (software.config.max_cruise_speed_mps); proven by range_failsafe and pi_hang.
   failsafe_stop_distance: 3 m
-  # At the 8 m/s top speed (manual driving) 3 m is physically impossible; the radio failsafe stop distance
-  # proven by top_speed_failsafe (8.46 m from 8.27 m/s: 0.25 s software failsafe, then the slip-servoed ESC brake;
-  # earlier full-brake runs 6.0-7.2 m). Note: rear-wheel braking alone gives at most ~mu g x 0.45 ~ 4 m/s^2, so a
-  # straight stop needs ~2.1 + 8.5 = 10.6 m; inside 9 m the twin's car still yaws while it stops.
+  # Manual top-speed stops use encoder/IMU anti-lock modulation and centred steering. The 90 ms radio
+  # timeout limits detection travel; the independent 60 ms heartbeat watchdog plus 20 ms frame is faster.
   failsafe_stop_distance_at_top_speed: 9 m
   max_wire_voltage_drop_fraction: 0.03
   min_wire_clearance_moving: 8 mm
@@ -516,14 +514,14 @@ software:
     gps:       {interface: uart, computer: pi, pins: [pi.J8.7, pi.J8.29], device: /dev/ttyAMA2, baud: 115200, expects: [gps.J1.2, gps.J1.3]}
     i2c:       {interface: i2c, computer: pi, pins: [pi.J8.3, pi.J8.5], device: /dev/i2c-1, expects: [imu.SDA, imu.SCL]}
     encoder:   {interface: gpio, computer: pi, pins: [pi.J8.11], device: gpiochip0, channel: 17, expects: [encoder.J1.2]}
-    # Failsafe heartbeat to the HAT's ATtiny412 arbiter: toggled every control cycle (100 Hz); after 100 ms
-    # without an edge the arbiter replaces the Pi's ESC PWM with 1500 us neutral.
+    # Failsafe heartbeat to the HAT's ATtiny412 arbiter: toggled every control cycle (100 Hz); after 60 ms
+    # without an edge the arbiter modulates the ESC brake, then sends 1500 us neutral.
     heartbeat: {interface: gpio, computer: pi, pins: [pi.J8.13], device: gpiochip0, channel: 27, expects: [hat.HEARTBEAT]}
   config:
     mpu6050: {address: 0x68, component: imu, mounting_rpy_deg: [0, 0, 0]}
     control_rate_hz: 100
     mode: autonomous            # autonomous | manual
-    radio_failsafe_timeout_s: 0.25
+    radio_failsafe_timeout_s: 0.09
     failsafe_action: brake
     low_voltage_cutoff_v: 6.6   # 3.3 V/cell under load
     low_voltage_limit_v: 7.0    # start limiting throttle
@@ -592,7 +590,7 @@ simulation:
       mission: {type: waypoints, laps: 1, speed: 4.0, waypoints: [[5, 0], [400, 0]]}
       faults:
         - {type: software_freeze, at: 15 s, method: sigstop}
-      expect: {arbiter_neutral_within_s: 0.12, stop_within_m_of_fault: 3.0, brownouts: 0}
+      expect: {arbiter_neutral_within_s: 0.12, stop_within_m_of_fault: 3.0, max_failsafe_yaw_deg: 30, brownouts: 0}
     - id: top_speed_failsafe
       description: >
         Manual full throttle to top speed, then the transmitter is switched off; the receiver sends no frames
@@ -602,7 +600,7 @@ simulation:
       pilot: {arm_at: 0.5 s, throttle: [[0, 0.0], [1.0, 1.0]], steering: [[0, 0.0]]}
       faults:
         - {type: transmitter_off, at: 7.0 s}
-      expect: {min_top_speed_mps: 8.0, stop_within_m_of_link_loss: 9.0, brownouts: 0}
+      expect: {min_top_speed_mps: 8.0, stop_within_m_of_link_loss: 9.0, max_failsafe_yaw_deg: 30, brownouts: 0}
     - id: low_battery
       description: Start nearly empty; firmware must cut throttle before cells drop below 3.0 V and the Pi must not brown out.
       duration: 120 s
