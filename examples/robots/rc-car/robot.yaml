@@ -57,8 +57,9 @@ components:
   knuckle_fr:  {type: steering-knuckle, params: {mirror: [1, -1, 1]}}
   stub_fl:     {type: stub-axle-6mm}
   stub_fr:     {type: stub-axle-6mm, params: {mirror: [1, -1, 1]}}
-  wheel_fl:    {type: wheel-110x45}
-  wheel_fr:    {type: wheel-110x45}
+  # Sourcing slots (`r3 source`): the type is the current part; a pinned choice in r3.lock.yaml replaces it.
+  wheel_fl:    {type: wheel-110x45, source: {group: front_wheels, requires: {kind: wheel, diameter: [100 mm, 115 mm], width: [40 mm, 50 mm], hub: 6 mm bore}}}
+  wheel_fr:    {type: wheel-110x45, source: {group: front_wheels, requires: {kind: wheel, diameter: [100 mm, 115 mm], width: [40 mm, 50 mm], hub: 6 mm bore}}}
   nut_fl:      {type: wheel-nut-m6-nyloc}
   nut_fr:      {type: wheel-nut-m6-nyloc}
   bs_kl:       {type: ball-stud-m3-5.8x8}
@@ -88,8 +89,9 @@ components:
   axle_rr:     {type: rear-axle-6mm-r, params: {mirror: [1, -1, 1]}}
   spacer_rl:   {type: wheel-spacer-6x9}
   spacer_rr:   {type: wheel-spacer-6x9}
-  wheel_rl:    {type: wheel-110x45-d}
-  wheel_rr:    {type: wheel-110x45-d}
+  # Rear wheels drive through D-flats on the axle (6 mm D-bore hub).
+  wheel_rl:    {type: wheel-110x45-d, source: {group: rear_wheels, requires: {kind: wheel, diameter: [100 mm, 115 mm], width: [40 mm, 50 mm], hub: 6 mm d-bore}}}
+  wheel_rr:    {type: wheel-110x45-d, source: {group: rear_wheels, requires: {kind: wheel, diameter: [100 mm, 115 mm], width: [40 mm, 50 mm], hub: 6 mm d-bore}}}
   nut_rl:      {type: wheel-nut-m6-nyloc}
   nut_rr:      {type: wheel-nut-m6-nyloc}
   # Drivetrain encoder: four magnets on a carrier pressed onto the spur-shaft extension; the Hall board below it
@@ -112,7 +114,7 @@ components:
   pi_spacer_2: {type: spacer-m2.5-ff-10}
   pi_spacer_3: {type: spacer-m2.5-ff-10}
   pi_spacer_4: {type: spacer-m2.5-ff-10}
-  pi:          {type: raspberry-pi-5-8gb}
+  pi:          {type: raspberry-pi-5-8gb, source: {requires: {kind: computer, family: raspberry-pi-5, ram: ">= 4 GB"}}}
   pi_standoff_1: {type: hat-standoff-mf-m2.5-11}
   pi_standoff_2: {type: hat-standoff-mf-m2.5-11}
   pi_standoff_3: {type: hat-standoff-mf-m2.5-11}
@@ -123,7 +125,7 @@ components:
   cap_hat_3:   {type: screw-cap-m2.5-petg}
   cap_hat_4:   {type: screw-cap-m2.5-petg}
   tape_rx:     {type: foam-tape-3m-4026, params: {size: [11 mm, 9 mm, 1.6 mm]}}
-  receiver:    {type: elrs-receiver-2g4}
+  receiver:    {type: elrs-receiver-2g4, source: {requires: {kind: radio, protocol: crsf, band: 2.4 GHz, supply: [4.5 V, 5.5 V]}}}
   antenna_mast: {type: antenna-mast-petg}
   rx_antenna:  {type: elrs-t-antenna}
   # RTK GNSS rover: standalone GNSS (1.5 m CEP) cannot hold the 1.5 m cross-track tolerance; RTK corrections from the

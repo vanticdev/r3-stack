@@ -595,3 +595,41 @@ cad_library:
   url: https://cad.onshape.com/documents/4d6e613b90c2bb0a65805a0d/w/b1c2b422c17fdd96f63b9335
   version_id: f04290525c8dd239fcfd0018
   workspace_id: b1c2b422c17fdd96f63b9335
+sourcing:
+  pi:
+    cad: vendor_step
+    candidate_id: raspberrypi-raspberry-pi-ltd-raspberry-pi-5-8gb
+    catalog_file: catalog/components/sourced_raspberrypi_raspberry_pi_ltd_raspberry_pi_5_8gb.yaml
+    catalog_id: sourced-raspberrypi-raspberry-pi-ltd-raspberry-pi-5-8gb
+    components:
+    - pi
+    digest: 5e71c7c664c92077
+    manufacturer: Raspberry Pi Ltd
+    mpn: Raspberry Pi 5 8GB
+    name: Raspberry Pi 5 (8 GB)
+    price:
+      amount: 175.0
+      currency: USD
+      quantity: 1
+    provider: raspberrypi
+    requirement_sha256: ff400d18a3a876b0
+    retrieved_at: 1793294309.325139
+    url: https://pip.raspberrypi.com/categories/892-raspberry-pi-5
+    vendor: Raspberry Pi Ltd (list price)
+  receiver:
+    cad: proxy
+    candidate_id: expresslrs-radiomaster-rm-rp1
+    catalog_file: catalog/components/sourced_expresslrs_radiomaster_rm_rp1.yaml
+    catalog_id: sourced-expresslrs-radiomaster-rm-rp1
+    components:
+    - receiver
+    digest: 3f048bdbfdc33191
+    manufacturer: RadioMaster
+    mpn: RM RP1
+    name: RadioMaster RP1 2.4GHz RX
+    price: null
+    provider: expresslrs
+    requirement_sha256: 35d2693dab6f89c0
+    retrieved_at: 1793294303.3607302
+    url: https://raw.githubusercontent.com/ExpressLRS/targets/master/targets.json#radiomaster.rx_2400.rp1
+    vendor: RadioMaster
