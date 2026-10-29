@@ -172,9 +172,9 @@ def render_ground_texture(visual: dict[str, Any], centerline: tuple[np.ndarray, 
         edge = _rgb(track.get("edge_color"), "white")
         # Paint stroke then lane stroke, each with round joints (disks at the vertices), so the edge lines stay
         # continuous around corners and no paint crosses the lane.
-        for color, width in ((edge, lane + 2 * paint), (surface, lane)):
-            radius = width * ppm / 2
-            draw.line(pts, fill=color, width=max(1, int(round(width * ppm))), joint="curve")
+        for color, stroke in ((edge, lane + 2 * paint), (surface, lane)):
+            radius = stroke * ppm / 2
+            draw.line(pts, fill=color, width=max(1, int(round(stroke * ppm))), joint="curve")
             for p in pts:
                 draw.ellipse([p[0] - radius, p[1] - radius, p[0] + radius, p[1] + radius], fill=color)
         center = track.get("center_line", {"color": "yellow", "dash": 0.3, "width": 0.04})

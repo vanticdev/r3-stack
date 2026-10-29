@@ -141,8 +141,9 @@ def create_project(target: str | Path, name: str | None = None, template: str = 
     write(".gitignore", _render("gitignore.j2", values))
     write(".mcp.json", _render("mcp.json.j2", values))
     write(".github/workflows/r3.yml", render_workflow(values["PLATFORM_URL"], ref))
-    write("cad/README.md", "# CAD\n\nCAD generator source (FeatureScript) and part mapping for Onshape. "
-                           "`r3 cad sync` writes `build/cad/cad_model.json` and pins the microversion in `r3.lock.yaml`.\n")
+    write("cad/README.md", "# CAD\n\nThe CAD is generated in Onshape from `robot.yaml` (one Part Studio per object, an assembly "
+                           "with standard mates; standard features only, never FeatureScript). `r3 cad sync` writes "
+                           "`build/cad/cad_model.json` and pins the document microversion in `r3.lock.yaml`.\n")
     for board in spec.pcb.boards:
         write(f"{board.source}/README.md", f"# {Path(board.source).name}\n\nKiCad generator inputs for component `{board.component}` "
                                            f"({board.layers} layers, {board.copper_oz} oz). `r3 pcb build` generates the KiCad project.\n")

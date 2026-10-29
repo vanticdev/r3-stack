@@ -279,7 +279,7 @@ components:
     behavior:
       model: tire.linear
       params: {radius: 0.055, width: 0.044, friction: 0.9, rolling_resistance: 0.02, torsional_friction: 0.005}
-      provenance: {status: estimated}
+      provenance: {status: estimated, notes: "friction and rolling resistance for rubber on asphalt (estimates)"}
 
   # ------------------------------------------------------------------ steering servo
   - id: savox-sc-0251mg

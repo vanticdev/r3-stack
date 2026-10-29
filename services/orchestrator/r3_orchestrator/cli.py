@@ -30,26 +30,34 @@ def configure_headless() -> None:
 
 
 # ----------------------------------------------------------------- printing
+READINESS_CODES = ("not_configured", "not_applicable")
+
+
 def _print_diagnostics(diagnostics: list[dict[str, Any]], show_info: bool = False) -> None:
     for d in diagnostics:
-        if d["severity"] == "info" and not show_info:
+        readiness = d["code"] in READINESS_CODES
+        if d["severity"] == "info" and not show_info and not readiness:
             continue
-        subjects = f" [{', '.join(d['subjects'])}]" if d["subjects"] else ""
+        subjects = f" [{', '.join(d['subjects'])}]" if d["subjects"] and not readiness else ""
         print(f"  {_SEVERITY_MARK[d['severity']]} {d['stage']:<11} {d['code']}{subjects}")
         print(f"      {d['message']}")
+        if readiness and d.get("hint"):
+            print(f"      next: {d['hint']}")
 
 
 def _print_results(payload: dict[str, Any]) -> None:
     print(f"{payload['robot']}  ({payload['project']})")
     for stage in payload["stages"]:
         c = stage.get("counts", {})
-        print(f"  {stage['stage']:<11} {stage['status']:<12} {c.get('error', 0)} errors, {c.get('warning', 0)} warnings"
+        print(f"  {stage['stage']:<11} {stage['status']:<14} {c.get('error', 0)} errors, {c.get('warning', 0)} warnings"
               f"  {stage.get('duration_s', 0):.2f} s")
     if payload["diagnostics"]:
         print("diagnostics:")
         _print_diagnostics(payload["diagnostics"])
     c = payload["counts"]
-    print(f"{'PASS' if payload['ok'] else 'FAIL'}: {c['error']} errors, {c['warning']} warnings, {c['info']} info")
+    pending = [s["stage"] for s in payload["stages"] if s.get("status") == "not_configured"]
+    incomplete = f" (incomplete: {', '.join(pending)} not configured yet)" if pending else ""
+    print(f"{'PASS' if payload['ok'] else 'FAIL'}: {c['error']} errors, {c['warning']} warnings, {c['info']} info{incomplete}")
 
 
 def _print_status(payload: dict[str, Any]) -> None:

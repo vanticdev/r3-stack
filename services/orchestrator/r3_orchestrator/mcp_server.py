@@ -29,6 +29,8 @@ from . import api, spec_ops
 from .cli import configure_headless
 
 INSTRUCTIONS = """R3 robot project tools. robot.yaml is the single source of truth.
+New robot: r3_guide (read it first), r3_create_project(template="blank"), then grow the spec component by component.
+Parts: r3_list_catalog / r3_get_catalog_component; your own printed parts with r3_put_catalog_component.
 Loop: r3_get_spec -> r3_patch_spec (pass the sha256 you read; on spec_conflict re-read and re-apply)
 -> r3_validate -> r3_get_diagnostics / r3_diagnose -> fix -> repeat. Parts declared by requirements
 (`source:` in robot.yaml) are found with r3_source_search and pinned with r3_source_choose. Diagnostics carry stable codes,
@@ -86,15 +88,17 @@ def r3_status(project: str = "") -> dict[str, Any]:
 
 @_tool(_DESIGN)
 def r3_validate(project: str = "", stages: list[str] | None = None, scenarios: list[str] | None = None) -> dict[str, Any]:
-    """Run pipeline stages in order (default all: model, cad, pcb, wiring, electrical, sim) and regenerate the report.
+    """Run pipeline stages in order (default all: assembly, model, cad, fabrication, pcb, wiring, connectors, electrical,
+    sim) and regenerate the report.
     Returns per-stage status and every diagnostic."""
     return _guard(lambda: api.validate(project or None, stages or None, scenarios=scenarios or None))
 
 
 @_tool(_DESIGN)
 def r3_run_stage(stage: str, project: str = "", scenarios: list[str] | None = None) -> dict[str, Any]:
-    """Run a single stage: model, cad, pcb, wiring, electrical, sim or report. Returns its diagnostics,
-    metrics and assumptions."""
+    """Run a single stage: assembly, model, cad, fabrication, pcb, wiring, connectors, electrical, sim or report. Returns
+    its diagnostics, metrics and assumptions. A stage with nothing to check yet reports `not_configured` (info, with a
+    hint saying what to add); `not_applicable` means the robot has nothing for it (e.g. no custom PCB)."""
     return _guard(lambda: api.run_stage(project or None, stage, scenarios=scenarios or None))
 
 
@@ -127,8 +131,35 @@ def r3_patch_spec(patch: dict[str, Any], expected_sha256: str, project: str = ""
 
 @_tool(_READ)
 def r3_list_catalog(project: str = "", kind: str = "", query: str = "") -> dict[str, Any]:
-    """Catalog components (filter by kind, e.g. motor, sensor, or `connector` / `wire`), connectors and wire gauges."""
+    """Catalog components (filter by kind: computer, battery, motor, esc, servo, regulator, sensor, camera, cable, radio,
+    wheel, gearbox, structure, ...; or `connector` / `wire` / `material` / `printer`), with their interfaces (names and
+    kinds, for assembly joins), connectors, pin roles and behaviour model. `query` matches id, name and part number.
+    Full entries: r3_get_catalog_component."""
     return _guard(lambda: api.list_catalog(project or None, kind or None, query or None))
+
+
+@_tool(_READ)
+def r3_get_catalog_component(component_id: str, project: str = "") -> dict[str, Any]:
+    """One catalog entry in full: mechanical envelope and solids, interfaces (for assembly joins), pins, connectors,
+    behaviour model parameters and provenance, plus whether it comes from the platform or the project catalog."""
+    return _guard(lambda: api.get_catalog_component(project or None, component_id))
+
+
+@_tool(_EDIT)
+def r3_put_catalog_component(entry: dict[str, Any], project: str = "", dry_run: bool = False) -> dict[str, Any]:
+    """Add or replace a component type in the project's catalog (catalog/components/<id>.yaml), validated against the
+    catalog schema. Use it for the robot's own 3D-printed parts (mechanical.fabricated: true, material e.g. PETG,
+    solids + interfaces with hole patterns that match the parts they join) and for bought parts missing from the
+    platform catalog (with provenance). Returns `catalog_entry_invalid` with the schema errors otherwise."""
+    return _guard(lambda: api.put_catalog_component(project or None, entry, dry_run=dry_run))
+
+
+@_tool(_READ)
+def r3_guide() -> dict[str, Any]:
+    """How to build a robot from nothing with R3 (docs/guide/build-a-robot.md): the spec, sourcing, joins and
+    interfaces, CAD (standard features only), wiring, electrical, firmware with r3_hal, sim scenarios, the release
+    gate, the policies and every tool. Read it before starting a new robot."""
+    return api.guide()
 
 
 @_tool(_DESIGN)
@@ -216,8 +247,10 @@ def deploy_fleet(confirm: bool = False, project: str = "", deploy_args: list[str
 
 
 @_tool(_EDIT)
-def r3_create_project(name: str, parent: str = ".", template: str = "rc-car") -> dict[str, Any]:
-    """Scaffold a new local R3 project directory (robot.yaml, cad/, pcb/, backend/, CI workflow, agent docs)."""
+def r3_create_project(name: str, parent: str = ".", template: str = "blank") -> dict[str, Any]:
+    """Scaffold a new local R3 project directory (robot.yaml, catalog/, cad/, backend/, agent docs). Local only: it never
+    creates a GitHub repository. template="blank" starts from nothing (grow it with r3_patch_spec); an example robot
+    id (e.g. "rc-car") copies that robot. Then pass project=<path> to the other tools (or set R3_PROJECT)."""
     return api.create_project(name, parent=parent, template=template)
 
 

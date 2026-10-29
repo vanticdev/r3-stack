@@ -1,0 +1,46 @@
+schema: r3/robot@1
+# Lane D fixture: a tiny robot with a PETG frame, a Raspberry Pi 5, the Arducam IMX296 camera on a CSI flat
+# cable, a 2S LiPo and a Pololu 5 V buck. Used by the camera, fabrication and blank-flow tests.
+robot: {name: printbot, description: Tiny printed-frame camera robot, version: 0.1.0}
+components:
+  frame: {type: printbot-frame-petg, pose: {xyz: [0, 0, 0.03]}}
+  pi: {type: raspberry-pi-5-4gb}
+  camera: {type: arducam-b0445-imx296}
+  csi_cable: {type: arducam-fpc-22-22-150mm}
+  battery: {type: gensace-5000-2s-60c-xt60}
+  bec: {type: pololu-d36v50f5}
+assembly:
+  root: frame
+  joins:
+    - {a: frame.pi_1, b: pi.h1, fasteners: {type: M2.5x5}}
+    - {a: frame.pi_2, b: pi.h2, fasteners: {type: M2.5x5}}
+    - {a: frame.pi_3, b: pi.h3, fasteners: {type: M2.5x5}}
+    - {a: frame.pi_4, b: pi.h4, fasteners: {type: M2.5x5}}
+    - {a: frame.camera, b: camera.mount, clock: 0 deg, fasteners: {type: M2x5}}
+    - {a: camera.csi, b: csi_cable.end_a}
+    - {a: frame.battery_seat, b: battery.bottom}
+    - {a: frame.bec_pad, b: bec.bottom}
+electrical:
+  direct_mates:
+    - {a: camera.J1, b: csi_cable.A}
+    - {a: csi_cable.B, b: pi.CAM0}
+  harnesses:
+    - id: bec_in
+      connectors:
+        A: {type: integral, mates: battery.J1}
+        B: {type: integral, mates: bec.J_IN}
+      wires:
+        - {id: W_BEC_P, from: A.1, to: B.1, awg: 18, color: red, signal: VBAT}
+        - {id: W_BEC_N, from: A.2, to: B.2, awg: 18, color: black, signal: GND}
+    - id: pi_power
+      connectors:
+        A: {type: integral, mates: bec.J_OUT}
+        B: {type: socket-2x20-2.54, mates: pi.J8}
+      wires:
+        - {id: W_PI_5V, from: A.1, to: B.2, awg: 22, color: red, signal: 5V}
+        - {id: W_PI_GND, from: A.2, to: B.6, awg: 22, color: black, signal: GND}
+software:
+  modules:
+    - {name: vision, language: python, runs_on: pi, entrypoint: main.py}
+  bindings:
+    front_camera: {interface: csi, computer: pi, device: cam0, pins: [pi.CAM0.21, pi.CAM0.20], expects: [camera.J1.21, camera.J1.20]}

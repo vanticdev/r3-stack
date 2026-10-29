@@ -109,6 +109,9 @@ def _execute(stage: StageSpec, project: Project, options: dict[str, Any]) -> Sta
         module = importlib.import_module(stage.module)
     except ModuleNotFoundError as error:
         return _unavailable(stage, project, error)
+    pending = _precheck(project, stage.name)
+    if pending is not None:
+        return pending
     try:
         result = _call(module.run, project, options)
         return result if isinstance(result, StageResult) else StageResult.model_validate(result)
@@ -126,7 +129,7 @@ def run_stage(project: Project, name: str, **options: Any) -> StageResult:
     if stage is None:
         raise KeyError(f"unknown stage {name!r}; known: {', '.join(ALL_STAGES)}")
     started = time.time()
-    result = _precheck(project, name) or _execute(stage, project, options)
+    result = _execute(stage, project, options)
     result.stage = result.stage or name
     for diagnostic in result.diagnostics:
         diagnostic.stage = diagnostic.stage or result.stage

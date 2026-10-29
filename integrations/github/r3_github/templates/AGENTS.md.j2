@@ -1,54 +1,74 @@
 # Working on the @@NAME@@ robot (R3 project)
 
-This repository describes one robot. `robot.yaml` (schema `r3/robot@1`) is the
-single source of truth for components, poses, harnesses, PCBs, software
-bindings, requirements and simulation scenarios. Everything under `build/` is
-generated and must never be edited or committed.
+This repository describes one robot. `robot.yaml` (schema `r3/robot@1`) is the single source of truth.
+It covers components, the object/interface assembly, harnesses, PCBs, software bindings, requirements,
+3D printing and simulation scenarios. Everything under `build/` is generated: never edit it or commit it.
+
+**Start here:** the guide `docs/guide/build-a-robot.md` in the R3 platform. You can also get it from the
+MCP tool `r3_guide`. It explains the following topics:
+
+- the spec;
+- sourcing;
+- joins and interfaces;
+- CAD (standard Onshape features only);
+- 3D printing;
+- wiring;
+- electrical;
+- firmware with `r3_hal` (including the camera);
+- simulation scenarios;
+- the release gate.
+
+## Policies (non-negotiable)
+
+- Fix the design, not the check. Never weaken a requirement, threshold or check. Change a requirement
+  only when physics makes it impossible. Do that explicitly, with a comment giving the physics and the
+  twin's evidence.
+- Record provenance for every catalog number (`datasheet`, `vendor`, `measured`, `estimated`). Label
+  estimates.
+- Build CAD only from standard Onshape features: sketch, extrude, revolve, hole, fillet, pattern,
+  mirror, boolean, mate connectors and assemblies with standard mates. **No FeatureScript**: no Feature
+  Studios, no custom features.
+- Use every tool as a human would, through its own API: Onshape REST, KiCad `pcbnew` and `kicad-cli`,
+  MuJoCo, ngspice. Never hand-write a tool's file format. Never write a solver.
+- Everything runs headless (`r3 doctor`).
+- External actions need an explicit human request plus `confirm=true`:
+  - fleet deployment (`deploy_fleet`, `r3 deploy --target fleet --yes`);
+  - GitHub (`create_github_repo`).
+
+  Agents never order parts or PCBs.
 
 ## Loop
 
-1. Read the current state: `r3 status --json` (MCP: `r3_status`).
-2. Read the spec with its revision: MCP `r3_get_spec` returns `sha256`.
-3. Edit the spec. Prefer MCP `r3_patch_spec` with `expected_sha256`; a
-   `spec_conflict` means another agent or human changed `robot.yaml`. Re-read
-   and re-apply your change; never overwrite blindly. Direct file edits are
-   fine for humans; keep comments and formatting.
-4. Validate: `r3 validate --json` (MCP: `r3_validate`). Fast inner loop:
-   `r3 validate --stage model`.
-5. Diagnose: `r3 diagnose` groups errors by subject with hints. Diagnostics have
-   stable `code`s, `subjects` (component, wire, binding ids) and numeric `data`.
-   Fix the design, not the check. If a check is wrong, say why in the PR.
-6. Simulate: `r3 sim run [--scenario <id>]` and inspect `build/sim/<id>/`.
-7. Commit `robot.yaml`, sources and `r3.lock.yaml` changes with a message that
-   names the diagnostics you fixed.
+1. `r3 status --json` (MCP: `r3_status`).
+2. `r3_get_spec`, which returns `sha256`, then `r3_patch_spec` with `expected_sha256` (an RFC 7386 merge
+   patch). If you get `spec_conflict`, re-read the spec and re-apply your change. Direct file edits are
+   fine; keep the comments.
+3. Find parts with `r3_list_catalog` / `r3_get_catalog_component`. Source unknown parts with
+   `r3_source_search` + `r3_source_choose`. Write your own printed parts with `r3_put_catalog_component`,
+   which writes `catalog/components/<id>.yaml`.
+4. `r3 validate --json` (MCP: `r3_validate`), or one stage at a time: `--stage assembly,model`. A stage
+   with nothing to check yet reports `not_configured` with a hint. `not_applicable` means there is
+   nothing to build.
+5. `r3 diagnose` groups errors by subject with hints. Codes are stable and `data` is numeric.
+6. Simulate with `r3 sim run --scenario <id>` (MCP: `r3_run_scenario`) and read `build/sim/<id>/`.
+7. Check the release gate with `r3 status --release` (MCP: `r3_release_status`). It is done when
+   `fabrication_ready: true`.
 
 ## Layout
 
-- `robot.yaml`: the robot. Units are SI or explicit strings such as `25 mm`.
-  Robot frame: +x forward, +y left, +z up, origin on the ground below the rear axle.
-- `r3.lock.yaml`: pinned external revisions (platform, Onshape microversion, PCB hashes).
-  Update it through the tools, not by hand.
-- `catalog/`: project-local component, connector and wire additions
-  (`components/*.yaml`, `connectors.yaml`, `wires.yaml`), merged over the platform catalog.
-  Record provenance (`datasheet`, `measured`, `estimated`).
-- `cad/`: CAD generator source and part mapping (Onshape).
-- `pcb/<board>/`: KiCad generator inputs and the generated KiCad project.
-- `backend/`: robot software in the BLITZ layout, `backend/<language>/<module>/`.
-  Software uses only `r3_hal`, so the same module runs on the robot
-  (`R3_HAL=linux`) and against the digital twin (`R3_HAL=virtual`).
-  `backend/deploy.py` keeps the hooks `get_modules()` and `pi_name_to_process_types()`.
-
-## Permissions
-
-- Free: reading, validating, simulating, editing the spec and sources.
-- Ask the human first and pass explicit confirmation: `r3 deploy --target fleet --yes`
-  (MCP `deploy_fleet(confirm=true)`) changes software on physical robots;
-  `create_github_repo(confirm=true)` creates an account-visible repository.
-  Ordering PCBs or parts is never done by an agent.
+- `robot.yaml`: the robot. Units are SI, or explicit strings such as `25 mm`. Robot frame: +x forward,
+  +y left, +z up.
+- `catalog/`: project-local parts (`components/*.yaml`, `connectors.yaml`, `wires.yaml`), merged over the
+  platform catalog.
+- `backend/python/<module>/`: robot software in the BLITZ layout. It uses only `r3_hal`, so it runs on
+  the robot (`R3_HAL=linux`) and against the twin (`R3_HAL=virtual`). `backend/deploy.py` keeps the
+  hooks `get_modules()` and `pi_name_to_process_types()`.
+- `cad/`: CAD notes. The CAD itself is generated in Onshape from the assembly.
+- `pcb/<board>/`: KiCad inputs (only for a custom board).
+- `r3.lock.yaml`: pinned revisions and sourced parts. Update it only through the tools.
 
 ## Rules
 
 - Do not hand-edit generated files (`build/`, generated KiCad projects).
-- Distinguish datasheet values from estimates in the catalog and in PR text.
-- A passing validation is not proof the robot works: read the `assumptions`
-  in `build/report/summary.json` before claiming success.
+- A passing validation is not proof that the robot works. Read the `assumptions` in
+  `build/report/summary.json` and the release gate before claiming success.

@@ -1,0 +1,25 @@
+components:
+  - id: printbot-frame-petg
+    kind: structure
+    cad_name: Printbot frame
+    name: Printbot frame, PETG printed, 4 mm plate with a front camera wall
+    mechanical:
+      shape: custom
+      size: [160 mm, 110 mm, 54 mm]
+      mass: 0.09
+      material: PETG
+      density: 1270
+      color: "#2c6e9e"
+      fabricated: true
+      solids:
+        - {kind: box, name: plate, position: [0, 0, 2 mm], size: [160 mm, 110 mm, 4 mm]}
+        - {kind: box, name: camera wall, position: [76 mm, 0, 29 mm], size: [8 mm, 50 mm, 50 mm]}
+    interfaces:
+      pi_1: {kind: hole_pattern, origin: [-49 mm, -24.5 mm, 4 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 4 mm]]}}
+      pi_2: {kind: hole_pattern, origin: [9 mm, -24.5 mm, 4 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 4 mm]]}}
+      pi_3: {kind: hole_pattern, origin: [-49 mm, 24.5 mm, 4 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 4 mm]]}}
+      pi_4: {kind: hole_pattern, origin: [9 mm, 24.5 mm, 4 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 4 mm]]}}
+      camera: {kind: hole_pattern, origin: [80 mm, 0, 29 mm], z: [1, 0, 0], x: [0, 1, 0],
+               params: {holes: [[15 mm, 15 mm, 2 mm, tapped, 8 mm], [-15 mm, 15 mm, 2 mm, tapped, 8 mm], [15 mm, -15 mm, 2 mm, tapped, 8 mm], [-15 mm, -15 mm, 2 mm, tapped, 8 mm]]}}
+      battery_seat: {kind: face_mount, origin: [-5 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      bec_pad: {kind: adhesive_pad, origin: [50 mm, 35 mm, 4 mm], z: [0, 0, 1], x: [1, 0, 0]}

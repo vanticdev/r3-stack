@@ -96,7 +96,8 @@ def test_spec_patch_reports_dangling_connectors(project):
 
 def test_catalog_and_artifacts(project):
     motors = m.r3_list_catalog(project=project, kind="motor")
-    assert [c["id"] for c in motors["components"]] == ["motor-540-brushed"]
+    ids = [c["id"] for c in motors["components"]]
+    assert "motor-540-brushed" in ids and all(c["kind"] == "motor" for c in motors["components"])
     assert m.r3_list_catalog(project=project, query="xt60")["connectors"]
     m.r3_run_stage("model", project=project)
     graph = m.r3_get_artifact("model/graph.json", project=project)

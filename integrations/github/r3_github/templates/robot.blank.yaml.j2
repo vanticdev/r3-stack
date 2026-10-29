@@ -1,16 +1,22 @@
+# @@NAME@@: a new R3 robot, starting from nothing. robot.yaml is the single source of truth.
+# Read the guide first: MCP r3_guide (docs/guide/build-a-robot.md). Grow the robot section by section,
+# validating as you go (`r3 validate`; every stage says what it still needs with `not_configured`).
+#
+# Units: SI floats or strings with units ("25 mm", "30 deg"). Robot frame: +x forward, +y left, +z up.
 schema: r3/robot@1
 robot:
   name: @@NAME@@
-  description: New R3 robot. Add components from `r3 list-catalog` / MCP r3_list_catalog.
+  description: ""
   version: 0.1.0
 
-requirements:
-  max_mass: 2 kg
+requirements: {}        # e.g. {max_mass: 2.5 kg, top_speed: 8 m/s, min_runtime: 10 min}
 
-# Robot frame: +x forward, +y left, +z up; origin on the ground.
-components:
-  pi: {type: raspberry-pi-5-8gb, pose: {xyz: [0, 0, 50 mm]}}
+# id -> {type: <catalog id>} (r3_list_catalog) or {source: {requires: {...}}} (r3_source_search/choose).
+# Your own printed parts go in catalog/components/ (r3_put_catalog_component). Only the assembly root has a pose.
+components: {}
 
-software:
-  modules:
-    - {name: controller, language: python, runs_on: pi, entrypoint: main.py}
+# assembly: {root: <frame id>, joins: [{a: <obj>.<interface>, b: <obj>.<interface>, fasteners: {type: M3x10}}]}
+# electrical: {harnesses: [...], direct_mates: [...]}
+# software: {modules: [{name: controller, language: python, runs_on: <computer id>, entrypoint: main.py}], bindings: {}}
+# simulation: {environment: {visual: {ground: grass, track: {from: mission}}}, scenarios: [...]}
+# fabrication: {printer: bambu-x1c}

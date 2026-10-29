@@ -487,6 +487,45 @@ class ModelChecker:
                         hint="Strap one device to an alternate address or move it to a second I2C bus."))
         return summary
 
+    # ------------------------------------------------------------ flat cables
+    def _connector_point(self, ref: str) -> np.ndarray | None:
+        cid, _, name = ref.partition(".")
+        comp = self.spec.components.get(cid)
+        ctype = self.catalog.components.get(comp.type) if comp is not None else None
+        inst = ctype.connectors.get(name) if ctype is not None else None
+        if inst is None:
+            return None
+        position, rotation = self.graph.component_pose(cid)
+        return position + rotation @ np.asarray([to_si(v) for v in inst.position], dtype=float)
+
+    def check_cable_reach(self) -> None:
+        """A `cable` component (flat CSI cable) must span the sockets its two ends mate: the straight distance
+        between them may not exceed its length (``behavior.params.length``); less than 15 % slack is a warning
+        (a flat cable needs room for its bends)."""
+        mates: dict[str, str] = {}
+        for mate in self.spec.electrical.direct_mates:
+            mates[mate.a], mates[mate.b] = mate.b, mate.a
+        for cid, comp in self.spec.components.items():
+            ctype = self.catalog.components.get(comp.type)
+            if ctype is None or ctype.kind != "cable" or ctype.behavior is None:
+                continue
+            length = ctype.behavior.params.get("length")
+            ends = [mates.get(f"{cid}.{name}") for name in ctype.connectors]
+            if length is None or len(ends) != 2 or None in ends:
+                continue
+            points = [self._connector_point(ref) for ref in ends]
+            if any(p is None for p in points):
+                continue
+            span, limit = float(np.linalg.norm(points[0] - points[1])), to_si(length)
+            data = {"span": span, "length": limit, "slack_fraction": (limit - span) / limit}
+            if span > limit:
+                self.add(Diagnostic.error("cable_too_short", f"{cid} ({limit * 1e3:.0f} mm) cannot reach from {ends[0]} to {ends[1]} "
+                                                             f"({span * 1e3:.0f} mm straight)", subjects=[cid, *ends], data=data,
+                                          hint="Use a longer cable (e.g. the 300/500 mm variant) or move the computer closer."))
+            elif span > 0.85 * limit:
+                self.add(Diagnostic.warning("cable_slack_low", f"{cid}: only {100 * (limit - span) / limit:.0f} % slack between "
+                                                               f"{ends[0]} and {ends[1]}", subjects=[cid, *ends], data=data))
+
     # ------------------------------------------------------------ mechanics
     def solids(self) -> dict[str, Solid]:
         result: dict[str, Solid] = {}
@@ -838,6 +877,7 @@ def run(project: Project) -> StageResult:
     checker.check_roles()
     rails = checker.check_voltages()
     buses = checker.check_i2c()
+    checker.check_cable_reach()
     solids = checker.solids()
     overlaps = checker.check_interference(solids)
     mass = checker.check_mass()
