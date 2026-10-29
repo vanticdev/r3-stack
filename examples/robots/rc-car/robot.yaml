@@ -399,8 +399,9 @@ electrical:
         - {id: W_ENC_VCC, from: A.1, to: B.1, awg: 26, color: red, signal: 3V3}
         - {id: W_ENC_OUT, from: A.2, to: B.2, awg: 26, color: yellow, signal: ENC}
         - {id: W_ENC_GND, from: A.3, to: B.3, awg: 26, color: black, signal: GND}
-      # The Hall board's lead leaves its outward face, away from the spur cover and the magnet carrier.
-      route: {slack: 25 mm, keep_away: [wheel_rr, gearbox, motor]}
+      # The Hall board's lead leaves its outward face, away from the spur cover and the magnet carrier, runs along
+      # the plate and wraps the deck's right edge behind the rear-right standoff (not the HAT lead slot).
+      route: {slack: 25 mm, keep_away: [wheel_rr, gearbox, motor, lead_post]}
 
 pcb:
   boards:
