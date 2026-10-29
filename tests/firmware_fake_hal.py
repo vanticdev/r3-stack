@@ -79,6 +79,7 @@ class CarParams:
     gyro_bias: float = 0.015         # rad/s
     gyro_noise: float = 0.003
     gps_sigma: float = 0.35          # m (white part; tests use a benign receiver)
+    gps_fix_quality: int = 4         # GGA quality reported (the RC car's rover is RTK; GST carries gps_sigma)
     gps_velocity_sigma: float = 0.05
     # --- slip model (CarParams(slip_model=True))
     slip_model: bool = False
@@ -319,8 +320,10 @@ class FakeCarHal(Hal):
             speed, course = math.hypot(vx, vy), math.degrees(math.atan2(vx, vy)) % 360.0
             utc = self._utc0 + self.t
             buffer = self.uart_rx.setdefault("/dev/ttyAMA2", bytearray())
-            buffer.extend(nmea.format_gga(utc, lat, lon, 400.0) + nmea.format_rmc(utc, lat, lon, speed, course)
-                          + nmea.format_vtg(speed, course))
+            gst = nmea.encode_sentence(f"GNGST,{nmea._format_time(utc)},{p.gps_sigma:.3f},{p.gps_sigma:.3f},{p.gps_sigma:.3f},0.0,"
+                                       f"{p.gps_sigma:.3f},{p.gps_sigma:.3f},{2 * p.gps_sigma:.3f}")
+            buffer.extend(nmea.format_gga(utc, lat, lon, 400.0, fix_quality=p.gps_fix_quality)
+                          + nmea.format_rmc(utc, lat, lon, speed, course) + nmea.format_vtg(speed, course) + gst)
 
     def _physics(self, dt: float) -> None:
         if self.params.slip_model:
