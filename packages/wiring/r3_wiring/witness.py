@@ -408,8 +408,8 @@ def _measure_diagnostic(diagnostic: Diagnostic, obstacle: Obstacle, routing: Any
 
 
 def _exempt(routing: Any, wire: Any, arc: np.ndarray, points: np.ndarray, obstacle: Obstacle) -> np.ndarray:
-    """The checker's exemptions: termination zones on the part a wire terminates on (and
-    the parts it is mounted on), and this harness's drilled pass-throughs."""
+    """The checker's exemptions: termination zones on the connector-owning part only,
+    and this harness's drilled pass-throughs. Mount ancestors remain obstacles."""
     nodes = routing.nodes[wire.harness]
     start, end = nodes[wire.from_node], nodes[wire.to_node]
     mask = np.zeros(len(arc), dtype=bool)

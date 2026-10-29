@@ -250,7 +250,7 @@ def _end_info(project: Project, kin: Kinematics, harness: Any, ref: str) -> tupl
     endpoint = project.graph.endpoints.get(connector.mates) if connector.mates else None
     if endpoint is not None and endpoint.owner_kind == "component":
         component = connector.mates.split(".")[0]
-        return kin.body_of(component), set(kin.mount_chain(component)), connector.type
+        return kin.body_of(component), {component}, connector.type
     return ROOT, set(), connector.type
 
 
