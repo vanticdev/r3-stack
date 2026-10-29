@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from ..http import HttpClient
 from .base import Provider, ProviderUnavailable
+from .catalog import CatalogProvider
 from .distributors import DigiKeyProvider, MouserProvider, NexarProvider
 from .expresslrs import ExpressLrsProvider
 from .raspberrypi import RaspberryPiProvider
 from .research import AgentResearchProvider
 
-#: id -> provider class. Manufacturer data first, then distributors, then agent research.
+#: id -> provider class. Parts R3 already models, then manufacturer data, then distributors, then agent research.
 PROVIDERS: dict[str, type[Provider]] = {cls.id: cls for cls in (
-    RaspberryPiProvider, ExpressLrsProvider, NexarProvider, DigiKeyProvider, MouserProvider, AgentResearchProvider)}
+    CatalogProvider, RaspberryPiProvider, ExpressLrsProvider, NexarProvider, DigiKeyProvider, MouserProvider, AgentResearchProvider)}
 
 
 def make_providers(ids: list[str] | None = None, http: HttpClient | None = None) -> list[Provider]:
@@ -23,5 +24,5 @@ def make_providers(ids: list[str] | None = None, http: HttpClient | None = None)
     return [PROVIDERS[i](http=http) for i in (ids or list(PROVIDERS))]
 
 
-__all__ = ["PROVIDERS", "AgentResearchProvider", "DigiKeyProvider", "ExpressLrsProvider", "MouserProvider", "NexarProvider",
+__all__ = ["PROVIDERS", "AgentResearchProvider", "CatalogProvider", "DigiKeyProvider", "ExpressLrsProvider", "MouserProvider", "NexarProvider",
            "Provider", "ProviderUnavailable", "RaspberryPiProvider", "make_providers"]

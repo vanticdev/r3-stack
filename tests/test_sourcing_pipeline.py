@@ -207,7 +207,7 @@ def test_mcp_tools(tmp_path, offline_cache):
     assert {"r3_source_slots", "r3_source_search", "r3_source_choose"} <= set(mcp_server.ungated_tools())
     assert mcp_server.TOOL_TIERS["r3_source_search"] == "design" and mcp_server.TOOL_TIERS["r3_source_choose"] == "edit"
     assert mcp_server.r3_source_slots(project=str(root))["slots"][0]["slot"] == "pi"
-    found = mcp_server.r3_source_search("pi", project=str(root), offline=True, top=2)
+    found = mcp_server.r3_source_search("pi", project=str(root), offline=True, top=2, providers=["raspberrypi"])
     assert len(found["ranked"]) == 2 and found["total"] == 5 and found["rejected"][0]["reasons"]
     chosen = mcp_server.r3_source_choose("pi", "1", project=str(root))
     assert chosen["ok"] and chosen["pinned"]["price"]["amount"] == 110.0

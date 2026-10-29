@@ -111,12 +111,22 @@ def _sim(project: Project) -> tuple[str, str, str] | None:
     return None
 
 
+def _assembly(project: Project) -> tuple[str, str, str] | None:
+    if project.spec.assembly is None:
+        return None
+    missing = _unresolved(project)
+    if missing:
+        return ("not_configured", f"the assembly joins components without a resolved catalog type: {', '.join(missing)}",
+                "Pin each `source:` slot with r3_source_search + r3_source_choose (or set `type`), then re-run.")
+    return None
+
+
 def _model(project: Project) -> tuple[str, str, str] | None:
     found = _components(project)
     return found if found is not None and not project.spec.components else None
 
 
-CHECKS: dict[str, Check] = {"model": _model, "cad": _cad, "pcb": _pcb, "wiring": _wiring, "connectors": _connectors,
+CHECKS: dict[str, Check] = {"assembly": _assembly, "model": _model, "cad": _cad, "pcb": _pcb, "wiring": _wiring, "connectors": _connectors,
                             "electrical": _electrical, "sim": _sim}
 
 

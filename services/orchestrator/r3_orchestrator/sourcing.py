@@ -139,19 +139,33 @@ def _twin_diagnostics(project: Project, spec: Any, catalog: Any) -> tuple[dict[t
     return found, mass
 
 
+def _catalog_id(candidate: Candidate) -> str | None:
+    """The existing catalog id of a ``catalog`` provider candidate (None for parts found online)."""
+    ref = candidate.urls.get("catalog", "") if candidate.provider == "catalog" else ""
+    return ref.removeprefix("catalog:") or None
+
+
 def make_checker(project: Project, requirement: Requirement, template: Any) -> Callable[[Candidate], list[TwinCheck]]:
     baseline, base_mass = _twin_diagnostics(project, project.spec, project.catalog) if template is not None else ({}, None)
     interfaces = [i for i in project.spec.mechanical.interfaces if set(i.parts) & set(requirement.components)]
 
     def check(candidate: Candidate) -> list[TwinCheck]:
-        try:
-            entry, meta = build_entry(candidate, requirement, template)
-        except ValueError as error:
-            return [TwinCheck("build", "sourcing_build_failed", "error", f"catalog entry does not validate: {error}")]
+        catalog_id = _catalog_id(candidate)
+        if catalog_id is not None and catalog_id in project.catalog.components:
+            # A part R3 already models: check the real entry, nothing is generated.
+            entry = project.catalog.components[catalog_id].model_dump(mode="json")
+            meta: dict[str, Any] = {"notes": []}
+            catalog = project.catalog
+        else:
+            try:
+                entry, meta = build_entry(candidate, requirement, template)
+            except ValueError as error:
+                return [TwinCheck("build", "sourcing_build_failed", "error", f"catalog entry does not validate: {error}")]
+            catalog = substituted_catalog(project.catalog, entry)
         spec = project.spec.model_copy(deep=True)
         for cid in requirement.components:
             spec.components[cid].type = entry["id"]
-        found, mass = _twin_diagnostics(project, spec, substituted_catalog(project.catalog, entry))
+        found, mass = _twin_diagnostics(project, spec, catalog)
         checks = [TwinCheck(_category(d.code), d.code, d.severity.value, d.message, d.subjects, d.data)
                   for key, d in found.items() if key not in baseline]
         delta = mass["total"] - base_mass["total"] if base_mass else None
@@ -317,6 +331,8 @@ def choose(root: str | Path, slot: str, choice: str | int, allow_rejected: bool 
         return {"ok": False, "code": "sourcing_candidate_rejected", "slot": requirement.slot, "reasons": picked["reasons"],
                 "message": f"candidate {picked['candidate']['id']} fails the hard requirements: {'; '.join(picked['reasons'])}"}
     candidate = Candidate.model_validate(picked["candidate"])
+    if (catalog_id := _catalog_id(candidate)) is not None:
+        return _pin_catalog_part(project, requirement, candidate, catalog_id, picked)
     template = select_template(project.spec, project.catalog, requirement.components, requirement.kind)
     from r3_catalog.sourcing import ParamMatch
 
@@ -359,6 +375,32 @@ def choose(root: str | Path, slot: str, choice: str | int, allow_rejected: bool 
             "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics]}
 
 
+def _pin_catalog_part(project: Project, requirement: Requirement, candidate: Candidate, catalog_id: str,
+                      picked: dict[str, Any]) -> dict[str, Any]:
+    """Pin an existing catalog entry for the slot (``catalog`` provider): r3.lock.yaml only, no generated file."""
+    if catalog_id not in project.catalog.components:
+        raise SourcingError(f"catalog entry {catalog_id!r} no longer exists")
+    pin = {"catalog_id": catalog_id, "catalog_file": "", "provider": "catalog", "candidate_id": candidate.id,
+           "name": candidate.name, "manufacturer": candidate.manufacturer, "mpn": candidate.mpn, "vendor": candidate.manufacturer,
+           "url": candidate.primary_url, "price": None, "retrieved_at": candidate.retrieved_at,
+           "requirement_sha256": requirement.digest(), "components": requirement.components, "cad": "catalog"}
+    lock_path = project.root / "r3.lock.yaml"
+    lock = (yaml.safe_load(lock_path.read_text()) if lock_path.exists() else {}) or {}
+    previous = (lock.get("sourcing") or {}).get(requirement.slot)
+    lock.setdefault("sourcing", {})[requirement.slot] = pin
+    lock_path.write_text(yaml.safe_dump(lock, sort_keys=True))
+    if previous and previous.get("catalog_file"):
+        still_used = any(p.get("catalog_file") == previous["catalog_file"] for p in lock["sourcing"].values())
+        old = project.root / previous["catalog_file"]
+        if not still_used and old.exists():
+            old.unlink()
+    result = StageResult(stage=BUILD)
+    result.extend(check_pins(Project.load(project.root)))
+    return {"ok": True, "slot": requirement.slot, "components": requirement.components, "pinned": pin, "previous": previous,
+            "catalog_file": "", "entry": {"id": catalog_id}, "twin": picked["twin"], "tier": picked["tier"],
+            "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics]}
+
+
 def unpin(root: str | Path, slot: str) -> dict[str, Any]:
     project = Project.load(root)
     requirement = requirement_for(project, slot)
@@ -378,7 +420,14 @@ def check_pins(project: Project) -> list[Diagnostic]:
         requirement = requirement_for(project, slot)
         pin = pins.get(slot)
         type_id = project.spec.components[members[0]].type
-        if pin:
+        if pin and pin.get("provider") == "catalog":
+            # A pinned platform catalog part: nothing generated, the entry itself must still exist.
+            if pin.get("catalog_id") not in project.catalog.components:
+                diagnostics.append(Diagnostic.error(
+                    "sourcing_catalog_missing", f"slot {slot} is pinned to catalog entry {pin.get('catalog_id')}, which no longer exists",
+                    subjects=members, hint=f"Search again: `r3 source {slot}` then `--choose N`."))
+                continue
+        elif pin:
             path = project.root / str(pin.get("catalog_file", ""))
             if not path.is_file():
                 diagnostics.append(Diagnostic.error(
@@ -400,9 +449,19 @@ def check_pins(project: Project) -> list[Diagnostic]:
         if type_id not in project.catalog.components:
             continue
         component = project.catalog.components[type_id]
-        params = catalog_params(component)
-        sourced = _sourced_params(project, pin)
-        params.update(sourced)
+        if pin and pin.get("provider") == "catalog":
+            from r3_catalog.sourcing.providers.catalog import catalog_candidate
+
+            sourced = {}
+            params = catalog_candidate(component).params  # behaviour parameters too, with the entry's provenance
+            if pin.get("requirement_sha256") and pin["requirement_sha256"] != requirement.digest():
+                diagnostics.append(Diagnostic.warning(
+                    "sourcing_pin_stale", f"slot {slot}'s requirements changed after {pin.get('name', pin['catalog_id'])} was pinned",
+                    subjects=members, hint=f"Run `r3 source {slot}` and choose again (re-sourcing is explicit)."))
+        else:
+            params = catalog_params(component)
+            sourced = _sourced_params(project, pin)
+            params.update(sourced)
         for match in requirement.evaluate(params, component.kind):
             if match.status == "fail":
                 diagnostics.append(Diagnostic.error(

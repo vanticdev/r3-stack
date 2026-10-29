@@ -126,3 +126,30 @@ def test_grow_a_printed_frame_robot(project: str) -> None:
     status = m.r3_status(project=project)
     assert status["summary"]["components"] == 6 and status["summary"]["bindings"] == 1
     assert m.r3_release_status(project=project)["fabrication_ready"] is False
+
+
+def test_source_a_catalog_part_by_requirements(tmp_path: Path) -> None:
+    """`source:` slots also find the bought parts R3 already models (provider `catalog`); choosing one pins the
+    existing entry (no generated file), with its datasheet provenance in the candidate parameters."""
+    import shutil
+
+    root = tmp_path / "printbot"
+    shutil.copytree(FIXTURE, root)
+    text = (root / "robot.yaml").read_text().replace(
+        "  camera: {type: arducam-b0445-imx296}",
+        "  camera: {source: {requires: {kind: camera, shutter: global}, prefer: {}}}")
+    (root / "robot.yaml").write_text(text)
+    project = str(root)
+    before = m.r3_validate(project=project, stages=["assembly", "model"])
+    assert [s["status"] for s in before["stages"][:2]] == ["not_configured", "failed"]
+    assert "component_unsourced" in {d["code"] for d in before["diagnostics"]}
+    found = m.r3_source_search("camera", project=project, providers=["catalog"], offline=True)
+    best = found["ranked"][0]
+    assert best["candidate"]["id"] == "catalog-arducam-b0445-imx296" and best["tier"] != "rejected"
+    params = best["candidate"]["params"]
+    assert params["shutter"]["value"] == "global" and params["sensor"]["status"] == "datasheet"
+    chosen = m.r3_source_choose("camera", "1", project=project)
+    assert chosen["ok"] and chosen["pinned"]["catalog_id"] == "arducam-b0445-imx296" and chosen["catalog_file"] == ""
+    assert not list((root / "catalog" / "components").glob("sourced_*.yaml"))
+    for name in ("assembly", "model"):
+        assert stage(project, name)["status"] == "ok"
