@@ -455,7 +455,8 @@ def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstac
         tangent = tangent / max(float(np.linalg.norm(tangent)), 1e-12)
         near_connector = any(np.linalg.norm(p - e) <= STRAIN_RELIEF_REACH for e in exits)
         load = SAFETY_FACTOR * mass_per_m * limit * PEAK_ACCEL_G * G + (HANDLING_PULL if near_connector else 0.0)
-        # Mount options: the nearest point of the nearest host, then flat faces of every host in reach.
+        # Round posts have no flat side faces. Consider each post in reach even
+        # when a plate is closer: the plate may lack installation clearance.
         options: list[tuple[Obstacle, np.ndarray, np.ndarray]] = []
         best = None
         for host, d in near_hosts:
@@ -464,6 +465,8 @@ def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstac
             closest = exact_closest(host.shape, p[None])[0]
             if closest.distance <= 0:
                 continue
+            if _post_at(posts, host.component, closest.point) is not None:
+                options.append((host, closest.point, (p - closest.point) / closest.distance))
             if best is None or closest.distance < best[1].distance:
                 best = (host, closest)
         if best is None:
