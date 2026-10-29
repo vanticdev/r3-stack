@@ -107,6 +107,7 @@ def sourced_rc_car(parent: Path, sources: dict[str, dict[str, Any]] | None = Non
     sources = sources if sources is not None else {"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE, "wheel_fl": WHEEL_SOURCE,
                                                    "wheel_fr": WHEEL_SOURCE}
     for cid, source in sources.items():
+        spec["components"][cid].pop("owned", None)  # fixture explicitly switches this part to buying
         spec["components"][cid]["source"] = json.loads(json.dumps(source))
     for cid in drop_type:
         spec["components"][cid].pop("type")

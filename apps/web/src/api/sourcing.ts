@@ -41,7 +41,8 @@ export interface Slot {
   last_search: { searched_at: number; candidates: number; eligible: number; requirement_sha256: string; reports: ProviderReport[] } | null;
 }
 export interface ProviderInfo { id: string; title: string; category: string; kinds: string[]; env: string[]; available: boolean; reason: string }
-export interface SlotsResponse { ok: boolean; project: string; slots: Slot[]; providers: ProviderInfo[] }
+export interface PurchaseSummary { lines: { component: string; type: string; owned: boolean; status: "owned" | "sourced" | "to_buy"; note: string; purchase_cost: number | null; currency: string | null }[]; to_buy_totals: Record<string, number>; unpriced_to_buy: number; to_buy_count: number }
+export interface SlotsResponse { purchases?: PurchaseSummary; ok: boolean; project: string; slots: Slot[]; providers: ProviderInfo[] }
 export interface SearchResult {
   slot: string; components: string[]; kind: string; requires: Record<string, unknown>; quantity: number; requirement_sha256: string;
   searched_at: number; template: string | null; reports: ProviderReport[]; counts: Record<Tier, number>; ranked: RankedCandidate[];

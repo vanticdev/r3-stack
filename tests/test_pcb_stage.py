@@ -31,12 +31,12 @@ def stage_run():
     os.environ.setdefault("R3_KICAD_REGENERATE", "0")      # check the committed project; the flow has its own test
     project = Project.load(CAR)
     result = stage.run(project)
-    board = json.loads((CAR / "build/pcb/carrier-hat/board.json").read_text())
+    board = json.loads((project.root / "build/pcb/carrier-hat/board.json").read_text())
     return project, result, board
 
 
 def test_board_json_contract(stage_run):
-    _, result, board = stage_run
+    project, result, board = stage_run
     assert board["board"] == "carrier-hat" and board["component"] == "hat"
     assert board["outline"]["width"] == pytest.approx(0.065) and board["outline"]["height"] == pytest.approx(0.0565)
     assert board["erc"]["errors"] == 0
@@ -50,9 +50,9 @@ def test_board_json_contract(stage_run):
     deliberate = [t for t in traces if t["origin"] == "deliberate"]
     assert any(t["net"] == "VIN_HAT" and t["max_current"] >= 5.0 for t in deliberate)
     for key in ("kicad_pcb", "kicad_sch", "gerbers", "board_step", "step", "bom", "pos", "netlist"):
-        assert (CAR / board["files"][key]).exists(), key
+        assert (project.root / board["files"][key]).exists(), key
     for side in ("render_top", "render_bottom"):
-        assert (CAR / board["renders"][side]).stat().st_size > 50_000
+        assert (project.root / board["renders"][side]).stat().st_size > 50_000
     assert not [d for d in result.diagnostics if d.code in ("kicad_erc_errors", "kicad_drc_errors", "kicad_gui_opened",
                                                             "pcb_netlist_mismatch", "pcb_flow_failed")]
 
@@ -86,9 +86,9 @@ def _requested_component() -> ComponentType:
 
 def test_board_matches_catalog_with_requested_patch(stage_run):
     project, _, _ = stage_run
-    source = CAR / "pcb/carrier-hat"
+    source = project.root / "pcb/carrier-hat"
     intent = load_intent_module(source).build()
-    netlist = read_netlist(CAR / "build/pcb/carrier-hat/carrier-hat.xml")
+    netlist = read_netlist(project.root / "build/pcb/carrier-hat/carrier-hat.xml")
     connectors = connectors_map(netlist, intent)
     diags = catalog_check("hat", _requested_component(), connectors, netlist.nets, intent)
     assert diags == [], [d.message for d in diags]

@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+from pydantic_core import PydanticCustomError
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .units import Quantity, Vector
@@ -82,10 +84,24 @@ class SourceSpec(_Model):
         return self
 
 
+class OwnedSpec(_Model):
+    """A part already available to the builder."""
+
+    note: str = Field(default="", description="Optional inventory or provenance note.")
+
+
 class ComponentInstance(_Model):
     type: str = Field(default="", description="Catalog id, e.g. raspberry-pi-5-8gb. Optional when `source` is given; "
                                               "a pinned sourcing choice replaces it.")
     source: SourceSpec | None = Field(default=None, description="Requirements for sourcing this part online.")
+    owned: bool | OwnedSpec = Field(default=False, description="Already owned; excluded from purchases and sourcing.")
+
+    @model_validator(mode="after")
+    def _check_owned(self) -> "ComponentInstance":
+        if self.owned and self.source is not None:
+            raise PydanticCustomError("owned_source_conflict", "An owned component cannot declare source")
+        return self
+
     mount: str = Field(default="world", description="Parent component id or 'world'.")
     pose: Pose = Field(default_factory=Pose, description="Pose of the component frame in the robot frame.")
     params: dict[str, Any] = Field(default_factory=dict, description="Overrides of catalog parameters.")

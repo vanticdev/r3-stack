@@ -33,6 +33,8 @@ from typing import Any, Callable
 from r3_model.diagnostics import StageResult
 from r3_model.project import Project
 
+from .purchasing import purchase_summary
+
 from . import stages as stage_runner
 
 SCHEMA = "r3/release@1"
@@ -357,6 +359,7 @@ def evaluate(project: Project) -> dict[str, Any]:
     counts = {status: sum(1 for i in items if i.status == status) for status in STATUSES}
     return {
         "schema": SCHEMA,
+        "purchases": purchase_summary(project),
         "ok": True,
         "project": str(project.root),
         "inputs": ctx.current,

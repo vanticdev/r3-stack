@@ -9,6 +9,7 @@ and the web dashboard (``apps/web``); paths in it are relative to ``build/``.
 
 from __future__ import annotations
 
+import csv
 import base64
 import html
 import json
@@ -18,6 +19,8 @@ from typing import Any
 
 from r3_model.diagnostics import StageResult
 from r3_model.project import Project
+
+from .purchasing import purchase_summary
 
 from . import stages as stage_runner
 from .hints import hint_for
@@ -70,6 +73,7 @@ def build_summary(project: Project, results: dict[str, StageResult]) -> dict[str
                  "images": _images(build)}
     return {
         "schema": SUMMARY_SCHEMA,
+        "purchases": purchase_summary(project),
         "generated_at": time.time(),
         "robot": project.spec.robot.model_dump(mode="json"),
         "inputs": fingerprint,
@@ -122,6 +126,12 @@ def render_html(summary: dict[str, Any], build: Path) -> str:
              f"<p>robot.yaml sha256 <code>{esc(summary['inputs'].get('robot_yaml_sha256', ''))}</code> "
              f"commit <code>{esc(summary['inputs'].get('git_commit', 'n/a')[:12])}</code> · generated "
              f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(summary['generated_at']))}</p></header><main>"]
+    purchases = summary.get("purchases", {})
+    parts.append("<section><h2>Parts to buy</h2><p>" + esc(str(purchases.get("to_buy_totals", {})))
+                 + " (" + str(purchases.get("unpriced_to_buy", 0)) + " unpriced)</p><table>")
+    for row in purchases.get("lines", []):
+        parts.append(f"<tr><td>{esc(row['component'])}</td><td>{esc(row['status'])}</td><td>{esc(str(row['purchase_cost']))}</td></tr>")
+    parts.append("</table></section>")
     verdict = "passed" if summary["ok"] else "failed"
     parts.append(f"<section><h2>Overall {_pill(verdict)}</h2><div class='kpi'>"
                  f"<div>{counts['error']}<span>errors</span></div><div>{counts['warning']}<span>warnings</span></div>"
@@ -187,6 +197,12 @@ def run(project: Project) -> StageResult:
     results.pop(STAGE, None)
     summary = build_summary(project, results)
     out = project.build_dir(STAGE)
+    with (out / "bom.csv").open("w", newline="") as handle:
+        rows = summary["purchases"]["lines"]
+        writer = csv.DictWriter(handle, fieldnames=["component", "type", "owned", "note", "status", "unit_price", "currency", "purchase_cost"])
+        writer.writeheader()
+        writer.writerows(rows)
+    result.artifact("report/bom.csv", "csv", "Component purchase BOM (owned parts included)")
     (out / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
     (out / "index.html").write_text(render_html(summary, project.root / "build"))
     result.artifact("report/summary.json", "json", "Machine-readable validation summary")

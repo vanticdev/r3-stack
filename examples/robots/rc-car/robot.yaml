@@ -114,7 +114,7 @@ components:
   pi_spacer_2: {type: spacer-m2.5-ff-10}
   pi_spacer_3: {type: spacer-m2.5-ff-10}
   pi_spacer_4: {type: spacer-m2.5-ff-10}
-  pi:          {type: raspberry-pi-5-4gb}  # owned by the user (Pi 5 4 GB): nothing to source
+  pi:          {type: raspberry-pi-5-4gb, owned: true}
   pi_standoff_1: {type: hat-standoff-mf-m2.5-11}
   pi_standoff_2: {type: hat-standoff-mf-m2.5-11}
   pi_standoff_3: {type: hat-standoff-mf-m2.5-11}
