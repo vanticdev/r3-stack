@@ -31,6 +31,8 @@ MODELS: dict[str, Callable[..., BehaviorModel]] = {
     "board.pcb": BoardPcb,
     "receiver.crsf": _constant("receiver.crsf"),
     "gps.nmea": _constant("gps.nmea"),
+    "gps.rtk": _constant("gps.rtk"),
+    "telemetry.sik": _constant("telemetry.sik"),
     "encoder.hall": _constant("encoder.hall"),
     "imu.mpu6050": _constant("imu.mpu6050"),
     "power_monitor.ina226": _constant("power_monitor.ina226"),

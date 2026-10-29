@@ -1,9 +1,12 @@
-"""NMEA-0183 parsing (GGA, RMC, VTG) and a local tangent-plane projection.
+"""NMEA-0183 parsing (GGA, RMC, VTG, GST) and a local tangent-plane projection.
 
 Sentence: ``$<talker><type>,<fields>*<checksum>\\r\\n``; the checksum is the XOR of
 every character between ``$`` and ``*`` as two hex digits. Any talker id
 (GP, GN, GL, GA, BD) is accepted. Latitude is ``ddmm.mmmm``, longitude
-``dddmm.mmmm``.
+``dddmm.mmmm`` (any number of decimals: u-blox high-precision NMEA sends 7).
+GGA fix quality: 1 = GNSS, 2 = DGNSS, 4 = RTK fixed, 5 = RTK float; field 13
+is the age of differential corrections (s). GST carries the receiver's own
+position error estimate (1-sigma latitude/longitude/altitude, m).
 """
 
 from __future__ import annotations
@@ -48,6 +51,7 @@ class Gga:
     satellites: int
     hdop: float | None
     altitude_m: float | None
+    age_s: float | None = None
 
 
 @dataclass(frozen=True)
@@ -66,7 +70,19 @@ class Vtg:
     speed_mps: float | None
 
 
-Sentence = Gga | Rmc | Vtg
+@dataclass(frozen=True)
+class Gst:
+    utc_s: float
+    rms_m: float | None
+    sigma_lat_m: float | None
+    sigma_lon_m: float | None
+    sigma_alt_m: float | None
+
+
+#: GGA fix quality values.
+FIX_GNSS, FIX_DGNSS, FIX_RTK_FIXED, FIX_RTK_FLOAT = 1, 2, 4, 5
+
+Sentence = Gga | Rmc | Vtg | Gst
 
 
 def _float(text: str) -> float | None:
@@ -99,7 +115,10 @@ def parse(sentence: str) -> Sentence | None:
     try:
         if kind == "GGA" and len(fields) >= 10:
             return Gga(_time(fields[1]), _coordinate(fields[2], fields[3], 2), _coordinate(fields[4], fields[5], 3),
-                       int(fields[6] or 0), int(fields[7] or 0), _float(fields[8]), _float(fields[9]))
+                       int(fields[6] or 0), int(fields[7] or 0), _float(fields[8]), _float(fields[9]),
+                       _float(fields[13]) if len(fields) > 13 else None)
+        if kind == "GST" and len(fields) >= 9:
+            return Gst(_time(fields[1]), _float(fields[2]), _float(fields[6]), _float(fields[7]), _float(fields[8]))
         if kind == "RMC" and len(fields) >= 9:
             knots = _float(fields[7])
             return Rmc(_time(fields[1]), fields[2] == "A", _coordinate(fields[3], fields[4], 2),

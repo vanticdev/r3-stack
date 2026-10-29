@@ -23,8 +23,10 @@ from __future__ import annotations
 import collections
 import json
 import math
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 import numpy as np
@@ -34,7 +36,7 @@ from r3_model.project import Project
 from r3_model.spec import Scenario
 from r3_model.units import to_si
 
-from .devices import ArbiterDevice, GpsReceiver, HallEncoder, Ina226, Mpu6050, arbiter_params
+from .devices import ArbiterDevice, GpsReceiver, HallEncoder, Ina226, Mpu6050, RtkGnssReceiver, arbiter_params
 from .fallbacks import FallbackCableSimulator, FallbackElectricalSystem
 from .pilot import Pilot
 from .radio import ElrsReceiver, RadioLink
@@ -49,7 +51,11 @@ SNAPSHOT_PERIOD = 1.0 / 30.0
 UART_BUFFER_BYTES = 4096  # Linux n_tty receive buffer
 #: Scenario fault types the kernel and runner inject (``scenario.faults``).
 FAULT_TYPES = {"software_freeze", "transmitter_off"}
-DEFAULT_GPS_ORIGIN = (37.4275, -122.1697, 30.0)  # fixed geodetic origin of the local tangent plane (estimate)
+DEFAULT_GPS_ORIGIN = (37.4275, -122.1697, 30.0)
+#: UTC at scenario t = 0 for GNSS time stamps (NMEA UTC, RTCM GPS time of week).
+GNSS_EPOCH_UTC = datetime(2026, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+RTK_PREROLL_S = 30.0  # base + rover on before the scenario (warm start); >= 3 x the datasheet RTK convergence bound
+RTK_PREROLL_STEP = 0.01  # fixed geodetic origin of the local tangent plane (estimate)
 
 
 def _get(mapping: Any, *path: str, default: Any = None) -> Any:
@@ -149,8 +155,9 @@ class CoSimKernel:
         self.dt = float(spec.simulation.timestep)
         self.seed = spec.simulation.seed if seed is None else seed
         streams = np.random.SeedSequence(self.seed).spawn(8)
-        self.rng_radio, self.rng_imu, self.rng_gps, self.rng_encoder, self.rng_ina, self.rng_uart, self.rng_misc, _ = (
-            np.random.default_rng(s) for s in streams)
+        self.rng_radio, self.rng_imu, self.rng_gps, self.rng_encoder, self.rng_ina, self.rng_uart, self.rng_misc = (
+            np.random.default_rng(s) for s in streams[:7])
+        self.rng_rtk_base, self.rng_rtk_link = (np.random.default_rng(s) for s in streams[7].spawn(2))
         self.diagnostics: list[Diagnostic] = []
         self.assumptions: list[tuple[str, str]] = []
         self.step_index = 0
@@ -239,12 +246,30 @@ class CoSimKernel:
 
         origin = initial.get("gps_origin") or env.radio_environment.get("gps_origin") or DEFAULT_GPS_ORIGIN
         self.gps_origin = tuple(float(v) for v in (list(origin) + [DEFAULT_GPS_ORIGIN[2]])[:3])
-        self.gps = GpsReceiver(_behavior_params(project, self.gps_id), self.gps_origin, self.rng_gps) if self.gps_id else None
+        gps_params = _behavior_params(project, self.gps_id) if self.gps_id else {}
+        gps_model = project.catalog.component(spec.components[self.gps_id].type).behavior.model if self.gps_id else ""
+        base = env.gnss_base
+        self.gps: GpsReceiver | None = None
+        if gps_model == "gps.rtk":
+            from .correction_link import gps_tow_ms
+
+            self.gps = RtkGnssReceiver(gps_params, self.gps_origin, self.rng_gps, epoch_utc=GNSS_EPOCH_UTC,
+                                       survey_error=tuple(base.survey_error) if base else (0.0, 0.0, 0.0),
+                                       gps_tow0_ms=gps_tow_ms(GNSS_EPOCH_UTC))
+        elif self.gps_id:
+            self.gps = GpsReceiver(gps_params, self.gps_origin, self.rng_gps, epoch_utc=GNSS_EPOCH_UTC)
         self.gps_uart = next((u for u in self.uarts.values() if u.component == self.gps_id), None)
         self.gps_antenna_offset = project.graph.component_pose(self.gps_id)[0] if self.gps_id else np.zeros(3)
         self.assumptions.append(("sensors", f"GPS local tangent plane: world +x east, +y north around "
                                             f"{self.gps_origin[0]:.5f}, {self.gps_origin[1]:.5f}; errors = Gauss-Markov "
                                             "(60 s) + white noise sized to the datasheet CEP."))
+        self.rtk_base = None
+        self.rtk_link = None
+        self.rtk_pending: collections.deque[tuple[float, int]] = collections.deque()
+        self.rtk_radio_id: str | None = None
+        self.rtk_garble = False
+        if isinstance(self.gps, RtkGnssReceiver):
+            self._setup_rtk(project, radio_scene)
 
         self.i2c_devices: dict[str, list[Any]] = {}
         for bmap in self.bindings.values():
@@ -345,6 +370,173 @@ class CoSimKernel:
         self.on_power_restored: Callable[[float], None] | None = None
 
     # ------------------------------------------------------------------ setup helpers
+    def _setup_rtk(self, project: Project, radio_scene: Any) -> None:
+        """Base station + SiK correction link into the rover's UART2 (only if the harness actually connects them)."""
+        from .correction_link import GnssBaseStation, SikCorrectionLink, correction_scene
+        from .radio_scene import car_body
+
+        spec, env = project.spec, project.spec.simulation.environment
+        base = env.gnss_base
+        gps_type = project.catalog.component(spec.components[self.gps_id].type)
+        rx2 = next((name for name, pin in gps_type.pins.items() if pin.role == "uart_rx" and name != "RX"), None)
+        radios = [cid for cid in _find_kind(project, "telemetry.sik")]
+        connected = [cid for cid in radios if rx2 and project.graph.connected(f"C:{cid}.TX", f"C:{self.gps_id}.{rx2}", through_internal=True)]
+        self.assumptions.append(("sensors", "RTK rover: single/float/fixed solution model driven by the RTCM3 frames that reach UART2 "
+                                            "intact (age of corrections, base position, baseline); RTK fixed CEP 0.01 m + 1 ppm "
+                                            "(datasheet); float accuracy, fix hold age and convergence draw are estimates; "
+                                            "wrong-fix events not modelled."))
+        if base is None:
+            self.diagnostics.append(Diagnostic.warning(
+                "rtk_base_missing", f"{self.gps_id} is an RTK rover but simulation.environment.gnss_base is not defined; "
+                                    "it navigates on standalone GNSS", subjects=[self.gps_id]))
+            return
+        if not connected:
+            self.diagnostics.append(Diagnostic.error(
+                "rtk_corrections_not_connected",
+                f"no correction radio TX reaches {self.gps_id}.{rx2}: RTCM3 corrections cannot arrive (standalone GNSS only)",
+                subjects=[self.gps_id, *radios], data={"radios": len(radios)},
+                hint="Wire a telemetry.sik radio's TX to the rover's UART2 RX (harness), and power it."))
+            return
+        self.rtk_radio_id = connected[0]
+        rover_params = _behavior_params(project, self.rtk_radio_id)
+        base_radio_params = dict(project.catalog.component(base.radio).behavior.params)
+        rover_baud = int(rover_params.get("serial_baud", 57600))
+        if abs(rover_baud - self.gps.uart2_baud) / rover_baud > 0.03:
+            self.rtk_garble = True
+            self.diagnostics.append(Diagnostic.error(
+                "rtk_uart_baud_mismatch", f"{self.rtk_radio_id} serial {rover_baud} baud vs {self.gps_id} UART2 {self.gps.uart2_baud} baud: "
+                                          "corrections are garbled", subjects=[self.rtk_radio_id, self.gps_id],
+                data={"radio_baud": rover_baud, "uart2_baud": self.gps.uart2_baud}))
+        position, rotation = project.graph.component_pose(self.rtk_radio_id)
+        port = np.asarray([to_si(v) for v in rover_params.get("antenna_port", [0.0, 0.0, 0.0])], dtype=float)
+        self.rtk_antenna_offset = (np.asarray(position, dtype=float) + np.asarray(rotation) @ port
+                                   + np.array([0.0, 0.0, to_si(rover_params.get("antenna_feed_height", 0.06))]))
+        base_position = np.asarray(base.position, dtype=float)
+        tx_position = (np.asarray(base.radio_antenna_position, dtype=float) if base.radio_antenna_position is not None
+                       else base_position - np.array([0.0, 0.0, 0.3]))
+        overrides = dict(base.correction_link or {})
+        scene = correction_scene(radio_scene, to_si(base_radio_params.get("frequency", 915e6)), tx_position,
+                                 float(overrides.get("power_dbm", base_radio_params.get("tx_power_dbm", 20.0))),
+                                 float(base_radio_params.get("antenna_gain_dbi", 2.0)), float(rover_params.get("antenna_gain_dbi", 2.0)),
+                                 self.rtk_antenna_offset, car_body(project, exclude=(self.rtk_radio_id,)) if radio_scene.body else [])
+        self.rtk_link = SikCorrectionLink(scene, base_radio_params, rover_params, env, overrides, self.rng_rtk_link,
+                                          scene_dir=project.build_dir("sim") / "radio" / f"rtk_scene_{scene.digest()}")
+        self.diagnostics.extend(self.rtk_link.diagnostics)
+        self.assumptions.extend(self.rtk_link.assumptions())
+        self.rtk_base = GnssBaseStation(base, self.gps.ltp, self.rng_rtk_base, int(base_radio_params.get("serial_baud", 57600)),
+                                        GNSS_EPOCH_UTC)
+        self._rtk_preroll(RTK_PREROLL_S)
+
+    def _rtk_preroll(self, seconds: float) -> None:
+        """Run base, link and rover for ``seconds`` before t = 0 with the car parked at its start pose: the rover is
+        warm at scenario start (as ``GpsReceiver`` assumes), with whatever solution the corrections gave it."""
+        position = np.asarray(self.vehicle.position(), dtype=float)
+        rotation = np.asarray(self.vehicle.rotation(), dtype=float)
+        gps_pos = position + rotation @ self.gps_antenna_offset
+        self.rtk_base.next_epoch = -seconds + 1.0
+        self.rtk_link.next_window = -seconds
+        self.gps.next_epoch = -seconds
+        steps = int(round(seconds / RTK_PREROLL_STEP))
+        for k in range(steps):
+            t = -seconds + (k + 1) * RTK_PREROLL_STEP
+            if t >= -1e-9:
+                break
+            self._rtk_step(t, position, rotation, powered=True)
+            self.gps.advance(t, gps_pos, np.zeros(3), True)
+        self.gps.tx_free_t = 0.0
+        stats = self.gps.stats()
+        self.assumptions.append(("sensors", f"RTK base and rover run {seconds:.0f} s before the scenario with the car parked at the "
+                                            f"start (warm receivers): rover in {self.gps.mode} at t = 0 (first fix at "
+                                            f"t = {stats['rtk_time_to_first_fix_s']} s)."))
+
+    # ------------------------------------------------------------------ radio path cache
+    def _route_poses(self, spacing: float, band: float, corner_radius: float = 3.0) -> list[tuple[np.ndarray, float]]:
+        """(robot-origin position, heading) samples the car will occupy: along the mission polyline (from the start
+        pose, closed when it has more than two waypoints), +-``band`` across it, every heading between the
+        adjacent segments within ``corner_radius`` of a waypoint."""
+        mission = self.scenario.mission or {}
+        waypoints = [np.asarray([to_si(v) for v in p[:2]], dtype=float) for p in (mission.get("waypoints") or [])]
+        if not waypoints:
+            return []
+        start = np.asarray(self.initial_pose[:2], dtype=float)
+        course = waypoints + ([waypoints[0]] if len(waypoints) > 2 else [])
+        legs = [start] + course
+        out: list[tuple[np.ndarray, float]] = []
+        headings = [math.atan2(*(b - a)[::-1]) for a, b in zip(legs[:-1], legs[1:])]
+        for i, (a, b) in enumerate(zip(legs[:-1], legs[1:])):
+            length = float(np.linalg.norm(b - a))
+            if length < 1e-6:
+                continue
+            u = (b - a) / length
+            n = np.array([-u[1], u[0]])
+            yaw = headings[i]
+            for s_along in np.arange(0.0, length + 1e-9, spacing):
+                p = a + u * s_along
+                near_end = length - s_along <= corner_radius and i + 1 < len(headings)
+                yaws = [yaw]
+                if near_end:
+                    turn = (headings[i + 1] - yaw + math.pi) % (2 * math.pi) - math.pi
+                    yaws = [yaw + turn * f for f in np.linspace(0.0, 1.0, 5)]
+                for offset in np.arange(-band, band + 1e-9, spacing):
+                    for y in yaws:
+                        out.append((p + n * offset, y))
+        return out
+
+    def radio_cache_keys(self, model: Any, antenna_offset: np.ndarray, limit: int = 4000) -> list[tuple[int, int, int, int]]:
+        key_for = getattr(model, "key_for", None)
+        if key_for is None:
+            return []
+        z0 = float(self.vehicle.position()[2])
+        keys: list[tuple[int, int, int, int]] = []
+        seen: set[tuple[int, int, int, int]] = set()
+        grid = float(getattr(model, "grid", 0.25))
+        for xy, yaw in self._route_poses(spacing=grid, band=grid):
+            c, s = math.cos(yaw), math.sin(yaw)
+            rotation = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+            key = key_for(np.array([xy[0], xy[1], z0]) + rotation @ antenna_offset, rotation)
+            if key not in seen:
+                seen.add(key)
+                keys.append(key)
+            if len(keys) >= limit:
+                break
+        return keys
+
+    def prepare_radio(self) -> dict[str, Any]:
+        """Trace the radio cells along the mission ahead of the run, in worker processes (both links)."""
+        report: dict[str, Any] = {}
+        links = [("elrs", self.radio.model, self.rx_antenna_offset)]
+        if self.rtk_link is not None:
+            links.append(("rtk", self.rtk_link.model, self.rtk_antenna_offset))
+        for name, model, offset in links:
+            if not hasattr(model, "precompute"):
+                continue
+            keys = self.radio_cache_keys(model, np.asarray(offset, dtype=float))
+            t0 = time.perf_counter()
+            added = model.precompute(keys)
+            report[name] = {"keys": len(keys), "traced": added, "seconds": round(time.perf_counter() - t0, 2)}
+        return report
+
+    def save_radio_cache(self) -> None:
+        for model in (self.radio.model, self.rtk_link.model if self.rtk_link is not None else None):
+            save = getattr(model, "save_cache", None)
+            if callable(save):
+                save()
+
+    def _rtk_step(self, t1: float, position: np.ndarray, rotation: np.ndarray, powered: bool | None = None) -> None:
+        """Base RTCM -> SiK air link -> rover radio serial -> rover UART2, delivering bytes that have arrived by ``t1``."""
+        if self.rtk_link is None or self.rtk_base is None:
+            return
+        powered = self.pi_powered if powered is None else powered
+        self.rtk_link.offer(self.rtk_base.advance(t1))
+        antenna = position + rotation @ self.rtk_antenna_offset
+        self.rtk_pending.extend(self.rtk_link.advance(t1, antenna, rotation, powered))
+        due: list[tuple[float, int]] = []
+        while self.rtk_pending and self.rtk_pending[0][0] <= t1 + 1e-12:
+            t, byte = self.rtk_pending.popleft()
+            due.append((t, int(self.rng_uart.integers(0, 256)) if self.rtk_garble else byte))
+        if due and powered:
+            self.gps.feed_rtcm(due)
+
     def _load_electrical(self, routes: Any, soc: float) -> Any:
         try:
             from r3_sim.electrical import ElectricalSystem  # type: ignore[attr-defined]
@@ -631,6 +823,7 @@ class CoSimKernel:
             self.rx_uart.push(frame_bytes, self.rng_uart)
         # 7. sensors.
         if self.gps is not None:
+            self._rtk_step(t1, position, rotation)
             gps_pos = position + rotation @ self.gps_antenna_offset
             gps_bytes = self.gps.advance(t1, gps_pos, state.velocity(), self.pi_powered)
             if self.gps_uart is not None:
@@ -730,6 +923,8 @@ class CoSimKernel:
             tx_distance=float(np.linalg.norm(position[:2] - self.radio.tx_position[:2])),
             wire_clearance=min((d for d, _ in self.wire_clearance.values()), default=float("nan")),
             armed=1.0 if self.pilot.armed(self.t) else 0.0,
+            gnss_mode=float({"single": 1, "float": 5, "fixed": 4}.get(getattr(self.gps, "mode", ""), 1 if self.gps else 0)),
+            gnss_age=float(min(getattr(self.gps, "age", math.nan), 999.0)),
         )
 
     @property

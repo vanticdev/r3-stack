@@ -44,3 +44,11 @@ All are read today with defaults (recorded as `estimated_parameters` in
 - **Sim requests 1-2 are implemented** (`initial={"battery_soc": ...}` accepted by the
    constructor; `pulse_us <= 0` is signal loss for the ESC and the servo). Item 3: servo outputs
    now also carry `voltage`.
+
+## From lane C (finish): RTK rover + correction radio on the 5 V rail
+- `gps` is now `gnss-rtk-zed-f9p` (behavior `gps.rtk`, 0.12 A at 5 V, estimate; module 68 mA plus LNA/compass/regulator),
+  replacing the M10 (0.03 A). The SiK 915 MHz correction radio `rtk_radio` (behavior `telemetry.sik`, `current_active`
+  0.1 A, the datasheet TX worst case; 25 mA receive) is powered from the rover's 5 V pin through `rtk_radio_lead`.
+  Total added load on the HAT 5 V rail: about +0.19 A. Both are registered as constant loads in
+  `r3_sim/electrical/models/__init__.py` (two lines). Please re-verify the 5 V budget and the gps_lead
+  (28 AWG) drop.

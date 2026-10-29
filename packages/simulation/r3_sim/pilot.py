@@ -6,7 +6,8 @@ channels) defaults to a surface radio: ch1 steering (+1 = left, matching the
 robot frame's positive yaw), ch2 throttle, AUX1 = ch5 arm switch, overridable
 by ``software.config.crsf_channels``. ``arm_at`` sets the arm channel high
 (2000 us, > 1700 us) from that time on; before it the switch reads 1000 us.
-Stick value s maps to 1500 + 500 s us.
+Stick value s maps to 1500 + 512 s us: full deflection is the CRSF channel limit
+988 / 2012 us (ticks 172 / 1811), as an EdgeTX/OpenTX handset sends at 100 % travel.
 """
 
 from __future__ import annotations
@@ -15,6 +16,9 @@ import bisect
 from typing import Any
 
 from r3_model.units import to_si
+
+#: Full stick deflection relative to centre (us): CRSF 988..2012 us.
+STICK_HALF_RANGE_US = 512.0
 
 
 class Pilot:
@@ -51,7 +55,7 @@ class Pilot:
 
     def channels_us(self, t: float) -> list[float]:
         channels = [1500.0] * 16
-        channels[self.channel_map["steering"] - 1] = 1500.0 + 500.0 * self.stick("steering", t)
-        channels[self.channel_map["throttle"] - 1] = 1500.0 + 500.0 * self.stick("throttle", t)
+        channels[self.channel_map["steering"] - 1] = 1500.0 + STICK_HALF_RANGE_US * self.stick("steering", t)
+        channels[self.channel_map["throttle"] - 1] = 1500.0 + STICK_HALF_RANGE_US * self.stick("throttle", t)
         channels[self.channel_map["arm"] - 1] = 2000.0 if self.armed(t) else 1000.0
         return channels

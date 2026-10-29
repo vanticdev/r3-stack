@@ -304,6 +304,22 @@ class RadioEndpoint(_Model):
     height: Quantity | None = None
 
 
+class GnssBase(_Model):
+    """RTK reference station in the scenario world: a GNSS receiver in fixed-base mode streaming RTCM3
+    corrections through a telemetry radio to the robot's rover (both catalog types)."""
+
+    receiver: str = Field(description="Catalog id of the base GNSS receiver (behavior gps.rtk), e.g. gnss-rtk-zed-f9p.")
+    radio: str = Field(description="Catalog id of the base correction radio (behavior telemetry.sik).")
+    position: Vector = Field(description="Base antenna phase centre in the local ENU world frame (m).")
+    radio_antenna_position: Vector | None = Field(default=None, description="Radio antenna in the world frame; default "
+                                                                             "0.3 m below the GNSS antenna on the same mast.")
+    survey_error: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0],
+                                 description="Error of the base's fixed (surveyed) coordinates, ENU (m); shifts every RTK solution.")
+    rtcm: dict[str, Any] = Field(default_factory=dict, description="RTCM3 output: {messages: {1005: 0.1 Hz, 1074: 1 Hz, ...}}.")
+    correction_link: dict[str, Any] = Field(default_factory=dict, description="Correction radio link overrides, e.g. "
+                                                                               "power_dbm, interference_dbm, air_rate.")
+
+
 class Environment(_Model):
     gravity: Quantity = 9.80665
     ambient_temperature_c: float = 25.0
@@ -313,6 +329,7 @@ class Environment(_Model):
     obstacles: list[dict[str, Any]] = Field(default_factory=list, description="Static boxes: {id, center, size, material}.")
     radio_transmitter: RadioEndpoint | None = None
     radio_environment: dict[str, Any] = Field(default_factory=dict)
+    gnss_base: GnssBase | None = Field(default=None, description="RTK base station and its correction link.")
 
 
 class Scenario(_Model):

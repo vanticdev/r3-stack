@@ -108,6 +108,8 @@ class RcCarController:
         self.gyro_z = 0.0
         self.accel_x: float | None = None
         self.gps_speed: float | None = None
+        self.gps_quality = 0
+        self._gst: tuple[int, float] | None = None  # (fix quality of the epoch it belongs to, 1-sigma m)
         self._last_edge_change_t = 0.0
         self.last_encoder = (0, 0.0)
         self.voltage: float | None = None
@@ -153,7 +155,18 @@ class RcCarController:
         if not self.supervisor.autonomous:
             return imu_ready
         gps_ready = self.estimator.position_initialised or not bool(self.cfg["require_gps_fix_to_arm"])
-        return imu_ready and gps_ready
+        rtk_ready = self.gps_quality == nmea.FIX_RTK_FIXED or not bool(self.cfg.get("require_rtk_fix_to_arm", False))
+        return imu_ready and gps_ready and rtk_ready
+
+    def _gps_sigma(self, quality: int) -> float | None:
+        """Measurement 1-sigma for a fix of ``quality``: the receiver's GST estimate when it belongs to the same
+        solution type (GST follows GGA within an epoch), else the configured value for that quality."""
+        table = self.cfg.get("gps_sigma_by_quality_m") or {}
+        default = table.get(str(quality))
+        floor = float(default) if default is not None and quality == nmea.FIX_RTK_FIXED else 0.0
+        if self._gst is not None and self._gst[0] == quality:
+            return max(self._gst[1], floor * 0.5)
+        return float(default) if default is not None else None
 
     # -- sensor processing ---------------------------------------------------
     def _read_radio(self, now: float) -> None:
@@ -181,11 +194,19 @@ class RcCarController:
     def _read_gps(self, now: float) -> None:
         data = self.gps_uart.read(2048, 0.0)
         for sentence in self.nmea_reader.feed(data):
-            if isinstance(sentence, nmea.Gga) and sentence.fix_quality > 0 and sentence.lat_deg is not None:
+            if isinstance(sentence, nmea.Gst):
+                sigmas = [v for v in (sentence.sigma_lat_m, sentence.sigma_lon_m) if v is not None]
+                if sigmas:
+                    self._gst = (self.gps_quality, max(sigmas))
+            elif isinstance(sentence, nmea.Gga) and sentence.fix_quality > 0 and sentence.lat_deg is not None:
+                if sentence.fix_quality != self.gps_quality:
+                    self.hal.log("info", "gnss_mode", quality=sentence.fix_quality, previous=self.gps_quality,
+                                 age_s=sentence.age_s)
+                    self.gps_quality = sentence.fix_quality
                 local = self._local(sentence.lat_deg, sentence.lon_deg)
                 if local is not None:
                     first = not self.estimator.position_initialised
-                    self.estimator.update_gps_position(local[0], local[1], sentence.hdop)
+                    self.estimator.update_gps_position(local[0], local[1], sentence.hdop, self._gps_sigma(sentence.fix_quality))
                     if first:
                         self.hal.log("info", "gps_fix", x=round(local[0], 3), y=round(local[1], 3), sats=sentence.satellites)
             elif isinstance(sentence, (nmea.Rmc, nmea.Vtg)):
@@ -362,7 +383,7 @@ class RcCarController:
                      yaw_rate=round(self.gyro_z, 3), yaw_rate_ref=round(self.traction.yaw.reference, 3),
                      yaw_correction=round(self.traction.yaw.correction, 4),
                      motor_current_est=round(self.traction.motor_current, 2), link_ok=link_ok, lq=self.link.link_quality,
-                     rssi_dbm=self.link.rssi_dbm, pos_sigma_m=round(est.sigma(0), 3), yaw_sigma=round(est.sigma(2), 4),
+                     rssi_dbm=self.link.rssi_dbm, pos_sigma_m=round(est.sigma(0), 3), gnss_quality=self.gps_quality, yaw_sigma=round(est.sigma(2), 4),
                      crsf_crc_errors=self.crsf_parser.crc_errors, nmea_checksum_errors=self.nmea_reader.checksum_errors)
 
     # -- main loop -----------------------------------------------------------

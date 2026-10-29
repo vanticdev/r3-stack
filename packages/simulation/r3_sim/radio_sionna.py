@@ -36,12 +36,19 @@ Link channel (per packet):
   few hundred metres.
 * Small-scale fading is the coherent multipath sum itself: fading_dB =
   10 log10(|H|^2 / sum |a_i|^2). No statistical fading is added on top.
+* Path cache: cells are traced on demand, or ahead of the run by
+  :meth:`SionnaPropagation.precompute` in worker processes (each builds the
+  same scene and traces its share of the cells with the deterministic
+  solver, so a precomputed cell is identical to one traced in the loop). The
+  cache persists next to the scene (``paths_<key>.pkl``, keyed by the scene
+  digest and the solver settings), so later runs reuse every traced cell.
 """
 
 from __future__ import annotations
 
 import math
 import os
+import pickle
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -95,9 +102,24 @@ def _box(center: np.ndarray, size: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return np.asarray(mesh.vertices), np.asarray(mesh.faces)
 
 
-def _material_xml(mat_id: str, material: str, thickness: float) -> str:
-    if material in CUSTOM_MATERIALS:
-        eps, sigma = CUSTOM_MATERIALS[material]
+def extrapolated_itu(material: str, frequency: float) -> tuple[float, float] | None:
+    """(eps_r, sigma) of an ITU-R P.2040 material at ``frequency`` when Sionna's table has no range covering it
+    (e.g. 'metal' and the grounds below 1 GHz): the fit of the nearest range, eps_r = a f^b, sigma = c f^d (f in GHz),
+    extrapolated. None when the frequency is in range (Sionna evaluates the material itself)."""
+    from sionna.rt.radio_materials.itu import ITU_MATERIALS_PROPERTIES
+
+    ranges = ITU_MATERIALS_PROPERTIES.get(material)
+    f_ghz = frequency / 1e9
+    if not ranges or any(lo <= f_ghz <= hi for lo, hi in ranges):
+        return None
+    (lo, hi), (a, b, c, d) = min(ranges.items(), key=lambda item: min(abs(f_ghz - item[0][0]), abs(f_ghz - item[0][1])))
+    return a * f_ghz ** b, c * f_ghz ** d
+
+
+def _material_xml(mat_id: str, material: str, thickness: float, frequency: float | None = None) -> str:
+    extrapolated = extrapolated_itu(material, frequency) if frequency and material not in CUSTOM_MATERIALS else None
+    if material in CUSTOM_MATERIALS or extrapolated is not None:
+        eps, sigma = CUSTOM_MATERIALS[material] if extrapolated is None else extrapolated
         return (f'<bsdf type="radio-material" id="{mat_id}"><float name="relative_permittivity" value="{eps}"/>'
                 f'<float name="conductivity" value="{sigma}"/><float name="thickness" value="{thickness}"/></bsdf>')
     return (f'<bsdf type="itu-radio-material" id="{mat_id}"><string name="type" value="{material}"/>'
@@ -113,7 +135,7 @@ def write_scene(scene: RadioScene, directory: Path) -> Path:
 
     def material_id(material: str, thickness: float) -> str:
         key = f"mat-{material}-{thickness:g}".replace(".", "p")
-        materials.setdefault(key, _material_xml(key, material, thickness))
+        materials.setdefault(key, _material_xml(key, material, thickness, scene.frequency))
         return key
 
     e = scene.ground_half_extent
@@ -126,7 +148,8 @@ def write_scene(scene: RadioScene, directory: Path) -> Path:
                                    f'<float name="conductivity" value="{sigma}"/><float name="thickness" value="10.0"/></bsdf>')
         ground_mat = "mat-ground"
     else:
-        # 10 m slab: at 2.4 GHz moist soil attenuates > 60 dB/m, so the ITU slab model reduces to a half-space.
+        # 10 m slab: at 2.4 GHz moist soil attenuates > 60 dB/m (> 25 dB/m at 915 MHz), so the ITU slab model reduces
+        # to a half-space.
         ground_mat = material_id(scene.ground_material, 10.0)
     shapes.append(f'<shape type="ply" id="mesh-ground"><string name="filename" value="meshes/ground.ply"/>'
                   f'<boolean name="face_normals" value="true"/><ref id="{ground_mat}" name="bsdf"/></shape>')
@@ -215,11 +238,90 @@ class SionnaPropagation:
         self.gain_correction_db = ((scene.tx_gain_dbi - _PATTERN_PEAK_DBI.get(scene.tx_pattern, 0.0))
                                    + (scene.rx_gain_dbi - _PATTERN_PEAK_DBI.get(scene.rx_pattern, 0.0)))
         self.cache: dict[tuple[int, int, int, int], PathSet] = {}
+        self.cache_loaded = 0
+        self.precomputed = 0
+        self.precompute_time = 0.0
+        self.precompute_workers = 0
+        self._load_cache()
         self.traces = 0
         self.trace_time = 0.0
         self.grid_points = 0
         self.grid_time = 0.0
         self.max_paths = 0
+
+    # ------------------------------------------------------------------ persistent cache
+    def settings(self) -> dict[str, Any]:
+        """Everything a traced cell depends on besides its key (the scene digest names the directory)."""
+        return {"grid": self.grid, "grid_z": self.grid_z, "bucket": self.heading_bucket, "depth": self.max_depth,
+                "samples": self.samples, "diffraction": self.diffraction, "refraction": self.refraction,
+                "sionna": self.rt.__version__, "variant": self.mi.variant(), "scene": self.scene_spec.digest()}
+
+    @property
+    def cache_path(self) -> Path:
+        import hashlib
+        import json
+
+        key = hashlib.sha256(json.dumps(self.settings(), sort_keys=True).encode()).hexdigest()[:16]
+        return self.directory / f"paths_{key}.pkl"
+
+    def _load_cache(self) -> None:
+        path = self.cache_path
+        if not path.exists() or os.environ.get("R3_RADIO_CACHE") == "0":
+            return
+        try:
+            with path.open("rb") as handle:
+                stored = pickle.load(handle)
+        except Exception:  # noqa: BLE001 - a corrupt cache is retraced, never trusted
+            return
+        if stored.get("settings") == self.settings():
+            self.cache.update(stored["cells"])
+            self.cache_loaded = len(stored["cells"])
+
+    def save_cache(self) -> None:
+        if os.environ.get("R3_RADIO_CACHE") == "0" or len(self.cache) <= self.cache_loaded:
+            return
+        path = self.cache_path
+        tmp = path.with_suffix(f".{os.getpid()}.tmp")
+        with tmp.open("wb") as handle:
+            pickle.dump({"settings": self.settings(), "cells": self.cache}, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(tmp, path)  # atomic: concurrent runs never read a partial file
+
+    def key_for(self, position: np.ndarray, rotation: np.ndarray | None) -> tuple[int, int, int, int]:
+        return self._key(np.asarray(position, dtype=float), _yaw(rotation))
+
+    def precompute(self, keys: list[tuple[int, int, int, int]], workers: int | None = None) -> int:
+        """Trace the uncached ``keys`` in ``workers`` processes (default: CPU count - 2, at most 12); returns the
+        number of cells added. Falls back to tracing in this process when worker processes are unavailable."""
+        todo = sorted({k for k in keys if k not in self.cache})
+        if not todo:
+            return 0
+        t0 = time.perf_counter()
+        if workers is None:  # enough cells per worker to amortise its scene load (~2 s)
+            workers = min(max(1, min(12, (os.cpu_count() or 2) - 2)), max(1, len(todo) // 16))
+        results: dict[tuple[int, int, int, int], PathSet] = {}
+        if workers > 1:
+            import concurrent.futures
+            import multiprocessing
+
+            chunks = [todo[i::workers] for i in range(workers)]
+            args = (self.scene_spec, str(self.directory), self.grid, math.degrees(self.heading_bucket), self.max_depth,
+                    self.samples, self.diffraction, self.refraction)
+            try:
+                context = multiprocessing.get_context("spawn")
+                with concurrent.futures.ProcessPoolExecutor(max_workers=workers, mp_context=context) as pool:
+                    for part in pool.map(_trace_cells, [(args, i, chunk) for i, chunk in enumerate(chunks)]):
+                        results.update(part)
+            except Exception:  # noqa: BLE001 - e.g. no fork/spawn in a sandbox: trace here instead
+                results, workers = {}, 1
+        for key in todo:
+            if key not in results:
+                results[key] = self._trace_key(key)
+        self.cache.update(results)
+        self._park_body()
+        self.precomputed += len(results)
+        self.precompute_time += time.perf_counter() - t0
+        self.precompute_workers = workers
+        return len(results)
 
     # ------------------------------------------------------------------ scene state
     def _set_body(self, pose: tuple[float, ...] | None, position: np.ndarray, rotation: np.ndarray) -> None:
@@ -319,14 +421,18 @@ class SionnaPropagation:
         hit = self.cache.get(key)
         if hit is not None:
             return hit
+        paths = self._trace_key(key)
+        self.cache[key] = paths
+        return paths
+
+    def _trace_key(self, key: tuple[int, int, int, int]) -> PathSet:
+        """Trace one cache cell: the cell centre, with the car body posed at the cell's heading bucket."""
         center = np.array([key[0] * self.grid, key[1] * self.grid, key[2] * self.grid_z])
         if self._body:
             yaw_b = key[3] * self.heading_bucket
             r = _rz(yaw_b)
             self._set_body(("pose", key[3], key[0], key[1], key[2]), center - r @ self.scene_spec.antenna_offset, r)
-        paths = self._solve(center[None, :])[0]
-        self.cache[key] = paths
-        return paths
+        return self._solve(center[None, :])[0]
 
     # ------------------------------------------------------------------ channel
     @staticmethod
@@ -392,6 +498,8 @@ class SionnaPropagation:
 
     def stats(self) -> dict[str, Any]:
         return {"backend": self.name, "traces": self.traces, "trace_time_s": round(self.trace_time, 2), "cache_cells": len(self.cache),
+                "cache_loaded": self.cache_loaded, "precomputed": self.precomputed,
+                "precompute_time_s": round(self.precompute_time, 2), "precompute_workers": self.precompute_workers,
                 "max_paths": self.max_paths, "grid_m": self.grid,
                 "static_points": self.grid_points, "static_time_s": round(self.grid_time, 2)}
 
@@ -401,7 +509,12 @@ class SionnaPropagation:
                   else f"ITU-R P.2040 '{s.ground_material}'")
         obstacles = ", ".join(f"{b.name}: {b.material}{' (material estimated)' if b.material_estimated else ''}" for b in s.obstacles)
         body = "; ".join(f"{m.material}: {len(m.parts)} parts" for m in s.body) or "none"
-        return [
+        extrapolated = sorted({m for m in [s.ground_material, *(b.material for b in s.obstacles), *(m.material for m in s.body)]
+                               if extrapolated_itu(m, s.frequency) is not None})
+        notes = [f"ITU-R P.2040 fits extrapolated to {s.frequency / 1e9:.3f} GHz (outside the tabulated range) for: "
+                 + ", ".join(f"{m} (eps_r {extrapolated_itu(m, s.frequency)[0]:.2f}, sigma {extrapolated_itu(m, s.frequency)[1]:.3g} S/m)"
+                             for m in extrapolated)] if extrapolated else []
+        return notes + [
             f"Sionna RT ray tracing ({self.rt.__version__}, Mitsuba variant {self.mi.variant()}): specular reflection depth "
             f"{self.max_depth}, refraction {self.refraction}, UTD wedge diffraction {self.diffraction}, {self.samples} rays/source, "
             "no diffuse scattering (ground roughness not modelled).",
@@ -413,3 +526,13 @@ class SionnaPropagation:
             "buckets with the car body posed per trace (exact blockage; near-field body scattering not modelled); first-segment exact extrapolation between traces; coherent sum at the "
             "FHSS hop frequency gives small-scale fading (no statistical fading model).",
         ] + list(s.notes)
+
+
+def _trace_cells(job: tuple[tuple[Any, ...], int, list[tuple[int, int, int, int]]]) -> dict[tuple[int, int, int, int], PathSet]:
+    """Worker process: build the scene (own directory, one Dr.Jit thread) and trace ``keys``."""
+    (scene, directory, grid, bucket, depth, samples, diffraction, refraction), index, keys = job
+    model = SionnaPropagation(scene, Path(directory) / f"worker_{index}", grid_m=grid, heading_bucket_deg=bucket, max_depth=depth,
+                              samples_per_src=samples, diffraction=diffraction, refraction=refraction)
+    model.dr.set_thread_count(int(os.environ.get("R3_RADIO_WORKER_THREADS", "2")))
+    model.cache.clear()  # the parent passes only uncached keys; never reuse a stale worker file
+    return {key: model._trace_key(key) for key in keys}
