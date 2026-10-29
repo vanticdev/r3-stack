@@ -74,13 +74,13 @@ class FuseBlade(BehaviorModel):
             "vsense a n1 dc 0",
             # x: melted latch through a 1 ohm / clearing_time RC (0 = intact, 1 = open), x(0) = latch.
             f"rx blown x 1",
-            f"cx x 0 {fmt(self.clearing_time)} ic={1 if self.s_blown else 0}",
             f"bfuse n1 b i = v(n1,b)*({fmt(g_cold)}*(1-max(min(v(x),1),0))+{fmt(g_open)}*max(min(v(x),1),0))",
             # melting integral dH/dt = I^2 - H / tau
-            "ch h 0 1",
             f"rh h 0 {fmt(self.tau)}",
             "bh 0 h i = i(vsense)*i(vsense)",
         ]
+        if net.transient:
+            lines += [f"cx x 0 {fmt(self.clearing_time)} ic={1 if self.s_blown else 0}", "ch h 0 1"]
         net.state(self.h_node, self.states[self.h_node])
         blown = self.control(net, "blown", 1.0 if self.s_blown else 0.0)
         net.subckt(name, ["a", "b", "h", "blown"], lines,

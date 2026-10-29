@@ -81,7 +81,10 @@ class DcBrushedMotor(BehaviorModel):
         lines = [
             "vsense pos n1 dc 0",
             f"br n1 n2 i = v(n1,n2)/{resistance}",
-            f"l1 n2 n3 {fmt(self.inductance)}",
+            # An operating point requires zero inductor voltage. ngspice's
+            # transient-OP fallback can otherwise return its finite-time current
+            # ramp as a DC solution (with nonzero L di/dt).
+            f"l1 n2 n3 {fmt(self.inductance)}" if net.transient else "vl_dc n2 n3 dc 0",
             f"bbrush n3 n4 v = {fmt(self.brush_drop)}*{brush}",
             f"eemf n4 neg omega 0 {fmt(self.ke)}",
             f"bloss ploss 0 v = i(vsense)*i(vsense)*{resistance}+{fmt(self.brush_drop)}*i(vsense)*{brush}",

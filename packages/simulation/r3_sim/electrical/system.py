@@ -405,6 +405,9 @@ class ElectricalSystem:
                 values[source] = model.controls[name]
         if extra:
             values.update(extra)
+        if ng is self._op:
+            for source, value in values.items():
+                ng.command(f"alter {source} dc = {fmt(value)}")
 
     def _start_transient(self) -> None:
         if self._tran is None:
@@ -530,10 +533,13 @@ class ElectricalSystem:
             self.restore(saved)
 
     def _solve_op(self, extra: dict[str, float]) -> Solution:
-        """``op`` with a warm-start fallback: ngspice starts every ``op`` from zero
-        and its source stepping does not scale EXTERNAL sources, so a point it
-        cannot reach directly is retried on a circuit reloaded with ``.nodeset``
-        from the last converged operating point (what a warm-started Newton does)."""
+        """``op`` with native DC source stepping and a warm-start fallback.
+
+        A point that cannot be reached directly is retried with ``.nodeset``
+        from the last converged operating point. Reactive elements are reduced
+        to their DC equivalents, so transient-OP fallback cannot return an
+        unfinished motor-current or battery-polarization transient as DC.
+        """
         attempts = [None] + ([self._op_nodeset] if self._op_nodeset else [])
         for nodeset in attempts:
             if nodeset is not None:

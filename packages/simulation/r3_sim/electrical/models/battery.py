@@ -124,14 +124,13 @@ class BatteryLipo(BehaviorModel):
             "brc n1 n2 v = v(vrc)",
             "vsense n2 pos dc 0",
             # RC pair state: C1 dv/dt = i - v/R1
-            f"crc vrc 0 {fmt(self.c1)}",
             f"brc1 vrc 0 i = v(vrc)/{r1}",
             "birc 0 vrc i = i(vsense)",
             # Joule heat of R0 and R1
             f"bloss ploss 0 v = i(vsense)*i(vsense)*{r0}+v(vrc)*v(vrc)/{r1}",
         ]
         if net.transient:
-            lines += [f"csoc soc 0 {fmt(self.capacity)}", "bsoc soc 0 i = i(vsense)"]
+            lines += [f"crc vrc 0 {fmt(self.c1)}", f"csoc soc 0 {fmt(self.capacity)}", "bsoc soc 0 i = i(vsense)"]
             net.state(self.soc_node, self.states[self.soc_node])
             net.state(self.vrc_node, self.states[self.vrc_node])
             net.state(self.t_node, self.states[self.t_node])
