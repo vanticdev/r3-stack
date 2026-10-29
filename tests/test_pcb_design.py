@@ -8,7 +8,8 @@ import pytest
 
 from r3_kicad import ipc2152
 from r3_kicad.arbiter import ArbiterParams, ArbiterState, FailsafeArbiter
-from r3_kicad.regulators import TPS56528, TPS568230, hold_up_time, pi_rail, regulated_output, servo_rail
+from r3_kicad.regulators import (LM5175, TPS568230, buck_boost_efficiency, hold_up_time, pi_rail, regulated_output,
+                                 servo_rail)
 
 
 def test_ipc2152_round_trip_and_known_values():
@@ -38,18 +39,23 @@ def test_pi_rail_meets_brief():
     assert 66e-6 <= v["c_out_effective"] <= 500e-6
 
 
-def test_servo_rail_meets_brief():
+def test_servo_rail_is_a_buck_boost_without_dropout():
+    """Finish brief: a real buck-boost of >= 3 A continuous for the servo (the TPS56528 buck sagged to 4.80 V at
+    minimum charge). LM5175 design procedure (SNVSA37A sec. 9.2.2)."""
     design = servo_rail()
     v = design.values
-    assert design.ic is TPS56528
-    assert v["v_out_nominal"] == pytest.approx(6.05, abs=0.02)
-    assert v["i_out_limit_min"] >= 5.0                            # >= 5 A peak
-    assert v["i_out_limit_max"] < 10.0                            # and a real limit for a stalled/shorted servo
-    assert v["i_l_peak_at_ocl"] < design.inductor.i_sat
+    assert design.ic is LM5175 and design.topology == "buck_boost"
+    assert v["v_out_nominal"] == pytest.approx(6.0, abs=0.01)
+    assert design.req.i_out >= 3.0
+    assert v["i_out_limit_min"] >= design.req.i_peak >= 4.0      # servo stall with margin, in buck and boost mode
+    assert v["i_out_limit_max"] < 10.0                           # a real limit for a stalled or shorted servo
     assert not design.failed_checks, design.failed_checks
-    # Dropout: below ~7.8 V at 2.5 A the rail follows Dmax * Vin.
-    assert regulated_output(design, 6.0, 2.5) < 5.0
-    assert regulated_output(design, 8.4, 2.5) == pytest.approx(v["v_out_nominal"])
+    assert v["uvlo_falling"] < 4.4 < v["uvlo_rising"] < 4.6      # keeps running on an empty pack under a motor stall
+    assert v["f_sw"] == pytest.approx(400e3, rel=0.02)
+    assert v["v_comp_buck_vin_transient"] > 0.3 and v["v_comp_boost_vin_min"] < 3.0
+    assert buck_boost_efficiency(design, 4.4, 3.0) > 0.9 and buck_boost_efficiency(design, 8.4, 3.0) > 0.9
+    # Eq. 22-23: the sense resistor leaves the peak load below 70 % of both current-limit thresholds.
+    assert design.r_sense <= min(v["r_sense_buck_max"], v["r_sense_boost_max"])
 
 
 def test_hold_up_time_formula():
@@ -82,13 +88,43 @@ def test_arbiter_boots_in_failsafe_and_rearms_only_at_neutral():
     assert all(us == 1700.0 for _, us in frames)
 
 
-def test_arbiter_times_out_within_100_ms_plus_one_frame():
+def test_arbiter_times_out_within_100_ms_plus_one_frame_and_brakes_before_neutral():
+    params = ArbiterParams()
     arb = FailsafeArbiter()
     _run(arb, 0.0, 0.1, 0.01, 1500.0)
     assert arb.state is ArbiterState.PASS
     last_edge = arb.last_edge
-    frames = _run(arb, 0.1, 0.5, None, 1900.0)                    # Pi hangs: heartbeat stops, PWM keeps commanding
-    first_neutral = next(t for t, us in frames if us == 1500.0)
-    assert first_neutral - last_edge <= ArbiterParams().timeout + ArbiterParams().frame + 1e-9
-    assert all(us == 1500.0 for t, us in frames if t >= first_neutral)
+    frames = _run(arb, 0.1, 4.0, None, 1900.0)                    # Pi hangs: heartbeat stops, PWM keeps commanding
+    first_failsafe = next(t for t, us in frames if us != 1900.0)
+    assert first_failsafe - last_edge <= params.timeout + params.frame + 1e-9
+    # After forward driving the reverse pulse is the ESC's brake: brake for brake_hold, then neutral for good.
+    failsafe = [(t, us) for t, us in frames if t >= first_failsafe]
+    assert {us for t, us in failsafe if t < first_failsafe + params.brake_hold - 1e-9} == {params.brake_us}
+    assert {us for t, us in failsafe if t >= first_failsafe + params.brake_hold + 1e-9} == {params.neutral_us}
     assert arb.failsafe_latency() == pytest.approx(0.12)
+
+
+def test_arbiter_never_sends_a_reverse_pulse_the_esc_could_take_as_reverse():
+    params = ArbiterParams()
+    # Reversing (forward -> neutral -> brake -> neutral -> reverse): a reverse pulse would keep reversing.
+    arb = FailsafeArbiter()
+    _run(arb, 0.0, 0.1, 0.01, 1500.0)
+    for command in (1800.0, 1500.0, 1200.0, 1500.0, 1200.0):
+        _run(arb, round(arb.last_edge + 0.01, 4), round(arb.last_edge + 0.5, 4), 0.01, command)
+    assert arb.esc.value == "reverse"
+    frames = _run(arb, round(arb.last_edge + 0.01, 4), round(arb.last_edge + 1.0, 4), None, 1200.0)
+    assert {us for _, us in frames if us != 1200.0} == {params.neutral_us}
+    # Braking when the Pi hangs: the reverse pulse continues the brake.
+    arb = FailsafeArbiter()
+    _run(arb, 0.0, 0.1, 0.01, 1500.0)
+    _run(arb, 0.1, 0.6, 0.01, 1800.0)
+    _run(arb, 0.6, 0.8, 0.01, 1300.0)
+    assert arb.esc.value == "brake"
+    frames = _run(arb, 0.8, 1.2, None, 1300.0)
+    assert params.brake_us in {us for _, us in frames}
+    # brake_hold = 0 is the neutral-only contract.
+    arb = FailsafeArbiter(ArbiterParams(brake_hold=0.0))
+    _run(arb, 0.0, 0.1, 0.01, 1500.0)
+    _run(arb, 0.1, 0.5, 0.01, 1800.0)
+    frames = _run(arb, 0.5, 1.0, None, 1800.0)
+    assert {us for _, us in frames if us != 1800.0} == {params.neutral_us}

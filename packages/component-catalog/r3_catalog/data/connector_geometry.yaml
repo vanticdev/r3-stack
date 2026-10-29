@@ -389,6 +389,25 @@ geometry:
       "1": {position: [-2.54 mm, 0, 0], tip: 0.0 mm, wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
       "2": {position: [0, 0, 0], tip: 0.0 mm, wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
       "3": {position: [2.54 mm, 0, 0], tip: 0.0 mm, wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  servo-3-female-hd:  # same housing as servo-3-female, 20 AWG crimp terminals
+    model:
+      source: proxy
+      units: mm
+      placement: {origin: [0, 0, 0], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+      params: {"builder": "housing", "width": 7.6, "thickness": 2.6, "length": 14.0, "cavity": 1.0}
+      provenance: {status: "estimated", source: "Futaba J / 2.54 mm 1x3 crimp housing: 7.6 x 2.6 x 14 mm (vendor listings; proxy)"}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [7.6 mm, 2.6 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#1d1d1d"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "Futaba J / 2.54 mm 1x3 crimp housing: 7.6 x 2.6 x 14 mm (vendor listings; proxy)"}
+    pins:
+      "1": {position: [-2.54 mm, 0, 0], tip: 0.0 mm, wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [0, 0, 0], tip: 0.0 mm, wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [2.54 mm, 0, 0], tip: 0.0 mm, wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
   socket-2x20-2.54:
     model:
       source: kicad

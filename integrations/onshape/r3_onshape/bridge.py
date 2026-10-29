@@ -24,7 +24,8 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from .client import NativeBridgeTransport
+from .client import OnshapeError, NativeBridgeTransport
+from .quota import raise_if_quota
 
 
 class BridgeUnavailable(RuntimeError):
@@ -49,20 +50,26 @@ class NativeBridge:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return json.loads(response.read())
         except urllib.error.HTTPError as error:
-            raise RuntimeError(f"bridge {path}: HTTP {error.code}: {error.read().decode(errors='replace')[:400]}") from None
+            raise OnshapeError(error.code, f"bridge {path}: {error.read().decode(errors='replace')[:400]}", error.headers) from None
 
     READ_TOOLS = {"element_tree", "document_tree", "display_state"}
 
     def local(self, tool: str, args: dict[str, Any], timeout: float = 300.0) -> dict[str, Any]:
-        """A /local tool call; reads back off and retry on Onshape rate limiting (HTTP 429)."""
+        """A /local tool call; only stale read snapshots may be retried. Quotas stop immediately."""
         for attempt in range(6):
             try:
-                return self._post(f"/local/{tool}", args, timeout)
+                result = self._post(f"/local/{tool}", args, timeout)
+                if result.get("error"):
+                    error = RuntimeError(str(result["error"]))
+                    raise_if_quota(error)
+                    raise error
+                return result
             except RuntimeError as error:
-                transient = "429" in str(error) or "changed during" in str(error)
+                raise_if_quota(error)
+                transient = "changed during" in str(error)
                 if not transient or tool not in self.READ_TOOLS or attempt == 5:
                     raise
-                time.sleep(3.0 if "changed during" in str(error) else 10.0 * 2 ** min(attempt, 3))
+                time.sleep(3.0)
         raise AssertionError("unreachable")
 
     @staticmethod
@@ -72,7 +79,9 @@ class NativeBridge:
     def command(self, job: dict[str, Any], timeout: float = 300.0) -> dict[str, Any]:
         result = self._post("/command", job, timeout)
         if isinstance(result, dict) and result.get("error"):
-            raise RuntimeError(f"bridge command {job.get('kind')}: {result['error']}")
+            error = RuntimeError(f"bridge command {job.get('kind')}: {result['error']}")
+            raise_if_quota(error)
+            raise error
         return result
 
     # -------------------------------------------------------------- editor tabs
@@ -92,7 +101,8 @@ class NativeBridge:
                 state = self.state(did, wid, eid)
                 if state.get("connected"):
                     return self.tabs[url]
-            except RuntimeError:
+            except RuntimeError as error:
+                raise_if_quota(error)
                 pass
             if time.time() > deadline:
                 raise RuntimeError(f"Onshape editor for {url} did not connect")
@@ -115,7 +125,8 @@ class NativeBridge:
             did, wid, eid = url.split("/documents/")[1].replace("/w/", "/").replace("/e/", "/").split("/")
             try:
                 self.command({"kind": "editor_tab", "target": {"did": did, "wid": wid, "eid": eid}, "tab_id": tab, "action": "close"})
-            except RuntimeError:
+            except RuntimeError as error:
+                raise_if_quota(error)
                 pass
         self.tabs.clear()
 
@@ -151,20 +162,13 @@ class NativeBridge:
 
     # -------------------------------------------------------------- organization writes
     def feature_folder(self, did: str, wid: str, eid: str, name: str, feature_ids: list[str]) -> dict[str, Any]:
-        for attempt in range(4):
-            tree = self.element_tree(did, wid, eid)
-            folders = {r["id"]: r.get("name") for r in tree["rows"] if str(r.get("id", "")).startswith("feature_folder:")}
-            inside = {r.get("feature_id") for r in tree["rows"] if r.get("parent_id") in folders and folders[r["parent_id"]] == name}
-            if set(feature_ids) <= inside:
-                return {"structure_verified": True, "already": True}  # done by an earlier (rate-limited) attempt
-            try:
-                result = self.local("sidebar_edit", {"snapshot": tree["snapshot"], "action": "create_folder", "name": name,
-                                                     "node_ids": [f"feature:{fid}" for fid in feature_ids]})
-                break
-            except RuntimeError as error:
-                if not self.rate_limited(error) or attempt == 3:
-                    raise
-                time.sleep(20.0 * (attempt + 1))
+        tree = self.element_tree(did, wid, eid)
+        folders = {r["id"]: r.get("name") for r in tree["rows"] if str(r.get("id", "")).startswith("feature_folder:")}
+        inside = {r.get("feature_id") for r in tree["rows"] if r.get("parent_id") in folders and folders[r["parent_id"]] == name}
+        if set(feature_ids) <= inside:
+            return {"structure_verified": True, "already": True}
+        result = self.local("sidebar_edit", {"snapshot": tree["snapshot"], "action": "create_folder", "name": name,
+                                             "node_ids": [f"feature:{fid}" for fid in feature_ids]})
         if not result.get("structure_verified"):
             raise RuntimeError(f"feature folder {name!r} not verified: {json.dumps(result)[:300]}")
         return result

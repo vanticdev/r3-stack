@@ -49,6 +49,10 @@ def setup_board(board, plan):
     for d, drill in plan["via_sizes"]:
         vias.append(pcbnew.VIA_DIMENSION(MM(d), MM(drill)))
     settings = bds.m_NetSettings
+    # Board Setup > Net Classes is replaced, not merged: stale classes or pattern assignments left in the project by
+    # an earlier design would otherwise win (the first matching pattern assigns the class).
+    settings.ClearNetclassPatternAssignments()
+    settings.ClearNetclasses()
     for nc in plan["net_classes"]:
         cls = settings.GetDefaultNetclass() if nc["name"] == "Default" else pcbnew.NETCLASS(nc["name"])
         cls.SetTrackWidth(MM(nc["track_width"]))

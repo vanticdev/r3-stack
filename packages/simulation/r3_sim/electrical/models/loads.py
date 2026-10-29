@@ -76,6 +76,13 @@ class BuckCore:
             self.dropout = p.get("dropout_voltage", 0.1)
             self.r_dropout = p.get("dropout_resistance", 0.05)
         self.current_limit = p.get("i_limit_min") if p.has("i_limit_min") else self.i_max
+        # 4-switch buck-boost (``model: regulator.buck_boost``): no dropout; in boost mode the output current is
+        # bounded by the peak inductor current limit, I_out = (I_L,pk - dI/2) V_in eta / V_out.
+        self.buck_boost = str(p.raw("model", "regulator.buck")) == "regulator.buck_boost"
+        self.peak_limit = p.get("inductor_peak_limit_min") if p.has("inductor_peak_limit_min") else math.inf
+        self.boost_ripple = p.get("inductor_ripple_boost", 0.0)
+        if self.buck_boost:
+            self.max_duty, self.dropout, self.r_dropout = 1.0, -1.0e3, 0.0
         self.hold_up = p.get("hold_up_capacitance") if p.has("hold_up_capacitance") else 0.0
         self.hold_up_esr = p.get("hold_up_esr", 0.01) if self.hold_up > 0 else 0.0  # polymer + ceramics (estimate)
         table = p.raw("efficiency")
@@ -99,7 +106,18 @@ class BuckCore:
 
     def dropout_input(self, current: float) -> float:
         """Input voltage below which the output falls out of regulation at ``current`` (A)."""
+        if self.buck_boost:  # no dropout: the boost current limit sets the lowest input that still carries ``current``
+            eta = efficiency_at(self.efficiency, current)
+            return max(self.uvlo_falling, self.v_out * current / (max(self.peak_limit - self.boost_ripple / 2, 1e-6) * eta))
         return (self.v_out + self.r_out * current + self.dropout + self.r_dropout * current) / self.max_duty
+
+    def limit_expression(self, vin: str, gnd: str) -> float | str:
+        """Output current limit: a number for a buck; for a buck-boost min(buck limit, boost limit(V_in))."""
+        if not self.buck_boost or not math.isfinite(self.peak_limit):
+            return self.current_limit
+        eta = efficiency_at(self.efficiency, self.current_limit)
+        boost = f"{fmt(self.peak_limit - self.boost_ripple / 2)}*max(v({vin},{gnd}),0.5)*{fmt(eta / self.v_out)}"
+        return f"min({fmt(self.current_limit)},{boost})"
 
     @property
     def s_temperature(self) -> float:
@@ -121,7 +139,8 @@ class BuckCore:
             net.model(ENABLE_MODEL, ENABLE_CARD)
             sense = (self.ctl_port, "0")
             control = self.owner.control(net, self.control_name, 1.0 if self.s_enabled else 0.0)
-        lines = regulator_lines(net, x, vout, gnd, vin, self.v_out, self.r_out, self.dropout, self.r_dropout, self.current_limit,
+        lines = regulator_lines(net, x, vout, gnd, vin, self.v_out, self.r_out, self.dropout, self.r_dropout,
+                                self.limit_expression(vin, gnd),
                                 "switching", self.efficiency, enable=(*sense, model, initial), max_duty=self.max_duty,
                                 reverse_limit=REVERSE_LIMIT if self.hold_up > 0 else None)
         lines += [

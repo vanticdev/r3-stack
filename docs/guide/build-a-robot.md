@@ -358,3 +358,9 @@ robot in this order:
 5. harnesses;
 6. firmware;
 7. scenarios.
+
+## Parts you already own
+
+Use `owned: true` or `owned: {note: "Already on hand"}` on a component to keep it
+in the model and exclude it from purchasing and sourcing. See [owned parts](owned-parts.md)
+for examples, purchase totals and the `source:` conflict rule.

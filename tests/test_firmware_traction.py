@@ -16,7 +16,7 @@ import firmware_fake_hal as fake
 import pytest
 from main import RcCarController
 from settings import DEFAULT_CONFIG, channel_map, load_settings
-from traction import (DcMotorModel, GroundSpeedEstimator, LaunchLimiter, SlipController, TractionConfig,
+from traction import (BrakeSlipController, DcMotorModel, GroundSpeedEstimator, LaunchLimiter, SlipController, TractionConfig,
                       YawStabilizer)
 
 WHEEL_RADIUS, WHEELBASE, MAX_STEER = 0.055, 0.26, 0.45
@@ -259,3 +259,29 @@ def test_flat_hal_document_lifts_mission_and_origin() -> None:
     assert "mission" not in settings.config and "gps_origin" not in settings.config
     assert TractionConfig.from_mapping(settings.config["traction"]).target_slip == 0.12
     assert settings.config["traction"]["motor_current_limit_a"] == 50.0, "defaults fill the rest"
+
+
+# --- unit: anti-lock failsafe brake ---------------------------------------------
+
+def test_brake_slip_controller_releases_a_locking_wheel_and_never_reaches_neutral() -> None:
+    cfg = TractionConfig()
+    brake = BrakeSlipController(cfg)
+    dt = 0.01
+    first = brake.update(dt, 8.0, 7.9)                      # rolling: the brake builds up
+    for _ in range(20):
+        brake.update(dt, 8.0, 7.9)
+    assert brake.fraction > first
+    for _ in range(50):                                     # wheel locking (slip 0.75): the brake backs off
+        brake.update(dt, 8.0, 2.0)
+    assert brake.fraction == pytest.approx(cfg.brake_min_fraction)  # floored, never neutral (would arm reverse)
+    assert brake.update(dt, 0.5, 0.0) == 1.0                # slow: full brake
+    assert brake.update(dt, 4.0, 3.9) == 1.0                # cruise speed: full brake (no lock-up)
+
+
+def test_brake_command_stays_on_the_brake_side_of_the_esc_deadband() -> None:
+    from traction import TractionControl
+
+    traction = TractionControl(TractionConfig(), WHEEL_RADIUS, WHEELBASE, MAX_STEER)
+    traction.ground.v = 6.0
+    out = traction.brake_command(0.01, 1.0, 0.0)            # heavy slip: minimum brake
+    assert out.throttle < -TractionConfig().esc_deadband

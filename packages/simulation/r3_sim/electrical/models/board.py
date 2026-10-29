@@ -2,8 +2,9 @@
 
 Read from the board's behavior params:
 
-* ``regulator`` and any other nested behavior with ``model: regulator.buck``
-  (e.g. ``servo_regulator``) — a synchronous buck each (:class:`BuckCore`).
+* ``regulator`` and any other nested behavior with ``model: regulator.buck`` or
+  ``regulator.buck_boost`` (e.g. ``servo_regulator``) — a synchronous buck or a
+  4-switch buck-boost each (:class:`BuckCore`; the buck-boost has no dropout).
   Input pin: ``input_pin`` or the ``power_in`` pin with the highest nominal
   voltage; output: ``output_pin`` or the ``power_out`` pin closest to ``v_out``.
   All converters share the board input path below.
@@ -11,16 +12,21 @@ Read from the board's behavior params:
 * A nested dict with ``shunt`` (current monitor) — series shunt resistor
   between the input pin and the converters; its reading is the whole board
   branch (every converter and on-board load behind it).
-* ``input_capacitance`` is not modelled: with the input disconnected, the bulk
-  capacitor discharging into the converters' constant-power inputs through
-  dropout stalls ngspice's step control; the converters' output (hold-up)
-  capacitance is modelled (``hold_up_capacitance``).
+* ``input_capacitance`` — the converters' shared input capacitance (transient only):
+  a list of ``{capacitance, esr}`` branches (e.g. the 220 uF hybrid-polymer bulk and the
+  ceramic bank) at the converters' input node, behind the FET and the shunt. Each
+  capacitor voltage is a state carried across transient restarts (its initial
+  condition is the DC operating point the transient starts from), so a disconnected
+  input or a brown-out discharges it realistically into the converters. The
+  converters' output (hold-up) capacitance is modelled too (``hold_up_capacitance``).
 * ``tvs`` — the input TVS: not part of the circuit at battery voltages (it
   conducts above its breakdown); checked statically against the converters'
   input absolute maximum (:meth:`BoardPcb.tvs_clamp`).
 * Any nested dict with ``address``/``bus`` (an on-board IC, e.g. ``ina226``,
   ``mpu6050``) — constant-current load on ``supply_pin`` or the power pin
-  closest to 3.3 V, current from ``current`` or a datasheet default.
+  closest to 3.3 V, current from ``current`` or a datasheet default. It returns to
+  ``ground_pin`` when given (an isolated domain, e.g. a digital isolator's far side
+  powered and referenced by another component), else to the board ground.
 """
 
 from __future__ import annotations
@@ -47,7 +53,7 @@ class BoardPcb(BehaviorModel):
         values = self.params.values
         self.regulator_params = values.get(PRIMARY) if isinstance(values.get(PRIMARY), dict) else None
         converters = {k: v for k, v in values.items() if isinstance(v, dict)
-                      and (k == PRIMARY or v.get("model") == "regulator.buck")}
+                      and (k == PRIMARY or v.get("model") in ("regulator.buck", "regulator.buck_boost"))}
         self.devices = {k: v for k, v in values.items() if isinstance(v, dict) and k not in converters
                         and ("address" in v or "bus" in v)}
         self.monitor = next((k for k, v in self.devices.items() if "shunt" in v), None)
@@ -92,8 +98,18 @@ class BoardPcb(BehaviorModel):
                 current, source = 1e-3, "estimated 1 mA"
             if source != "catalog":
                 self.params.estimated[f"{name}.current"] = current
+            ground = device.get("ground_pin")
             self.device_info[name] = {"supply_pin": supply.name, "current": current, "source": source,
-                                      "v_knee": 0.8 * (supply.voltage_nominal or 3.3)}
+                                      "v_knee": 0.8 * (supply.voltage_nominal or 3.3),
+                                      "ground_pin": str(ground) if ground else self.gnd.name}
+        # Input capacitance branches (transient): (C, ESR, state node)
+        self.input_caps: list[tuple[float, float, str]] = []
+        caps = values.get("input_capacitance")
+        for k, branch in enumerate(caps if isinstance(caps, list) else ([caps] if isinstance(caps, dict) else [])):
+            c, esr = to_si(branch["capacitance"]), to_si(branch.get("esr", 0.01))
+            node = self.local(f"cin{k}")
+            self.input_caps.append((c, esr, node))
+            self.states[node] = None  # set by the first transient solution (the DC start)
 
     def _pin(self, name: str | None, roles: tuple[str, ...], target: float, highest: bool = False) -> PinRef | None:
         if name:
@@ -146,12 +162,20 @@ class BoardPcb(BehaviorModel):
                 if control:
                     controls.append((core.ctl_port, control))
                 controls += core.extra_ports(net)
+            if net.transient:
+                for k, (c, esr, state) in enumerate(self.input_caps):
+                    lines += [f"rcin{k} {node} cin{k} {fmt(esr)}", f"ccin{k} cin{k} {gnd} {fmt(c)}"]
+                    controls.append((f"cin{k}", state))
+                    if self.states.get(state) is not None:
+                        net.state(state, self.states[state])
         for device, info in self.device_info.items():
             supply = self.pins[info["supply_pin"]]
             used[supply.name] = supply
-            port, tag = self._port(supply.name), spice_name(device)
+            ground_pin = self.pins[info["ground_pin"]]
+            used[ground_pin.name] = ground_pin
+            port, tag, ret = self._port(supply.name), spice_name(device), self._port(ground_pin.name)
             lines += [f"vd_{tag} {port} d_{tag} dc 0",
-                      f"bd_{tag} d_{tag} {gnd} i = {constant_current(info['current'], info['v_knee'], f'v({port},{gnd})')}"]
+                      f"bd_{tag} d_{tag} {ret} i = {constant_current(info['current'], info['v_knee'], f'v({port},{ret})')}"]
         if not lines:
             return
         ports = [self._port(p) for p in used] + [c.t_port for c in self.cores.values()] + ["tamb"]

@@ -40,16 +40,20 @@ def test_intent_is_consistent(intent):
     refs = {p.ref for p in intent.parts}
     assert {"U2", "U3", "U4", "U1", "U5", "Q1", "R2"} <= refs
     nets = intent.nets()
-    # Brief: dedicated servo rail on J_SERVO.2, ESC BEC not connected, heartbeat on header pin 13.
+    # Brief: dedicated servo rail (buck-boost output Q5) on J_SERVO.2, heartbeat on header pin 13.
     servo = intent.connectors()["J_SERVO"]
     esc = intent.connectors()["J_ESC"]
     gpio = intent.connectors()["J_GPIO"]
-    assert servo.pins["2"] == "SERVO_6V" and "L2.2" in nets["SERVO_6V"]
-    assert "2" not in esc.pins and "2" in esc.no_connect
+    assert servo.pins["2"] == "SERVO_6V" and "Q5.5" in nets["SERVO_6V"] and "U3.12" in nets["SERVO_6V"]
     assert gpio.pins["13"] == "HEARTBEAT" and "U4.3" in nets["HEARTBEAT"]
-    # The Pi's ESC PWM reaches the ESC only through the arbiter (no resistor straight across).
+    # The Pi's ESC PWM reaches the ESC only through the arbiter and then the isolator (no resistor straight across).
     assert not [p for p in intent.parts if set(p.pins.values()) == {"PI_ESC_PWM", "ESC_PWM"}]
-    assert "U4.2" in nets["PI_ESC_PWM"] and "U4.7" in nets["ESC_OUT"]
+    assert "U4.2" in nets["PI_ESC_PWM"] and {"U4.7", "U6.2"} <= set(nets["ESC_OUT"])
+    # Ground-loop break: J_ESC is the isolator's ESC side; its ground is not HAT GND and only U6/U7 touch it.
+    assert esc.pins == {"1": "ESC_PWM", "2": "ESC_BEC", "3": "ESC_GND"}
+    assert {n.split(".")[0] for n in nets["ESC_GND"] if not n.startswith("#")} == {"J3", "U6", "U7", "C37", "C38", "C39", "R26"}
+    assert "U6.5" in nets["ESC_GND"] and "U6.4" in nets["GND"]
+    assert {n.split(".")[0] for n in nets["ESC_BEC"] if not n.startswith("#")} == {"J3", "U7", "C38"}
 
 
 @needs_kicad
@@ -89,10 +93,11 @@ def test_schematic_plan_has_no_overlaps_or_shorts(module, intent):
         symbol = load_symbol(part.lib_id)
         connected = {p.number for p in symbol.pins if p.number in part.pins}
         assert connected <= {pin for ref, pin in labelled if ref == part.ref}, part.ref
-    for sym in plan.symbols:   # inside the A3 frame, clear of the title block
+    assert intent.sheet == "A2"
+    for sym in plan.symbols:   # inside the A2 frame (594 x 420 mm), clear of the title block
         x0, y0, x1, y1 = sym.box
-        assert 10 <= x0 and x1 <= 410 and 10 <= y0 and y1 <= 287, sym
-        assert not (x1 > 290 and y1 > 250), sym
+        assert 10 <= x0 and x1 <= 584 and 10 <= y0 and y1 <= 410, sym
+        assert not (x1 > 470 and y1 > 375), sym
 
 
 def test_placement_covers_every_footprint(intent):

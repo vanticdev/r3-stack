@@ -57,3 +57,21 @@
     `range_failsafe` never drives (max 2 m from the TX; link never lost). Fix it on one side: the firmware reads
     `mission`/`gps_origin` from a flat HAL document, or the twin sends the structured form. The twin's own reference
     controller (`tests/sim_test_controller.py`) reads the flat form.
+
+## From lane B (branch `r3/finish-b`): two evaluation changes made to unblock the failsafe scenarios
+
+Both are small and in `r3_sim`; please review them when merging (lane C owns evaluation/scenarios):
+
+1. `arbiter_neutral_within_s` (`evaluation.py`): the HAT arbiter now brakes before neutral (QuicRun brake: reverse stick
+   after forward; `brake_us` for `brake_hold`, then `neutral_us`, both recorded on the `arbiter_failsafe` event). The
+   check now requires the ESC to follow the arbiter's own output (brake, then neutral) after the switch instead of
+   neutral only; the latency limit is unchanged.
+2. Link loss for `link_lost_beyond_m` / `stop_within_m_of_link_loss` (`scenario.py`): at the edge of range the ELRS
+   receiver keeps catching single packets (LQ 3-12 % at ~518 m), so its own 1 s loss timeout never fires and both
+   checks reported "link never lost". When the receiver declares no loss, the first RC-frame gap longer than the
+   software's `radio_failsafe_timeout_s` while the car moves is scored as the loss (`source: software_failsafe_gap`);
+   it can only be earlier than a receiver-declared loss, so neither check is relaxed. range_failsafe on my branch:
+   loss at 515.8 m (>= 300 m), stop 2.12 m (<= 3 m) from 3.9 m/s.
+3. Pooled ngspice instances (`electrical/ngspice.py`) now drop the previous circuit's `time_sources`/`edges` on
+   reset: a switched-ESC test left its PWM gate function behind and the next circuit's duty source followed it
+   (the order-dependent `test_electrical_stage` failures on `r3/integration`).

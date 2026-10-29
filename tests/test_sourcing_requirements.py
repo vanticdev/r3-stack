@@ -87,6 +87,7 @@ def _spec(mutate):
     data = yaml.safe_load((RC_CAR / "robot.yaml").read_text())
     for component in data["components"].values():
         component.pop("source", None)
+        component.pop("owned", None)
     mutate(data["components"])
     return data
 

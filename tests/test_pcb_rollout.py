@@ -33,12 +33,14 @@ def project():
 def test_catalog_hat_matches_the_board(project):
     hat = project.catalog.component("r3-carrier-hat")
     assert hat.connectors["J_SERVO"].pins["2"] == "SERVO_6V"
-    assert hat.pins["ESC_BEC_NC"].role == "nc" and hat.connectors["J_ESC"].pins["2"] == "ESC_BEC_NC"
+    # J_ESC is the ESC side of the U6 isolator: its BEC powers U6/U7 only, its ground is not HAT GND.
+    assert hat.connectors["J_ESC"].pins == {"1": "ESC_PWM", "2": "ESC_BEC", "3": "ESC_GND"}
+    assert hat.pins["ESC_GND"].role == "ground" and hat.pins["ESC_BEC"].role == "power_in"
     assert hat.connectors["J_GPIO"].pins["13"] == "HEARTBEAT"
     link = next(link for link in hat.internal_links if link.a == "PI_ESC_PWM")
     assert link.kind == "failsafe_arbiter" and link.value == pytest.approx(0.1)
     params = hat.behavior.params
-    assert params["tvs"]["part"] == "SMAJ10A" and params["servo_regulator"]["max_duty"] == pytest.approx(0.8)
+    assert params["tvs"]["part"] == "SMAJ10A" and params["servo_regulator"]["model"] == "regulator.buck_boost"
 
 
 def test_arbiter_link_carries_the_signal_but_no_dc(project):
@@ -56,11 +58,26 @@ def test_arbiter_link_carries_the_signal_but_no_dc(project):
     assert [b for b in links if b.meta.get("link_kind") == "series_resistor"]
 
 
-def test_esc_bec_is_not_wired_and_servo_runs_from_the_hat(project):
+def test_esc_lead_feeds_only_the_isolator_and_servo_runs_from_the_hat(project):
     wires = {w.id: w for h in project.spec.electrical.harnesses for w in h.wires}
-    assert "W_ESC_BEC" not in wires and wires["W_SRV_VCC"].signal == "SERVO_6V"
+    assert wires["W_ESC_BEC"].signal == "ESC_BEC" and wires["W_SRV_VCC"].signal == "SERVO_6V"
     assert project.graph.connected("servo.J1.2", "hat.SERVO_6V")
     assert not project.graph.connected("servo.J1.2", "esc.J_SIG.2")
+    assert project.graph.connected("esc.J_SIG.2", "hat.ESC_BEC")       # the BEC reaches only the isolator's LDO
+    assert project.graph.connected("esc.J_SIG.3", "hat.ESC_GND")
+
+
+@needs_ngspice
+def test_isolated_esc_lead_carries_no_motor_return(project):
+    """Ground-loop break: at a motor stall the ESC signal lead's ground carries only the isolator's few mA (it was
+    ~3.4 A when J_ESC.3 was HAT GND and paralleled the power harness)."""
+    from r3_sim.electrical import ElectricalSystem
+
+    system = ElectricalSystem(project, routes={})
+    out = system.operating_point({"esc": {"throttle": 1.0}, "motor": {"omega": 0.0}, "pi": {"activity": 1.0}}, soc=1.0)
+    assert out["motor"]["current"] > 30.0
+    assert abs(out["_branches"]["W_ESC_GND"]["current"]) < 0.01
+    system.close()
 
 
 def test_model_stage_understands_the_arbiter_and_failsafe_chain(project):
@@ -118,7 +135,8 @@ def _run(device: ArbiterDevice, t0: float, t1: float, pulse: float, beat: bool, 
 def test_arbiter_params_from_catalog(project):
     params = arbiter_params(project.catalog.component("r3-carrier-hat").behavior.params["failsafe"])
     assert params == ArbiterParams(part="ATtiny412", timeout=0.1, neutral_us=1500.0, frame=0.02, rearm_edges=3,
-                                   rearm_band_us=50.0)
+                                   rearm_band_us=50.0, brake_us=1000.0, brake_hold=3.0, deadband_us=15.0,
+                                   esc_reverse_delay=0.1)
 
 
 def test_arbiter_boots_neutral_and_rearms_only_at_neutral():
@@ -131,17 +149,20 @@ def test_arbiter_boots_neutral_and_rearms_only_at_neutral():
     assert all(pulse == 1800.0 for _, pulse in trace)
 
 
-def test_arbiter_neutral_within_timeout_plus_one_frame_after_the_last_edge():
-    device = _device()
+def test_arbiter_brakes_within_timeout_plus_one_frame_after_the_last_edge_then_neutral():
+    device = _device(brake_hold=1.0)
     _run(device, 0.0, 0.5, 1500.0, beat=True)
     _run(device, 0.5, 1.0, 1800.0, beat=True)
     last_edge = device.last_edge_t
-    trace = _run(device, 1.0, 1.5, 1800.0, beat=False)     # main loop hung: PWM keeps 1800 us, no heartbeat
-    first_neutral = next(t for t, pulse in trace if pulse == 1500.0)
-    assert 0.1 <= first_neutral - last_edge <= 0.12 + 1e-9
-    assert all(pulse == 1500.0 for t, pulse in trace if t >= first_neutral)
+    trace = _run(device, 1.0, 2.5, 1800.0, beat=False)     # main loop hung: PWM keeps 1800 us, no heartbeat
+    first = next(t for t, pulse in trace if pulse != 1800.0)
+    assert 0.1 <= first - last_edge <= 0.12 + 1e-9
+    assert {pulse for t, pulse in trace if first <= t < first + 1.0 - 1e-9} == {1000.0}  # active brake
+    assert {pulse for t, pulse in trace if t >= first + 1.0 + 1e-9} == {1500.0}           # then neutral
     event = next(e for e in device.events if e["event"] == "arbiter_failsafe")
     assert event["last_heartbeat_edge_t"] == pytest.approx(last_edge)
+    assert event["brake_until"] == pytest.approx(first + 1.0)
+    assert any(e["event"] == "arbiter_brake_end" for e in device.events)
 
 
 def test_unpowered_arbiter_outputs_no_pulses_and_reboots_in_failsafe():
@@ -183,7 +204,8 @@ def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(rc_car_fresh):
         assert device.edges >= 29 and not device.failsafe
         esc.set_pulse_us(1700.0)
         hal.clock.sleep_until(0.5)                         # no heartbeat for 200 ms
-        assert device.failsafe and kernel.esc_pulse == pytest.approx(1500.0)
+        # After forward driving the arbiter brakes first (brake_us), then holds neutral.
+        assert device.failsafe and kernel.esc_pulse == pytest.approx(device.params.brake_us)
     finally:
         hal.close()
         thread.join(5.0)
@@ -199,18 +221,19 @@ def test_hat_regulators_follow_catalog_uvlo_dropout_and_limits(project):
     hat = system.models["hat"]
     pi_core, servo_core = hat.cores["regulator"], hat.cores["servo_regulator"]
     assert (pi_core.uvlo_falling, pi_core.uvlo_rising) == (pytest.approx(3.8), pytest.approx(4.4))
-    assert pi_core.current_limit == pytest.approx(8.1) and servo_core.current_limit == pytest.approx(5.5)
+    assert pi_core.current_limit == pytest.approx(8.1) and servo_core.current_limit == pytest.approx(4.86)
     assert pi_core.hold_up == pytest.approx(268e-6)
-    # TPS56528 dropout: D_max V_in - I (D Rhs + (1 - D) Rls + DCR) = 6.05 V at 2.5 A needs ~7.84 V in.
-    assert servo_core.dropout_input(2.5) == pytest.approx(7.84, abs=0.02)
-    inputs = {"esc": {"throttle": 0.0}, "motor": {"omega": 0.0}, "servo": {"horn_torque": 0.0, "horn_speed": 0.0},
+    # LM5175 buck-boost: no dropout; below the 4.18 V UVLO it stops. Its boost-mode limit scales with V_in.
+    assert servo_core.buck_boost and servo_core.dropout_input(2.5) == pytest.approx(4.18)
+    assert (servo_core.uvlo_falling, servo_core.uvlo_rising) == (pytest.approx(4.18), pytest.approx(4.53))
+    inputs = {"esc": {"throttle": 0.0}, "motor": {"omega": 0.0}, "servo": {"horn_torque": 5.0, "horn_speed": 0.0},
               "pi": {"activity": 0.5}}
     full = system.operating_point(inputs, soc=1.0)["hat"]
     empty = system.operating_point(inputs, soc=0.0)["hat"]
-    assert full["servo_regulator"]["v_out"] == pytest.approx(6.05, abs=0.01) and not full["servo_regulator"]["in_dropout"]
-    # Near-empty 2S: the servo rail follows 0.8 V_in, the Pi rail still regulates (low UVLO).
-    assert empty["servo_regulator"]["in_dropout"]
-    assert empty["servo_regulator"]["v_out"] == pytest.approx(0.8 * empty["v_in"], abs=0.1)
+    # Servo stalled (2.4 A): 6.0 V from a full and from an empty pack (the TPS56528 buck gave 4.78 V empty).
+    for point in (full, empty):
+        assert point["servo_regulator"]["v_out"] == pytest.approx(6.0, abs=0.03)
+        assert not point["servo_regulator"]["in_dropout"] and point["servo_regulator"]["i_out"] > 2.0
     assert empty["v_out"] == pytest.approx(5.1, abs=0.02) and not empty["uvlo"]
     # INA226 sees the whole HAT branch (both regulators), VBUS on the shunt's load side.
     assert empty["ina226_current"] == pytest.approx(empty["current_in"]) and empty["ina226_bus_voltage"] < empty["v_in"]
@@ -219,24 +242,32 @@ def test_hat_regulators_follow_catalog_uvlo_dropout_and_limits(project):
 
 @needs_ngspice
 def test_hold_up_keeps_the_pi_rail_after_the_input_drops(project):
-    """HAT supply lead open: the 268 uF hold-up carries the 5 V rail to the Pi's 4.63 V brown-out in
-    t = C (V0^2 - V1^2) / (2 P) (the pcb stage's hold_up_time), then the Pi resets and its 3V3 rail turns off."""
+    """HAT supply lead open: the VIN_HAT bulk (220 uF polymer + ceramics, modelled with ESR and a carried state)
+    first carries both converters down to the Pi buck's dropout, then the 268 uF output hold-up carries the 5 V rail
+    to the Pi's 4.63 V brown-out: t = C_in (V0^2 - V_drop^2) / (2 P_in) + C_out (V5^2 - 4.63^2) / (2 P_5V)
+    (the pcb stage's hold_up_time), then the Pi resets and its 3V3 rail turns off."""
     from r3_kicad.regulators import hold_up_time
     from r3_sim.electrical import ElectricalSystem
 
     system = ElectricalSystem(project, routes={}, initial={"battery_soc": 0.9})
+    hat = system.models["hat"]
+    assert [round(c * 1e6, 1) for c, _, _ in hat.input_caps] == [220.0, 71.5]
     inputs = {"esc": {"pulse_us": 1500.0}, "motor": {"omega": 0.0}, "servo": {"pulse_us": 1500.0}, "pi": {"activity": 0.5}}
     for _ in range(5):
         out = system.step(1e-3, inputs)
     v0, load = out["_nets"]["5V"], out["hat"]["regulator"]["power_out"]
+    v_in, p_in = out["hat"]["v_in"], out["hat"]["v_in"] * out["hat"]["current_in"]
     dt, t_fault = 2e-5, system.time
     out = system.step(dt, {**inputs, "_faults": [{"type": "open", "branch": "W_Y_P_HAT"}]})
     while out["pi"]["powered"]:
         out = system.step(dt, inputs)
-        assert system.time - t_fault < 0.01
+        assert system.time - t_fault < 0.05
     held = system.time - t_fault
-    expected = hold_up_time(268e-6, v0, 4.63, load)
-    assert held == pytest.approx(expected, rel=0.3), (held, expected, load)
+    c_in = sum(c for c, _, _ in hat.input_caps)
+    v_drop = hat.cores["regulator"].dropout_input(load / v0)
+    expected = c_in * (v_in ** 2 - v_drop ** 2) / (2 * p_in) + hold_up_time(268e-6, v0, 4.63, load)
+    assert held == pytest.approx(expected, rel=0.35), (held, expected, load)
+    assert held > hold_up_time(268e-6, v0, 4.63, load) * 2   # the input bulk dominates the hold-up
     for _ in range(20):  # the reset Pi's 3V3 rail switches off cleanly while the hold-up still decays
         out = system.step(1e-4, inputs)
     assert out["_nets"]["3V3"] < 0.1 and 0.5 < out["_nets"]["5V"] < 4.63
