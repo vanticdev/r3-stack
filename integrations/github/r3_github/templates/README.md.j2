@@ -30,10 +30,12 @@ env = { R3_PROJECT = "/path/to/@@NAME@@" }
 
 ## CI
 
-`.github/workflows/r3.yml` validates every push and pull request, uploads
+`.github/workflows/r3.yml` validates every push and pull request inside the
+R3 worker image (KiCad, ngspice, MuJoCo, Freerouting; fully headless), uploads
 `build/` as an artifact and posts a job summary. Optional secrets:
-`ONSHAPE_ACCESS_KEY` / `ONSHAPE_SECRET_KEY` (CAD sync) and `R3_PLATFORM_TOKEN`
-(private platform repository). KiCad steps run when `kicad-cli` is available.
+`ONSHAPE_ACCESS_KEY` / `ONSHAPE_SECRET_KEY` (CAD sync with Onshape API keys),
+`R3_WORKER_IMAGE_TOKEN` (private worker image) and `R3_PLATFORM_TOKEN` (private
+platform repository). Run `r3 doctor` to see which stages can run headless.
 
 ## Deploy
 

@@ -36,7 +36,7 @@ exposed as `<package>.stage.run`. It writes artifacts under `build/<stage>/`, ad
 | # | Stage | Reads | Writes |
 | --- | --- | --- | --- |
 | 1 | `model` | robot.yaml, catalog | `build/model/graph.json`; binding/connector-mate/pin-voltage/logic-level/I²C-address checks |
-| 2 | `cad` | spec, `cad/` | `build/cad/cad_model.json`, `build/cad/meshes/<component>.stl`, screenshots |
+| 2 | `cad` | spec, `cad/` | `build/cad/cad_model.json`, `build/cad/meshes/<component>.stl`, `build/cad/views/*.png` (REST shaded views) |
 | 3 | `pcb` | spec, `pcb/<board>/` | `build/pcb/<board>/board.json`, KiCad files, gerbers, ERC/DRC reports |
 | 4 | `wiring` | graph, cad_model, board.json | `build/wiring/routes.json`, harness BOM, cut lengths |
 | 5 | `electrical` | graph, routes, catalog behaviors | `build/electrical/operating_points.json` (static worst cases) |
@@ -46,6 +46,10 @@ exposed as `<package>.stage.run`. It writes artifacts under `build/<stage>/`, ad
 
 Stages fall back to catalog estimates when an upstream artifact is missing, and
 say so with a `*_estimated` warning diagnostic.
+
+Every stage runs headless (no display, no browser) in the R3 worker image;
+`r3 doctor` reports what the current environment supports. See
+[headless operation](headless.md).
 
 ### `build/cad/cad_model.json`
 

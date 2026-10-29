@@ -29,6 +29,9 @@ TEMPLATES = Path(__file__).parent / "templates"
 PLATFORM_ROOT = Path(__file__).resolve().parents[3]
 # The r3-platform pip source written into CI. Override with $R3_PLATFORM_URL.
 DEFAULT_PLATFORM_URL = os.environ.get("R3_PLATFORM_URL", "git+https://github.com/vanticdev/r3-stack.git")
+# The R3 worker image (docker/r3-worker) CI runs in, tagged by platform revision
+# by the platform's own workflow. Override the repository with $R3_WORKER_IMAGE_REPO.
+DEFAULT_WORKER_IMAGE_REPO = os.environ.get("R3_WORKER_IMAGE_REPO", "ghcr.io/vanticdev/r3-worker")
 TEMPLATE_DIRS = ("cad", "pcb", "backend", "catalog")
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 
@@ -49,9 +52,12 @@ def _render(template: str, values: dict[str, str]) -> str:
     return text
 
 
-def render_workflow(platform_url: str | None = None, platform_ref: str = "main") -> str:
-    """The GitHub Actions workflow for an R3 project."""
-    return _render("r3.yml.j2", {"PLATFORM_URL": platform_url or DEFAULT_PLATFORM_URL, "PLATFORM_REF": platform_ref})
+def render_workflow(platform_url: str | None = None, platform_ref: str = "main", worker_image: str | None = None) -> str:
+    """The GitHub Actions workflow for an R3 project. It runs in the R3 worker
+    image for ``platform_ref`` unless ``worker_image`` names another one."""
+    image = worker_image or f"{DEFAULT_WORKER_IMAGE_REPO}:{platform_ref}"
+    return _render("r3.yml.j2", {"PLATFORM_URL": platform_url or DEFAULT_PLATFORM_URL, "PLATFORM_REF": platform_ref,
+                                 "WORKER_IMAGE": image})
 
 
 def _rename_robot(text: str, name: str) -> str:
