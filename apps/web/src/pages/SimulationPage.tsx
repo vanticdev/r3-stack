@@ -181,6 +181,12 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
         <div className="stack" style={{ gap: 16 }}>
           {has3d ? (
             <Card flush title="Playback" actions={<label className="check small"><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />Follow vehicle</label>}>
+              {last?.stale && (
+                // Playback draws today's CAD at the recorded body poses, but the wires are the recorded cable
+                // simulation, so an old run shows old routes and slack over the current layout.
+                <div className="stale-notice" role="status" data-testid="playback-stale"><Icon name="clock" size={14} />
+                  <span>Recorded with an earlier design. Parts are drawn from the current CAD, wires from that run's cable simulation, so they may not line up. Rerun to see the current design.</span></div>
+              )}
               <div style={{ height: 440 }}>
                 <RobotViewer data={data!} playback={{ recording: recording!, t: playback.t, follow }} showJointPanel={false} />
               </div>
