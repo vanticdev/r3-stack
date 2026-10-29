@@ -1,0 +1,42 @@
+id: ball-stud-m3-5.8x8
+name: Steel ball stud, M3 x 8 thread, 5.8 mm ball, hex collar
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0058
+    - 0.0058
+    - 0.017
+    unit: m
+    source: Typical 1/10 RC 5.8 mm ball stud (fasteners.yaml ball-stud-m3-5.8)
+    status: estimated
+  mass:
+    value: 0.00163
+    unit: kg
+    source: Typical 1/10 RC 5.8 mm ball stud (fasteners.yaml ball-stud-m3-5.8)
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: ball-stud-m3-5.8x8
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.177795+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

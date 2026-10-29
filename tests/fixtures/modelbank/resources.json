@@ -1,0 +1,26 @@
+{
+  "pololu": {
+    "url": "https://www.pololu.com/product/4091/resources",
+    "html": "<a href='/file/0J1733/d36v50fx-step-down-voltage-regulator.step'>3D model</a>"
+  },
+  "raspberrypi": {
+    "url": "https://pip.raspberrypi.com/categories/892-raspberry-pi-5",
+    "html": "<a href='https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip'>STEP</a>"
+  },
+  "arducam": {
+    "url": "https://docs.arducam.com/",
+    "html": "<a href=\"/account/login\">Sign in</a><p>No exact public STEP link in this recorded discovery result.</p>"
+  },
+  "ublox": {
+    "url": "https://www.u-blox.com/en/product/zed-f9p-module",
+    "html": "<a href=\"/account/login\">Sign in</a><p>No exact public STEP link in this recorded discovery result.</p>"
+  },
+  "sparkfun": {
+    "url": "https://www.sparkfun.com/",
+    "html": "<a href=\"/account/login\">Sign in</a><p>No exact public STEP link in this recorded discovery result.</p>"
+  },
+  "adafruit": {
+    "url": "https://www.adafruit.com/",
+    "html": "<a href=\"/account/login\">Sign in</a><p>No exact public STEP link in this recorded discovery result.</p>"
+  }
+}

@@ -30,6 +30,7 @@ MCP tool `r3_guide`. It explains the following topics:
   Studios, no custom features.
 - Use every tool as a human would, through its own API: Onshape REST, KiCad `pcbnew` and `kicad-cli`,
   MuJoCo, ngspice. Never hand-write a tool's file format. Never write a solver.
+- Purchased parts are never sculpted. Search `r3 models search` (MCP `r3_models_search`) first. On a miss, search public Onshape versions, official vendor STEP, then permitted open model libraries; add the find with `r3 models add` / `r3_models_add`, including provenance and checksum. Only a documented exact-model miss permits a labelled datasheet proxy (`cad_purchased_proxy`). Validate bounding boxes, holes/faces, interface frames and datasheet mass before fabrication. See `docs/guide/model-bank.md`.
 - Everything runs headless (`r3 doctor`).
 - External actions need an explicit human request plus `confirm=true`:
   - fleet deployment (`deploy_fleet`, `r3 deploy --target fleet --yes`);

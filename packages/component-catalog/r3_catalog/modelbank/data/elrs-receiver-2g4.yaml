@@ -1,0 +1,42 @@
+id: elrs-receiver-2g4
+name: ExpressLRS 2.4 GHz receiver (CRSF)
+manufacturer: ''
+mpn: RadioMaster RP1
+aliases: []
+category: receiver
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.013000000000000001
+    - 0.011
+    - 0.003
+    unit: m
+    source: ''
+    status: estimated
+  mass:
+    value: 0.0015
+    unit: kg
+    source: ''
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: elrs-receiver-2g4
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.166455+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

@@ -1,0 +1,44 @@
+id: hobbywing-quicrun-wp-1060
+name: Hobbywing QuicRun WP 1060 brushed ESC, 60 A, 2-3S, 6 V / 3 A switch-mode BEC
+manufacturer: Hobbywing
+mpn: '30120200'
+aliases: []
+category: esc
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0365
+    - 0.032
+    - 0.018000000000000002
+    unit: m
+    source: https://www.hobbywing.com/en/products/quicrun-wp-1060-brushed55 (36.5
+      x 32 x 18 mm, 39 g)
+    status: datasheet
+  mass:
+    value: 0.039
+    unit: kg
+    source: https://www.hobbywing.com/en/products/quicrun-wp-1060-brushed55 (36.5
+      x 32 x 18 mm, 39 g)
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: hobbywing-quicrun-wp-1060
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.138495+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

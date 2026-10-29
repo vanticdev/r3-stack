@@ -1,0 +1,50 @@
+id: arducam-b0445-imx296
+name: Arducam 1.58 MP IMX296 colour global-shutter camera, M12 6 mm lens (board UC-717)
+manufacturer: Arducam
+mpn: B0445
+aliases:
+- UC-717
+category: camera
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.038
+    - 0.038
+    - 0.0246
+    unit: m
+    source: 'https://www.uctronics.com/1-58mp-imx296-color-global-shutter-camera-module-with-m12-lens-for-raspberry-pi.html
+      (Arducam store: 38 x 38 mm board, 13 mm lens holder); lens 14 mm dia (RobotShop
+      M2506ZH04 listing)'
+    status: datasheet
+  mass:
+    value: 0.015
+    unit: kg
+    source: 'https://www.uctronics.com/1-58mp-imx296-color-global-shutter-camera-module-with-m12-lens-for-raspberry-pi.html
+      (Arducam store: 38 x 38 mm board, 13 mm lens holder); lens 14 mm dia (RobotShop
+      M2506ZH04 listing)'
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: arducam-b0445-imx296
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: https://forum.arducam.com/t/10328 (UC-717 = IMX296, Arducam staff)
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.122071+00:00'
+- provider: manufacturer
+  url: https://forum.arducam.com/t/10317
+  result: UC-717 exact STEP not located; other Arducam boards are not substitutes
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

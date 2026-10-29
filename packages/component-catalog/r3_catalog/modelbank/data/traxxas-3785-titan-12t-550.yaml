@@ -1,0 +1,47 @@
+id: traxxas-3785-titan-12t-550
+name: Traxxas Titan 12T 550 brushed motor, 3 mm shaft, integrated fan
+manufacturer: Traxxas
+mpn: '3785'
+aliases: []
+category: motor
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.036000000000000004
+    - 0.036000000000000004
+    - 0.057
+    unit: m
+    source: 'https://traxxas.com/58234-8-slash-2wd-xl-5-wbattery: 36 mm dia, 57 mm
+      can, 78 mm overall, 240 g'
+    status: datasheet
+  mass:
+    value: 0.24
+    unit: kg
+    source: 'https://traxxas.com/58234-8-slash-2wd-xl-5-wbattery: 36 mm dia, 57 mm
+      can, 78 mm overall, 240 g'
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: traxxas-3785-titan-12t-550
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.128794+00:00'
+- provider: manufacturer
+  url: https://traxxas.com/products/parts/3785
+  result: parts/drawings pointer; no STEP located
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

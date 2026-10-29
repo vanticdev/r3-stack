@@ -1,0 +1,42 @@
+id: fuse-atc-10a
+name: Inline ATC/ATO blade fuse holder with 10 A fuse
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.03
+    - 0.012
+    - 0.022
+    unit: m
+    source: ''
+    status: estimated
+  mass:
+    value: 0.008
+    unit: kg
+    source: ''
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: fuse-atc-10a
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.169026+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

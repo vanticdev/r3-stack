@@ -1,0 +1,48 @@
+id: traxxas-rear-halfshaft-r
+name: Traxxas Slash 2WD rear half-shaft, right (6852X + 2753X + 12 mm hex); 12 mm
+  shorter for the gear-cover output
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.013900000000000001
+    - 0.12
+    - 0.013900000000000001
+    unit: m
+    source: As traxxas-rear-halfshaft-l, 12 mm shorter inboard (right output exits
+      the gear cover)
+    status: estimated
+  mass:
+    value: 0.041
+    unit: kg
+    source: As traxxas-rear-halfshaft-l, 12 mm shorter inboard (right output exits
+      the gear cover)
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: traxxas-rear-halfshaft-r
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.130863+00:00'
+- provider: manufacturer
+  url: https://traxxas.com/products/parts/rear
+  result: parts/drawings pointer; no STEP located
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

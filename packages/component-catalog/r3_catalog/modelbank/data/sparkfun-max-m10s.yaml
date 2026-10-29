@@ -1,0 +1,45 @@
+id: sparkfun-max-m10s
+name: SparkFun GNSS Receiver Breakout MAX-M10S (Qwiic), GPS-18037, u-blox M10, SMA
+  antenna
+manufacturer: SparkFun
+mpn: GPS-18037
+aliases: []
+category: gnss
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0381
+    - 0.0305
+    - 0.004
+    unit: m
+    source: https://cdn.sparkfun.com/assets/e/8/8/9/8/SparkFun_u-blox_MAX-M10S_Board_Dimensions.png;
+      height and mass estimated
+    status: datasheet
+  mass:
+    value: 0.006
+    unit: kg
+    source: https://cdn.sparkfun.com/assets/e/8/8/9/8/SparkFun_u-blox_MAX-M10S_Board_Dimensions.png;
+      height and mass estimated
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: sparkfun-max-m10s
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.140631+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

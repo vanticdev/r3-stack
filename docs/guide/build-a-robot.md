@@ -23,6 +23,7 @@ can read for patterns but should not copy wholesale.
 - **Use each tool the way its own UI would.** Use Onshape through its API, KiCad through `pcbnew` and
   `kicad-cli`, and MuJoCo and ngspice through their libraries. Never hand-write a tool's internal file
   format.
+- Purchased parts are never sculpted. Search `r3 models search` (MCP `r3_models_search`) first. On a miss, search public Onshape versions, official vendor STEP, then permitted open model libraries; add the find with `r3 models add` / `r3_models_add`, including provenance and checksum. Only a documented exact-model miss permits a labelled datasheet proxy (`cad_purchased_proxy`). Validate bounding boxes, holes/faces, interface frames and datasheet mass before fabrication. See `docs/guide/model-bank.md`.
 - **Everything runs headless.** No GUI is needed. `r3 doctor` tells you which stages can run here.
 - **Real simulators only.** The twin uses MuJoCo (rigid bodies, cables, camera rendering), ngspice
   (circuits) and Sionna RT (radio). Do not write a replacement solver.

@@ -1,0 +1,46 @@
+id: traxxas-5879-sct-wheel-front
+name: Traxxas 5879-BLK SCT tire and wheel, glued, 2WD front (two 5 x 11 x 4 bearings
+  in the hub)
+manufacturer: Traxxas
+mpn: 5879-BLK
+aliases: []
+category: wheel
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.11
+    - 0.11
+    - 0.044
+    unit: m
+    source: Same wheel as 5878 (110 x 44 mm); mass estimated
+    status: datasheet
+  mass:
+    value: 0.11
+    unit: kg
+    source: Same wheel as 5878 (110 x 44 mm); mass estimated
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: traxxas-5879-sct-wheel-front
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.136466+00:00'
+- provider: manufacturer
+  url: https://traxxas.com/products/parts/5879-BLK
+  result: parts/drawings pointer; no STEP located
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

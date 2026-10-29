@@ -74,6 +74,7 @@ export function AppShell() {
           </NavLink>
           <nav className="nav-section nav" aria-label="Workspace">
             <NavLink to="/" end className={() => (location.pathname === "/" ? "active" : "")}><Icon name="folder" />Projects</NavLink>
+            <NavLink to="/models"><Icon name="cube" />Model bank</NavLink>
             <NavLink to="/environment"><Icon name="stethoscope" />Environment</NavLink>
           </nav>
           {pid && <ProjectNav pid={pid} />}

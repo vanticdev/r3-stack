@@ -1,0 +1,42 @@
+id: hat-standoff-mf-m2.5-11
+name: Male-female hex standoff M2.5, 11 mm body + 6 mm stud, brass (HAT stacking)
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0058
+    - 0.005
+    - 0.017
+    unit: m
+    source: fasteners.yaml standoff-mf-m2.5-11; 11 mm board-to-board per HAT guidance
+    status: estimated
+  mass:
+    value: 0.0021
+    unit: kg
+    source: fasteners.yaml standoff-mf-m2.5-11; 11 mm board-to-board per HAT guidance
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: hat-standoff-mf-m2.5-11
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.178715+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

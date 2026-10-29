@@ -1,0 +1,44 @@
+id: servo-digital-20kg
+name: 20 kg-cm digital steering servo
+manufacturer: ''
+mpn: DS3218
+aliases: []
+category: servo
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.02
+    - 0.054
+    - 0.0455
+    unit: m
+    source: 'DS3218 datasheet: 40 x 20 x 40.5 mm body, 49.5 x 10 mm ear hole pattern;
+      ear height estimated'
+    status: datasheet
+  mass:
+    value: 0.06
+    unit: kg
+    source: 'DS3218 datasheet: 40 x 20 x 40.5 mm body, 49.5 x 10 mm ear hole pattern;
+      ear height estimated'
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: servo-digital-20kg
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.161930+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

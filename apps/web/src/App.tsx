@@ -13,6 +13,7 @@ import { DeployPage } from "./pages/DeployPage.tsx";
 import { EnvironmentPage } from "./pages/EnvironmentPage.tsx";
 
 // three.js pages load on demand so the project list and tables paint without the 3D bundle.
+const ModelBankPage = lazy(() => import("./pages/ModelBankPage.tsx").then((m) => ({ default: m.ModelBankPage })));
 const ThreeDPage = lazy(() => import("./pages/ThreeDPage.tsx").then((m) => ({ default: m.ThreeDPage })));
 const WiringPage = lazy(() => import("./pages/WiringPage.tsx").then((m) => ({ default: m.WiringPage })));
 const DiagnosticsPage = lazy(() => import("./pages/DiagnosticsPage.tsx").then((m) => ({ default: m.DiagnosticsPage })));
@@ -27,6 +28,7 @@ const router = createHashRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <ProjectsPage /> },
+      { path: "models", element: lazyPage(<ModelBankPage />) },
       { path: "environment", element: <EnvironmentPage /> },
       // "Settings · r3 doctor" became the workspace-level Environment page; old links still resolve.
       { path: "settings", element: <Navigate to="/environment" replace /> },

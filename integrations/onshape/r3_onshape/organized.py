@@ -297,7 +297,21 @@ def _default_elements(api: Transport, doc: DocumentInfo) -> list[dict[str, Any]]
 def _build_studios(api: Transport, doc: DocumentInfo, groups: dict[str, list[LocalPart]], result: StageResult,
                    variables: dict[str, Variable] | None = None, bindings: dict[str, Any] | None = None) -> None:
     defaults = _default_elements(api, doc)
+    # Real purchased models bypass build_studio entirely. Separate imported
+    # Part Studios keep vendor bodies and provenance intact within a family.
+    native_groups = {}
     for name, members in groups.items():
+        for part in members:
+            from .purchased import public_source
+            if public_source(part):
+                continue  # insert the validated public version directly; never rebuild it
+            if part.bank_model:
+                from .purchased import import_studio
+                built = import_studio(api, doc.did, doc.wid, part)
+                doc.studios[part.studio] = StudioRef(part.studio, built.element_id, built.part_ids, built.connectors, built.folders)
+            else:
+                native_groups.setdefault(name, []).append(part)
+    for name, members in native_groups.items():
         eid = api.json("POST", f"/partstudios/d/{doc.did}/w/{doc.wid}", body={"name": name})["id"]
         if doc.variable_studio:
             api.request("POST", f"/variables/d/{doc.did}/w/{doc.wid}/e/{eid}/variablestudioreferences",
@@ -380,6 +394,13 @@ class AssemblyBuilder:
         return f"/assemblies/d/{self.robot.did}/w/{self.robot.wid}/e/{self.robot.assemblies[level]}"
 
     def _source(self, key: str) -> tuple[DocumentInfo, str, str, str]:
+        from .purchased import public_source
+        source = public_source(self.parts[key])
+        if source:
+            if self.api.json("GET", f"/documents/{source.did}").get("isPublic") is not True:
+                raise ValueError(f"{source.did}: bank source is not public")
+            doc = DocumentInfo(did=source.did, wid="", vid=source.vid, name=self.parts[key].name)
+            return doc, source.eid, source.part_id, source.vid
         for doc in (self.robot, self.library):
             try:
                 eid, pid, _ = doc.part_ref(key)
@@ -395,7 +416,7 @@ class AssemblyBuilder:
         for key, members in by_key.items():
             doc, eid, pid, vid = self._source(key)
             body: dict[str, Any] = {"documentId": doc.did, "elementId": eid, "partId": pid, "isAssembly": False, "isWholePartStudio": False}
-            if doc is self.library:
+            if vid:
                 body["versionId"] = vid
             for _ in members:
                 self.api.json("POST", self.base(level) + "/instances", body=body)
@@ -428,6 +449,9 @@ class AssemblyBuilder:
 
     def _connector_feature(self, iid: str, name: str) -> str:
         key = self.plan.placements[iid].key
+        from .purchased import public_source
+        if public_source(self.parts[key]):
+            return self.parts[key].bank_model["onshape_connectors"][name]
         for doc in (self.robot, self.library):
             for studio in doc.studios.values():
                 if key in studio.connectors and name in studio.connectors[key]:
@@ -877,7 +901,7 @@ def input_digest(project: Project) -> str:
     payload = {
         "organizer": ORGANIZER_VERSION, "validator": VALIDATOR_VERSION,
         "parts": {k: {"plan": _jsonable(p.plan), "connectors": [[c.name, c.frame.round(9).tolist()] for c in p.connectors],
-                      "name": p.name, "studio": p.studio, "library": p.library, "mirror_of": p.mirror_of} for k, p in sorted(parts.items())},
+                      "name": p.name, "studio": p.studio, "library": p.library, "mirror_of": p.mirror_of, "bank_model": p.bank_model} for k, p in sorted(parts.items())},
         "placements": {k: [v.key, v.level, v.group, v.pose.round(9).tolist()] for k, v in sorted(plan.placements.items())},
         "mates": [asdict(m) for m in plan.mates],
         "variables": {k: v.expression for k, v in variables.items()}, "bindings": repr(sorted((k, repr(v)) for k, v in bindings.items())),
@@ -959,6 +983,10 @@ def sync_organized(project: Project, api: Transport, result: StageResult, attemp
         keys = {p.key for p in plan.placements.values()}
         fixture: dict[str, Any] = {}
         local = {**fetch_local_geometry(api, robot, keys, fixture), **fetch_local_geometry(api, library, keys, fixture)}
+        from .purchased import public_documents
+        external_docs = public_documents(parts)
+        for document in external_docs:
+            local.update(fetch_local_geometry(api, document, keys, fixture))
         model = compose_world(local, plan, solved)
         fixture_dir = build_dir / "fixtures"
         fixture_dir.mkdir(parents=True, exist_ok=True)
@@ -970,6 +998,8 @@ def sync_organized(project: Project, api: Transport, result: StageResult, attemp
         report["kinematics"] = run_motion(project, model, fit, result)
         report["rf"] = antenna_position(project, model)
         masses = {**local_mass(api, robot, keys), **local_mass(api, library, keys)}
+        for document in external_docs:
+            masses.update(local_mass(api, document, keys))
         mesh_dir = build_dir / "meshes"
         mesh_dir.mkdir(parents=True, exist_ok=True)
         imported: dict[str, Any] = {}
@@ -987,6 +1017,12 @@ def sync_organized(project: Project, api: Transport, result: StageResult, attemp
                      "bbox_min": geometry.lo.tolist(), "bbox_max": geometry.hi.tolist(), "mesh": f"meshes/{filename}",
                      "mesh_triangles": int(len(geometry.triangles)), "mesh_sha256": hashlib.sha256(data).hexdigest(),
                      "subassembly": placement.level, "studio": part.studio, "library": part.library}
+            if part.bank_model:
+                entry["model_bank_id"] = part.bank_model["id"]
+                entry["model_sources"] = part.bank_model["sources"]
+                entry["model_validation"] = part.bank_model["validation"]
+            elif part.plan.kind == "purchased":
+                entry["proxy"] = True
             entry.update(_world_mass(masses.get(placement.key, {}), solved.get(iid, placement.pose)))
             if part.plan.kind == "fastener":
                 fastener = next((f for f in spec.mechanical.fasteners if iid in (f.part, f.nut_part)), None)

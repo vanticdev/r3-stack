@@ -31,10 +31,12 @@ from .client import Transport, default_transport
 def run(project: Project) -> StageResult:
     result = StageResult(stage="cad", inputs=project.fingerprint())
     started = time.time()
-    result.assume("mechanical", "Purchased parts are catalog envelopes plus their datasheet features, modeled once in the linked "
-                                "R3 Parts Library; their mass is a labeled catalog mass override (inertia from the envelope geometry).")
+    from .purchased import diagnostics as purchased_diagnostics
+    purchased_diagnostics(project, result)
+    result.assume("mechanical", "Purchased parts resolve through the model bank and use real vendor geometry with datasheet mass overrides. "
+                                "Missing exact models remain explicitly diagnosed catalog proxies; geometry validation is separate from sourcing.")
     result.assume("mechanical", "Fabricated parts get holes, bores, sockets and slots from their catalog interfaces (the joins they "
-                                "serve); mass from geometry x material density. Fasteners are full-geometry parts (no hex sockets).")
+                                "serve); mass from geometry x material density. Missing-source fasteners are labelled standard-geometry proxies.")
     result.assume("mechanical", "Fit checks run on the Onshape Part Studio geometry moved by the solved assembly transforms, which "
                                 "must equal the compiled poses.")
     if project.spec.cad.provider == "none":
@@ -42,6 +44,9 @@ def run(project: Project) -> StageResult:
         return result
     if project.spec.assembly is None:
         result.add(Diagnostic.error("cad_assembly_required", "the organized CAD build needs an assembly section (objects joined at interfaces)"))
+        return result
+    if not result.ok:
+        result.duration_s = time.time() - started
         return result
     from .organized import input_digest, sync_organized, write_model
 
@@ -62,7 +67,20 @@ def run(project: Project) -> StageResult:
         return result
     previous = (project.lock.get("cad", {}) or {})
     attempt = previous.get("attempt", 0) + 1
-    report = sync_organized(project, api, result, attempt_label=os.environ.get("R3_CAD_LABEL", ""))
+    from .studio import StudioBuildError
+    from .client import OnshapeError
+    try:
+        report = sync_organized(project, api, result, attempt_label=os.environ.get("R3_CAD_LABEL", ""))
+    except StudioBuildError as error:
+        code = error.feature if error.feature.startswith("model_") else "cad_purchased_import_failed"
+        result.add(Diagnostic.error(code, str(error), subjects=[error.part], data={"feature": error.feature}))
+        result.duration_s = time.time() - started
+        return result
+    except OnshapeError as error:
+        result.add(Diagnostic.error("cad_api_quota" if error.status == 429 else "onshape_request_failed", str(error),
+                                    subjects=["cad"], data={"status": error.status}))
+        result.duration_s = time.time() - started
+        return result
     if result.ok and report.get("robot") is not None:
         path = write_model(project, report, api.name, digest)
         model = json.loads(path.read_text())
