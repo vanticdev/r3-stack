@@ -1,0 +1,218 @@
+"""Physical obstacles for routing, checks and slack simulation.
+
+Geometry comes from ``build/cad/cad_model.json`` (meshes, else bounding boxes)
+when the CAD stage has run, otherwise from catalog primitives posed by
+``RobotGraph.component_pose`` (``cad_geometry_estimated``). Moving parts get a
+swept envelope over their joint travel: wheels spinning about their axle and
+steered wheels/knuckles swept through the steering limits about the kingpin.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+from r3_model.diagnostics import Diagnostic
+from r3_model.project import Project
+
+from .bodies import ROOT, Kinematics, Transform
+from .geometry import Box, Cylinder, MeshShape, Shape, SweptShape, axis_matrix, load_stl
+
+# A structure plate thinner than this may get drilled pass-through holes.
+PLATE_MAX_THICKNESS = 0.005
+SWEEP_STEP = math.radians(1.0)
+
+
+@dataclass
+class Obstacle:
+    component: str
+    kind: str
+    shape: Shape  # nominal pose, robot frame
+    swept: Shape  # envelope over joint travel (== shape for static parts)
+    keepout: float
+    moving: bool
+    body: str
+    structure: bool  # static structure: tie anchor and preferred running surface
+    plate_axis: int | None = None  # robot-frame normal axis of a drillable plate
+    source: str = "catalog"
+    color: str = "#888888"
+
+    def current(self, transform: Transform) -> Shape:
+        """Shape after the body moves by ``transform`` (relative to nominal)."""
+        return self.shape.transformed(*transform)
+
+
+@dataclass
+class ObstacleSet:
+    obstacles: list[Obstacle]
+    kinematics: Kinematics
+    estimated: list[str] = field(default_factory=list)
+    cad_source: dict[str, Any] = field(default_factory=dict)
+
+    def by_component(self, component: str) -> Obstacle | None:
+        for obstacle in self.obstacles:
+            if obstacle.component == component:
+                return obstacle
+        return None
+
+    @property
+    def static(self) -> list[Obstacle]:
+        return [o for o in self.obstacles if not o.moving]
+
+    @property
+    def moving(self) -> list[Obstacle]:
+        return [o for o in self.obstacles if o.moving]
+
+    @property
+    def structures(self) -> list[Obstacle]:
+        return [o for o in self.obstacles if o.structure]
+
+    def floor(self) -> Obstacle | None:
+        """The lowest static structure (the base plate)."""
+        candidates = self.structures
+        return min(candidates, key=lambda o: o.shape.aabb()[0][2]) if candidates else None
+
+    def min_distance(self, points: np.ndarray, obstacles: list[Obstacle], swept: bool = False,
+                     keepout: bool = False, exclude: set[str] | None = None) -> tuple[np.ndarray, list[str]]:
+        """Per-point minimum signed distance (and which component) over ``obstacles``."""
+        points = np.atleast_2d(points)
+        best = np.full(len(points), np.inf)
+        which = [""] * len(points)
+        for obstacle in obstacles:
+            if exclude and obstacle.component in exclude:
+                continue
+            shape = obstacle.swept if swept else obstacle.shape
+            value = shape.sdf_bounded(points, 0.2) - (obstacle.keepout if keepout else 0.0)
+            better = value < best
+            if better.any():
+                best[better] = value[better]
+                for k in np.nonzero(better)[0]:
+                    which[k] = obstacle.component
+        return best, which
+
+
+def _catalog_shape(project: Project, component: str) -> Shape | None:
+    """Catalog primitive in the robot frame. Box frames sit on their bottom
+    face; x/y-axis cylinders are centred at the component origin; z-axis
+    cylinders (standoffs, posts) start at the mounting face like boxes."""
+    spec, catalog = project.spec, project.catalog
+    ctype = catalog.component(spec.components[component].type)
+    mech = ctype.mechanical
+    position, rotation = project.graph.component_pose(component)
+    size = np.asarray(mech.size, dtype=float)
+    if mech.shape == "cylinder":
+        radius, length = size[0] / 2, size[1]
+        local_center = np.array([0.0, 0.0, length / 2]) if mech.axis == "z" else np.zeros(3)
+        return Cylinder(position + rotation @ local_center, rotation @ axis_matrix(mech.axis), radius, length / 2)
+    half = size / 2
+    return Box(position + rotation @ np.array([0.0, 0.0, half[2]]), rotation.copy(), half)
+
+
+def _cad_shape(project: Project, part: dict[str, Any]) -> tuple[Shape, str] | None:
+    mesh = part.get("mesh")
+    if mesh:
+        path = project.root / "build" / "cad" / mesh
+        if path.exists():
+            vertices, faces = load_stl(path)
+            if len(faces):
+                return MeshShape(vertices, faces), "cad_mesh"
+    if "bbox_min" in part and "bbox_max" in part:
+        lo, hi = np.asarray(part["bbox_min"], dtype=float), np.asarray(part["bbox_max"], dtype=float)
+        return Box((lo + hi) / 2, np.eye(3), (hi - lo) / 2), "cad_bbox"
+    return None
+
+
+def _spin_invariant(shape: Shape, axis: np.ndarray, origin: np.ndarray) -> bool:
+    """True when rotating about (origin, axis) maps the shape onto itself."""
+    if not isinstance(shape, Cylinder):
+        return False
+    parallel = np.linalg.norm(np.cross(shape.axis, axis)) < 1e-6
+    offset = shape.center - origin
+    on_axis = np.linalg.norm(offset - axis * (offset @ axis)) < 1e-6
+    return bool(parallel and on_axis)
+
+
+def _swept(kin: Kinematics, shape: Shape, body: str, label: str) -> Shape:
+    skip = {j.id for j in kin.chain(body) if j.type == "continuous" and _spin_invariant(shape, j.axis, j.origin)}
+    configs = kin.configurations(body, step_angle=SWEEP_STEP, skip=skip)
+    if len(configs) == 1 and not configs[0]:
+        return shape
+    return SweptShape([shape.transformed(*kin.body_transform(body, q)) for q in configs], label)
+
+
+def build_obstacles(project: Project) -> tuple[ObstacleSet, list[Diagnostic]]:
+    spec, catalog = project.spec, project.catalog
+    kin = Kinematics(spec)
+    cad = project.read_build_json("cad/cad_model.json") or {}
+    parts: dict[str, Any] = cad.get("parts", {}) if isinstance(cad, dict) else {}
+    obstacles: list[Obstacle] = []
+    estimated: list[str] = []
+    diagnostics: list[Diagnostic] = []
+
+    for cid, comp in spec.components.items():
+        try:
+            ctype = catalog.component(comp.type)
+        except KeyError:
+            continue
+        mech = ctype.mechanical
+        shape, source = None, "catalog"
+        if cid in parts:
+            resolved = _cad_shape(project, parts[cid])
+            if resolved:
+                shape, source = resolved
+        if shape is None:
+            shape = _catalog_shape(project, cid)
+            estimated.append(cid)
+        body = kin.body_of(cid)
+        jointed = kin.is_moving(body)
+        moving = jointed or mech.moving
+        # Moving parts without a joint (motor can, enclosed gears) keep their own
+        # envelope: a spinning cylinder or a gear housing occupies its own volume.
+        swept = _swept(kin, shape, body, cid) if jointed else shape
+        structure = ctype.kind == "structure" and not moving
+        obstacles.append(Obstacle(cid, ctype.kind, shape, swept, float(mech.keepout_margin), bool(moving), body,
+                                  structure, source=source, color=mech.color))
+
+    floor = min((o for o in obstacles if o.structure), key=lambda o: o.shape.aabb()[0][2], default=None)
+    for obstacle in obstacles:
+        if obstacle.structure and obstacle is not floor and isinstance(obstacle.shape, Box):
+            rotation = obstacle.shape.rotation
+            aligned = np.allclose(np.abs(rotation), np.round(np.abs(rotation)), atol=1e-6)
+            thin = int(np.argmin(obstacle.shape.half))
+            if aligned and 2 * obstacle.shape.half[thin] <= PLATE_MAX_THICKNESS:
+                obstacle.plate_axis = int(np.argmax(np.abs(rotation[:, thin])))
+
+    if estimated:
+        diagnostics.append(Diagnostic.warning(
+            "cad_geometry_estimated",
+            f"{len(estimated)} component(s) use catalog primitives instead of CAD geometry "
+            f"({'no build/cad/cad_model.json' if not parts else 'missing from cad_model.json'})",
+            subjects=estimated, data={"estimated_components": len(estimated), "cad_parts": len(parts)},
+            hint="Run the cad stage to route against exported meshes and bounding boxes."))
+    source = cad.get("source", {}) if isinstance(cad, dict) else {}
+    return ObstacleSet(obstacles, kin, estimated, source), diagnostics
+
+
+def plate_obstacles(obstacles: ObstacleSet) -> list[Obstacle]:
+    return [o for o in obstacles.obstacles if o.plate_axis is not None]
+
+
+def describe(obstacles: ObstacleSet) -> dict[str, Any]:
+    """JSON summary for the routing detail artifact."""
+    out = {}
+    for o in obstacles.obstacles:
+        lo, hi = o.shape.aabb()
+        slo, shi = o.swept.aabb()
+        out[o.component] = {"kind": o.kind, "source": o.source, "moving": o.moving, "body": o.body,
+                            "keepout": o.keepout, "bbox_min": lo.tolist(), "bbox_max": hi.tolist(),
+                            "swept_bbox_min": slo.tolist(), "swept_bbox_max": shi.tolist(),
+                            "swept_poses": len(o.swept.shapes) if isinstance(o.swept, SweptShape) else 1,
+                            "drillable_plate": o.plate_axis is not None}
+    return out
+
+
+__all__ = ["Obstacle", "ObstacleSet", "ROOT", "build_obstacles", "describe", "plate_obstacles", "Path"]

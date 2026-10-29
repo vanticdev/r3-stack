@@ -1,0 +1,65 @@
+"""Wiring stage on the reference RC car: artifacts, contract format, and real findings."""
+
+import csv
+import json
+import shutil
+from pathlib import Path
+
+import pytest
+
+from r3_model.project import Project
+from r3_wiring.stage import format_diagnostics, run
+
+RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+
+
+@pytest.fixture(scope="module")
+def stage(tmp_path_factory):
+    root = tmp_path_factory.mktemp("rc-car")
+    shutil.copy(RC_CAR / "robot.yaml", root / "robot.yaml")
+    project = Project.load(root)
+    result = run(project)
+    print("\n" + format_diagnostics(result))
+    print("harness lengths (mm):", {k: round(v * 1e3, 1) for k, v in result.metrics["harness_length"].items()})
+    print("worst static clearance:", result.metrics["worst_static_clearance"])
+    print("worst dynamic clearance:", result.metrics["worst_dynamic_clearance"])
+    return root, result
+
+
+def test_routes_json_contract(stage):
+    root, result = stage
+    routes = json.loads((root / "build" / "wiring" / "routes.json").read_text())
+    assert set(routes) == {"wires", "harnesses", "clearances"}
+    spec_wires = {w.id for h in Project.load(root).spec.electrical.harnesses for w in h.wires}
+    assert set(routes["wires"]) == spec_wires
+    for wire in routes["wires"].values():
+        assert set(wire) == {"harness", "awg", "path", "routed_length", "cut_length"}
+        assert len(wire["path"]) >= 2 and all(len(p) == 3 for p in wire["path"])
+        assert wire["cut_length"] >= wire["routed_length"] > 0
+    for harness in routes["harnesses"].values():
+        assert set(harness) == {"bundle_path", "length", "tie_points"}
+    assert routes["clearances"] and set(routes["clearances"][0]) == {"wire", "component", "min_distance"}
+
+
+def test_artifacts_written(stage):
+    root, result = stage
+    out = root / "build" / "wiring"
+    for name in ("routes_iso.png", "routes_top_side.png", "slack_peak_bump.png", "slack_clearance_timeline.png",
+                 "harness_bom.csv", "slack_sim.json", "routing_detail.json", "result.json"):
+        assert (out / name).stat().st_size > 0, name
+    rows = list(csv.DictReader((out / "harness_bom.csv").open()))
+    assert {r["section"] for r in rows} >= {"wire", "connector", "splice", "tie", "total"}
+    assert result.inputs["robot_yaml_sha256"]
+
+
+def test_rc_car_findings_are_structured(stage):
+    _, result = stage
+    codes = {d.code for d in result.diagnostics}
+    assert "cad_geometry_estimated" in codes and "harness_mass" in codes
+    for d in result.diagnostics:
+        assert d.stage == "wiring" and d.data, d.code
+    # The motor's bullet connectors face the right rear wheel from ~16 mm away.
+    motor = [d for d in result.diagnostics if d.code == "connector_clearance_violation" and "wheel_rr" in d.subjects]
+    assert motor and all(d.data["min_distance"] < d.data["required"] for d in motor)
+    assert not [d for d in result.diagnostics if d.code in ("wire_route_failed", "connector_wire_gauge_mismatch")]
+    assert result.metrics["worst_dynamic_clearance"]["wire"]
