@@ -136,3 +136,47 @@ def test_renderer_backend_is_explicit():
     explicit = subprocess.run([sys.executable, "-c", code], env={**env, "MUJOCO_GL": "osmesa" if sys.platform == "linux"
                                                                   else "glfw"}, capture_output=True, text=True, timeout=120)
     assert explicit.stdout.strip() in ("osmesa", "glfw")  # an explicit MUJOCO_GL always wins
+
+
+def _every_pair_minimum(cables) -> tuple[np.ndarray, np.ndarray]:
+    """Reference for the clearance monitor: mj_geomDistance on every cable/moving-part pair in the contact list."""
+    data, model = cables.data, cables.model
+    current = np.full(len(cables.current), cables.margin)
+    part = np.full(len(cables.current), -1)
+    n = data.ncon
+    if not n:
+        return current, part
+    geoms = data.contact.geom[:n]
+    g1, g2 = geoms[:, 0], geoms[:, 1]
+    first = (cables.geom_bundle[g1] >= 0) & cables.geom_moving[g2]
+    second = (cables.geom_bundle[g2] >= 0) & cables.geom_moving[g1]
+    relevant = first | second
+    pairs = np.unique(np.stack([np.where(first, g1, g2)[relevant], np.where(first, g2, g1)[relevant]], axis=1), axis=0)
+    fromto = np.zeros(6)
+    for gc, gp in pairs:
+        d = min(mujoco.mj_geomDistance(model, data, int(gc), int(gp), cables.margin, fromto), cables.margin)
+        b = cables.geom_bundle[gc]
+        if d < current[b]:
+            current[b], part[b] = d, cables.geom_part[gp]
+    return current, part
+
+
+def test_clearance_branch_and_bound_equals_every_pair(routed):
+    """The bounding-sphere branch and bound in the clearance monitor returns the same per-bundle
+    minimum (and closest part) as measuring every listed pair exactly."""
+    project, _ = routed
+    scenario = next(s for s in project.spec.simulation.scenarios if s.id == "steering_sweep")
+    kernel = CoSimKernel(project, scenario)
+    cables = kernel.vehicle.cables
+    compared = near = 0
+    for step in range(600):
+        kernel.step()
+        if step % 3:
+            continue
+        reference, part = _every_pair_minimum(cables)
+        assert np.allclose(cables.current, reference, rtol=0.0, atol=1e-12)
+        close = reference < cables.margin
+        assert np.array_equal(cables.current_part[close], part[close])
+        compared += 1
+        near += int(close.sum())
+    assert compared == 200 and near > 0

@@ -856,20 +856,42 @@ class CableMonitor:
                 cable_geom = np.where(cable_first, g1, g2)[relevant]
                 part_geom = np.where(cable_first, g2, g1)[relevant]
                 pairs = np.unique(np.stack([cable_geom, part_geom], axis=1), axis=0)
-                fromto = np.zeros(6)
-                exact = np.array([mujoco.mj_geomDistance(self.model, data, int(gc), int(gp), self.margin, fromto) for gc, gp in pairs])
-                bundle = self.geom_bundle[pairs[:, 0]]
-                part = self.geom_part[pairs[:, 1]]
-                d = np.minimum(exact, self.margin)
-                np.minimum.at(self.current, bundle, d)
-                closest = d <= self.current[bundle]
-                self.current_part[bundle[closest]] = part[closest]
+                self._bundle_minimum(pairs)
         better = self.current < self.minimum
         if better.any():
             self.minimum[better] = self.current[better]
             self.minimum_part[better] = self.current_part[better]
             self.minimum_time[better] = data.time
         return self.current
+
+    def _bundle_minimum(self, pairs: np.ndarray) -> None:
+        """Exact per-bundle minimum of ``mj_geomDistance`` over (cable geom, part geom) ``pairs`` by branch and bound.
+
+        Bounding spheres give a lower bound on every pair's distance, d >= |c1 - c2| - r1 - r2
+        (``geom_rbound`` encloses the geom about ``geom_xpos``). Pairs are measured in order of
+        increasing bound, with the bundle's best distance so far as ``distmax`` (GJK early exit),
+        and a bundle stops once its next bound reaches its best distance: no pair left can be
+        closer. The minimum and its part are the same as measuring every pair."""
+        import mujoco
+
+        model, data = self.model, self.data
+        bundle = self.geom_bundle[pairs[:, 0]]
+        gap = (np.linalg.norm(data.geom_xpos[pairs[:, 0]] - data.geom_xpos[pairs[:, 1]], axis=1)
+               - model.geom_rbound[pairs[:, 0]] - model.geom_rbound[pairs[:, 1]])
+        order = np.lexsort((gap, bundle))
+        fromto = np.zeros(6)
+        current, current_part, margin = self.current, self.current_part, self.margin
+        geom_part = self.geom_part
+        for k in order:
+            b = bundle[k]
+            best = current[b]
+            if gap[k] >= best:
+                continue  # every later pair of this bundle has a larger bound
+            gc, gp = int(pairs[k, 0]), int(pairs[k, 1])
+            d = min(mujoco.mj_geomDistance(model, data, gc, gp, best, fromto), margin)
+            if d < best or (d <= best and current_part[b] < 0):
+                current[b] = d
+                current_part[b] = geom_part[gp]
 
     def end_tension(self) -> np.ndarray:
         """(bundles, 2) magnitude of the cable force at the start and end terminations (N):
