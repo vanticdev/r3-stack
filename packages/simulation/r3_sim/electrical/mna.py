@@ -11,7 +11,15 @@ keeps floating signal islands well-posed, exactly like SPICE's ``gmin``.
 
 Linear resistors are stamped once per step in a vectorized bank. Every other
 element derives from :class:`NumericElement`, which needs only a residual
-function; its Jacobian is obtained by central differences.
+function; its Jacobian is obtained by forward differences.
+
+The linear unknowns (touched only by resistors and ``gmin``) are eliminated
+exactly with a Schur complement: per solve, the linear block ``A_LL`` is
+factored once, and Newton runs on the small block of unknowns the nonlinear
+elements touch. Within one warm-started solve the nonlinear Jacobian is reused
+while the iteration keeps contracting (chord/modified Newton) and refreshed
+otherwise; convergence tests are unchanged, so the converged operating point
+meets the same tolerances as full Newton.
 """
 
 from __future__ import annotations
@@ -24,6 +32,7 @@ import numpy as np
 
 GROUND = -1
 DEFAULT_GMIN = 1e-9  # S, node-to-reference leakage (same role as SPICE gmin)
+CHORD_CONTRACTION = 0.5  # refresh the reused Jacobian when |dx| shrinks by less than this per iteration
 
 
 def softplus(x: float, width: float) -> float:
@@ -102,7 +111,7 @@ class NumericElement(Element):
 
     ``rows`` are the residual rows it contributes to (node KCL rows or its own
     branch rows; ``GROUND`` entries are dropped), ``deps`` the unknowns its
-    residual depends on. The Jacobian is computed by central differences."""
+    residual depends on. The Jacobian is computed by forward differences."""
 
     rows: list[int]
     deps: list[int]
@@ -110,31 +119,72 @@ class NumericElement(Element):
     def residual(self, v: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
+    def _indices(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """(rows, deps, valid-row mask, valid-dep mask) as arrays, cached per rows/deps list."""
+        cache = self.__dict__.get("_index_cache")
+        if cache is None or cache[0] is not self.rows or cache[1] is not self.deps:
+            rows, deps = np.asarray(self.rows, dtype=np.int64), np.asarray(self.deps, dtype=np.int64)
+            rmask, dmask = rows != GROUND, deps != GROUND
+            unique = len(set(rows[rmask].tolist())) == int(rmask.sum())
+            cache = (self.rows, self.deps, rows, deps, rmask, dmask, unique, np.where(dmask, deps, 0))
+            self._index_cache = cache
+        return cache[2], cache[3], cache[4], cache[5]
+
     def _values(self, x: np.ndarray) -> np.ndarray:
-        return np.array([x[d] if d != GROUND else 0.0 for d in self.deps])
+        _, _, _, dmask = self._indices()
+        return np.where(dmask, x[self._index_cache[7]], 0.0)
 
     def evaluate(self, x: np.ndarray) -> np.ndarray:
         return self.residual(self._values(x))
 
-    def load(self, x: np.ndarray, F: np.ndarray, J: np.ndarray) -> None:
+    def add_residual(self, x: np.ndarray, F: np.ndarray) -> None:
+        rows, _, rmask, _ = self._indices()
+        if self._index_cache[6]:
+            F[rows[rmask]] += self.residual(self._values(x))[rmask]
+        else:
+            np.add.at(F, rows[rmask], self.residual(self._values(x))[rmask])
+
+    def add_residual_padded(self, xe: np.ndarray, Fe: np.ndarray) -> None:
+        """:meth:`add_residual` on vectors with one trailing ground slot (``GROUND = -1``
+        reads 0 from ``xe`` and writes to a discarded row of ``Fe``)."""
+        cache = self.__dict__.get("_padded_cache")
+        if cache is None or cache[0] is not self.rows or cache[1] is not self.deps:
+            rows = np.asarray(self.rows, dtype=np.int64)
+            cache = (self.rows, self.deps, rows, np.asarray(self.deps, dtype=np.int64),
+                     len(set(self.rows)) == len(self.rows))
+            self._padded_cache = cache
+        r = self.residual(xe[cache[3]])
+        if cache[4]:
+            Fe[cache[2]] += r
+        else:
+            np.add.at(Fe, cache[2], r)
+
+    def load(self, x: np.ndarray, F: np.ndarray, J: np.ndarray, local: np.ndarray | None = None) -> None:
+        """Residual into ``F`` and Jacobian into ``J``. With ``local`` (global -> local
+        index map) ``J`` is the block of the unknowns the nonlinear elements touch."""
+        rows, deps, rmask, dmask = self._indices()
         v = self._values(x)
-        r = self.residual(v)
-        rows = self.rows
-        for k, row in enumerate(rows):
-            if row != GROUND:
-                F[row] += r[k]
-        for j, dep in enumerate(self.deps):
-            if dep == GROUND:
-                continue
+        r0 = self.residual(v)
+        if self._index_cache[6]:
+            F[rows[rmask]] += r0[rmask]
+        else:
+            np.add.at(F, rows[rmask], r0[rmask])
+        # Forward differences: the Jacobian only steers Newton (the residual decides convergence),
+        # and an O(h) = 1e-7 relative error keeps the contraction rate near 1e-7.
+        columns = np.zeros((len(rows), len(deps)))
+        for j in np.flatnonzero(dmask):
             h = 1e-7 * max(1.0, abs(v[j]))
             vp = v.copy()
-            vm = v.copy()
             vp[j] += h
-            vm[j] -= h
-            column = (self.residual(vp) - self.residual(vm)) / (2.0 * h)
-            for k, row in enumerate(rows):
-                if row != GROUND:
-                    J[row, dep] += column[k]
+            columns[:, j] = (self.residual(vp) - r0) / h
+        r_index, d_index = rows[rmask], deps[dmask]
+        if local is not None:
+            r_index, d_index = local[r_index], local[d_index]
+        block = columns[rmask][:, dmask]
+        if self._index_cache[6]:
+            J[r_index[:, None], d_index[None, :]] += block
+        else:
+            np.add.at(J, (r_index[:, None], d_index[None, :]), block)
 
 
 class VoltageSource(NumericElement):
@@ -184,14 +234,16 @@ class ResistorBank:
         return len(self.a) - 1
 
     def arrays(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        return np.asarray(self.a), np.asarray(self.b), np.asarray(self.resistance, dtype=float)
+        cached = self.__dict__.get("_terminal_cache")
+        if cached is None or len(cached[0]) != len(self.a):
+            cached = self._terminal_cache = (np.asarray(self.a), np.asarray(self.b))
+        return cached[0], cached[1], np.asarray(self.resistance, dtype=float)
 
     def currents(self, x: np.ndarray) -> np.ndarray:
         """Current from ``a`` to ``b`` through every resistor."""
         a, b, r = self.arrays()
-        va = np.where(a >= 0, x[np.maximum(a, 0)], 0.0)
-        vb = np.where(b >= 0, x[np.maximum(b, 0)], 0.0)
-        return (va - vb) / r
+        xe = np.append(x, 0.0)  # GROUND = -1 reads the trailing zero
+        return (xe[a] - xe[b]) / r
 
 
 class SolverError(RuntimeError):
@@ -259,22 +311,51 @@ class Circuit:
 
     # -------------------------------------------------------------- solving
     def linear_matrix(self, gmin: float | None = None) -> np.ndarray:
+        """Conductance stamps of every resistor plus ``gmin`` on every node."""
         n = self.size
-        A = np.zeros((n, n))
         a, b, r = self.resistors.arrays()
         if len(a):
-            g = 1.0 / r
-            for ia, ib, gk in zip(a, b, g):
-                if ia >= 0:
-                    A[ia, ia] += gk
-                if ib >= 0:
-                    A[ib, ib] += gk
-                if ia >= 0 and ib >= 0:
-                    A[ia, ib] -= gk
-                    A[ib, ia] -= gk
-        nodes = np.flatnonzero(np.asarray(self.is_node))
+            key = (n, len(a))
+            cached = self.__dict__.get("_stamp_cache")
+            if cached is None or cached[0] != key:
+                # Flat indices and signs of the four stamps of each resistor (ground rows dropped).
+                ka, kb = a >= 0, b >= 0
+                both = ka & kb
+                index = np.concatenate([a[ka] * n + a[ka], b[kb] * n + b[kb], a[both] * n + b[both], b[both] * n + a[both]])
+                which = np.concatenate([np.flatnonzero(ka), np.flatnonzero(kb), np.flatnonzero(both), np.flatnonzero(both)])
+                sign = np.concatenate([np.ones(int(ka.sum()) + int(kb.sum())), -np.ones(2 * int(both.sum()))])
+                cached = self._stamp_cache = (key, index, which, sign)
+            _, index, which, sign = cached
+            A = np.bincount(index, weights=sign * (1.0 / r)[which], minlength=n * n).reshape(n, n)
+        else:
+            A = np.zeros((n, n))
+        nodes = self.__dict__.get("_node_indices")
+        if nodes is None or len(self.is_node) != self.__dict__.get("_node_count"):
+            nodes = self._node_indices = np.flatnonzero(np.asarray(self.is_node))
+            self._node_count = len(self.is_node)
         A[nodes, nodes] += self.gmin if gmin is None else gmin
         return A
+
+    def _partition(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """(nonlinear unknowns S, linear unknowns L, global -> S-local index map)."""
+        key = (self.size, len(self.elements))
+        cached = self.__dict__.get("_partition_cache")
+        if cached is not None and cached[0] == key:
+            return cached[1]
+        touched: set[int] = set()
+        for element in self.elements:
+            touched.update(int(i) for i in getattr(element, "rows", []) if i != GROUND)
+            touched.update(int(i) for i in getattr(element, "deps", []) if i != GROUND)
+        nonlinear = np.asarray(sorted(touched), dtype=np.int64)
+        linear = np.setdiff1d(np.arange(self.size), nonlinear)
+        local = np.full(self.size, -1, dtype=np.int64)
+        local[nonlinear] = np.arange(len(nonlinear))
+        self._partition_cache = (key, (nonlinear, linear, local))
+        self._blocks = {"LL": np.ix_(linear, linear), "LS": np.ix_(linear, nonlinear),
+                        "SL": np.ix_(nonlinear, linear), "SS": np.ix_(nonlinear, nonlinear)}
+        self._jacobian = None
+        self._linear_cache = None
+        return nonlinear, linear, local
 
     def residual(self, x: np.ndarray, A: np.ndarray | None = None) -> np.ndarray:
         A = self.linear_matrix() if A is None else A
@@ -288,7 +369,7 @@ class Circuit:
               voltage_step_limit: float = 2.0) -> tuple[np.ndarray, SolveInfo]:
         x = np.zeros(self.size) if x0 is None or len(x0) != self.size else np.array(x0, dtype=float)
         A = self.linear_matrix()
-        result = self._newton(x, A, max_iterations, tolerance, voltage_step_limit)
+        result = self._newton(x, A, max_iterations, tolerance, voltage_step_limit, chord=True)
         if result is not None:
             return result
         # A warm start can sit on the wrong branch of a constant-power load whose
@@ -308,29 +389,121 @@ class Circuit:
         return x, info
 
     def _newton(self, x: np.ndarray, A: np.ndarray, max_iterations: int, tolerance: float,
-                voltage_step_limit: float) -> tuple[np.ndarray, SolveInfo] | None:
-        node_mask = np.asarray(self.is_node)
+                voltage_step_limit: float, chord: bool = False) -> tuple[np.ndarray, SolveInfo] | None:
+        """Newton on J dx = -F with the linear unknowns eliminated exactly:
+        dx_S = (A_SS + N - A_SL A_LL^-1 A_LS)^-1 (-F_S + A_SL A_LL^-1 F_L),
+        dx_L = -A_LL^-1 (F_L + A_LS dx_S), where N is the nonlinear Jacobian
+        (non-zero only on S). ``chord`` starts from the previous solve's N and
+        linear factorization and reuses them while |dx| shrinks by 2x per
+        iteration, refreshing both otherwise. The residual always uses the exact
+        A, so a stale factor only changes the rate of convergence."""
+
+        node_mask = self.__dict__.get("_node_mask")
+        if node_mask is None or len(node_mask) != self.size:
+            node_mask = self._node_mask = np.asarray(self.is_node)
+        nonlinear, linear, local = self._partition()
         x = x.copy()
+        cached = self.__dict__.get("_linear_cache") if chord else None
+        linear_part = cached if cached is not None else self._factor_linear(A, linear)
+        if linear_part is None:
+            return None
+        if chord:
+            self._linear_cache = linear_part
+        jacobian: np.ndarray | None = self._jacobian if chord else None
+        previous_step = math.inf
+        refreshed = False
+        n = self.size
+        xe, Fe = np.zeros(n + 1), np.zeros(n + 1)  # trailing slot = ground
         for iteration in range(1, max_iterations + 1):
-            F = A @ x
-            J = A.copy()
-            for element in self.elements:
-                element.load(x, F, J)
+            if jacobian is None:
+                F = A @ x
+                jacobian = np.zeros((len(nonlinear), len(nonlinear)))
+                for element in self.elements:
+                    element.load(x, F, jacobian, local)
+                fresh = True
+                if chord:
+                    self._jacobian = jacobian
+            else:
+                xe[:n] = x
+                np.matmul(A, x, out=Fe[:n])
+                Fe[n] = 0.0
+                for element in self.elements:
+                    element.add_residual_padded(xe, Fe)
+                F = Fe[:n].copy()
+                fresh = False
             residual = float(np.max(np.abs(F))) if F.size else 0.0
-            try:
-                dx = np.linalg.solve(J, -F)
-            except np.linalg.LinAlgError:
-                return None
-            if not np.all(np.isfinite(dx)):
+            dx = self._update(F, jacobian, linear_part, nonlinear, linear)
+            if dx is None:
                 return None
             step = float(np.max(np.abs(dx[node_mask]))) if node_mask.any() else 0.0
             if step > voltage_step_limit:
                 dx *= voltage_step_limit / step
             x += dx
+            size = float(np.max(np.abs(dx))) if dx.size else 0.0
             scale = 1.0 + float(np.max(np.abs(x)))
-            if float(np.max(np.abs(dx))) < tolerance * scale and residual < 1e-6:
+            if size < tolerance * scale and residual < 1e-6:
                 return x, SolveInfo(iteration, residual, True)
+            if not chord:
+                jacobian = None
+            elif not fresh and (size > CHORD_CONTRACTION * previous_step or iteration > 12):
+                # The reused Jacobian stopped contracting: refresh it, and the linear factor
+                # too once conductor resistances have drifted (temperature) or it did not help.
+                jacobian = None
+                if refreshed or self._resistances_drifted():
+                    linear_part = self._factor_linear(A, linear)
+                    if linear_part is None:
+                        return None
+                    self._linear_cache = linear_part
+                refreshed = True
+            previous_step = size
         return None
+
+    def _resistances_drifted(self, tolerance: float = 1e-3) -> bool:
+        """True when a resistor changed by more than ``tolerance`` (relative) since the last factorization."""
+        reference = self.__dict__.get("_factor_resistances")
+        current = np.asarray(self.resistors.resistance, dtype=float)
+        if reference is None or len(reference) != len(current):
+            return True
+        return bool(np.any(np.abs(current - reference) > tolerance * np.abs(reference)))
+
+    def _factor_linear(self, A: np.ndarray, linear: np.ndarray) -> dict[str, np.ndarray] | None:
+        """LU of A_LL, A_LL^-1 A_LS and the Schur complement A_SS - A_SL A_LL^-1 A_LS."""
+        import scipy.linalg
+
+        self._factor_resistances = np.asarray(self.resistors.resistance, dtype=float)
+
+        blocks = self._blocks
+        try:
+            if not len(linear):
+                return {"schur": A[blocks["SS"]]}
+            factor = scipy.linalg.lu_factor(A[blocks["LL"]], check_finite=False)
+            coupling = scipy.linalg.lu_solve(factor, A[blocks["LS"]], check_finite=False)
+            a_sl = A[blocks["SL"]]
+            return {"factor": factor, "coupling": coupling, "a_sl": a_sl, "schur": A[blocks["SS"]] - a_sl @ coupling}
+        except (np.linalg.LinAlgError, ValueError):
+            return None
+
+    @staticmethod
+    def _update(F: np.ndarray, jacobian: np.ndarray, part: dict[str, np.ndarray], nonlinear: np.ndarray,
+                linear: np.ndarray) -> np.ndarray | None:
+        from scipy.linalg import lapack  # direct LAPACK calls: these systems are small, wrappers dominate
+
+        dx = np.empty_like(F)
+        if len(linear):
+            lu, piv = part["factor"]
+            y, info = lapack.dgetrs(lu, piv, F[linear])
+            if info:
+                return None
+            _, _, dx_s, info = lapack.dgesv(part["schur"] + jacobian, part["a_sl"] @ y - F[nonlinear])
+            if info:
+                return None
+            dx[nonlinear] = dx_s
+            dx[linear] = -y - part["coupling"] @ dx_s
+        else:
+            _, _, dx, info = lapack.dgesv(part["schur"] + jacobian, -F)
+            if info:
+                return None
+        return dx if np.all(np.isfinite(dx)) else None
 
     # ---------------------------------------------------------------- SPICE
     def to_spice(self, x: np.ndarray, title: str = "r3 electrical operating point", nodeset: bool = True,

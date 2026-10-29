@@ -143,8 +143,8 @@ class TwinHalServer:
             pass
 
     # ------------------------------------------------------------------ dispatch
-    def _advance(self, done: Any, limit: float | None = None) -> str:
-        reason = self.kernel.advance_until(done, limit)
+    def _advance(self, done: Any, limit: float | None = None, deadline: float | None = None) -> str:
+        reason = self.kernel.advance_until(done, limit, deadline)
         if reason == "brownout":
             raise HalRequestError("brownout", "computer supply browned out while blocked")
         return reason
@@ -162,7 +162,7 @@ class TwinHalServer:
             return {}, "ok"
         if op == "clock.sleep_until":
             target = float(req.get("t", k.t))
-            reason = self._advance(lambda: k.t + 1e-9 >= target)
+            reason = self._advance(lambda: k.t + 1e-9 >= target, deadline=target)
             return {}, "end" if reason == "end" else "ok"
         if op.startswith("gpio."):
             return self._gpio(op, req)

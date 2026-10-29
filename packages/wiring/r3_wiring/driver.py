@@ -1,6 +1,8 @@
-"""Standalone vibration / bump / steering test drive for the cable simulator.
+"""Standalone vibration / bump / steering test drive on the MuJoCo cable shaker.
 
-Load case (chassis frame, world-vertical excitation):
+The harnesses are MuJoCo elastic cables on the robot's bodies (chassis on a
+shaker table, :class:`r3_wiring.cable_sim.CableSimulator`). Load case
+(chassis frame, world-vertical excitation):
 
 * continuous 0.5 g, 25 Hz sinusoidal vertical vibration (motor/terrain);
 * one 3 g half-sine bump of 20 ms, timed to coincide with full left lock;
@@ -72,12 +74,13 @@ class DriveResult:
     timeline: dict[str, np.ndarray]
     requirement: float
     max_speed: float
-    max_strain: float
+    max_strain: float  # largest pin give (m)
     profile: DriveProfile = field(default_factory=DriveProfile)
+    assumptions: list[tuple[str, str]] = field(default_factory=list)
 
     def summary(self) -> dict[str, Any]:
         return {"requirement": self.requirement, "worst": self.worst, "snapshot_time": self.snapshot_time,
-                "max_particle_speed": self.max_speed, "max_strain": self.max_strain,
+                "max_segment_speed": self.max_speed, "max_pin_error_m": self.max_strain,
                 "profile": self.profile.__dict__,
                 "wires": {w: {**v, "sags_into_moving": self.sags_into_moving[w],
                               "below_requirement": self.below_requirement[w]} for w, v in self.min_clearance.items()}}
@@ -100,10 +103,19 @@ def moving_poses(project: Project, kin: Kinematics, steer: float, spin: float) -
     return out
 
 
+def drive_joints(kin: Kinematics, steer: float, spin: float) -> dict[str, float]:
+    """Joint values for a centre steer angle (Ackermann) and a wheel spin angle."""
+    q = kin.ackermann(steer)
+    for joint in kin.joints.values():
+        if joint.type == "continuous":
+            q[joint.id] = spin
+    return q
+
+
 def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet | None = None,
               profile: DriveProfile | None = None, simulator: CableSimulator | None = None) -> DriveResult:
     profile = profile or DriveProfile()
-    sim = simulator or CableSimulator(project, routes, obstacles)
+    sim = simulator or CableSimulator(project, routes, obstacles, timestep=profile.dt)
     kin = sim.kin
     max_steer = kin.steering_limit()
     wheel_radius = float(project.spec.software.config.get("wheel_radius_m", 0.055))
@@ -117,9 +129,9 @@ def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet |
         t = (k + 1) * profile.dt
         steer = max_steer * profile.steer_fraction(t)
         a_z = profile.accel_z(t)
-        moving = moving_poses(project, kin, steer, profile.speed / wheel_radius * t)
+        joints = drive_joints(kin, steer, profile.speed / wheel_radius * t)
         report = sim.step(profile.dt, {"pos": [0, 0, 0], "quat": [1, 0, 0, 0], "lin_acc": [0.0, 0.0, a_z],
-                                       "ang_vel": [0, 0, 0], "ang_acc": [0, 0, 0]}, moving)
+                                       "ang_vel": [0, 0, 0], "ang_acc": [0, 0, 0]}, joints=joints)
         times.append(t)
         clearance.append(min(d for d, _ in report.min_clearance.values()))
         accel.append(a_z)
@@ -130,7 +142,7 @@ def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet |
             pre_bump = sim.positions()
         if pre_bump is not None and profile.bump_time <= t <= profile.bump_time + 0.08:
             current = sim.positions()
-            sag = float(np.mean(np.concatenate([pre_bump[w][:, 2] - current[w][:, 2] for w in current])))
+            sag = float(np.mean(np.concatenate([pre_bump[w][:, 2] - current[w][:, 2] for w in current]))) if current else 0.0
             if sag > best_sag:
                 best_sag, snapshot, snapshot_time = sag, current, t
     history = sim.min_history
@@ -143,11 +155,11 @@ def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet |
                        {w: v["min_distance"] < requirement for w, v in min_clearance.items()}, worst, snapshot,
                        snapshot_time, {"time": np.asarray(times), "min_clearance": np.asarray(clearance),
                                        "accel_z": np.asarray(accel), "steer": np.asarray(steer_log)},
-                       requirement, max_speed, max_strain, profile)
+                       requirement, max_speed, max_strain, profile, list(sim.plan.assumptions))
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Cable slack vibration/steering test drive")
+    parser = argparse.ArgumentParser(description="Cable slack vibration/steering test drive (MuJoCo cable shaker)")
     parser.add_argument("project", type=Path)
     parser.add_argument("--duration", type=float, default=DriveProfile.duration)
     args = parser.parse_args(argv)

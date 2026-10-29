@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import collections
 import json
+import math
+from collections.abc import MutableMapping
 from pathlib import Path
 from typing import Any
 
@@ -231,21 +233,54 @@ class ElectricalSystem:
             x, info = self.circuit.solve(x)
         return x, info
 
+    def _advance_temperatures(self, currents: np.ndarray, dt: float) -> None:
+        """Vectorized :meth:`Branch.advance_temperature` over every branch with a
+        thermal model: P = I^2 R(T), exact first-order step towards P R_th with tau = R_th C."""
+        cache = self.__dict__.get("_thermal_cache")
+        if cache is None or cache[0] != len(self.network.branches):
+            thermal = [b for b in self.network.branches.values()
+                       if math.isfinite(b.thermal_resistance) and b.heat_capacity > 0.0]
+            cache = self._thermal_cache = (
+                len(self.network.branches), thermal, np.array([b.index for b in thermal], dtype=np.int64),
+                np.array([b.resistance_ref for b in thermal]), np.array([b.temperature_coefficient for b in thermal]),
+                np.array([b.thermal_resistance for b in thermal]), np.array([b.heat_capacity for b in thermal]))
+        _, thermal, index, r_ref, alpha, r_th, capacity = cache
+        if not thermal:
+            return
+        rise = np.array([b.temperature_rise for b in thermal])
+        current = currents[index]
+        power = current * current * (r_ref * (1.0 + alpha * (self.ambient_c + rise - 20.0)))
+        target = power * r_th
+        rise = target + (rise - target) * np.exp(-dt / (r_th * capacity))
+        for branch, value in zip(thermal, rise.tolist()):
+            branch.temperature_rise = value
+
     def branch_currents(self, x: np.ndarray) -> dict[str, float]:
         currents = self.circuit.resistors.currents(x)
         return {key: float(currents[b.index]) for key, b in self.network.branches.items()}
 
     def step(self, dt: float, inputs: dict[str, Any] | None = None) -> dict[str, Any]:
+        return self.finish_step(dt, *self.solve_step(dt, inputs))
+
+    def solve_step(self, dt: float, inputs: dict[str, Any] | None = None) -> tuple[np.ndarray, SolveInfo]:
+        """First half of :meth:`step`: the network solution for this step (state unchanged
+        until :meth:`finish_step`, which must follow before the next solve)."""
         inputs = inputs or {}
         self._apply_faults(inputs.get("_faults"))
-        x, info = self._solve(dt, inputs, self.x)
+        # Warm start from the linear extrapolation of the last two steps (predictor);
+        # Newton's convergence test is unchanged, it only needs fewer iterations.
+        previous = self.__dict__.get("_x_previous")
+        guess = self.x if previous is None or len(previous) != len(self.x) else 2.0 * self.x - previous
+        return self._solve(dt, inputs, guess)
+
+    def finish_step(self, dt: float, x: np.ndarray, info: SolveInfo) -> dict[str, Any]:
+        """Second half of :meth:`step`: model states, conductor temperatures, outputs."""
+        self._x_previous = self.x
         self.time += dt
         events: list[Event] = []
         for model in self.models.values():
             events.extend(model.end_step(dt, x, self.time))
-        currents = self.branch_currents(x)
-        for key, branch in self.network.branches.items():
-            branch.advance_temperature(currents[key], dt, self.ambient_c)
+        self._advance_temperatures(self.circuit.resistors.currents(x), dt)
         self.x, self.last_info = x, info
         self.events.extend(events)
         return self._outputs(x, events, info)
@@ -298,6 +333,8 @@ class ElectricalSystem:
             for model in self.models.values():
                 events.extend(model.end_step(None, x, self.time))
             out = self._outputs(x, events, info)
+            for key in ("_nets", "_pins", "_branches"):  # reports read them all
+                out[key] = dict(out[key])
             out["_x"] = x
             if export_spice:
                 out["_spice"] = self.circuit.to_spice(x, title=f"r3 electrical operating point: {self.project.spec.robot.name}",
@@ -315,29 +352,37 @@ class ElectricalSystem:
 
     def _outputs(self, x: np.ndarray, events: list[Event], info: SolveInfo) -> dict[str, Any]:
         out: dict[str, Any] = {cid: model.outputs(x) for cid, model in self.models.items()}
-        out["_nets"] = {name: self._v(x, rep) for name, rep in self.net_representative.items()}
-        out["_pins"] = {label[2:]: self._v(x, label) for label in self.project.graph.nodes if label.startswith("C:")}
-        currents = self.branch_currents(x)
-        resistance = self.circuit.resistors.resistance
-        branches: dict[str, Any] = {}
-        for key, branch in self.network.branches.items():
-            i = currents[key]
-            r = resistance[branch.index]
-            # ``current`` flows from ``from`` to ``to`` (graph edge orientation).
-            entry = {"kind": branch.kind, "from": branch.node_a, "to": branch.node_b, "current": i, "resistance": r, "voltage_drop": i * r, "power_loss": i * i * r,
-                     "temperature_rise": branch.temperature_rise, "rating": branch.rating}
-            if branch.kind == "wire":
-                entry.update(harness=branch.meta["harness"], awg=branch.meta["awg"], length=branch.meta["length"],
-                             length_source=branch.meta["length_source"])
-            elif branch.kind == "contact":
-                entry.update(connectors=branch.meta["connectors"], pin=branch.meta["pin"], burst_rating=branch.burst_rating)
-            branches[key] = entry
-        out["_branches"] = branches
+        out["_nets"] = _LazyMapping(self.net_representative, lambda rep: self._v(x, rep))
+        # Per-pin voltages and per-branch records are built on access: a co-simulation step
+        # reads a handful of them, reports read them all.
+        keys = self.__dict__.get("_output_keys")
+        if keys is None:
+            keys = self._output_keys = ({label[2:]: label for label in self.project.graph.nodes if label.startswith("C:")},
+                                        {key: key for key in self.network.branches})
+        out["_pins"] = _LazyMapping(keys[0], lambda label: self._v(x, label))
+        currents = self.circuit.resistors.currents(x)
+        resistance = list(self.circuit.resistors.resistance)
+        out["_branches"] = _LazyMapping(keys[1], lambda key: self._branch_entry(
+            self.network.branches[key], float(currents[self.network.branches[key].index]), resistance))
         out["_events"] = [e.to_json() for e in events]
         out["_time"] = self.time
         out["_solver"] = {"iterations": info.iterations, "residual": info.residual, "converged": info.converged,
                           "unknowns": self.circuit.size}
         return out
+
+    @staticmethod
+    def _branch_entry(branch: Branch, i: float, resistance: list[float]) -> dict[str, Any]:
+        r = resistance[branch.index]
+        # ``current`` flows from ``from`` to ``to`` (graph edge orientation).
+        entry = {"kind": branch.kind, "from": branch.node_a, "to": branch.node_b, "current": i, "resistance": r,
+                 "voltage_drop": i * r, "power_loss": i * i * r, "temperature_rise": branch.temperature_rise,
+                 "rating": branch.rating}
+        if branch.kind == "wire":
+            entry.update(harness=branch.meta["harness"], awg=branch.meta["awg"], length=branch.meta["length"],
+                         length_source=branch.meta["length_source"])
+        elif branch.kind == "contact":
+            entry.update(connectors=branch.meta["connectors"], pin=branch.meta["pin"], burst_rating=branch.burst_rating)
+        return entry
 
     # ---------------------------------------------------------------- SPICE
     def to_spice(self, x: np.ndarray | None = None) -> tuple[str, dict[str, str]]:
@@ -357,3 +402,38 @@ class ElectricalSystem:
     def __repr__(self) -> str:
         return f"ElectricalSystem({self.project.spec.robot.name!r}, models={len(self.models)}, unknowns={self.unknowns})"
 
+
+class _LazyMapping(MutableMapping):
+    """Mapping whose values are computed (once) on first access; writes override them."""
+
+    def __init__(self, keys: dict[Any, Any], compute: Any) -> None:
+        self._keys = keys  # public key -> argument of ``compute`` (shared, not copied)
+        self._compute = compute
+        self._cache: dict[Any, Any] = {}
+        self._extra: dict[Any, None] = {}
+
+    def __getitem__(self, name: Any) -> Any:
+        if name not in self._cache:
+            self._cache[name] = self._compute(self._keys[name])
+        return self._cache[name]
+
+    def __setitem__(self, name: Any, value: Any) -> None:
+        if name not in self._keys:
+            self._extra[name] = None
+        self._cache[name] = value
+
+    def __delitem__(self, name: Any) -> None:
+        raise TypeError("electrical outputs cannot be deleted")
+
+    def __contains__(self, name: object) -> bool:
+        return name in self._keys or name in self._extra
+
+    def __iter__(self) -> Any:
+        yield from self._keys
+        yield from self._extra
+
+    def __len__(self) -> int:
+        return len(self._keys) + len(self._extra)
+
+    def __repr__(self) -> str:
+        return repr(dict(self))

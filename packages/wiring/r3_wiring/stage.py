@@ -1,4 +1,4 @@
-"""Pipeline stage 4, ``wiring``: route harnesses, check them, simulate slack.
+"""Pipeline stage 4, ``wiring``: route harnesses, check them, simulate slack (MuJoCo cables).
 
 Reads the derived graph, ``build/cad/cad_model.json`` (optional) and writes:
 
@@ -69,7 +69,7 @@ def _dynamic_diagnostics(drive, routing) -> list[Diagnostic]:
     return out
 
 
-def _assumptions(result: StageResult, estimated: bool) -> None:
+def _assumptions(result: StageResult, estimated: bool, drive: Any = None) -> None:
     if estimated:
         result.assume("geometry", "Obstacles are catalog boxes/cylinders posed by component poses (no CAD export); "
                                   "custom shapes such as the tapered chassis plate use their bounding box.")
@@ -91,10 +91,11 @@ def _assumptions(result: StageResult, estimated: bool) -> None:
                             "gravity and stiffness (conservative); route slack is distributed uniformly over spans.")
     result.assume("checks", "Clearance and intersection ignore a termination zone at each end against the component "
                             "the wire terminates on (and the parts it is mounted on).")
-    result.assume("simulation", "XPBD rods, 7.5 mm segments, 0.5 ms substeps; EI from catalog estimates, axial "
-                                "stiffness 0.6 x E_Cu x A; velocity damping 19 1/s (~5 % of critical at 30 Hz) and "
-                                "friction 0.5 are estimates. Wires are simulated individually (no wire-wire contact); "
-                                "moving parts do not push cables, contacts are reported.")
+    for domain, statement in (drive.assumptions if drive is not None else []):
+        result.assume("simulation" if domain == "wiring" else domain, statement)
+    result.assume("simulation", "Slack drive on a MuJoCo shaker: chassis fixed, its translational acceleration applied "
+                                "as effective gravity R^T (g - a) (equivalence principle), jointed parts driven through "
+                                "stiff joint equality constraints; moving parts push cables they touch.")
 
 
 def run(project: Project, options: RouterOptions | None = None, drive_profile: DriveProfile | None = None,
@@ -148,10 +149,10 @@ def run(project: Project, options: RouterOptions | None = None, drive_profile: D
         "pass_throughs": len(routing.holes),
         "diagnostic_counts": dict(Counter(d.code for d in result.diagnostics)),
         "router": routing.stats,
-        "slack_sim": {"max_particle_speed": drive.max_speed, "max_tensile_strain": drive.max_strain,
-                      "duration": drive.profile.duration},
+        "slack_sim": {"max_segment_speed": drive.max_speed, "max_pin_error_m": drive.max_strain,
+                      "duration": drive.profile.duration, "engine": "mujoco.elasticity.cable"},
     }
-    _assumptions(result, bool(obstacles.estimated))
+    _assumptions(result, bool(obstacles.estimated), drive)
     result.duration_s = time.time() - started
     result.write(out / "result.json")
     return result

@@ -1,80 +1,202 @@
-"""Cable slack simulation: catenary sag, long-run stability, pins on moving bodies."""
+"""Cables as MuJoCo elastic cables: catenary, bending stiffness, 10 s stability, pins on
+moving bodies, contact-based clearance vs mj_geomDistance, and the RC-car steering sweep."""
 
 import math
+import shutil
+from pathlib import Path
 
+import mujoco
 import numpy as np
+import pytest
 from scipy.optimize import brentq
 
 from r3_model.project import Project
-from r3_wiring.cable_sim import GRAVITY, CableSimulator, RodSolver
+from r3_wiring.bodies import ROOT
+from r3_wiring.cable_sim import CableSimulator
 from r3_wiring.checks import run_checks
+from r3_wiring.driver import drive_joints
 from r3_wiring.export import routes_json
+from r3_wiring.geometry import Box, MeshShape
+from r3_wiring.mujoco_cables import ANCHOR_SOLIMP, ANCHOR_SOLREF, CABLE_PLUGIN, CableBundle, CableSpan, _damping
 from r3_wiring.obstacles import build_obstacles
 from r3_wiring.router import route_project
+from r3_wiring.stage import route_and_check
 from test_wiring_support import write_project
+
+RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+G = 9.80665
+
+
+def _bundle(vertices: np.ndarray, od: float, ei: float, mass_per_m: float, dt: float = 0.001) -> CableBundle:
+    length = float(np.mean(np.linalg.norm(np.diff(vertices, axis=0), axis=1)))
+    span = CableSpan("c", vertices, ROOT, ROOT, _damping(ei, mass_per_m, od / 2, length, dt))
+    return CableBundle("c", "h", ["w"], ["red"], od, ei, mass_per_m, 0.0, 0.0, [span], (ROOT, ROOT))
+
+
+def _single_cable(vertices: np.ndarray, bundle: CableBundle, initial: str, end: str, gravity: float = -G) -> str:
+    """One MuJoCo cable composite (R3's plugin parameters) between two fixed anchors."""
+    span = bundle.spans[0]
+    tip = np.linalg.norm(vertices[-1] - vertices[-2])
+    vertex = " ".join(f"{v:.9g}" for v in vertices.ravel())
+    stiff = f'solref="{ANCHOR_SOLREF}" solimp="{ANCHOR_SOLIMP}"'
+    end_constraint = (f'<connect body1="cB_last" body2="b" anchor="{tip:.9g} 0 0" {stiff}/>' if end == "pin"
+                      else f'<weld body1="cB_last" body2="b" {stiff}/>')
+    return f"""<mujoco><option timestep="0.001" integrator="implicitfast" gravity="0 0 {gravity}"/>
+<extension><plugin plugin="{CABLE_PLUGIN}"/></extension>
+<worldbody><body name="a"><composite type="cable" prefix="c" vertex="{vertex}" initial="{initial}">
+<plugin plugin="{CABLE_PLUGIN}"><config key="twist" value="{bundle.shear_modulus:.9g}"/>
+<config key="bend" value="{bundle.young_modulus:.9g}"/><config key="flat" value="true"/><config key="vmax" value="0"/></plugin>
+<joint kind="main" damping="{span.damping:.9g}"/>
+<geom type="capsule" size="{bundle.radius:.9g}" density="{bundle.density:.9g}" contype="0" conaffinity="0"/>
+</composite></body><body name="b" pos="{vertices[-1][0]:.9g} {vertices[-1][1]:.9g} {vertices[-1][2]:.9g}"/></worldbody>
+<equality>{end_constraint}</equality></mujoco>"""
+
+
+def _vertices(model: mujoco.MjModel, data: mujoco.MjData, segment: float) -> np.ndarray:
+    ids = [i for i in range(model.nbody) if (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, i) or "").startswith("cB_")]
+    tip = data.xpos[ids[-1]] + data.xmat[ids[-1]].reshape(3, 3)[:, 0] * segment
+    return np.vstack([data.xpos[ids], tip])
 
 
 def test_hanging_cable_matches_catenary():
+    # A nearly perfectly flexible cable pinned at both ends hangs as a catenary:
+    # s = 2 a sinh(D / 2a), z(x) = a cosh((x - D/2)/a) - a cosh(D/2a).
     span, length, n = 0.2, 0.26, 52
-    x = np.column_stack([np.linspace(0, span, n + 1), np.zeros(n + 1), np.zeros(n + 1)])
-    x[1:-1, 2] -= 1e-4 * np.sin(np.linspace(0, math.pi, n + 1)[1:-1])
-    rest = np.full(n, length / n)
-    mass = np.zeros(n + 1)
-    mass[:-1] += 0.5 * rest * 0.01
-    mass[1:] += 0.5 * rest * 0.01
-    pinned = np.zeros(n + 1, bool)
-    pinned[[0, -1]] = True
-    solver = RodSolver(iterations=4, damping=8.0)
-    solver.add_chain(x, rest, mass, 1e-9, 1e3, 0.001, pinned)  # nearly perfectly flexible
-    solver.finalize()
-    for _ in range(int(3.0 / 0.0005)):
-        solver.substep(0.0005, lambda p, v: np.broadcast_to(GRAVITY, p.shape))
-    # Catenary through both pins: s = 2 a sinh(D / 2a), z(x) = a cosh((x - D/2)/a) - a cosh(D/2a).
+    # Start from an upward arc of the right length (not the answer).
+    angle = brentq(lambda t: span / (2 * math.sin(t)) * 2 * t - length, 1e-6, 3.1)
+    radius = span / (2 * math.sin(angle))
+    theta = np.linspace(-angle, angle, n + 1)
+    vertices = np.column_stack([span / 2 + radius * np.sin(theta), np.zeros(n + 1),
+                                radius * np.cos(theta) - radius * math.cos(angle)])
+    bundle = _bundle(vertices, od=0.001, ei=1e-9, mass_per_m=0.01)
+    model = mujoco.MjModel.from_xml_string(_single_cable(vertices, bundle, initial="ball", end="pin"))
+    data = mujoco.MjData(model)
+    damping = model.dof_damping.copy()
+    model.dof_damping[:] = damping * 50  # damped pre-roll, as in r3_wiring.mujoco_cables.settle
+    for _ in range(4000):
+        mujoco.mj_step(model, data)
+    model.dof_damping[:] = damping
+    for _ in range(2000):
+        mujoco.mj_step(model, data)
+    assert data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number == 0
+    assert sum(model.body_mass) == pytest.approx(0.01 * length, rel=0.01)  # capsule density carries m' l per segment
+    points = _vertices(model, data, length / n)
     a = brentq(lambda a: 2 * a * math.sinh(span / (2 * a)) - length, 1e-3, 10.0)
-    xs, zs = solver.x[:, 0], solver.x[:, 2]
-    analytic = a * np.cosh((xs - span / 2) / a) - a * math.cosh(span / (2 * a))
+    analytic = a * np.cosh((points[:, 0] - span / 2) / a) - a * math.cosh(span / (2 * a))
     sag = a * (math.cosh(span / (2 * a)) - 1)
-    assert abs(-zs.min() - sag) / sag < 0.02
-    assert np.sqrt(np.mean((zs - analytic) ** 2)) < 0.001
-    assert np.abs(solver.v).max() < 1e-3  # at rest
+    print(f"catenary sag {sag * 1e3:.2f} mm, MuJoCo {-points[:, 2].min() * 1e3:.2f} mm, "
+          f"rms {np.sqrt(np.mean((points[:, 2] - analytic) ** 2)) * 1e3:.3f} mm")
+    assert abs(-points[:, 2].min() - sag) / sag < 0.02
+    assert np.sqrt(np.mean((points[:, 2] - analytic) ** 2)) < 0.001
+    assert np.abs(data.qvel).max() < 0.05  # at rest
+
+
+def test_cantilever_matches_catalog_bending_stiffness():
+    # Small-deflection cantilever under its own weight: delta = m' g L^4 / (8 EI). The rigid clamped
+    # first segment shortens the beam, so the discrete answer converges as ~(1 - 2 l / L).
+    length, n, od, ei, mass_per_m = 0.1, 40, 0.002, 2e-4, 0.0045
+    vertices = np.column_stack([np.linspace(0, length, n + 1), np.zeros(n + 1), np.zeros(n + 1)])
+    bundle = _bundle(vertices, od, ei, mass_per_m)
+    xml = _single_cable(vertices, bundle, initial="none", end="free")
+    xml = xml[:xml.index("<equality>")] + "</mujoco>"
+    model = mujoco.MjModel.from_xml_string(xml)
+    data = mujoco.MjData(model)
+    for _ in range(6000):
+        mujoco.mj_step(model, data)
+    tip = -_vertices(model, data, length / n)[-1, 2]
+    theory = mass_per_m * G * length ** 4 / (8 * ei)
+    print(f"cantilever tip {tip * 1e6:.1f} um vs Euler-Bernoulli {theory * 1e6:.1f} um")
+    assert 1 - 2.5 / n < tip / theory < 1.02
+
+
+def _routes(project: Project):
+    obstacles, _ = build_obstacles(project)
+    routing = route_project(project, obstacles)
+    return obstacles, routes_json(routing, run_checks(project, obstacles, routing).clearances)
 
 
 def test_simulator_stable_10s(tmp_path):
     project = Project.load(write_project(tmp_path, block=True, slack="40 mm"))
-    obstacles, _ = build_obstacles(project)
-    routing = route_project(project, obstacles)
-    routes = routes_json(routing, run_checks(project, obstacles, routing).clearances)
+    obstacles, routes = _routes(project)
     sim = CableSimulator(project, routes, obstacles)
-    start = sim.solver.x.copy()
-    max_speed = 0.0
-    for k in range(10000):  # 10 s at 1 ms with 0.5 g 25 Hz vibration and a 3 g bump at 5 s
+    start = sim.positions()
+    max_speed = max_pin = 0.0
+    for k in range(10000):  # 10 s at 1 ms: 0.5 g 25 Hz vibration, a 3 g bump at 5 s, yawing at 0.5 rad/s
         t = (k + 1) * 0.001
-        a_z = 0.5 * 9.80665 * math.sin(2 * math.pi * 25 * t) + (3 * 9.80665 * math.sin(math.pi * (t - 5) / 0.02) if 5 <= t <= 5.02 else 0)
+        a_z = 0.5 * G * math.sin(2 * math.pi * 25 * t) + (3 * G * math.sin(math.pi * (t - 5) / 0.02) if 5 <= t <= 5.02 else 0)
         report = sim.step(0.001, {"pos": [0, 0, 0], "quat": [1, 0, 0, 0], "lin_acc": [0, 0, a_z],
                                   "ang_vel": [0, 0, 0.5], "ang_acc": [0, 0, 0]})
-        max_speed = max(max_speed, report.max_speed)
-    assert np.all(np.isfinite(sim.solver.x))
+        max_speed, max_pin = max(max_speed, report.max_speed), max(max_pin, report.max_strain)
+    end = sim.positions()
+    assert sim.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number == 0
+    assert all(np.all(np.isfinite(p)) for p in end.values())
     assert max_speed < 3.0
-    assert report.max_strain < 0.02
-    assert np.abs(sim.solver.x - start).max() < 0.05  # bounded: pinned cable cannot wander off
+    assert max_pin < 0.001  # pins (connector clamps) give less than 1 mm
+    assert max(np.abs(end[w] - start[w]).max() for w in end) < 0.05  # bounded: pinned cables cannot wander off
 
 
 def test_pins_follow_moving_body(tmp_path):
     project = Project.load(write_project(tmp_path, block=False, moving_end=True, slack="60 mm"))
-    obstacles, _ = build_obstacles(project)
-    routing = route_project(project, obstacles)
-    routes = routes_json(routing, run_checks(project, obstacles, routing).clearances)
-    sim = CableSimulator(project, routes, obstacles, settle=0.1)
-    wire = sim.wires[0]
-    end_index, body, nominal = wire.pins[-1]
-    assert body == "arm"
-    rotation = np.array([[math.cos(0.3), -math.sin(0.3), 0], [math.sin(0.3), math.cos(0.3), 0], [0, 0, 1]])
+    obstacles, routes = _routes(project)
+    sim = CableSimulator(project, routes, obstacles, settle_time=0.1)
+    nominal = sim.positions()["W1"][-1].copy()  # the dst end sits on the steered arm
     origin = np.array([0.2, -0.06, 0.013])
-    p0, _ = project.graph.component_pose("arm")
-    pose = {"pos": (rotation @ (p0 - origin) + origin).tolist(),
-            "quat": [math.cos(0.15), 0, 0, math.sin(0.15)]}
-    for _ in range(50):
-        sim.step(0.001, {}, {"arm": pose, "dst": {"pos": (rotation @ (project.graph.component_pose("dst")[0] - origin) + origin).tolist(),
-                                                  "quat": pose["quat"]}})
+    for _ in range(300):
+        sim.step(0.001, joints={"steer": 0.3})
+    rotation = np.array([[math.cos(0.3), -math.sin(0.3), 0], [math.sin(0.3), math.cos(0.3), 0], [0, 0, 1]])
     expected = rotation @ (nominal - origin) + origin
-    assert np.linalg.norm(sim.solver.x[end_index] - expected) < 1e-6
+    assert np.linalg.norm(sim.positions()["W1"][-1] - expected) < 0.001
+    # The same joint value recovered from component poses (the CableSimulator.step interface).
+    p0, r0 = project.graph.component_pose("arm")
+    from r3_wiring.geometry import matrix_to_quat
+    pose = {"pos": (rotation @ (p0 - origin) + origin).tolist(), "quat": matrix_to_quat(rotation @ r0).tolist()}
+    assert sim.joints_from_poses({}, {"arm": pose})["steer"] == pytest.approx(0.3, abs=1e-9)
+
+
+@pytest.fixture(scope="module")
+def rc_car(tmp_path_factory):
+    root = tmp_path_factory.mktemp("rc-car-cables")
+    shutil.copy(RC_CAR / "robot.yaml", root / "robot.yaml")
+    project = Project.load(root)
+    bundle = route_and_check(project)
+    return project, bundle["obstacles"], bundle["routes"]
+
+
+def test_rc_car_steering_sweep(rc_car):
+    """Lock-to-lock steering with spinning wheels on the shaker: stable, and every clearance is a
+    physical surface distance (the PBD-era kernel reported -0.2 m from a frame/sign bug)."""
+    project, obstacles, routes = rc_car
+    sim = CableSimulator(project, routes, obstacles)
+    limit = sim.kin.steering_limit()
+    worst = math.inf
+    for k in range(1000):
+        t = (k + 1) * 0.001
+        steer = limit * math.sin(2 * math.pi * t)
+        report = sim.step(0.001, joints=drive_joints(sim.kin, steer, 36.0 * t))
+        worst = min(worst, min(d for d, _ in report.min_clearance.values()))
+    history = sim.min_history
+    print("RC car sweep worst clearance:", round(worst * 1e3, 2), "mm;",
+          {w: (round(d * 1e3, 2), c) for w, (d, c, _) in sorted(history.items(), key=lambda kv: kv[1][0])[:4]})
+    assert sim.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number == 0
+    assert all(np.isfinite(d) and -0.01 < d <= sim.plan.margin for d, _, _ in history.values())
+    # MuJoCo's own distance query agrees with the contact-derived clearance.
+    exact = sim.exact_clearance()
+    for wire, (distance, _) in sim.monitor.wire_clearance().items():
+        assert distance == pytest.approx(exact[wire][0], abs=1e-6), wire
+
+
+def test_mesh_sdf_sign_is_exact_near_corners():
+    box = Box(np.array([0.26, 0.068, 0.055]), np.eye(3), np.array([0.015, 0.01, 0.02]))
+    corners = box.corners()
+    hull = [(0, 1, 3), (0, 3, 2), (4, 6, 7), (4, 7, 5), (0, 4, 5), (0, 5, 1), (2, 3, 7), (2, 7, 6), (0, 2, 6),
+            (0, 6, 4), (1, 5, 7), (1, 7, 3)]
+    faces = np.array([f if np.dot(np.cross(corners[f[1]] - corners[f[0]], corners[f[2]] - corners[f[0]]),
+                                  corners[list(f)].mean(axis=0) - box.center) > 0 else f[::-1] for f in hull])
+    mesh = MeshShape(corners, faces, spacing=0.001)
+    rng = np.random.default_rng(0)
+    points = box.center + rng.uniform(-0.25, 0.25, size=(400, 3))
+    points[:50] = box.center + rng.uniform(-0.016, 0.016, size=(50, 3)) * [1, 1, 1.3]
+    # The point that the nearest-sample sign called -0.196 m (behind the top face, beside the box).
+    points = np.vstack([points, [[0.0546, 0.0112, 0.0749]]])
+    assert np.all(np.sign(mesh.sdf(points)) == np.sign(box.sdf(points)))
+    assert np.allclose(mesh.sdf(points), box.sdf(points), atol=0.0015)

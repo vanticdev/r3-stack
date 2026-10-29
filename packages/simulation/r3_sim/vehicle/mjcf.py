@@ -16,6 +16,11 @@ Wheels collide as MuJoCo *cylinders* (native plane-cylinder contact, which
 returns up to four rim/edge contacts per wheel, so the tire contact patch has
 width and resists yaw scrub). No capsule/ellipsoid approximation is used
 because MuJoCo 3.x supports cylinder-plane and cylinder-box contact natively.
+
+With ``routes`` (``build/wiring/routes.json``) every routed harness is added to
+the same world as a MuJoCo elastic cable (``mujoco.elasticity.cable``),
+anchored to the bodies that carry its connectors and ties, colliding with
+massless part collision geoms (:mod:`r3_wiring.mujoco_cables`).
 """
 
 from __future__ import annotations
@@ -95,6 +100,7 @@ class VehicleModel:
     assumptions: list[tuple[str, str]] = field(default_factory=list)
     mass_source: dict[str, str] = field(default_factory=dict)
     geometry: dict[str, dict[str, Any]] = field(default_factory=dict)  # body -> primitive shape (for clearance)
+    cables: Any = None  # r3_wiring.mujoco_cables.CablePlan when routes were given
 
 
 def _fmt(values: Any) -> str:
@@ -188,9 +194,10 @@ def _hex_rgba(color: str, alpha: float = 1.0) -> str:
 
 def build_vehicle_model(project: Project, initial_pose: tuple[float, float, float] = (0.0, 0.0, 0.0),
                         obstacles: list[dict[str, Any]] | None = None,
-                        course: list[list[float]] | None = None) -> VehicleModel:
+                        course: list[list[float]] | None = None, routes: dict[str, Any] | None = None) -> VehicleModel:
     """Build the MJCF for the spec. ``initial_pose`` is (x, y, yaw) of the robot
-    origin in the world; ``course`` waypoints are drawn as visual markers."""
+    origin in the world; ``course`` waypoints are drawn as visual markers;
+    ``routes`` adds the routed harnesses as MuJoCo cables."""
     spec = project.spec
     catalog = project.catalog
     diagnostics: list[Diagnostic] = []
@@ -466,6 +473,8 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
         assumptions.append(("mechanical", "Open differential splits carrier torque equally (fixed tendon, coef 1/n); motor "
                                           "rotor inertia is reflected through ratio^2 onto the carrier; gear backlash is not modeled."))
 
+    cable_plan = _add_cables(project, mj, routes, root, elements, body_origin, diagnostics, assumptions) if routes else None
+
     sensor = ET.SubElement(mj, "sensor")
     if imu_site:
         ET.SubElement(sensor, "accelerometer", name="imu_acc", site=imu_site)
@@ -473,10 +482,33 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     ET.SubElement(sensor, "framequat", name="chassis_quat", objtype="site", objname="chassis_ref")
 
     xml = ET.tostring(mj, encoding="unicode")
+    if cable_plan is not None:
+        total_mass += cable_plan.total_mass  # wire mass rides on the vehicle through its anchors
     return VehicleModel(xml=xml, root=root, bodies=bodies, body_origin=body_origin, mass_properties=body_props,
                         total_mass=total_mass, wheels=wheels, drives=drives, steering=steering, imu_site=imu_site,
                         imu_component=imu_component, diagnostics=diagnostics, assumptions=assumptions,
-                        mass_source=mass_source, geometry=geometry)
+                        mass_source=mass_source, geometry=geometry, cables=cable_plan)
+
+
+def _add_cables(project: Project, mj: ET.Element, routes: dict[str, Any], root: str, elements: dict[str, ET.Element],
+                body_origin: dict[str, np.ndarray], diagnostics: list[Diagnostic],
+                assumptions: list[tuple[str, str]]) -> Any:
+    """Routed harnesses as MuJoCo cables in this world (None if they cannot be built)."""
+    try:
+        from r3_wiring.bodies import ROOT
+        from r3_wiring.mujoco_cables import emit_mjcf, plan_cables
+
+        plan = plan_cables(project, routes, timestep=float(project.spec.simulation.timestep))
+        body = lambda kin_body: root if kin_body == ROOT else kin_body  # noqa: E731
+        emit_mjcf(mj, plan, lambda b: elements[body(b)], lambda b: body_origin[body(b)], body)
+    except Exception as error:  # noqa: BLE001 - any failure leaves the vehicle without cables
+        diagnostics.append(Diagnostic.warning(
+            "cable_model_fallback", f"MuJoCo cables could not be built from routes.json ({type(error).__name__}: {error})",
+            subjects=["wiring/routes.json"], data={"fallback": 1}))
+        return None
+    diagnostics.extend(plan.diagnostics)
+    assumptions.extend(plan.assumptions)
+    return plan
 
 
 def write_mjcf(model: VehicleModel, path: Path) -> Path:

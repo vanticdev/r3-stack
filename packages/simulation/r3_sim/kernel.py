@@ -7,7 +7,9 @@ Per step (``simulation.timestep``), in the documented order:
    electrically reach the device);
 3. ``ElectricalSystem.step`` solves the DC network -> motor torque, rails, brownout;
 4. MuJoCo vehicle steps with motor torque (differential) and servo torque (Ackermann);
-5. ``CableSimulator.step`` every 5 ms -> wire clearance to moving parts;
+5. the routed cables are MuJoCo elastic cables in the same world, stepped by
+   step 4; their clearance to moving parts is read from MuJoCo contact data
+   every step;
 6. radio link + ELRS receiver -> CRSF bytes on the receiver UART;
 7. sensors (IMU, GPS, encoder, INA226) sample the physical state;
 8. time advances; the HAL server wakes software whose deadline has passed.
@@ -21,6 +23,7 @@ from __future__ import annotations
 import collections
 import json
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -48,7 +51,7 @@ DEFAULT_GPS_ORIGIN = (37.4275, -122.1697, 30.0)  # fixed geodetic origin of the 
 
 def _get(mapping: Any, *path: str, default: Any = None) -> Any:
     for key in path:
-        if not isinstance(mapping, dict) or key not in mapping:
+        if not isinstance(mapping, Mapping) or key not in mapping:
             return default
         mapping = mapping[key]
     return mapping
@@ -155,7 +158,9 @@ class CoSimKernel:
 
         mission = scenario.mission or {}
         waypoints = mission.get("waypoints") or []
-        self.vm = build_vehicle_model(project, self.initial_pose, spec.simulation.environment.obstacles, waypoints)
+        routes = project.read_build_json("wiring/routes.json")
+        self.vm = build_vehicle_model(project, self.initial_pose, spec.simulation.environment.obstacles, waypoints,
+                                      routes=routes)
         self.diagnostics.extend(self.vm.diagnostics)
         self.assumptions.extend(self.vm.assumptions)
         self.vehicle = Vehicle(project, self.vm)
@@ -179,7 +184,6 @@ class CoSimKernel:
         self.brownout_voltage = to_si(computer_params.get("brownout_voltage", 4.63))
 
         # --- electrical / cable models (built in parallel by other packages; fall back if absent)
-        routes = project.read_build_json("wiring/routes.json")
         soc = float(initial.get("battery_soc", 1.0))
         self.electrical = self._load_electrical(routes, soc)
         self.cables = self._load_cables(routes)
@@ -294,8 +298,6 @@ class CoSimKernel:
         self.wire_clearance: dict[str, tuple[float, str]] = {}
         self.min_wire_clearance = (math.inf, "", "")
         self.recorder = Recorder()
-        self._prev_v: np.ndarray | None = None
-        self._prev_w: np.ndarray | None = None
         self._next_record = 0.0
         self._next_snapshot = 0.0
         self._next_cable = 0.0
@@ -330,16 +332,16 @@ class CoSimKernel:
             return FallbackElectricalSystem(self.project, routes, initial_soc=soc)
 
     def _load_cables(self, routes: Any) -> Any:
-        try:
-            from r3_wiring import CableSimulator  # type: ignore[attr-defined]
-        except Exception as error:  # noqa: BLE001
-            self._fallback_warning("cable_model_fallback", "r3_wiring.CableSimulator", error)
-            return FallbackCableSimulator(self.project, routes, self.vm.geometry)
-        try:
-            return CableSimulator(self.project, routes)
-        except Exception as error:  # noqa: BLE001
-            self._fallback_warning("cable_model_fallback", "CableSimulator construction", error)
-            return FallbackCableSimulator(self.project, routes, self.vm.geometry)
+        """In-world MuJoCo cables when routes.json exists; the labeled static fallback otherwise."""
+        if self.vehicle.cables is not None:
+            return self.vehicle.cables
+        if routes:
+            self.diagnostics.append(Diagnostic.warning(
+                "cable_model_fallback", "routes.json present but the MuJoCo cables could not be built; using the labeled "
+                "fallback in r3_sim.fallbacks", subjects=["wiring/routes.json"], data={"fallback": 1}))
+        else:
+            self._fallback_warning("cable_model_fallback", "build/wiring/routes.json", FileNotFoundError("not built"))
+        return FallbackCableSimulator(self.project, routes, self.vm.geometry)
 
     def _fallback_warning(self, code: str, what: str, error: Exception) -> None:
         self.diagnostics.append(Diagnostic.warning(
@@ -407,24 +409,28 @@ class CoSimKernel:
                     return state["duty_ns"] / 1000.0
         return 0.0
 
-    def step(self) -> None:
-        dt, t0 = self.dt, self.t
+    def _inputs(self) -> tuple[dict[str, Any], float, float, float]:
+        """Steps 1-2: software outputs -> device inputs. Returns (electrical inputs, motor
+        speed, ESC pulse, servo pulse); reads only state that MuJoCo's mj_step2 leaves alone."""
         vehicle = self.vehicle
-        # 1-2. software outputs -> device inputs.
-        self.esc_pulse = self._pulse_for(self.esc_id)
-        self.servo_pulse = self._pulse_for(self.servo_id)
+        esc_pulse = self._pulse_for(self.esc_id)
+        servo_pulse = self._pulse_for(self.servo_id)
         servo = vehicle.servos[0] if vehicle.servos else None
         motor_omega = vehicle.motor_omega(0) if self.vm.drives else 0.0
         activity = 0.0 if not self.pi_powered else (0.55 if self.software_running else 0.8)
         inputs = {
-            self.esc_id: {"pulse_us": self.esc_pulse},
+            self.esc_id: {"pulse_us": esc_pulse},
             self.motor_id: {"omega": motor_omega},
-            self.servo_id: {"pulse_us": self.servo_pulse, "horn_torque": servo.last_torque if servo else 0.0,
+            self.servo_id: {"pulse_us": servo_pulse, "horn_torque": servo.last_torque if servo else 0.0,
                             "horn_speed": servo.omega if servo else 0.0},
             self.computer: {"activity": activity},
         }
-        # 3. electrical network.
-        out = self.electrical.step(dt, inputs)
+        return inputs, motor_omega, esc_pulse, servo_pulse
+
+    def _apply(self, out: dict[str, Any], t0: float, motor_omega: float, esc_pulse: float, servo_pulse: float) -> None:
+        """Step 3 outputs -> power state; step 4 controls (motor torque, servo) for mj_step2."""
+        vehicle = self.vehicle
+        self.esc_pulse, self.servo_pulse = esc_pulse, servo_pulse
         self.last_outputs = out
         torque = float(_first(out, [(self.motor_id, "torque")], 0.0))
         powered = _first(out, [(self.computer, "powered")])
@@ -433,22 +439,86 @@ class CoSimKernel:
         self._update_power(bool(powered), t0)
         servo_v = float(_first(out, [(self.servo_id, "voltage"), (self.servo_id, "v_supply"), (self.esc_id, "bec_voltage"),
                                      ("_nets", "BEC_6V")], 6.0))
-        # 4. vehicle physics.
         if self.vm.drives:
-            vehicle.set_motor_torque(0, torque)
+            vehicle.set_motor_torque(0, torque, motor_omega)
         if self.vm.steering:
-            vehicle.step_servo(0, dt, self.servo_pulse, servo_v)
-        vehicle.step()
+            vehicle.step_servo(0, self.dt, servo_pulse, servo_v)
+
+    def step(self) -> None:
+        """One master step, serially except that mj_step1 runs while the circuit is solved."""
+        t0 = self.t
+        vehicle = self.vehicle
+        inputs, motor_omega, esc_pulse, servo_pulse = self._inputs()
+        vehicle.start_step()  # mj_step1 depends only on the state
+        out = self.electrical.step(self.dt, inputs)  # 3. electrical network
+        self._apply(out, t0, motor_omega, esc_pulse, servo_pulse)
+        vehicle.finish_step()  # 4. mj_step2 with the new controls
         self.step_index += 1
-        t1 = self.t
-        position = vehicle.position()
-        rotation = vehicle.rotation()
-        # 5. cables.
-        if t1 + 1e-9 >= self._next_cable:
+        self._post(t0, out, vehicle)
+
+    def _run_overlapped(self, steps: int) -> None:
+        """``steps`` master steps with no software interaction in between, overlapping
+        MuJoCo's step halves (background worker) with the Python work they do not touch:
+
+        * mj_step1 of step k  ||  steps 5-8 of step k-1 (from a snapshot of its state) and the
+          bookkeeping half of step k's electrical step (model states, temperatures, outputs);
+        * mj_step2 of step k  ||  the network solve of step k+1 (its inputs are final: software
+          outputs cannot change between these steps; motor speed comes from mj_step1).
+
+        Every quantity is read at the same point of the step sequence as in :meth:`step`,
+        so the results are identical. Stops early after a brownout."""
+        vehicle = self.vehicle
+        # Split the electrical step only if it is the system's own (a wrapped instance ``step``,
+        # e.g. fault injection, must run as a whole).
+        split = (hasattr(self.electrical, "solve_step") and hasattr(self.electrical, "finish_step")
+                 and "step" not in vars(self.electrical))
+        frame: tuple[float, dict[str, Any], Any] | None = None
+        prepared: tuple[Any, ...] | None = None
+        for k in range(steps):
+            t0 = self.t
+            if prepared is None:
+                inputs, motor_omega, esc_pulse, servo_pulse = self._inputs()
+                vehicle.start_step()
+                solution = (self.electrical.solve_step if split else self.electrical.step)(self.dt, inputs)
+            else:
+                inputs, motor_omega, esc_pulse, servo_pulse, solution = prepared
+                vehicle.start_step()
+            if frame is not None:
+                self._post(*frame)
+                frame = None
+            out = self.electrical.finish_step(self.dt, *solution) if split else solution
+            prepared = None
+            self._apply(out, t0, motor_omega, esc_pulse, servo_pulse)
+            vehicle.launch_step2()
+            if k < steps - 1 and self.pi_powered:
+                upcoming = self._inputs()
+                solve = self.electrical.solve_step if split else self.electrical.step
+                prepared = (*upcoming, solve(self.dt, upcoming[0]))
+            vehicle.complete_step()
+            self.step_index += 1
+            frame = (t0, out, vehicle.state(moving_parts=vehicle.cables is None))
+            if not self.pi_powered:
+                break
+        if frame is not None:
+            self._post(*frame)
+
+    def _post(self, t0: float, out: dict[str, Any], state: Any) -> None:
+        """Steps 5-8 after the MuJoCo step: cable clearance, radio, sensors, UARTs, recording.
+        ``state`` is the vehicle or a snapshot of it taken right after the step."""
+        dt, t1 = self.dt, self.t
+        position = state.position()
+        rotation = state.rotation()
+        # 5. cables: stepped inside MuJoCo (step 4); clearance from this step's contact data.
+        if self.vehicle.cables is not None:
+            if float(self.vehicle.cables.current.min()) < self.min_wire_clearance[0]:
+                self._update_min_clearance()
+            if t1 + 1e-9 >= self._next_cable:
+                self._next_cable += CABLE_PERIOD
+                self.wire_clearance = self.vehicle.cables.wire_clearance()
+        elif t1 + 1e-9 >= self._next_cable:
             self._next_cable += CABLE_PERIOD
-            chassis = vehicle.chassis_state(self._prev_v, self._prev_w, CABLE_PERIOD)
-            self._prev_v, self._prev_w = chassis["lin_vel"], chassis["ang_vel"]
-            report = self.cables.step(CABLE_PERIOD, chassis, vehicle.moving_parts())
+            chassis = {"pos": position, "quat": state.quaternion()}
+            report = self.cables.step(CABLE_PERIOD, chassis, state.moving_parts())
             self.wire_clearance = dict(getattr(report, "min_clearance", {}) or {})
             for wire, (distance, part) in self.wire_clearance.items():
                 if distance < self.min_wire_clearance[0]:
@@ -463,12 +533,12 @@ class CoSimKernel:
         # 7. sensors.
         if self.gps is not None:
             gps_pos = position + rotation @ self.gps_antenna_offset
-            gps_bytes = self.gps.advance(t1, gps_pos, vehicle.velocity(), self.pi_powered)
+            gps_bytes = self.gps.advance(t1, gps_pos, state.velocity(), self.pi_powered)
             if self.gps_uart is not None:
                 self.gps_uart.push(gps_bytes, self.rng_uart)
         if self.imu is not None:
             self.imu.set_powered(self.pi_powered)
-            acc, gyro = vehicle.imu()
+            acc, gyro = state.imu()
             self.imu.update(dt, acc, gyro, self.temperature_c + 8.0)
         if self.ina is not None:
             self.ina.set_powered(self.pi_powered)
@@ -477,7 +547,7 @@ class CoSimKernel:
             bus_v = _first(out, [(self.board_id or "", "v_in"), ("_nets", "VBAT"), (self.battery_id, "v_terminal")], 0.0)
             self.ina.update(dt, float(branch), float(bus_v))
         if self.encoder is not None and self.encoder_joint is not None:
-            edges = self.encoder.update(t0, t1, vehicle.joint_angle(self.encoder_joint))
+            edges = self.encoder.update(t0, t1, state.joint_angle(self.encoder_joint))
             line = self.gpio_lines.get(self.encoder_line) if self.pi_powered else None
             for t_edge, rising in edges:
                 if line is not None:
@@ -491,11 +561,17 @@ class CoSimKernel:
         # 8. record.
         if t1 + 1e-9 >= self._next_record:
             self._next_record += RECORD_PERIOD
-            self._record(out, position)
+            self._record(out, position, state)
         if t1 + 1e-9 >= self._next_snapshot:
             self._next_snapshot += SNAPSHOT_PERIOD
             self.recorder.snapshots_t.append(t1)
-            self.recorder.snapshots_qpos.append(vehicle.data.qpos.copy())
+            self.recorder.snapshots_qpos.append(state.qpos())
+
+    def _update_min_clearance(self) -> None:
+        """Running minimum over every MuJoCo step (the monitor tracks it per bundle)."""
+        for wire, (distance, part, _) in self.vehicle.cables.wire_minimum().items():
+            if distance < self.min_wire_clearance[0]:
+                self.min_wire_clearance = (distance, wire, part)
 
     def _update_power(self, powered: bool, t: float) -> None:
         if self.pi_powered and not powered:
@@ -513,18 +589,19 @@ class CoSimKernel:
             if self.on_power_restored:
                 self.on_power_restored(t)
 
-    def _record(self, out: dict[str, Any], position: np.ndarray) -> None:
+    def _record(self, out: dict[str, Any], position: np.ndarray, state: Any = None) -> None:
         vehicle = self.vehicle
+        state = vehicle if state is None else state
         sample = self.receiver.last_sample
-        v = vehicle.velocity()
+        v = state.velocity()
         battery_v = float(_first(out, [(self.battery_id, "v_terminal")], 0.0))
         self.recorder.add(
-            t=self.t, x=position[0], y=position[1], z=position[2], yaw=vehicle.yaw(), speed=vehicle.forward_speed(),
+            t=self.t, x=position[0], y=position[1], z=position[2], yaw=state.yaw(), speed=state.forward_speed(),
             vx=v[0], vy=v[1],
-            steer=vehicle.steer_angle(0) if self.vm.steering else 0.0,
+            steer=state.steer_angle(0) if self.vm.steering else 0.0,
             steer_target=0.5 * sum(vehicle.steer_targets[0]) if self.vm.steering else 0.0,
             horn=vehicle.servos[0].theta if vehicle.servos else 0.0,
-            motor_omega=vehicle.motor_omega(0) if self.vm.drives else 0.0,
+            motor_omega=state.motor_omega(0) if self.vm.drives else 0.0,
             motor_torque=vehicle.motor_torque[0] if self.vm.drives else 0.0,
             motor_current=float(_first(out, [(self.motor_id, "current")], 0.0)),
             esc_pulse=self.esc_pulse, servo_pulse=self.servo_pulse,
@@ -544,8 +621,10 @@ class CoSimKernel:
             armed=1.0 if self.pilot.armed(self.t) else 0.0,
         )
 
-    def advance_until(self, done: Callable[[], bool], limit: float | None = None) -> str:
-        """Step until ``done()``; returns 'done' | 'brownout' | 'end' (scenario duration)."""
+    def advance_until(self, done: Callable[[], bool], limit: float | None = None, deadline: float | None = None) -> str:
+        """Step until ``done()``; returns 'done' | 'brownout' | 'end' (scenario duration).
+        ``deadline``: ``done()`` is exactly ``t >= deadline``, so the steps up to it can run
+        with MuJoCo overlapped across steps (:meth:`_run_overlapped`)."""
         end = self.duration if limit is None else min(self.duration, limit)
         while True:
             if done():
@@ -554,7 +633,22 @@ class CoSimKernel:
                 return "brownout"
             if self.t >= end - 1e-9:
                 return "end" if self.t >= self.duration - 1e-9 else "done"
+            if deadline is not None and self.vehicle.overlapped:
+                steps = self._steps_until(deadline, end)
+                if steps > 1:
+                    self._run_overlapped(steps)
+                    continue
             self.step()
+
+    def _steps_until(self, deadline: float, end: float) -> int:
+        """Steps the serial loop would take before ``t >= deadline`` or ``t >= end`` (same
+        float tests as :meth:`advance_until`, on ``t = step_index * dt``)."""
+        steps = max(0, int((min(deadline, end) - self.t) / self.dt) - 1)
+        while True:
+            t = (self.step_index + steps) * self.dt
+            if t + 1e-9 >= deadline or t >= end - 1e-9:
+                return steps
+            steps += 1
 
     def log(self, level: str, message: str, fields: dict[str, Any]) -> None:
         self.recorder.logs.append({"t": round(self.t, 6), "level": level, "message": message, "fields": fields})

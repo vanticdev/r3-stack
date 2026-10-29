@@ -11,6 +11,8 @@ Entry points:
 
 from __future__ import annotations
 
+from . import gl as _gl  # noqa: F401 - selects MuJoCo's headless OpenGL backend before mujoco is imported
+
 __all__ = ["__version__"]
 
 __version__ = "0.1.0"

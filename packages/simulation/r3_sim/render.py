@@ -1,6 +1,13 @@
-"""Offscreen MuJoCo renders (``mujoco.Renderer``) of recorded vehicle states."""
+"""Offscreen MuJoCo renders (``mujoco.Renderer``) of recorded vehicle states.
+
+Headless: the OpenGL backend is chosen by :mod:`r3_sim.gl` before ``mujoco``
+is imported (``MUJOCO_GL=egl`` or ``osmesa`` on Linux servers, ``cgl`` on macOS;
+an explicit ``MUJOCO_GL`` wins). :data:`GL_BACKEND` records the choice.
+"""
 
 from __future__ import annotations
+
+import os
 
 import math
 import shutil
@@ -10,6 +17,19 @@ from pathlib import Path
 import mujoco
 import numpy as np
 from PIL import Image
+
+from .gl import BACKEND
+
+GL_BACKEND = os.environ.get("MUJOCO_GL") or BACKEND or "default"
+
+
+def _renderer(model: mujoco.MjModel, height: int, width: int) -> mujoco.Renderer:
+    try:
+        return mujoco.Renderer(model, height, width)
+    except Exception as error:  # noqa: BLE001 - re-raised with the headless hint
+        raise RuntimeError(f"MuJoCo offscreen rendering failed with MUJOCO_GL={GL_BACKEND}: {error}. On a Linux "
+                           "server install EGL (libegl1, GPU or Mesa) and set MUJOCO_GL=egl, or OSMesa "
+                           "(libosmesa6) and set MUJOCO_GL=osmesa, before mujoco is imported.") from error
 
 
 def _camera(lookat: np.ndarray, yaw: float, distance: float = 1.1, elevation: float = -22.0) -> mujoco.MjvCamera:
@@ -28,7 +48,7 @@ def render_frames(model: mujoco.MjModel, times: list[float], qpos: list[np.ndarr
     out_dir.mkdir(parents=True, exist_ok=True)
     data = mujoco.MjData(model)
     paths = []
-    with mujoco.Renderer(model, height, width) as renderer:
+    with _renderer(model, height, width) as renderer:
         for target in at:
             k = int(np.argmin(np.abs(np.asarray(times) - target)))
             data.qpos[:] = qpos[k]
@@ -53,7 +73,7 @@ def render_video(model: mujoco.MjModel, times: list[float], qpos: list[np.ndarra
         return None
     data = mujoco.MjData(model)
     frames = []
-    with mujoco.Renderer(model, height, width) as renderer:
+    with _renderer(model, height, width) as renderer:
         for k, t in enumerate(times):
             if t > max_seconds:
                 break

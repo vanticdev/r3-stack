@@ -77,8 +77,10 @@ class ObstacleSet:
         return min(candidates, key=lambda o: o.shape.aabb()[0][2]) if candidates else None
 
     def min_distance(self, points: np.ndarray, obstacles: list[Obstacle], swept: bool = False,
-                     keepout: bool = False, exclude: set[str] | None = None) -> tuple[np.ndarray, list[str]]:
-        """Per-point minimum signed distance (and which component) over ``obstacles``."""
+                     keepout: bool = False, exclude: set[str] | None = None,
+                     cutoff: float = 0.2) -> tuple[np.ndarray, list[str]]:
+        """Per-point minimum signed distance (and which component) over ``obstacles``;
+        distances beyond ``cutoff`` are reported as ``cutoff``."""
         points = np.atleast_2d(points)
         best = np.full(len(points), np.inf)
         which = [""] * len(points)
@@ -86,7 +88,7 @@ class ObstacleSet:
             if exclude and obstacle.component in exclude:
                 continue
             shape = obstacle.swept if swept else obstacle.shape
-            value = shape.sdf_bounded(points, 0.2) - (obstacle.keepout if keepout else 0.0)
+            value = shape.sdf_bounded(points, cutoff) - (obstacle.keepout if keepout else 0.0)
             better = value < best
             if better.any():
                 best[better] = value[better]
