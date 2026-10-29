@@ -1,8 +1,8 @@
 """Offscreen MuJoCo renders (``mujoco.Renderer``) of recorded vehicle states.
 
-Headless: the OpenGL backend is chosen by :mod:`r3_sim.gl` before ``mujoco``
-is imported (``MUJOCO_GL=egl`` or ``osmesa`` on Linux servers, ``cgl`` on macOS;
-an explicit ``MUJOCO_GL`` wins). :data:`GL_BACKEND` records the choice.
+Headless: :mod:`r3_sim.headless` chooses the OpenGL backend before ``mujoco``
+is imported (``MUJOCO_GL=egl`` with a GPU or ``osmesa`` on Linux servers, ``cgl``
+on macOS; an explicit ``MUJOCO_GL`` wins). :data:`GL_BACKEND` records the choice.
 """
 
 from __future__ import annotations
@@ -18,9 +18,7 @@ import mujoco
 import numpy as np
 from PIL import Image
 
-from .gl import BACKEND
-
-GL_BACKEND = os.environ.get("MUJOCO_GL") or BACKEND or "default"
+GL_BACKEND = os.environ.get("MUJOCO_GL") or "default"  # set by r3_sim.headless.configure() on import
 
 
 def _renderer(model: mujoco.MjModel, height: int, width: int) -> mujoco.Renderer:

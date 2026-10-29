@@ -1,6 +1,6 @@
 """``electrical`` pipeline stage: static worst-case operating points and checks.
 
-Operating points (DC solves of the full nonlinear network, see
+Operating points (ngspice ``op`` solves of the full nonlinear network, see
 :mod:`r3_sim.electrical.system`), each at three battery states (full, nominal,
 minimum = SOC 0):
 
@@ -212,8 +212,7 @@ def harness_drops(system: ElectricalSystem, out: dict[str, Any]) -> dict[str, di
     harness's own nodes plus the mated far-side contacts, divided by the highest
     node voltage in the harness (the supply it carries)."""
     graph, spec = system.project.graph, system.project.spec
-    x = out["_x"]
-    voltage = {label: (0.0 if system.circuit.index(label) < 0 else float(x[system.circuit.index(label)])) for label in graph.nodes}
+    voltage = {label: system.voltage(out["_x"], label) for label in graph.nodes}
     result = {}
     for harness in spec.electrical.harnesses:
         prefix = (f"H:{harness.id}.", f"S:{harness.id}.")
@@ -758,6 +757,7 @@ def full_throttle_transient(project: Any, routes: Any, ops: OperatingPoints, dur
         trace["torque"].append(out[motor]["torque"])
         trace["battery_voltage"].append(out[battery]["v_terminal"])
         trace["pi_voltage"].append(out[computer]["voltage"] if computer else 0.0)
+    system.close()
     return trace
 
 
@@ -802,7 +802,8 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
     result.metrics.update({
         "vehicle_mass": vehicle["mass"], "cruise_motor_torque": ops.motor_torque_cruise, "cruise_motor_omega": ops.motor_omega_cruise,
         "traction_motor_torque": ops.motor_torque_traction, "runtime": runtime.get("runtime"),
-        "unknowns": system.unknowns, "behavior_models": len(system.models),
+        "unknowns": system.unknowns, "behavior_models": len(system.models), "solver": "ngspice",
+        "operating_point_solves": system.stats["operating_points"],
         "max_battery_current": max(abs(p["components"][battery.id]["current"]) for p in points) if battery else 0.0,
     })
     for p in points:
@@ -821,6 +822,10 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
     path = build / "operating_points.json"
     path.write_text(json.dumps(_clean(document), indent=2, default=_json_default, allow_nan=False))
     result.artifact("electrical/operating_points.json", "json", "Static worst-case electrical operating points and checks")
+    for mode, description in (("op", "ngspice deck for the operating points (EXTERNAL sources set per point)"),
+                              ("tran", "ngspice deck of the lockstep co-simulation transient")):
+        (build / f"circuit_{mode}.cir").write_text(system.to_spice(mode) + "\n")
+        result.artifact(f"electrical/circuit_{mode}.cir", "spice", description)
 
     if plots:
         from . import plots as plotting
@@ -834,11 +839,14 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
             plotting.runtime_curve(runtime, build / "runtime.png")
             result.artifact("electrical/runtime.png", "plot_png", "Quasi-static discharge at the duty cycle")
         if ops.motors:
+            started_transient = time.perf_counter()
             trace = full_throttle_transient(project, routes, ops)
+            result.metrics["transient_real_time_factor"] = 2.0 / (time.perf_counter() - started_transient)
             plotting.transient(trace, build / "full_throttle_transient.png")
             result.artifact("electrical/full_throttle_transient.png", "plot_png", "2 s full-throttle transient (constant motor-speed ramp)")
             result.metrics["transient_peak_motor_current"] = max(trace["motor_current"])
             result.metrics["transient_min_battery_voltage"] = min(trace["battery_voltage"])
+    system.close()
     result.duration_s = time.time() - started
     result.write(build / "result.json")
     return result
@@ -846,7 +854,13 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
 
 def _assumptions(result: StageResult, vehicle: dict[str, Any], ops: OperatingPoints, estimated: dict[str, Any], routed: bool) -> None:
     a = result.assume
-    a("electrical", "DC network solved by nonlinear MNA/Newton; PWM drives are state-space averaged (no ripple, no switching transients).")
+    a("electrical", "Circuit solved by ngspice (shared library): operating points with `op`, the transient in lockstep with the "
+                    "1 ms co-simulation clock; every component is a SPICE subcircuit generated from robot.yaml and the catalog.")
+    a("electrical", "ESC H-bridge is a state-space averaged switch inside ngspice (no PWM ripple); its cycle-by-cycle current limit "
+                    "acts with one co-simulation step (one 1 kHz PWM period) of latency. The PWM-switched bridge "
+                    "(ElectricalSystem(esc_model='switched'), gate edges resolved by ngspice) runs at ~0.1x real time versus "
+                    "~2x averaged on the RC car; its step-mean motor torque was ~4 % below the averaged model at 1 kHz PWM, "
+                    "50 % throttle, where the current ripple is large (L/R ~ T/2).")
     a("electrical", "Wire resistance from the AWG table with copper tempco 0.00393/K; contact resistance per mated pin from the catalog; PCB trace resistance not modeled.")
     if not routed:
         a("wiring", "No build/wiring/routes.json: wire lengths are 1.3 x straight-line connector distance (wire_length_estimated).")
@@ -860,6 +874,8 @@ def _assumptions(result: StageResult, vehicle: dict[str, Any], ops: OperatingPoi
     a("loads", f"Steering hold load {STEERING_HOLD}; servo stall = {SERVO_STALL_DEMAND} x stall torque demand at zero speed; computer activity {CRUISE_ACTIVITY} at cruise, 1.0 at peaks.")
     a("regulators", "Buck UVLO falling threshold = catalog v_in_min unless uvlo_falling is given; ESC linear BEC dropout 1.0 V and 1.5 x current-limit foldback (estimates).")
     a("fuses", "Fuse melting integral with tau set by a 1.25 x rating minimum melting current; contacts and fuse resistance temperature-independent.")
+    a("thermal", "Operating points: power-net conductors at their electrothermal steady state (continuous points) or ambient (burst "
+                 "points), solved inside ngspice; component temperatures at ambient. Signal-net conductors stay at ambient.")
     a("logic", f"Logic-level check uses {LOGIC_INPUT_RESISTANCE:.0f} ohm receiver input and {DRIVER_OUTPUT_RESISTANCE:.0f} ohm driver output (estimates).")
     a("runtime", "Runtime is quasi-static (DC points weighted by duty cycle); no regenerative braking; capacity independent of rate (no Peukert).")
     if estimated:

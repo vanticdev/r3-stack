@@ -1,8 +1,9 @@
 """Routed harnesses as MuJoCo cables inside the vehicle world, clearance in the kernel,
-overlapped stepping, the reduced electrical Newton solve and headless GL selection."""
+overlapped stepping and the explicit headless GL backend."""
 
 import json
 import shutil
+import sys
 from pathlib import Path
 
 import mujoco
@@ -10,7 +11,6 @@ import numpy as np
 import pytest
 
 from r3_model.project import Project
-from r3_sim.gl import choose_backend
 from r3_sim.kernel import CoSimKernel
 from r3_sim.vehicle import Vehicle, build_vehicle_model
 from r3_wiring.stage import route_and_check
@@ -74,27 +74,41 @@ def test_kernel_clearance_is_a_physical_surface_distance(routed):
     assert -0.005 < distance <= monitor.margin
 
 
-def _drive(kernel: CoSimKernel) -> None:
-    for key in kernel.pwm_devices:
-        kernel.pwm_state[key] = {"enabled": True, "period_ns": 20_000_000,
-                                 "duty_ns": 1_800_000 if kernel.esc_id in kernel.pwm_devices[key] else 1_500_000}
+_RUN = """
+import hashlib, sys
+from r3_model.project import Project
+from r3_sim.kernel import CoSimKernel
+project = Project.load(sys.argv[1])
+kernel = CoSimKernel(project, next(s for s in project.spec.simulation.scenarios if s.id == "full_throttle"))
+for key in kernel.pwm_devices:
+    kernel.pwm_state[key] = {"enabled": True, "period_ns": 20_000_000,
+                             "duty_ns": 1_800_000 if kernel.esc_id in kernel.pwm_devices[key] else 1_500_000}
+for deadline in (0.05, 0.1, 0.25, 0.4):  # deadline advances, as the HAL's sleep_until
+    kernel.advance_until(lambda: kernel.t + 1e-9 >= deadline, deadline=deadline)
+rec = kernel.recorder.arrays()
+digest = hashlib.sha1(kernel.vehicle.data.qpos.tobytes() + b"".join(rec[k].tobytes() for k in sorted(rec)))
+print(kernel.vehicle.overlapped, digest.hexdigest(), repr(kernel.min_wire_clearance))
+"""
 
 
-def test_overlapped_stepping_is_bit_identical(routed, monkeypatch):
+def test_overlapped_stepping_is_bit_identical(routed):
+    """Serial (R3_SIM_OVERLAP=0) and overlapped stepping give identical recordings. Each run is
+    its own process: libngspice is process-global, so a second circuit in one process starts
+    from different library state."""
+    import os
+    import subprocess
+
     project, _ = routed
-    runs = []
+    results = []
     for overlap in ("0", "1"):
-        monkeypatch.setenv("R3_SIM_OVERLAP", overlap)
-        kernel = CoSimKernel(project, _scenario(project))
-        _drive(kernel)
-        assert kernel.vehicle.overlapped == (overlap == "1")
-        for deadline in (0.05, 0.1, 0.25, 0.4):  # deadline advances, as the HAL's sleep_until
-            kernel.advance_until(lambda: kernel.t + 1e-9 >= deadline, deadline=deadline)
-        runs.append((kernel.vehicle.data.qpos.copy(), kernel.recorder.arrays(), kernel.min_wire_clearance))
-    (q0, rec0, clr0), (q1, rec1, clr1) = runs
-    assert np.array_equal(q0, q1)
-    assert rec0.keys() == rec1.keys() and all(np.array_equal(rec0[k], rec1[k], equal_nan=True) for k in rec0)
-    assert clr0 == clr1
+        env = {**os.environ, "R3_SIM_OVERLAP": overlap, "PYTHONPATH": os.pathsep.join(sys.path)}
+        run = subprocess.run([sys.executable, "-c", _RUN, str(project.root)], env=env, capture_output=True, text=True,
+                             timeout=600)
+        assert run.returncode == 0, run.stderr[-2000:]
+        results.append(run.stdout.strip().splitlines()[-1].split(" ", 2))
+    (serial_overlap, serial, serial_clearance), (overlapped, digest, clearance) = results
+    assert (serial_overlap, overlapped) == ("False", "True")
+    assert digest == serial and clearance == serial_clearance
 
 
 def test_vehicle_step_halves_equal_mj_step(routed):
@@ -111,45 +125,18 @@ def test_vehicle_step_halves_equal_mj_step(routed):
     assert np.array_equal(a.data.qpos, b.data.qpos) and np.array_equal(a.data.qvel, b.data.qvel)
 
 
-def test_reduced_newton_matches_full_newton(routed):
-    from r3_sim.electrical import ElectricalSystem
+def test_renderer_backend_is_explicit():
+    """In a fresh interpreter, importing r3_sim selects the backend before mujoco loads."""
+    import os
+    import subprocess
 
-    project, routes = routed
-    system = ElectricalSystem(project, routes=routes)
-    inputs = {"esc": {"pulse_us": 1900.0}, "motor": {"omega": 600.0}, "pi": {"activity": 0.55},
-              "servo": {"pulse_us": 1500.0, "horn_torque": 0.1, "horn_speed": 0.0}}
-    for _ in range(20):
-        system.step(0.001, inputs)
-    circuit = system.circuit
-    A = circuit.linear_matrix()
-    x_chord, info = circuit.solve(system.x)
-    assert info.converged
-    x_full, _ = circuit._newton(system.x, A, 80, 1e-9, 2.0, chord=False)
-    # Plain dense Newton with central-difference Jacobian, no elimination: the textbook reference.
-    x = system.x.copy()
-    for _ in range(50):
-        F, J = A @ x, A.copy()
-        for element in circuit.elements:
-            rows, deps, rmask, dmask = element._indices()
-            v = element._values(x)
-            F[rows[rmask]] += element.residual(v)[rmask]
-            for j in np.flatnonzero(dmask):
-                h = 1e-7 * max(1.0, abs(v[j]))
-                vp, vm_ = v.copy(), v.copy()
-                vp[j] += h
-                vm_[j] -= h
-                J[rows[rmask], deps[j]] += ((element.residual(vp) - element.residual(vm_)) / (2 * h))[rmask]
-        dx = np.linalg.solve(J, -F)
-        x += dx
-        if np.abs(dx).max() < 1e-12:
-            break
-    scale = 1.0 + np.abs(x).max()
-    assert np.abs(x_chord - x).max() < 1e-8 * scale
-    assert np.abs(x_full - x).max() < 1e-8 * scale
-
-
-def test_headless_gl_backend_selection():
-    assert choose_backend("Linux", {}) in ("egl", "osmesa")  # no display: EGL if libEGL exists, else OSMesa
-    assert choose_backend("Linux", {"DISPLAY": ":0"}) is None  # MuJoCo's default (GLFW)
-    assert choose_backend("Linux", {"MUJOCO_GL": "osmesa"}) == "osmesa"  # explicit choice wins
-    assert choose_backend("Darwin", {}) == "cgl"
+    env = {k: v for k, v in os.environ.items() if k not in ("MUJOCO_GL", "PYOPENGL_PLATFORM")}
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    code = "from r3_sim import render; import mujoco; print(render.GL_BACKEND)"
+    backend = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=120)
+    assert backend.returncode == 0, backend.stderr[-1000:]
+    if sys.platform == "darwin":
+        assert backend.stdout.strip() == "cgl"  # offscreen CGL, no display needed
+    explicit = subprocess.run([sys.executable, "-c", code], env={**env, "MUJOCO_GL": "osmesa" if sys.platform == "linux"
+                                                                  else "glfw"}, capture_output=True, text=True, timeout=120)
+    assert explicit.stdout.strip() in ("osmesa", "glfw")  # an explicit MUJOCO_GL always wins

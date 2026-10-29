@@ -1,0 +1,27 @@
+# Python dependencies of the R3 worker image (r3-platform and its tooling).
+# Pinned to the versions the platform is developed and tested against; bump
+# together with the shared development venv.
+numpy==2.5.4
+scipy==1.18.1
+matplotlib==3.11.2
+pillow==13.0.0
+pydantic==2.14.1
+PyYAML==6.0.3
+ruamel.yaml==0.19.1
+# Rigid-body physics and cable simulation; offscreen rendering uses EGL or
+# OSMesa through PyOpenGL (a mujoco dependency).
+mujoco==3.17.0
+# Mesh booleans for CAD verification.
+manifold3d==3.5.4
+trimesh==5.2.0
+# Orchestrator MCP server.
+mcp==2.3.0
+pytest==9.2.0
+# BLITZ deployment tooling (backend/, cicd/): `r3 deploy`, the firmware bundle
+# and its tests. Mirrors the root requirements.txt.
+protobuf==5.29.6
+zeroconf==0.151.5
+Flask==3.1.3
+colorama==0.4.6
+psutil==7.2.2
+requests==2.34.2

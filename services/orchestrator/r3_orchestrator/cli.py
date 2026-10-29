@@ -19,6 +19,16 @@ EXIT_OK, EXIT_ERRORS, EXIT_USAGE = 0, 1, 2
 _SEVERITY_MARK = {"error": "E", "warning": "W", "info": "i"}
 
 
+def configure_headless() -> None:
+    """Headless rendering defaults (MuJoCo EGL/OSMesa, matplotlib Agg) before any
+    stage imports MuJoCo. A no-op without r3_sim or with a display."""
+    try:
+        from r3_sim.headless import configure
+    except ImportError:
+        return
+    configure()
+
+
 # ----------------------------------------------------------------- printing
 def _print_diagnostics(diagnostics: list[dict[str, Any]], show_info: bool = False) -> None:
     for d in diagnostics:
@@ -123,6 +133,19 @@ def cmd_create(args: argparse.Namespace) -> dict[str, Any]:
                               confirm=args.github, platform_url=args.platform_url)
 
 
+def cmd_doctor(args: argparse.Namespace) -> dict[str, Any]:
+    from .doctor import run_doctor
+
+    required = [s for item in (args.require or []) for s in item.split(",") if s] or None
+    return run_doctor(required)
+
+
+def _print_doctor(payload: dict[str, Any]) -> None:
+    from .doctor import print_doctor
+
+    print_doctor(payload)
+
+
 def _print_create(payload: dict[str, Any]) -> None:
     print(f"created {payload['path']} ({len(payload['files'])} files)")
     if payload.get("github"):
@@ -130,7 +153,8 @@ def _print_create(payload: dict[str, Any]) -> None:
     print(f"next: cd {payload['path']} && r3 validate")
 
 
-PRINTERS: dict[str, Callable[[dict[str, Any]], None]] = {"status": _print_status, "diagnose": _print_diagnose, "create": _print_create}
+PRINTERS: dict[str, Callable[[dict[str, Any]], None]] = {"status": _print_status, "diagnose": _print_diagnose, "create": _print_create,
+                                                        "doctor": _print_doctor}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -173,6 +197,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("deploy_args", nargs=argparse.REMAINDER, help="fleet: extra arguments for backend/deploy.py after `--`.")
     p.set_defaults(func=cmd_deploy)
 
+    p = sub.add_parser("doctor", parents=[common], help="Report available tools and which stages can run headless here.")
+    p.add_argument("--require", action="append", metavar="STAGE",
+                   help="Exit 1 unless these stages (repeatable or comma separated) can run headless.")
+    p.set_defaults(func=cmd_doctor)
+
     p = sub.add_parser("create", parents=[common], help="Scaffold a new R3 robot project repository.")
     p.add_argument("name")
     p.add_argument("--from", dest="template", default="rc-car", help="Template robot (default: rc-car).")
@@ -187,6 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    configure_headless()
     parser = build_parser()
     args = parser.parse_args(argv)
     if getattr(args, "deploy_args", None) and args.deploy_args[:1] == ["--"]:
@@ -199,7 +229,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = {"ok": False, "code": "usage_error", "message": str(error).strip("'\"")}
     if args.json:
         print(json.dumps(payload, indent=2, default=str))
-    elif payload.get("code") and not payload.get("ok"):
+    elif payload.get("code") and not payload.get("ok") and payload["code"] != "stage_not_headless":
         print(f"r3: {payload['code']}: {payload.get('message', '')}", file=sys.stderr)
         if payload.get("errors") and isinstance(payload["errors"], list):
             for error in payload["errors"]:

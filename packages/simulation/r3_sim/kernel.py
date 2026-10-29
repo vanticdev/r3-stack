@@ -38,6 +38,7 @@ from .devices import GpsReceiver, HallEncoder, Ina226, Mpu6050
 from .fallbacks import FallbackCableSimulator, FallbackElectricalSystem
 from .pilot import Pilot
 from .radio import ElrsReceiver, RadioLink
+from .radio_scene import scene_for_project
 from .signals import BindingMap, map_bindings, uart_paths
 from .vehicle import Vehicle, build_vehicle_model
 from .vehicle.mjcf import _behavior_params
@@ -223,15 +224,16 @@ class CoSimKernel:
 
         env = spec.simulation.environment
         receiver_params = _behavior_params(project, self.receiver_id) if self.receiver_id else {}
-        self.radio = RadioLink(env, receiver_params, self.rng_radio)
+        radio_scene = scene_for_project(project, self.receiver_id, receiver_params)
+        self.radio = RadioLink(env, receiver_params, self.rng_radio, scene=radio_scene,
+                               scene_dir=project.build_dir("sim") / "radio" / f"scene_{radio_scene.digest()}")
+        self.diagnostics.extend(self.radio.diagnostics)
         self.assumptions.extend(self.radio.assumptions())
         rx_uart = next((u for u in self.uarts.values() if u.component == self.receiver_id), None)
         self.rx_uart = rx_uart
         self.receiver = ElrsReceiver(self.radio, float(rx_uart.device_baud if rx_uart else 420000), self.rng_radio)
-        self.rx_antenna_offset = np.zeros(3)
-        if self.receiver_id:
-            pos, _ = project.graph.component_pose(self.receiver_id)
-            self.rx_antenna_offset = pos + np.array([0.0, 0.0, self.radio.antenna_height])
+        # Car antenna in the robot frame: CAD rf.antenna_position when exposed, else receiver pose + antenna height.
+        self.rx_antenna_offset = np.asarray(radio_scene.antenna_offset, dtype=float)
 
         origin = initial.get("gps_origin") or env.radio_environment.get("gps_origin") or DEFAULT_GPS_ORIGIN
         self.gps_origin = tuple(float(v) for v in (list(origin) + [DEFAULT_GPS_ORIGIN[2]])[:3])
@@ -527,7 +529,7 @@ class CoSimKernel:
         rx_powered = self.pi_powered and float(_first(out, [("_nets", "5V")], 5.0)) >= 4.5
         rx_pos = position + rotation @ self.rx_antenna_offset
         channels = self.pilot.channels_us(t1)
-        frame_bytes = self.receiver.advance(t1, rx_pos, channels, rx_powered)
+        frame_bytes = self.receiver.advance(t1, rx_pos, channels, rx_powered, rotation)
         if self.rx_uart is not None:
             self.rx_uart.push(frame_bytes, self.rng_uart)
         # 7. sensors.
@@ -615,6 +617,7 @@ class CoSimKernel:
             pi_powered=1.0 if self.pi_powered else 0.0, software=1.0 if self.software_running else 0.0,
             rssi=sample.rx_power_dbm if sample else float("nan"), snr=sample.snr_db if sample else float("nan"),
             per=sample.per if sample else float("nan"), lq=float(self.receiver.lq),
+            multipath=sample.fading_db if sample else float("nan"), shadowing=sample.shadowing_db if sample else float("nan"),
             link=1.0 if self.receiver.connected else 0.0,
             tx_distance=float(np.linalg.norm(position[:2] - self.radio.tx_position[:2])),
             wire_clearance=min((d for d, _ in self.wire_clearance.values()), default=float("nan")),

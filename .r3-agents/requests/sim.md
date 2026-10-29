@@ -34,3 +34,26 @@
     stays above 3.5 V/cell and a correct firmware never reaches `low_voltage_cutoff_v`. That makes
     `low_voltage_cutoff_engaged: true` fail for the right firmware. Suggest `battery_soc: 0.02` (about 3.4 V/cell OCV), or a longer
     duration.
+
+## Radio: Sionna RT propagation (branch `r3/sionna`)
+
+11. **Spec: `radio_environment.model`.** `robot.yaml` still says `model: two_ray_ground_log_normal`. The twin
+    now ray-traces with Sionna RT by default and ignores this key. Please change it to `model: sionna_rt`.
+    Optional keys the twin reads: `propagation_backend` (`sionna_rt` | `analytic`), `ground_material`
+    (ITU-R P.2040 name, default `medium_dry_ground` for `terrain: flat-grass`), `rt_grid_m` (0.25),
+    `rt_max_depth` (3), `rt_samples_per_source` (200000), `tx_antenna_pattern` (`hw_dipole`), `polarization` (`V`).
+    `ground_permittivity: 15` is now ignored unless `ground_conductivity` is also given, because the ITU material
+    defines both; the twin records this as an assumption.
+12. **Spec: obstacle materials.** `cone_a` has no `material`; the twin assumes ITU `concrete` and labels it
+    as estimated. A traffic cone is PVC. Please add `material: plastic` (the twin maps it to eps_r 3.0, sigma 0.004 S/m),
+    or another ITU-R P.2040 name.
+13. **CAD contract: `rf.antenna_position`.** The twin uses `build/cad/cad_model.json` → `{"rf": {"antenna_position":
+    [x, y, z]}}` (robot frame, m) for the car antenna when present. Otherwise it uses the receiver pose plus the catalog
+    `antenna_height_above_mount`. Please have the CAD stage write it, for example from a mate connector on the antenna tip.
+14. **Firmware does not receive the scenario mission (blocks `range_failsafe`).** The twin's `hello` reply
+    sends a flat config document (`{..., "mode", "mission", "gps_origin", "crsf_channels"}`), the same content as
+    `R3_SOFTWARE_CONFIG`. `rc_car_controller.settings.load_settings` reads `mission` (and `geodetic_origin`) only
+    from a structured `{"config": ..., "mission": ...}` document, so the firmware boots with `mission: False` and
+    `range_failsafe` never drives (max 2 m from the TX; link never lost). Fix it on one side: the firmware reads
+    `mission`/`gps_origin` from a flat HAL document, or the twin sends the structured form. The twin's own reference
+    controller (`tests/sim_test_controller.py`) reads the flat form.

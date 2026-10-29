@@ -220,9 +220,9 @@ simulation:
     ambient_temperature_c: 25
     terrain: flat-grass
     radio_transmitter: {position: [-2 m, 0, 1.2 m], power_dbm: 20, antenna_gain_dbi: 2.0}
-    radio_environment: {model: two_ray_ground_log_normal, shadowing_sigma_db: 4.0, ground_permittivity: 15, interference_dbm: -100, gps_origin: [37.4275, -122.1697, 30.0]}
+    radio_environment: {model: sionna_rt, shadowing_sigma_db: 4.0, ground_permittivity: 15, interference_dbm: -100, gps_origin: [37.4275, -122.1697, 30.0]}
     obstacles:
-      - {id: cone_a, center: [12 m, 6 m, 0.15 m], size: [0.3 m, 0.3 m, 0.3 m]}
+      - {id: cone_a, center: [12 m, 6 m, 0.15 m], size: [0.3 m, 0.3 m, 0.3 m], material: plastic}
   scenarios:
     - id: autonomous_course
       description: Arm by radio, then follow a 30 x 15 m rectangular GPS course twice at cruise speed.

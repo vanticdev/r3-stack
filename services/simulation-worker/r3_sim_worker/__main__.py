@@ -22,6 +22,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--quiet", action="store_true")
     parser.add_argument("--software-cmd", nargs=argparse.REMAINDER, help="robot software command (rest of the line)")
     args = parser.parse_args(argv)
+    from r3_sim.headless import configure
+
+    configure()
     project = Project.load(args.project)
     from r3_sim.stage import run
 

@@ -77,7 +77,9 @@ def test_stage_hal_vendors_r3_hal(deploy: dict, tmp_path: Path) -> None:
     code = ("import sys; sys.path.insert(0, sys.argv[1]); import vendor, r3_hal; print(r3_hal.__file__)")
     firmware = BACKEND / "python/rc_car_controller"
     (module / "vendor.py").write_text((firmware / "vendor.py").read_text())
-    result = subprocess.run([sys.executable, "-I", "-c", code, str(module)], capture_output=True, text=True, check=True)
+    # -S: no site-packages, like a BLITZ bundle venv; an installed r3-platform (e.g. the R3
+    # worker image) would otherwise provide r3_hal and the vendored copy is rightly unused.
+    result = subprocess.run([sys.executable, "-I", "-S", "-c", code, str(module)], capture_output=True, text=True, check=True)
     assert result.stdout.strip().startswith(str(staged))
 
 

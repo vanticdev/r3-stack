@@ -26,6 +26,7 @@ except ImportError:  # pragma: no cover - mcp 1.x
 from mcp.types import ToolAnnotations
 
 from . import api, spec_ops
+from .cli import configure_headless
 
 INSTRUCTIONS = """R3 robot project tools. robot.yaml is the single source of truth.
 Loop: r3_get_spec -> r3_patch_spec (pass the sha256 you read; on spec_conflict re-read and re-apply)
@@ -119,6 +120,16 @@ def r3_get_artifact(path: str, project: str = "") -> dict[str, Any]:
     return _guard(lambda: api.get_artifact(project or None, path))
 
 
+@mcp.tool(annotations=_READ)
+def r3_doctor(require: list[str] | None = None) -> dict[str, Any]:
+    """Environment check: versions of MuJoCo (and its working offscreen GL backend), libngspice, kicad-cli,
+    KiCad IPC, Freerouting, Java, Docker, the Onshape transport and Sionna RT, plus which stages can run
+    headless here. With `require` (stage names), ok=false if any of them cannot."""
+    from .doctor import run_doctor
+
+    return run_doctor(require or None)
+
+
 @mcp.tool(annotations=_GATED)
 def deploy_fleet(confirm: bool = False, project: str = "", deploy_args: list[str] | None = None, force: bool = False) -> dict[str, Any]:
     """Deploy robot software to PHYSICAL robots via BLITZ backend/deploy.py. Requires confirm=true, which
@@ -148,6 +159,7 @@ def create_github_repo(name: str, directory: str, private: bool = True, confirm:
 
 
 def main() -> None:
+    configure_headless()
     mcp.run("stdio")
 
 

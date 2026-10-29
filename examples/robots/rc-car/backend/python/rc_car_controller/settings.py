@@ -43,11 +43,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "wheelbase_m": 0.26,
     "wheel_radius_m": 0.055,
     "encoder_pulses_per_rev": 4,
-    "arm_channel": 5,
+    "arm_channel": 5,                    # legacy; crsf_channels.arm takes precedence
     "crsf_channels": {"steering": 1, "throttle": 2, "arm": 5},
     # Firmware-level defaults (not in robot.yaml).
-    "steering_channel": 1,
-    "throttle_channel": 2,
     "telemetry_rate_hz": 5,
     "imu_calibration_s": 0.5,
     "require_gps_fix_to_arm": True,
@@ -56,7 +54,28 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "link_degraded_speed_mps": 2.0,
     "ina226": {"address": 0x40, "shunt_ohm": 0.002, "max_current_a": 10.0},
     "mpu6050": {"address": 0x68},
+    # Traction/launch control, motor current limit and gyro yaw assist; any
+    # traction.TractionConfig field may be overridden here.
+    "traction": {"enabled": True, "yaw_assist_enabled": True, "target_slip": 0.10,
+                 "motor_current_limit_a": 50.0, "launch_slew_per_s": 3.0, "yaw_gain": 0.6},
 }
+
+CHANNEL_ROLES = ("steering", "throttle", "arm")
+
+
+def channel_map(config: Mapping[str, Any]) -> dict[str, int]:
+    """CRSF channel numbers (1-based) by role from ``crsf_channels``.
+
+    The legacy ``arm_channel`` key is honoured only when ``crsf_channels`` has no
+    ``arm`` entry (the twin's pilot uses the same rule).
+    """
+    mapping = dict(config.get("crsf_channels") or {})
+    if "arm" not in mapping and "arm_channel" in config:
+        mapping["arm"] = config["arm_channel"]
+    missing = [role for role in CHANNEL_ROLES if role not in mapping]
+    if missing:
+        raise ValueError(f"crsf_channels is missing {', '.join(missing)}")
+    return {role: int(mapping[role]) for role in CHANNEL_ROLES}
 
 DEFAULT_BINDINGS: dict[str, dict[str, Any]] = {
     "esc_pwm": {"interface": "pwm", "device": "pwmchip0", "channel": 2, "frequency": 50.0},
@@ -141,17 +160,23 @@ def load_settings(argv_config: str | None = None, environ: Mapping[str, str] | N
     elif hal_document:
         document = dict(hal_document)
         sources.append("hal_config")
-    structured = isinstance(document.get("config"), dict)
-    config = deep_merge(DEFAULT_CONFIG, document["config"] if structured else document)
+    if not isinstance(document.get("config"), dict):
+        # A bare software.config. The twin's HAL offers one with the scenario's
+        # "mission" and its "gps_origin" ({lat, lon, alt}) merged in
+        # (r3_sim kernel.software_config); lift those out.
+        flat = dict(document)
+        mission, origin = flat.pop("mission", None), flat.pop("gps_origin", None)
+        document = {"config": flat, "mission": mission or None,
+                    "geodetic_origin": flat.pop("geodetic_origin", None) or origin or None}
+    config = deep_merge(DEFAULT_CONFIG, document["config"])
     bindings = copy.deepcopy(DEFAULT_BINDINGS)
-    if structured and isinstance(document.get("bindings"), dict):
+    if isinstance(document.get("bindings"), dict):
         bindings = deep_merge(bindings, document["bindings"])
         sources.append("document_bindings")
     if hal_bindings:
         bindings = deep_merge(bindings, {k: dict(v) for k, v in hal_bindings.items()})
         sources.append("hal_bindings")
-    return FirmwareSettings(config, bindings, document.get("mission") if structured else None,
-                            document.get("geodetic_origin") if structured else None, sources)
+    return FirmwareSettings(config, bindings, document.get("mission"), document.get("geodetic_origin"), sources)
 
 
 def document_from_robot_yaml(robot_yaml: str | Path, scenario: str | None = None,

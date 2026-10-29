@@ -104,10 +104,17 @@ def plot_all(rec: dict[str, np.ndarray], context: dict[str, Any], out: Path) -> 
     # RSSI vs distance
     fig, ax = plt.subplots(figsize=(8, 4.8), dpi=130)
     d = np.maximum(rec["tx_distance"], 0.5)
-    ax.scatter(d, rec["rssi"], s=2, color=SERIES[0], alpha=0.5, label="uplink RX power")
+    ax.scatter(d, rec["rssi"], s=2, color=SERIES[0], alpha=0.5, label=f"uplink RX power ({context.get('radio_label', 'model')}, per packet)")
     curve = context.get("rssi_curve")
     if curve:
-        ax.plot(curve["distance"], curve["rssi"], color=INK, linewidth=1.0, label="two-ray mean (no shadowing)")
+        if curve.get("backend") == "sionna_rt":
+            ax.plot(curve["distance"], curve["rssi"], color=INK, linewidth=1.0, label="Sionna RT, static scene, carrier (no shadowing)")
+            ax.plot(curve["distance"], curve["rssi_local_mean"], color=INK, linewidth=0.8, linestyle=(0, (1, 1)),
+                    label="Sionna RT incoherent path sum")
+            ax.plot(curve["distance"], curve["rssi_analytic"], color=SERIES[4 % len(SERIES)], linewidth=1.0, linestyle="--",
+                    label="previous analytic two-ray model")
+        else:
+            ax.plot(curve["distance"], curve["rssi"], color=INK, linewidth=1.0, label="analytic two-ray FALLBACK mean (no shadowing)")
     ax.axhline(context["sensitivity_dbm"], color=SERIES[1], linestyle="--", linewidth=1, label="datasheet sensitivity")
     ax.axhline(context["noise_dbm"] + context["snr_required_db"], color=SERIES[3], linestyle=":", linewidth=1,
                label="required level (noise + interference)")

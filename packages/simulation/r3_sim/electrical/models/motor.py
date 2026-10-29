@@ -1,15 +1,16 @@
-"""``motor.dc_brushed``: permanent-magnet brushed DC motor.
+"""``motor.dc_brushed``: permanent-magnet brushed DC motor (ngspice subcircuit).
 
-    V = I R(T) + L dI/dt + Ke w + V_brush tanh(I / I_b)
+    V = I R(T) + L dI/dt + V_brush tanh(I / I_b) + Ke w
     torque = Kt (I - I0 tanh(w / w_s))
     Ke = Kt = 60 / (2 pi Kv)                       (SI, V s/rad = N m/A)
 
-``I0`` is the no-load current (friction + iron losses referred to current).
-The sign functions are smoothed with tanh (I_b = 0.1 A, w_s = 1 rad/s) so the
-Newton iteration stays differentiable. Winding resistance follows copper,
-R(T) = R25 (1 + 0.00393 (T - 25 C)), with a lumped thermal model
-C_th dT/dt = I^2 R + V_brush |I| - (T - T_amb) / theta. The inductor uses the
-backward-Euler companion L/dt (I[n+1] - I[n]); in DC operating points dI/dt = 0.
+The rotor speed w is owned by MuJoCo and enters the circuit through an
+``EXTERNAL`` voltage source (1 V = 1 rad/s) driving the back-EMF VCVS; the
+torque returned to MuJoCo is computed from the SPICE winding current. ``I0``
+is the no-load current (friction + iron losses referred to current); the sign
+functions are smoothed with tanh (I_b = 0.1 A, w_s = 1 rad/s). Winding
+resistance follows copper, R(T) = R25 (1 + 0.00393 (T - 25 C)), with a lumped
+thermal node C_th dT/dt = I^2 R + V_brush I tanh(I / I_b) - (T - T_amb) / theta.
 """
 
 from __future__ import annotations
@@ -17,11 +18,9 @@ from __future__ import annotations
 import math
 from typing import Any
 
-import numpy as np
-
-from ..mna import Circuit, NumericElement, SpiceWriter
+from ..netlist import Netlist, Solution, fmt, temperature
 from ..network import COPPER_ALPHA
-from .base import BehaviorModel, Event, first_order, voltage
+from .base import BehaviorModel, Event
 from .battery import ctype_thermal
 
 BRUSH_CURRENT_SCALE = 0.1  # A
@@ -29,37 +28,9 @@ OMEGA_SIGN_SCALE = 1.0  # rad/s
 MOTOR_SPECIFIC_HEAT = 500.0  # J/(kg K), steel/copper mix (estimate)
 
 
-class MotorBranch(NumericElement):
-    def __init__(self, name: str, pos: int, neg: int, branch: int) -> None:
-        self.name = name
-        self.pos, self.neg, self.branch = pos, neg, branch
-        self.rows = [pos, neg, branch]
-        self.deps = [pos, neg, branch]
-        self.resistance = 0.1
-        self.l_over_dt = 0.0
-        self.i_prev = 0.0
-        self.back_emf = 0.0
-        self.brush_drop = 0.0
-
-    def residual(self, v: np.ndarray) -> np.ndarray:
-        vp, vn, i = v
-        drop = self.resistance * i + self.l_over_dt * (i - self.i_prev) + self.back_emf + self.brush_drop * math.tanh(i / BRUSH_CURRENT_SCALE)
-        return np.array([i, -i, (vp - vn) - drop])
-
-    def spice(self, writer: SpiceWriter, x: np.ndarray) -> None:
-        writer.comment(f"{self.name}: R={self.resistance:.6g}, L/dt={self.l_over_dt:.6g}, Ke*w={self.back_emf:.6g}")
-        sense, mid = writer.name("V"), writer.internal_node()
-        mid2 = writer.internal_node()
-        writer.add(f"{sense} {writer.node(self.pos)} {mid} DC 0")
-        r_total = self.resistance + self.l_over_dt
-        writer.add(f"{writer.name('R')} {mid} {mid2} {r_total:.12g}")
-        history = -self.l_over_dt * self.i_prev
-        writer.add(f"{writer.name('B')} {mid2} {writer.node(self.neg)} V = {self.back_emf + history:.12g}"
-                   f"+{self.brush_drop:.12g}*tanh(I({sense})/{BRUSH_CURRENT_SCALE})")
-
-
 class DcBrushedMotor(BehaviorModel):
     model = "motor.dc_brushed"
+    ramped = ("omega",)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -82,41 +53,61 @@ class DcBrushedMotor(BehaviorModel):
         if len(terminals) != 2:
             raise ValueError(f"{self.id}: motor.dc_brushed needs exactly two 'motor' pins")
         self.pos, self.neg = terminals
+        self.t_node = self.local("t")
+        self.states = {self.t_node: self.ambient_c}
         self.omega = 0.0
         self.s_current = 0.0
-        self.s_temperature = self.ambient_c
         self.s_overtemperature = False
 
     @property
-    def resistance(self) -> float:
-        return self.r25 * (1.0 + COPPER_ALPHA * (self.s_temperature - 25.0))
+    def s_temperature(self) -> float:
+        return self.states[self.t_node]
 
-    def build(self, circuit: Circuit) -> None:
-        self.branch = circuit.branch(f"{self.id}#i")
-        self.element = circuit.add(MotorBranch(f"{self.id} ({self.model})", self.pos.node, self.neg.node, self.branch))
+    @s_temperature.setter
+    def s_temperature(self, value: float) -> None:
+        self.states[self.t_node] = float(value)
+
+    @property
+    def resistance(self) -> float:
+        return self.resistance_at(self.s_temperature)
+
+    def resistance_at(self, temperature_c: float) -> float:
+        return self.r25 * (1.0 + COPPER_ALPHA * (temperature_c - 25.0))
+
+    def build(self, net: Netlist) -> None:
+        name = f"motor_dc_{self.inst[1:]}"
+        resistance = f"({fmt(self.r25)}*(1+{COPPER_ALPHA}*({temperature('t')}-25)))"
+        brush = f"tanh(i(vsense)/{BRUSH_CURRENT_SCALE})"
+        lines = [
+            "vsense pos n1 dc 0",
+            f"br n1 n2 i = v(n1,n2)/{resistance}",
+            f"l1 n2 n3 {fmt(self.inductance)}",
+            f"bbrush n3 n4 v = {fmt(self.brush_drop)}*{brush}",
+            f"eemf n4 neg omega 0 {fmt(self.ke)}",
+            f"bloss ploss 0 v = i(vsense)*i(vsense)*{resistance}+{fmt(self.brush_drop)}*i(vsense)*{brush}",
+        ]
+        self.thermal(net, "t", self.heat_capacity, self.theta, "v(ploss)", lines)
+        net.state(self.t_node, self.states[self.t_node])
+        omega = self.control(net, "omega", 0.0)
+        net.subckt(name, ["pos", "neg", "omega", "t", "tamb"], lines,
+                   doc=f"{self.id}: brushed DC motor Kv {60 / (2 * math.pi * self.kt):.0f} rpm/V, R25 {self.r25} ohm, L {self.inductance} H")
+        net.add(f"{self.inst} {self.pos.node} {self.neg.node} {omega} {self.t_node} tamb {name}")
 
     def initialize(self, initial: dict[str, Any]) -> None:
         self.s_temperature = float(initial.get("temperature_c", self.s_temperature))
 
     def begin_step(self, dt: float | None, inputs: dict[str, Any], time: float) -> None:
         self.omega = float(inputs.get("omega", 0.0))
-        e = self.element
-        e.resistance = self.resistance
-        e.l_over_dt = 0.0 if dt is None else self.inductance / dt
-        e.i_prev = self.s_current
-        e.back_emf = self.ke * self.omega
-        e.brush_drop = self.brush_drop
+        self.controls["omega"] = self.omega
 
     def torque(self, current: float) -> float:
         return self.kt * (current - self.no_load_current * math.tanh(self.omega / OMEGA_SIGN_SCALE))
 
-    def end_step(self, dt: float | None, x: np.ndarray, time: float) -> list[Event]:
-        i = float(x[self.branch])
+    def end_step(self, dt: float | None, sol: Solution, time: float) -> list[Event]:
         if dt is None:
             return []
-        self.s_current = i
-        heat = i * i * self.resistance + self.brush_drop * abs(i)
-        self.s_temperature = first_order(self.s_temperature, self.ambient_c + heat * self.theta, dt, self.theta * self.heat_capacity)
+        self.capture_states(sol)
+        self.s_current = sol.i(self.sense("vsense"))
         events = []
         hot = self.s_temperature > self.max_temp_c
         if hot and not self.s_overtemperature:
@@ -125,10 +116,18 @@ class DcBrushedMotor(BehaviorModel):
         self.s_overtemperature = hot
         return events
 
-    def outputs(self, x: np.ndarray) -> dict[str, Any]:
-        i = float(x[self.branch])
-        v = voltage(x, self.pos.node, self.neg.node)
-        torque = self.torque(i)
-        return {"torque": torque, "current": i, "voltage": v, "back_emf": self.ke * self.omega, "omega": self.omega,
-                "power_electrical": v * i, "power_mechanical": torque * self.omega,
-                "copper_loss": i * i * self.resistance, "temperature_c": self.s_temperature, "kt": self.kt}
+    def watches(self) -> list[tuple[str, str]]:
+        return [(f"{self.sense('vsense')}#branch", "mean")]
+
+    def outputs(self, sol: Solution) -> dict[str, Any]:
+        i = sol.i(self.sense("vsense"))
+        # Torque for MuJoCo from the step-averaged winding current (equals the
+        # end-of-step current unless the current ripples within the step).
+        i_mean = sol.reduced(f"{self.sense('vsense')}#branch", "mean")
+        v = sol.v(self.pos.node, self.neg.node)
+        temperature = sol.v(self.t_node)
+        resistance = self.resistance_at(temperature)
+        torque = self.torque(i_mean)
+        return {"torque": torque, "current": i, "current_mean": i_mean, "voltage": v, "back_emf": self.ke * self.omega,
+                "omega": self.omega, "power_electrical": v * i, "power_mechanical": torque * self.omega,
+                "copper_loss": i * i * resistance, "temperature_c": temperature, "kt": self.kt}

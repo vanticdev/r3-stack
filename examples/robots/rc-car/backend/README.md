@@ -10,6 +10,7 @@ backend/
     ├── devices.py               # INA226 and MPU-6050 drivers, gyro bias calibration
     ├── estimator.py             # EKF [x, y, yaw, v, gyro bias] + encoder period speed
     ├── control.py               # pure pursuit, speed planner, PI+FF, battery, supervisor
+    ├── traction.py              # ground speed, slip/launch control, stall current limit, gyro yaw assist
     ├── settings.py              # defaults (= robot.yaml software.config), config loading
     ├── vendor.py                # r3_hal search path (_vendor/ in BLITZ bundles)
     └── main.py                  # 100 Hz loop on hal.clock.sleep_until
@@ -22,11 +23,15 @@ on the Pi (`R3_HAL=linux`) and against the twin (`R3_HAL=virtual`).
 
 | Function | Implementation |
 | --- | --- |
-| Radio | CRSF at 420000 baud on `crsf` binding; ch1 steering, ch2 throttle (centre 1500 us), ch5 arm |
+| Radio | CRSF at 420000 baud on `crsf` binding; channel roles from `crsf_channels` (default steering 1, throttle 2 (centre 1500 us), arm 5); legacy `arm_channel` only if `crsf_channels` has no `arm` |
 | Failsafe | no valid RC frame for `radio_failsafe_timeout_s` (or fresh LQ = 0) → ESC brake until wheels stop (budget 1.5 v0/3 m/s², max 3 s) → neutral, disarmed |
-| Arming | autonomy arms on a low (<1300 us) → high (>1700 us) transition of `arm_channel` with valid link, calibrated IMU and a GPS fix; never at boot with the switch already high |
+| Arming | autonomy arms on a low (<1300 us) → high (>1700 us) transition of the arm channel with valid link, calibrated IMU and a GPS fix; never at boot with the switch already high |
 | Manual | sticks map linearly to `esc_pulse_us` / `steering_pulse_us` (2012 us steering = full left); resumes after failsafe once the throttle is at neutral; no arming needed |
 | Autonomous | pure pursuit (L = 1.0 + 0.5 v, 1.2–6 m) on the EKF estimate; corner/end speed planning; PI speed control with steady-state and acceleration feed-forward |
+| Ground speed | 2-state Kalman filter [v, accel bias]: MPU-6050 forward specific force (predict), GPS RMC/VTG speed, wheel speed only while free-rolling (est. motor current < 2.5 A) or when GPS is stale, zero-velocity + bias averaging at standstill |
+| Traction | manual and autonomous: forward-force budget = 0.85 µ m g (rear share) + PI on wheel-speed error toward slip λ* = 0.10 (slip = (v_w − v_g)/max(v_g, 1 m/s)) → armature current via the DC-motor model → ESC throttle ceiling `(V_brush + R I + k_e ω_m)/V_bat`; launch slew 3/s below 2 m/s; `traction_limit` event |
+| Stall protection | throttle ceiling for `motor_current_limit_a` (50 A, below the 60 A XT60/ESC rating) from the same motor model; active even with `traction.enabled: false`; `motor_current_limit` event |
+| Yaw assist | gyro counter-steer δ_c = (L/v)(k e + k_i E) with e = ω_ref − ω_gyro, ω_ref = v tan(δ)/L (servo-lagged, ≤ µg/v), E the leaky integral (heading hold while steering is centred); cuts forward force when the yaw error exceeds 0.6 rad/s |
 | Battery | INA226 (0x40, 2 mΩ, CAL 5120, 0.5 mA LSB); 0.5 s filtered bus voltage; throttle ceiling 1 → 0.25 between `low_voltage_limit_v` and `low_voltage_cutoff_v`; latched cutoff after 1.5 s below cutoff, at rest below cutoff + 0.2 V, or raw < cutoff − 0.4 V for 0.3 s |
 | IMU | MPU-6050 (0x68) ±500 °/s, DLPF 44 Hz, 14-byte burst read; gyro-z bias averaged for `imu_calibration_s` while no encoder edges |
 | Logging | `hal.log` events (`boot`, `armed`, `radio_failsafe`, `brake_start`, `low_voltage_limit`, `low_voltage_cutoff`, `lap_completed`, `mission_complete`, …) and 5 Hz `telemetry` |
@@ -40,7 +45,10 @@ Without a configured origin, the GPS fixes averaged during IMU calibration defin
 `--config PATH` > `R3_FIRMWARE_CONFIG` > `BLITZ_CONFIG_PATH` (base64 JSON from
 `deploy.py`) > built-in defaults. A document is
 `{"config": {...}, "bindings": {...}, "mission": {...}, "geodetic_origin": {"lat", "lon"}}`;
-`hal.bindings()` (virtual HAL) overrides document bindings.
+`hal.bindings()` (virtual HAL) overrides document bindings. A bare config mapping
+(the twin's `hal.config()`) may carry `mission` and `gps_origin`; they are lifted
+out of it. Traction parameters live under `config.traction` (any
+`traction.TractionConfig` field; plant constants default to catalog estimates).
 
 ## Deploy to the Pi 5 fleet
 

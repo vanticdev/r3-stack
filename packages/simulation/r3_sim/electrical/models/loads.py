@@ -8,10 +8,10 @@ from typing import Any
 
 import numpy as np
 
-from ..mna import Circuit, NumericElement, SpiceWriter, smooth_min, softplus, spice_smooth_min, spice_softplus
-from .base import BehaviorModel, Event, Params, SupplyLoad, constant_current, first_order, voltage
+from ..netlist import Netlist, Solution, fmt, smooth_min, softplus
+from .base import BehaviorModel, Event, Params, constant_current, gated_power
 from .battery import ctype_thermal
-from .esc import RegulatorOutput
+from .regulator import ENABLE_CARD, ENABLE_MODEL, efficiency_at, regulator_lines
 
 # Typical supply currents when the catalog gives none (A).
 DEVICE_CURRENTS = {
@@ -23,14 +23,17 @@ DEVICE_CURRENTS = {
 
 
 class BuckCore:
-    """Synchronous buck converter between explicit nodes.
+    """Synchronous buck converter between ports of its owner's subcircuit.
 
     V_out = min(V_set - R_o I, V_in - V_drop - R_drop I) with current-limit
     foldback; I_in = V_out I / (eta(I) V_in) + I_q (power balance).
-    UVLO: off below ``uvlo_falling`` (default: the rated ``v_in_min``), back on
-    above ``uvlo_rising``. Junction: T = T_amb + theta P_loss (first order)."""
+    UVLO is a SPICE ``sw`` comparator with hysteresis on V_in in series with
+    the output: off below ``uvlo_falling`` (default: the rated ``v_in_min``),
+    back on above ``uvlo_rising``. A second switch with the same control and
+    model drives a 0/1 readout node (``reg_en``). Junction: thermal RC heated
+    by P_in - P_out."""
 
-    def __init__(self, owner: str, params: Params, vin: int, vout: int, gnd: int, thermal: dict[str, Any], ambient_c: float) -> None:
+    def __init__(self, owner: BehaviorModel, params: Params, thermal: dict[str, Any]) -> None:
         self.owner = owner
         p = params
         self.v_out = p.get("v_out")
@@ -48,69 +51,102 @@ class BuckCore:
         self.theta = float(thermal.get("theta_ja_c_per_w", 40.0))
         self.max_temp_c = float(thermal.get("max_temp_c", 125.0))
         self.heat_capacity = p.get("heat_capacity_j_per_k", 2.0)
-        self.vin, self.vout, self.gnd = vin, vout, gnd
-        self.ambient_c = ambient_c
+        self.t_node = owner.local("t")
+        owner.states[self.t_node] = owner.ambient_c
         self.s_enabled = True
-        self.s_temperature = ambient_c
         self.s_overtemperature = False
         self._toggled = False
 
-    def build(self, circuit: Circuit) -> None:
-        self.branch = circuit.branch(f"{self.owner}#buck")
-        self.element = circuit.add(RegulatorOutput(
-            f"{self.owner} buck", self.vout, self.gnd, self.vin, self.branch, self.v_out, self.r_out, self.dropout,
-            self.r_dropout, self.i_max, "switching", self.efficiency))
-        fn, expr = constant_current(self.quiescent, 1.0)
-        circuit.add(SupplyLoad(f"{self.owner} buck quiescent", self.vin, self.gnd, fn, expr))
+    @property
+    def s_temperature(self) -> float:
+        return self.owner.states[self.t_node]
 
-    def begin_step(self) -> None:
-        self.element.enabled = self.s_enabled
+    def lines(self, net: Netlist, vin: str, vout: str, gnd: str) -> tuple[list[str], str | None]:
+        """Subcircuit lines; returns (lines, node for the owner's ``reg_ctl``
+        port in operating points, else None)."""
+        initial = "on" if self.s_enabled else "off"
+        control: str | None = None
+        if net.transient:  # comparator with hysteresis on V_in
+            model = f"swuvlo_{self.owner.inst[1:]}"
+            center, half = 0.5 * (self.uvlo_rising + self.uvlo_falling), 0.5 * (self.uvlo_rising - self.uvlo_falling)
+            net.model(model, f".model {model} sw vt={fmt(center)} vh={fmt(half)} ron=1e-5 roff=1e9")
+            sense = (vin, gnd)
+        else:  # operating points: enable from the active set in ``resolve`` (hysteresis is path dependent in DC)
+            model = ENABLE_MODEL
+            net.model(ENABLE_MODEL, ENABLE_CARD)
+            sense = ("reg_ctl", "0")
+            control = self.owner.control(net, "uvlo_enable", 1.0 if self.s_enabled else 0.0)
+        lines = regulator_lines(net, "reg", vout, gnd, vin, self.v_out, self.r_out, self.dropout, self.r_dropout, self.i_max,
+                                "switching", self.efficiency, enable=(*sense, model, initial))
+        lines += [
+            f"vregq {vin} reg_q dc 0",
+            f"bregq reg_q {gnd} i = {constant_current(self.quiescent, 1.0, f'v({vin},{gnd})')}",
+            # UVLO state readout: the same comparator switching a 1 V source
+            "vreg_one reg_one 0 dc 1",
+            f"sreg_read reg_one reg_en {sense[0]} {sense[1]} {model} {initial}",
+            "rreg_read reg_en 0 1k",
+            f"bregloss reg_ploss 0 v = v({vin},{gnd})*(i(vregin)+i(vregq))-v({vout},{gnd})*i(vreg)",
+        ]
+        self.owner.thermal(net, "t", self.heat_capacity, self.theta, "v(reg_ploss)", lines)
+        net.state(self.t_node, self.owner.states[self.t_node])
+        return lines, control
+
+    def prepare(self) -> None:
+        """Operating point: the UVLO enable starts from the current state."""
+        self.owner.controls["uvlo_enable"] = 1.0 if self.s_enabled else 0.0
         self._toggled = False
 
-    def resolve(self, x: np.ndarray) -> bool:
+    def resolve(self, sol: Solution, vin: str, gnd: str) -> bool:
+        """Operating-point active set: off below ``uvlo_falling``, on above
+        ``uvlo_rising``; True when the point must be re-solved."""
         if self._toggled:
             return False
-        vin = voltage(x, self.vin, self.gnd)
-        if self.s_enabled and vin < self.uvlo_falling:
-            self.s_enabled = self.element.enabled = False
-        elif not self.s_enabled and vin > self.uvlo_rising:
-            self.s_enabled = self.element.enabled = True
+        v_in = sol.v(vin, gnd)
+        if self.s_enabled and v_in < self.uvlo_falling:
+            self.s_enabled = False
+        elif not self.s_enabled and v_in > self.uvlo_rising:
+            self.s_enabled = True
         else:
             return False
         self._toggled = True
+        self.owner.controls["uvlo_enable"] = 1.0 if self.s_enabled else 0.0
         return True
 
-    def state(self, x: np.ndarray) -> dict[str, float]:
-        vin = voltage(x, self.vin, self.gnd)
-        vout = voltage(x, self.vout, self.gnd)
-        i = float(x[self.branch]) if self.s_enabled else 0.0
-        drawn = self.element.input_current(vout, vin, i) if self.s_enabled else 0.0
-        p_in = vin * (drawn + self.quiescent)
-        p_out = vout * i
-        return {"v_in": vin, "v_out": vout, "i_out": i, "i_in": drawn + self.quiescent, "efficiency": self.element.eta(i),
-                "power_in": p_in, "power_out": p_out, "power_loss": p_in - p_out, "enabled": self.s_enabled,
-                "temperature_c": self.s_temperature, "uvlo_falling": self.uvlo_falling}
+    def enabled(self, sol: Solution) -> bool:
+        return sol.get(self.owner.internal("reg_en")) > 0.5
 
-    def end_step(self, dt: float | None, x: np.ndarray, time: float) -> list[Event]:
+    def state(self, sol: Solution, vin: str, vout: str, gnd: str) -> dict[str, Any]:
+        owner = self.owner
+        v_in = sol.v(vin, gnd)
+        v_out = sol.v(vout, gnd)
+        i = sol.i(owner.sense("vreg"))
+        i_in = sol.i(owner.sense("vregin")) + sol.i(owner.sense("vregq"))
+        p_in, p_out = v_in * i_in, v_out * i
+        return {"v_in": v_in, "v_out": v_out, "i_out": i, "i_in": i_in, "efficiency": efficiency_at(self.efficiency, i),
+                "power_in": p_in, "power_out": p_out, "power_loss": sol.get(owner.internal("reg_ploss")),
+                "enabled": self.enabled(sol), "temperature_c": sol.v(self.t_node), "uvlo_falling": self.uvlo_falling}
+
+    def end_step(self, dt: float | None, sol: Solution, time: float, vin: str, gnd: str) -> list[Event]:
         events: list[Event] = []
-        state = self.state(x)
-        if self._toggled:
-            code = "regulator_uvlo" if not self.s_enabled else "regulator_restart"
-            events.append(Event(time, code, self.owner, f"buck input {state['v_in']:.2f} V (UVLO {self.uvlo_falling} V)",
-                                {"v_in": state["v_in"], "uvlo_falling": self.uvlo_falling, "uvlo_rising": self.uvlo_rising}))
+        enabled = self.enabled(sol)
+        v_in = sol.v(vin, gnd)
+        if (dt is None and self._toggled) or (dt is not None and enabled != self.s_enabled):
+            code = "regulator_uvlo" if not enabled else "regulator_restart"
+            events.append(Event(time, code, self.owner.id, f"buck input {v_in:.2f} V (UVLO {self.uvlo_falling} V)",
+                                {"v_in": v_in, "uvlo_falling": self.uvlo_falling, "uvlo_rising": self.uvlo_rising}))
         if dt is None:
             return events
-        self.s_temperature = first_order(self.s_temperature, self.ambient_c + state["power_loss"] * self.theta, dt,
-                                         self.theta * self.heat_capacity)
-        hot = self.s_temperature > self.max_temp_c
+        self.s_enabled = enabled
+        temperature = sol.v(self.t_node)
+        hot = temperature > self.max_temp_c
         if hot and not self.s_overtemperature:
-            events.append(Event(time, "regulator_overtemperature", self.owner, f"buck {self.s_temperature:.0f} C",
-                                {"temperature_c": self.s_temperature, "limit": self.max_temp_c}))
+            events.append(Event(time, "regulator_overtemperature", self.owner.id, f"buck {temperature:.0f} C",
+                                {"temperature_c": temperature, "limit": self.max_temp_c}))
         self.s_overtemperature = hot
         return events
 
     def snapshot(self) -> dict[str, Any]:
-        return {"s_enabled": self.s_enabled, "s_temperature": self.s_temperature, "s_overtemperature": self.s_overtemperature}
+        return {"s_enabled": self.s_enabled, "s_overtemperature": self.s_overtemperature}
 
     def restore(self, state: dict[str, Any]) -> None:
         self.__dict__.update(state)
@@ -121,75 +157,55 @@ class BuckRegulator(BehaviorModel):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        vin = self.require(self.pin_by_role("power_in"), "power_in")
-        vout = self.require(self.pin_by_role("power_out"), "power_out")
-        gnd = self.require(self.pin_by_role("ground"), "ground")
-        self.core = BuckCore(self.id, self.params, vin.node, vout.node, gnd.node, ctype_thermal(self.ctype), self.ambient_c)
+        self.vin = self.require(self.pin_by_role("power_in"), "power_in")
+        self.vout = self.require(self.pin_by_role("power_out"), "power_out")
+        self.gnd = self.require(self.pin_by_role("ground"), "ground")
+        self.core = BuckCore(self, self.params, ctype_thermal(self.ctype))
 
-    def build(self, circuit: Circuit) -> None:
-        self.core.build(circuit)
+    def build(self, net: Netlist) -> None:
+        name = f"regulator_buck_{self.inst[1:]}"
+        net.model(ENABLE_MODEL, ENABLE_CARD)
+        lines, control = self.core.lines(net, "vin", "vout", "vss")
+        ports = ["vin", "vout", "vss", "t", "tamb"] + (["reg_ctl"] if control else [])
+        nodes = [self.vin.node, self.vout.node, self.gnd.node, self.core.t_node, "tamb"] + ([control] if control else [])
+        net.subckt(name, ports, lines, doc=f"{self.id}: buck regulator {self.core.v_out} V")
+        net.add(f"{self.inst} {' '.join(nodes)} {name}")
 
     def begin_step(self, dt: float | None, inputs: dict[str, Any], time: float) -> None:
-        self.core.begin_step()
+        if dt is None:
+            self.core.prepare()
 
-    def resolve(self, x: np.ndarray) -> bool:
-        return self.core.resolve(x)
+    def resolve(self, sol: Solution) -> bool:
+        return self.core.resolve(sol, self.vin.node, self.gnd.node)
 
-    def end_step(self, dt: float | None, x: np.ndarray, time: float) -> list[Event]:
-        return self.core.end_step(dt, x, time)
+    def end_step(self, dt: float | None, sol: Solution, time: float) -> list[Event]:
+        if dt is not None:
+            self.capture_states(sol)
+        return self.core.end_step(dt, sol, time, self.vin.node, self.gnd.node)
 
-    def outputs(self, x: np.ndarray) -> dict[str, Any]:
-        return self.core.state(x)
+    def outputs(self, sol: Solution) -> dict[str, Any]:
+        return self.core.state(sol, self.vin.node, self.vout.node, self.gnd.node)
 
     def snapshot(self) -> dict[str, Any]:
-        return self.core.snapshot()
+        return {**super().snapshot(), "core": self.core.snapshot()}
 
     def restore(self, state: dict[str, Any]) -> None:
-        self.core.restore(state)
-
-
-class ComputerSupply(NumericElement):
-    """Constant-power computer input: I = (P + sum V_rail,set i_rail / eta) / V,
-    resistive below ``v_knee``. Rail currents are unknowns of the rail sources."""
-
-    def __init__(self, name: str, vin: int, gnd: int, rails: list[tuple[int, float]], v_knee: float, rail_efficiency: float) -> None:
-        self.name = name
-        self.vin, self.gnd = vin, gnd
-        self.rails = rails  # (branch index, set voltage)
-        self.rows = [vin, gnd]
-        self.deps = [vin, gnd] + [branch for branch, _ in rails]
-        self.v_knee = v_knee
-        self.rail_efficiency = rail_efficiency
-        self.power = 0.0
-
-    def total_power(self, rail_currents: np.ndarray) -> float:
-        return self.power + sum(v * max(i, 0.0) for (_, v), i in zip(self.rails, rail_currents)) / self.rail_efficiency
-
-    def residual(self, v: np.ndarray) -> np.ndarray:
-        vin = v[0] - v[1]
-        power = self.total_power(v[2:])
-        i = power / vin if vin >= self.v_knee else power * vin / (self.v_knee ** 2)
-        return np.array([i, -i])
-
-    def spice(self, writer: SpiceWriter, x: np.ndarray) -> None:
-        terms = [f"{self.power:.12g}"]
-        for branch, v_set in self.rails:
-            if branch in writer.sense:  # rail enabled: its current is measured by a 0 V source
-                terms.append(f"{v_set:.12g}*max(I({writer.sense[branch]}),0)/{self.rail_efficiency:.12g}")
-        power = "(" + "+".join(terms) + ")"
-        v = writer.v(self.vin, self.gnd)
-        writer.comment(f"{self.name}: constant-power computer load")
-        writer.add(f"{writer.name('B')} {writer.node(self.vin)} {writer.node(self.gnd)} I = "
-                   f"({v} >= {self.v_knee:.12g} ? {power}/{v} : {power}*{v}/{self.v_knee ** 2:.12g})")
+        state = dict(state)
+        self.core.restore(state.pop("core"))
+        super().restore(state)
 
 
 class ComputerLoad(BehaviorModel):
     """``load.computer``: P = P_idle + activity (P_active - P_idle) when booted,
     the midpoint while booting and ``reset_power_fraction`` P_idle in reset.
-    Brownout below ``brownout_voltage`` -> reset; power returns above
-    brownout + hysteresis and the OS needs ``boot_time`` before software runs.
-    Output rails (``power_out`` pins, e.g. 3V3) are regulated sources whose
-    power is drawn from the input with ``rail_efficiency``."""
+    Brownout (the minimum supply over the step's accepted ngspice points) below
+    ``brownout_voltage`` -> reset; power returns above brownout + hysteresis and
+    the OS needs ``boot_time`` before software runs. Output rails (``power_out``
+    pins, e.g. 3V3) are regulated sources whose power is drawn from the input
+    with ``rail_efficiency``. In SPICE: a constant-power B current source
+    I = (P + sum V_rail i_rail / eta) / V, P from an ``EXTERNAL`` source set by the power-state logic.
+    The input stage (PMIC) turns off smoothly below ``input_uvlo`` x nominal
+    (default 0.6, estimate), see :func:`gated_power`."""
 
     model = "load.computer"
 
@@ -205,6 +221,7 @@ class ComputerLoad(BehaviorModel):
         self.rail_max = p.get("rail_3v3_max", 0.5)
         self.rail_efficiency = p.get("rail_efficiency", 0.9)
         self.rail_resistance = p.get("rail_output_resistance", 0.05)
+        self.input_uvlo = p.get("input_uvlo_fraction", 0.6)
         self.vin = self.require(self.pin_by_role("power_in"), "power_in")
         self.gnd = self.require(self.pin_by_role("ground"), "ground")
         self.rail_pins = self.pins_by_role("power_out")
@@ -215,17 +232,28 @@ class ComputerLoad(BehaviorModel):
         self.s_brownouts = 0
         self._brownout_now = False
 
-    def build(self, circuit: Circuit) -> None:
-        self.rails: list[tuple[PinRefLike, int, RegulatorOutput]] = []
-        for pin in self.rail_pins:
-            branch = circuit.branch(f"{self.id}#{pin.name}")
+    def build(self, net: Netlist) -> None:
+        name = f"load_computer_{self.inst[1:]}"
+        net.model(ENABLE_MODEL, ENABLE_CARD)
+        lines = ["bvsup vsup 0 v = v(vin,vss)"]
+        ports, nodes = ["vin", "vss"], [self.vin.node, self.gnd.node]
+        rail_terms = []
+        for k, pin in enumerate(self.rail_pins):
             v_set = pin.voltage_nominal or 3.3
-            rail = circuit.add(RegulatorOutput(f"{self.id} {pin.name} rail", pin.node, self.gnd.node, self.vin.node, branch,
-                                               v_set, self.rail_resistance, 0.1, 0.0, self.rail_max, "none"))
-            self.rails.append((pin, branch, rail))
-        v_knee = 0.5 * (self.vin.voltage_nominal or 5.0)
-        self.supply = circuit.add(ComputerSupply(f"{self.id} ({self.model})", self.vin.node, self.gnd.node,
-                                                 [(b, r.v_set) for _, b, r in self.rails], v_knee, self.rail_efficiency))
+            port = f"rail{k}"
+            lines += regulator_lines(net, f"r{k}", port, "vss", "vin", v_set, self.rail_resistance, 0.1, 0.0, self.rail_max,
+                                     "none", enable=("en", "0", ENABLE_MODEL, "on"))
+            rail_terms.append(f"{fmt(v_set)}*max(i(vr{k}),0)/{fmt(self.rail_efficiency)}")
+            ports.append(port)
+            nodes.append(pin.node)
+        power = "+".join(["v(p)", *rail_terms])
+        nominal = self.vin.voltage_nominal or 5.0
+        lines += ["vsin vin vs2 dc 0",
+                  f"bsup vs2 vss i = {gated_power(power, self.input_uvlo * nominal, 0.04 * nominal, 'v(vin,vss)')}"]
+        ports += ["p", "en"]
+        nodes += [self.control(net, "p", self.power()), self.control(net, "en", 1.0)]
+        net.subckt(name, ports, lines, doc=f"{self.id}: computer load {self.p_idle:g}-{self.p_active:g} W (load.computer)")
+        net.add(f"{self.inst} {' '.join(nodes)} {name}")
 
     def initialize(self, initial: dict[str, Any]) -> None:
         if initial.get("cold_start"):
@@ -241,21 +269,24 @@ class ComputerLoad(BehaviorModel):
 
     def begin_step(self, dt: float | None, inputs: dict[str, Any], time: float) -> None:
         self.activity = max(0.0, min(1.0, float(inputs.get("activity", self.activity if dt is not None else 0.0))))
-        self.supply.power = self.power()
-        for _, _, rail in self.rails:
-            rail.enabled = self.s_powered
+        self.controls["p"] = self.power()
+        self.controls["en"] = 1.0 if self.s_powered else 0.0
 
-    def end_step(self, dt: float | None, x: np.ndarray, time: float) -> list[Event]:
-        v = voltage(x, self.vin.node, self.gnd.node)
-        self._brownout_now = v < self.brownout_voltage
+    def watches(self) -> list[tuple[str, str]]:
+        return [(self.internal("vsup"), "min")]
+
+    def end_step(self, dt: float | None, sol: Solution, time: float) -> list[Event]:
+        v = sol.v(self.vin.node, self.gnd.node)
+        lowest = sol.reduced(self.internal("vsup"), "min")
+        self._brownout_now = min(v, lowest) < self.brownout_voltage
         events: list[Event] = []
         if dt is None:
             return events
         if self.s_powered and self._brownout_now:
             self.s_powered = self.s_booted = False
             self.s_brownouts += 1
-            events.append(Event(time, "brownout", self.id, f"supply {v:.3f} V below {self.brownout_voltage} V",
-                                {"voltage": v, "threshold": self.brownout_voltage}))
+            events.append(Event(time, "brownout", self.id, f"supply {lowest:.3f} V below {self.brownout_voltage} V",
+                                {"voltage": lowest, "threshold": self.brownout_voltage}))
         elif not self.s_powered and v >= self.brownout_voltage + self.hysteresis:
             self.s_powered, self.s_boot_elapsed = True, 0.0
             events.append(Event(time, "power_restored", self.id, f"supply {v:.3f} V, rebooting ({self.boot_time:.0f} s)",
@@ -267,11 +298,11 @@ class ComputerLoad(BehaviorModel):
                 events.append(Event(time, "boot_complete", self.id, "software running", {"boot_time": self.boot_time}))
         return events
 
-    def outputs(self, x: np.ndarray) -> dict[str, Any]:
-        v = voltage(x, self.vin.node, self.gnd.node)
-        rails = {pin.name: {"voltage": voltage(x, pin.node, self.gnd.node), "current": float(x[branch]) if rail.enabled else 0.0}
-                 for pin, branch, rail in self.rails}
-        current = float(self.supply.evaluate(x)[0])
+    def outputs(self, sol: Solution) -> dict[str, Any]:
+        v = sol.v(self.vin.node, self.gnd.node)
+        rails = {pin.name: {"voltage": sol.v(pin.node, self.gnd.node), "current": sol.i(self.sense(f"vr{k}"))}
+                 for k, pin in enumerate(self.rail_pins)}
+        current = sol.i(self.sense("vsin"))
         powered = self.s_powered and v >= self.brownout_voltage
         return {"powered": powered, "booted": self.s_booted and powered, "software_running": self.s_booted and powered,
                 "voltage": v, "brownout": self._brownout_now, "brownout_count": self.s_brownouts,
@@ -279,56 +310,19 @@ class ComputerLoad(BehaviorModel):
                 "activity": self.activity, "rails": rails}
 
 
-PinRefLike = Any
+class ServoPwm(BehaviorModel):
+    """Servo supply current from horn torque and speed (both from MuJoCo via
+    ``EXTERNAL`` sources) through its DC motor referred to the horn:
+    R = V_rated / (I_stall - I_idle), Kt = T_stall / (I_stall - I_idle),
+    Ke = V_rated / w_no_load.
 
-
-class ServoSupply(NumericElement):
-    """Servo supply current from horn torque and speed via its DC motor
-    referred to the horn: R = V_rated / (I_stall - I_idle), Kt = T_stall /
-    (I_stall - I_idle), Ke = V_rated / w_no_load.
-
-    I_m = min(|T| / Kt, (V - Ke |w|) / R)   (saturates at the supply)
+    I_m = min(|T| / Kt, (V - Ke |w|) / R)   (smooth; saturates at the supply)
     I_supply = I_idle + (I_m^2 R + Ke |w| I_m) / V   (power balance of the drive)
     At stall (w = 0, demanded torque >= available) this is I_idle + V / R."""
 
-    def __init__(self, name: str, vin: int, gnd: int, r: float, kt: float, ke: float, idle: float) -> None:
-        self.name = name
-        self.vin, self.gnd = vin, gnd
-        self.rows = [vin, gnd]
-        self.deps = [vin, gnd]
-        self.r, self.kt, self.ke, self.idle = r, kt, ke, idle
-        self.torque = 0.0
-        self.speed = 0.0
-        self.v_knee = 1.0
-
-    def motor_current(self, v: float) -> float:
-        need = abs(self.torque) / self.kt
-        cap = softplus((v - self.ke * abs(self.speed)) / self.r, 0.01)
-        return max(0.0, smooth_min(need, cap, 0.01))
-
-    def current(self, v: float) -> float:
-        i_m = self.motor_current(v)
-        power = i_m * i_m * self.r + self.ke * abs(self.speed) * i_m
-        idle = self.idle if v >= self.v_knee else self.idle * max(v, 0.0) / self.v_knee
-        return idle + power / max(v, self.v_knee)
-
-    def residual(self, v: np.ndarray) -> np.ndarray:
-        i = self.current(v[0] - v[1])
-        return np.array([i, -i])
-
-    def spice(self, writer: SpiceWriter, x: np.ndarray) -> None:
-        v = writer.v(self.vin, self.gnd)
-        emf = self.ke * abs(self.speed)
-        cap = spice_softplus(f"({v}-{emf:.12g})/{self.r:.12g}", 0.01)
-        i_m = f"max(0,{spice_smooth_min(f'{abs(self.torque) / self.kt:.12g}', cap, 0.01)})"
-        power = f"({i_m}*{i_m}*{self.r:.12g}+{emf:.12g}*{i_m})"
-        idle = f"({v} >= {self.v_knee} ? {self.idle:.12g} : {self.idle:.12g}*max({v},0)/{self.v_knee})"
-        writer.comment(f"{self.name}: servo torque={self.torque:.6g} N m speed={self.speed:.6g} rad/s")
-        writer.add(f"{writer.name('B')} {writer.node(self.vin)} {writer.node(self.gnd)} I = {idle}+{power}/max({v},{self.v_knee})")
-
-
-class ServoPwm(BehaviorModel):
     model = "servo.pwm"
+    ramped = ("torque", "speed")
+    V_KNEE = 1.0
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -349,32 +343,49 @@ class ServoPwm(BehaviorModel):
         self.travel = p.get("travel", math.pi / 2)
         self.v_min = self.vin.voltage_min or 0.8 * self.v_rated
         self.commanded_angle = 0.0
+        self.torque = 0.0
+        self.speed = 0.0
 
-    def build(self, circuit: Circuit) -> None:
-        self.element = circuit.add(ServoSupply(f"{self.id} ({self.model})", self.vin.node, self.gnd.node,
-                                               self.r, self.kt, self.ke, self.idle))
+    def build(self, net: Netlist) -> None:
+        name = f"servo_pwm_{self.inst[1:]}"
+        v = "v(vin,vss)"
+        emf = f"{fmt(self.ke)}*abs(v(speed))"
+        cap = softplus(f"({v}-{emf})/{fmt(self.r)}", 0.01)
+        i_m = f"max(0,{smooth_min(f'abs(v(torque))/{fmt(self.kt)}', cap, 0.01)})"
+        idle = f"({v} >= {self.V_KNEE} ? {fmt(self.idle)} : {fmt(self.idle)}*max({v},0)/{self.V_KNEE})"
+        lines = [
+            f"bim im 0 v = {i_m}",
+            "vsin vin vs2 dc 0",
+            f"bsup vs2 vss i = {idle}+(v(im)*v(im)*{fmt(self.r)}+{emf}*v(im))/max({v},{self.V_KNEE})",
+        ]
+        nodes = [self.vin.node, self.gnd.node, self.control(net, "torque"), self.control(net, "speed")]
+        net.subckt(name, ["vin", "vss", "torque", "speed"], lines,
+                   doc=f"{self.id}: servo supply, R {self.r:.3g} ohm, Kt {self.kt:.3g} N m/A, Ke {self.ke:.3g} V s/rad")
+        net.add(f"{self.inst} {' '.join(nodes)} {name}")
 
     def begin_step(self, dt: float | None, inputs: dict[str, Any], time: float) -> None:
-        self.element.torque = float(inputs.get("horn_torque", 0.0))
-        self.element.speed = float(inputs.get("horn_speed", 0.0))
+        self.torque = float(inputs.get("horn_torque", 0.0))
+        self.speed = float(inputs.get("horn_speed", 0.0))
+        self.controls["torque"] = self.torque
+        self.controls["speed"] = self.speed
         pulse = inputs.get("pulse_us")
-        if pulse is not None:
+        if pulse is not None and float(pulse) > 0.0:  # pulse <= 0: no signal, the servo holds its last command
             seconds = float(pulse) * 1e-6
             center = 0.5 * (self.pulse_min + self.pulse_max)
             self.commanded_angle = (seconds - center) / (self.pulse_max - self.pulse_min) * self.travel
 
-    def outputs(self, x: np.ndarray) -> dict[str, Any]:
-        v = voltage(x, self.vin.node, self.gnd.node)
-        e = self.element
-        available = self.kt * max(0.0, (v - self.ke * abs(e.speed)) / self.r)
-        return {"supply_voltage": v, "current": e.current(v), "max_torque": available,
-                "no_load_speed": max(v, 0.0) / self.ke, "stall_current": self.idle + max(v, 0.0) / self.r,
+    def outputs(self, sol: Solution) -> dict[str, Any]:
+        v = sol.v(self.vin.node, self.gnd.node)
+        i_m = sol.get(self.internal("im"))
+        available = self.kt * max(0.0, (v - self.ke * abs(self.speed)) / self.r)
+        return {"supply_voltage": v, "voltage": v, "current": sol.i(self.sense("vsin")), "motor_current": i_m,
+                "max_torque": available, "no_load_speed": max(v, 0.0) / self.ke, "stall_current": self.idle + max(v, 0.0) / self.r,
                 "commanded_angle": self.commanded_angle, "powered": v >= self.v_min,
-                "saturated": abs(e.torque) / self.kt > e.motor_current(v) + 1e-3}
+                "saturated": abs(self.torque) / self.kt > i_m + 1e-3}
 
 
 class ConstantLoad(BehaviorModel):
-    """Small electronics load: constant current on its ``power_in`` pin(s),
+    """Small electronics load: constant current on its ``power_in`` pin,
     resistive below ``voltage_min`` (or 0.8 x nominal)."""
 
     def __init__(self, component_id: str, ctype: Any, params: dict[str, Any], ctx: Any, model: str = "") -> None:
@@ -398,10 +409,12 @@ class ConstantLoad(BehaviorModel):
         nominal = self.vin.voltage_nominal or 5.0
         self.v_min = self.vin.voltage_min or 0.8 * nominal
 
-    def build(self, circuit: Circuit) -> None:
-        fn, expr = constant_current(self.current, self.v_min)
-        self.element = circuit.add(SupplyLoad(f"{self.id} ({self.model})", self.vin.node, self.gnd.node, fn, expr))
+    def build(self, net: Netlist) -> None:
+        name = f"{self.model.replace('.', '_')}_{self.inst[1:]}"
+        lines = ["vsin vin vs2 dc 0", f"bload vs2 vss i = {constant_current(self.current, self.v_min, 'v(vin,vss)')}"]
+        net.subckt(name, ["vin", "vss"], lines, doc=f"{self.id}: {self.current * 1e3:.3g} mA constant-current load ({self.model})")
+        net.add(f"{self.inst} {self.vin.node} {self.gnd.node} {name}")
 
-    def outputs(self, x: np.ndarray) -> dict[str, Any]:
-        v = voltage(x, self.vin.node, self.gnd.node)
-        return {"supply_voltage": v, "current": self.element.current(x), "powered": v >= self.v_min}
+    def outputs(self, sol: Solution) -> dict[str, Any]:
+        v = sol.v(self.vin.node, self.gnd.node)
+        return {"supply_voltage": v, "current": sol.i(self.sense("vsin")), "powered": v >= self.v_min}

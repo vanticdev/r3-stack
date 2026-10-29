@@ -69,12 +69,17 @@ def test_workflow_yaml(tmp_path):
     assert {"push", "pull_request"} <= set(triggers)
     job = workflow["jobs"]["validate"]
     assert "git+https://example.com/r3.git" in job["env"]["R3_PLATFORM_URL"] and "v1.2.3" in job["env"]["R3_PLATFORM_REF"]
+    # Runs inside the R3 worker image pinned to the platform revision.
+    assert job["container"]["image"].endswith("'ghcr.io/vanticdev/r3-worker:v1.2.3' }}")
+    assert "vars.R3_WORKER_IMAGE" in job["container"]["image"]
+    assert job["env"]["MPLBACKEND"] == "Agg" and job["env"]["R3_ONSHAPE_TRANSPORT"] == "api-keys"
     steps = {s.get("name", s.get("uses")): s for s in job["steps"]}
-    assert "actions/setup-python@v5" in steps
-    assert "r3-platform" in steps["Install r3-platform"]["run"]
+    assert "actions/setup-python@v5" not in steps
+    assert "r3-platform" in steps["Install r3-platform override"]["run"]
+    assert "r3 doctor" in steps["Worker environment"]["run"]
     assert "r3 validate" in steps["Validate"]["run"] and "--json" in steps["Validate"]["run"]
     assert "ONSHAPE_ACCESS_KEY" in steps["Sync CAD (Onshape)"]["if"]
-    assert "kicad" in steps["Build PCBs (KiCad)"]["if"]
+    assert "kicad-cli" in steps["Build PCBs (KiCad)"]["run"]
     upload = steps["Upload build artifacts"]
     assert upload["uses"].startswith("actions/upload-artifact") and upload["with"]["path"] == "build/" and upload["if"] == "always()"
     assert "build/report/summary.json" in steps["Job summary"]["run"] and "GITHUB_STEP_SUMMARY" in steps["Job summary"]["run"]

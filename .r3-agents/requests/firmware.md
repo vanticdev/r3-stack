@@ -81,3 +81,27 @@ The firmware assumes the following; the twin's sensor/radio models should produc
   (documents the assumption above).
 - `r3-carrier-hat.behavior.params.ina226.max_current: 10 A` (the fuse rating used for
   the INA226 calibration).
+
+## 3. Traction control round (`r3/firmware-traction`)
+
+- **sim — cross-track window artefact.** `evaluation.py` starts the
+  `max_cross_track_error_m` window when the car enters the 2 m capture radius of
+  waypoint 1, so the first sample is ~2.0 m from the course by construction
+  (`autonomous_course` reports 1.991 m at t = 2.46 s, (3.03, −0.26)). *Request:*
+  start the window when course progress first becomes positive (waypoint 1 passed).
+- **sim — full stick is 97.6 %.** The pilot maps stick 1.0 to 2000 us; CRSF full
+  deflection is 2012 us. With the firmware's 2 % centre deadband 2000 us gives
+  throttle 0.976, which caps `full_throttle` at 8.045 m/s (motor limited). *Request:*
+  map ±1.0 to 988/2012 us (CRSF limits).
+- **sim/design — GPS-limited cross-track.** `autonomous_course` truth cross-track on
+  the course is 1.89 m (lap 1), 1.07 m (lap 2); the firmware's own estimate stays at
+  0.30 m rms, while its position error vs truth reaches 1.91 m (GPS Gauss-Markov
+  bias, CEP 1.5 m). Identical with yaw assist off (1.874 m). The design needs RTK or
+  a better receiver to meet 1.5 m; the sim's `gps_accuracy_insufficient` already says so.
+- **design — single-wheel encoder on an open differential.** The hall encoder rides
+  on `spin_rl`; the unmeasured right rear wheel can spin faster (twin: carrier
+  6.45 m/s vs left wheel 5.80 m/s at t = 2.4 s). Slip control sees only the left
+  wheel. *Suggestion:* sense the spur gear / carrier (or both wheels).
+- **robot.yaml (optional).** `software.config.traction` with the measured plant
+  constants (`vehicle_mass_kg`, `rear_axle_load_fraction`, motor Kv/R, ratio) and
+  `motor_current_limit_a`; firmware defaults are catalog estimates.

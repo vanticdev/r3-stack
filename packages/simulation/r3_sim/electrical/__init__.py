@@ -1,7 +1,8 @@
-"""Electrical digital twin: nonlinear MNA network of wires, connectors and
-component behavior models, plus the ``electrical`` pipeline stage."""
+"""Electrical digital twin: the robot's wiring, connectors and component
+behavior models as an ngspice circuit (shared library, lockstep with the
+co-simulation clock), plus the ``electrical`` pipeline stage."""
 
-from .mna import Circuit, SolverError
+from .ngspice import NgSpiceError
 from .system import ElectricalSystem
 
-__all__ = ["Circuit", "ElectricalSystem", "SolverError"]
+__all__ = ["ElectricalSystem", "NgSpiceError"]
