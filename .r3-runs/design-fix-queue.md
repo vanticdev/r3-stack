@@ -73,3 +73,14 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
     VBAT. Re-run servo stall at minimum charge.
 24. The HAT input's 220 µF bulk cap is not modelled (an ngspice step-control stall when the input is disconnected). Model it with an
     ESR and an initial condition so brownout and hold-up are realistic.
+
+## After the phase B merge
+25. 39 `cad_mesh_invalid` errors: the phase-B tessellated meshes come out about 2.3 % under the CAD volume (chord error on
+    small bores and threads), and 16 are not watertight (tessellation seams). Fix: export at a finer chord/angle tolerance
+    for small parts; in the audit, weld vertices/seams (trimesh `merge_vertices` plus a hole fill limited to seam gaps)
+    and scale the volume tolerance with the expected chord error.
+26. The Onshape organization pass and its negative tests are blocked by the per-user quota on the Part Studio features
+    endpoint (it resets about 11 h after 2026-10-29 ~10:00). Then run `python -m r3_onshape.organized organize
+    examples/robots/rc-car` and `python -m r3_onshape.negative_organized`.
+27. Phase-B wiring blockers: a cable notch in servo_post_b; clips holding the servo lead above the tie rod; a moved
+    ESC pad (W_MOT_B is 11.5 mm inside the ESC); a re-clocked GPS connector; the encoder lead 4 mm from the ring.
