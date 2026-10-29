@@ -267,7 +267,7 @@ class ComponentType(_Model):
     id: str
     kind: Literal[
         "computer", "battery", "motor", "esc", "servo", "regulator", "sensor",
-        "radio", "pcb", "structure", "wheel", "fuse", "switch", "gearbox", "antenna",
+        "radio", "pcb", "structure", "wheel", "fuse", "switch", "gearbox", "antenna", "camera", "cable",
     ]
     name: str
     manufacturer: str = ""
@@ -431,12 +431,79 @@ class PrintFit(_Model):
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 
+class Material(_Model):
+    """An engineering material of fabricated parts (FDM filaments first).
+
+    Strengths are ultimate tensile strengths of printed test bars (ISO 527 /
+    ASTM D638) in the XY (in-layer) direction; ``tensile_strength_z`` is across
+    layers, the weak direction of an FDM part. ``hdt`` is the heat deflection
+    temperature at 0.45 MPa (ISO 75-2 B)."""
+
+    id: str
+    name: str
+    process: Literal["fdm", "sls", "machined"] = "fdm"
+    keywords: list[str] = Field(default_factory=list, description="Lower-case words that identify the material in a catalog "
+                                                                  "`mechanical.material` string (e.g. petg).")
+    density: Quantity
+    tensile_strength: Quantity = Field(description="XY ultimate tensile strength (Pa).")
+    tensile_strength_z: Quantity | None = Field(default=None, description="Z (interlayer) tensile strength (Pa); default "
+                                                                          "z_strength_factor x tensile_strength.")
+    z_strength_factor: float = Field(default=0.5, description="Interlayer/in-layer strength ratio when Z is not published.")
+    youngs_modulus: Quantity
+    poisson_ratio: float = 0.35
+    elongation_at_break: float | None = Field(default=None, description="Fraction, XY.")
+    hdt: Quantity | None = Field(default=None, description="Heat deflection temperature at 0.45 MPa (deg C).")
+    max_service_temp_c: float | None = None
+    nozzle_temp_c: Vector | None = None
+    bed_temp_c: Vector | None = None
+    enclosure: bool = False
+    drying: str = ""
+    color: str = "#888888"
+    notes: str = ""
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="datasheet"))
+
+    @property
+    def z_strength(self) -> float:
+        return float(self.tensile_strength_z if self.tensile_strength_z is not None else self.z_strength_factor * self.tensile_strength)
+
+
+class Printer(_Model):
+    """A 3D printer: printable volume [x, y, z] (m) and default nozzle."""
+
+    id: str
+    name: str
+    manufacturer: str = ""
+    process: Literal["fdm", "sls"] = "fdm"
+    build_volume: Vector
+    nozzle: Quantity = 0.0004
+    layer_height: Quantity = 0.0002
+    enclosed: bool = False
+    max_nozzle_temp_c: float | None = None
+    max_bed_temp_c: float | None = None
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="datasheet"))
+
+
 class Catalog(_Model):
     components: dict[str, ComponentType] = Field(default_factory=dict)
     connectors: dict[str, ConnectorType] = Field(default_factory=dict)
     wires: dict[int, WireGauge] = Field(default_factory=dict)
     fasteners: dict[str, FastenerType] = Field(default_factory=dict)
     print_fits: dict[str, PrintFit] = Field(default_factory=dict)
+    materials: dict[str, Material] = Field(default_factory=dict)
+    printers: dict[str, Printer] = Field(default_factory=dict)
+
+    def material(self, text: str) -> Material | None:
+        """The material entry for a material id or a catalog ``mechanical.material`` string (None if unknown)."""
+        if text in self.materials:
+            return self.materials[text]
+        lowered = text.lower()
+        # Longest keyword first so "pa6-cf" wins over "pa".
+        best: tuple[int, Material] | None = None
+        for material in self.materials.values():
+            for word in material.keywords:
+                if word in lowered and (best is None or len(word) > best[0]):
+                    best = (len(word), material)
+        return best[1] if best else None
 
     def print_fit(self, material: str) -> PrintFit | None:
         """The print-fit table entry for a printed material (None for machined parts)."""

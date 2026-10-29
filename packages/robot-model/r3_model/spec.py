@@ -274,10 +274,11 @@ class Cad(_Model):
 class HardwareBinding(_Model):
     """Maps a software-visible handle to a physical interface on a computer."""
 
-    interface: Literal["gpio", "pwm", "i2c", "spi", "uart"]
+    interface: Literal["gpio", "pwm", "i2c", "spi", "uart", "csi"]
     computer: str
     pins: list[str] = Field(description="Computer pin refs <component>.<connector>.<pin>.")
-    device: str = Field(default="", description="Linux device or chip, e.g. /dev/ttyAMA0, pwmchip0, gpiochip0, /dev/i2c-1.")
+    device: str = Field(default="", description="Linux device or chip, e.g. /dev/ttyAMA0, pwmchip0, gpiochip0, /dev/i2c-1; "
+                                                "csi: the camera port (cam0, cam1).")
     channel: int | None = Field(default=None, description="PWM channel, GPIO line, SPI chip-select.")
     baud: int | None = None
     frequency: Quantity | None = None
@@ -313,6 +314,10 @@ class Environment(_Model):
     obstacles: list[dict[str, Any]] = Field(default_factory=list, description="Static boxes: {id, center, size, material}.")
     radio_transmitter: RadioEndpoint | None = None
     radio_environment: dict[str, Any] = Field(default_factory=dict)
+    visual: dict[str, Any] = Field(default_factory=dict, description=(
+        "What cameras see (r3_sim.vehicle.scene_visual): ground (grass|asphalt|concrete|checker), size, "
+        "track {points|from: mission, width, line_width, edge_color, center_line}, cones [{position, color}] "
+        "or cone_spacing along the track edges. Visual only unless cones set collide: true."))
 
 
 class Scenario(_Model):
@@ -396,6 +401,30 @@ class Assembly(_Model):
     tolerance: AssemblyTolerance = Field(default_factory=AssemblyTolerance)
 
 
+class LoadCase(_Model):
+    """A quasi-static load case for printed structural parts: an acceleration of
+    every mass the part carries (``accel`` in g, robot frame, e.g. [0, 0, -5]
+    for a 5 g landing, [-10, 0, 0] for a 10 g frontal crash)."""
+
+    id: str
+    accel: Vector = Field(description="Acceleration in units of g along robot x, y, z (gravity included by the author).")
+    description: str = ""
+
+
+class Fabrication(_Model):
+    """3D printing as a manufacturing process (see ``r3_fab``)."""
+
+    printer: str = Field(default="bambu-x1c", description="Catalog printer id (printers.yaml): bed size and nozzle.")
+    material: str | None = Field(default=None, description="Default FDM material id (materials.yaml) for printed parts "
+                                                           "whose catalog material is not a printable material.")
+    parts: dict[str, dict[str, Any]] = Field(default_factory=dict, description=(
+        "Per component overrides: {material, orientation: [rx, ry, rz] deg or 'auto', infill, perimeters, print: false}."))
+    load_cases: list[LoadCase] = Field(default_factory=list, description="Default: 5 g bump (z) and 10 g frontal crash (x).")
+    min_safety_factor: float = Field(default=2.0, description="Required strength / von Mises stress on printed load paths.")
+    max_overhang_deg: float = Field(default=45.0, description="Unsupported overhang limit from vertical.")
+    min_wall: Quantity = Field(default=0.0012, description="Minimum printable wall (3 perimeters x 0.4 mm nozzle).")
+
+
 class RobotSpec(_Model):
     schema_: str = Field(alias="schema", default=SCHEMA_ID)
     robot: RobotInfo
@@ -408,6 +437,7 @@ class RobotSpec(_Model):
     software: Software = Field(default_factory=Software)
     simulation: Simulation = Field(default_factory=Simulation)
     assembly: Assembly | None = None
+    fabrication: Fabrication = Field(default_factory=Fabrication)
 
     @model_validator(mode="after")
     def _check_references(self) -> "RobotSpec":

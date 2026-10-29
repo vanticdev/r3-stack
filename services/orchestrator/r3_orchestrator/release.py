@@ -331,6 +331,12 @@ def _stage_items(ctx: _Context) -> list[Item]:
         elif stage_runner.status_of(result) == "unavailable":
             item.message = "stage is not installed here"
             item.evidence = [ctx.stage_evidence(name, "stage_unavailable", None, None, None, f"{name}/result.json")]
+        elif (pending := [d for d in result.diagnostics if d.code == "not_configured"]) and result.ok:
+            # A section the robot still needs (no assembly for CAD, no scenarios for the twin): nothing was
+            # checked, so it cannot count as evidence. ``not_applicable`` (no PCB in a robot without a custom
+            # board) is a real pass and falls through to the error count below.
+            item.message = "; ".join(d.message for d in pending)
+            item.evidence = [ctx.stage_evidence(name, "not_configured", None, None, None, f"{name}/result.json")]
         else:
             counts = stage_runner.counts(result.diagnostics)
             estimates = sorted({d.code for d in result.diagnostics if d.code.endswith("_estimated")})
