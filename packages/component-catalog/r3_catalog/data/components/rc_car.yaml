@@ -398,7 +398,7 @@ components:
     cad_name: Raspberry Pi 5
     name: Raspberry Pi 5 (8 GB)
     manufacturer: Raspberry Pi Ltd
-    description: Frame at the PCB bottom centre; 85 x 56 mm board outline. Overall size includes connector overhangs and underside parts, measured from the official STEP. Mount seats follow the official STEP laminate thickness of 1.276 mm; the assembly adds discrete shims below the HAT standoffs.
+    description: Frame at the vendor STEP XY board centre and source Z=0; the actual laminate underside is at Z=0.030 mm; 85 x 56 mm board outline. Overall size includes connector overhangs and underside parts, measured from the official STEP. Mount seats follow the official STEP laminate thickness of 1.276 mm; the assembly adds discrete shims below the HAT standoffs.
     mechanical:
       shape: custom
       size: [88.500 mm, 57.630352 mm, 18.976 mm]
@@ -408,16 +408,16 @@ components:
       color: "#1a7f37"
       mount_holes: [[-39 mm, -24.5 mm, 0], [19 mm, -24.5 mm, 0], [-39 mm, 24.5 mm, 0], [19 mm, 24.5 mm, 0]]
       solids:
-        - {kind: box, name: pcb, position: [0, 0, 0.638 mm], size: [85 mm, 56 mm, 1.276 mm]}
+        - {kind: box, name: pcb, position: [0, 0, 0.668 mm], size: [85 mm, 56 mm, 1.276 mm]}
         - {kind: box, name: components, position: [-10 mm, 0, 3.1 mm], size: [52 mm, 43 mm, 3 mm]}
         - {kind: box, name: usb ethernet, position: [33.75 mm, 0, 9.6 mm], size: [21.5 mm, 53 mm, 16 mm]}
         - {kind: box, name: gpio header base, position: [-10 mm, 24.5 mm, 2.61 mm], size: [50.8 mm, 5.08 mm, 2.54 mm]}
         - {kind: box, name: gpio pins, position: [-10 mm, 24.5 mm, 6.88 mm], size: [50.4 mm, 4.7 mm, 6 mm]}
       features:
-        - {id: hole_1, kind: clearance_hole, position: [-39 mm, -24.5 mm, 1.276 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
-        - {id: hole_2, kind: clearance_hole, position: [19 mm, -24.5 mm, 1.276 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
-        - {id: hole_3, kind: clearance_hole, position: [-39 mm, 24.5 mm, 1.276 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
-        - {id: hole_4, kind: clearance_hole, position: [19 mm, 24.5 mm, 1.276 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
+        - {id: hole_1, kind: clearance_hole, position: [-39 mm, -24.5 mm, 1.306 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
+        - {id: hole_2, kind: clearance_hole, position: [19 mm, -24.5 mm, 1.306 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
+        - {id: hole_3, kind: clearance_hole, position: [-39 mm, 24.5 mm, 1.306 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
+        - {id: hole_4, kind: clearance_hole, position: [19 mm, 24.5 mm, 1.306 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
       provenance: {status: datasheet, source: "Raspberry Pi 5 mechanical drawing: 85 x 56 board, 58 x 49 M2.5 holes; overall envelope from official RP-010083-CA-1 STEP. Laminate 1.276 mm and GPIO insulator faces 1.34/3.88 mm measured from the vendor STEP; other catalog solids remain labelled proxies."}
     model:
       source: vendor
@@ -430,14 +430,14 @@ components:
       provenance: {status: datasheet, source: "Raspberry Pi Ltd official Raspberry Pi 5 3D STEP (RP-010083-CA-1, no graphics), product information portal pip.raspberrypi.com", notes: "STEP origin at the PCB bottom-left corner; its PCB is 1.276 mm thick; header plastic is 1.34–3.88 mm above the PCB bottom"}
     interfaces:
     # Mounting holes (58 x 49 mm M2.5 pattern) as single-hole seats on both board faces, and the 2x20 header.
-      h1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
-      h2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
-      h3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
-      h4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
-      t1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 1.276 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
-      t2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 1.276 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
-      t3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 1.276 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
-      t4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 1.276 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      h1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 0.030 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      h2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 0.030 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      h3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 0.030 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      h4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 0.030 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      t1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 1.306 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      t2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 1.306 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      t3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 1.306 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      t4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 1.306 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
       J8: {kind: header, origin: [-10 mm, 24.5 mm, 3.88 mm], z: [0, 0, 1], x: [1, 0, 0], params: {pitch: 2.54 mm, rows: 2, cols: 20, pin1: [-24.13 mm, -1.27 mm]}, description: "Top of the header base; pin 1 at the -x end on the inner row"}
     pins:
       5V: {role: power_in, voltage_nominal: 5.1, voltage_min: 4.75, voltage_max: 5.5, current_max: 5.0}

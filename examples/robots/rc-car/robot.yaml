@@ -256,7 +256,8 @@ assembly:
     # spacers' top threads, HAT screwed onto the standoffs, header into socket.
     # Official Pi laminate: 1.276 mm. Four purchased DIN 988 0.3 mm shims plus 11 mm standoffs put
     # the HAT underside 12.576 mm above the Pi underside. The 8.5 mm socket mouth is at 4.076 mm:
-    # 0.196 mm clear of the header plastic (3.88 mm), 5.804 mm pin insertion, 4.704 mm contact overlap.
+    # The vendor datum is 0.030 mm below the laminate: 0.226 mm plastic clearance, 5.774 mm insertion,
+    # and 2.364 mm beyond the Harwin M20-783 contact point (3.41 mm from the socket mouth).
     - {id: pi_spacer_1, a: deck.pi_1, b: pi_spacer_1.bottom, fasteners: {type: M2.5x8}}
     - {id: pi_spacer_2, a: deck.pi_2, b: pi_spacer_2.bottom, fasteners: {type: M2.5x8}}
     - {id: pi_spacer_3, a: deck.pi_3, b: pi_spacer_3.bottom, fasteners: {type: M2.5x8}}
@@ -281,7 +282,7 @@ assembly:
     - {id: hat_2, a: pi_standoff_2.top, b: hat.h4, fasteners: {type: M2.5x6}}
     - {id: hat_3, a: pi_standoff_3.top, b: hat.h1, fasteners: {type: M2.5x6}}
     - {id: hat_4, a: pi_standoff_4.top, b: hat.h2, fasteners: {type: M2.5x6}}
-    - {id: gpio_header, a: pi.J8, b: hat.socket, offset: 0.196 mm, verify: {min_insertion: 5.5 mm, lateral_tolerance: 0.2 mm}}
+    - {id: gpio_header, a: pi.J8, b: hat.socket, offset: 0.226 mm, verify: {min_insertion: 5.5 mm, lateral_tolerance: 0.2 mm}}
     - {id: cap_hat_1, a: hat.cap_1, b: cap_hat_1.seat}
     - {id: cap_hat_2, a: hat.cap_2, b: cap_hat_2.seat}
     - {id: cap_hat_3, a: hat.cap_3, b: cap_hat_3.seat}
