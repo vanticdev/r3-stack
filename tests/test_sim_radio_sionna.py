@@ -122,7 +122,9 @@ def test_scene_from_rc_car_spec(tmp_path):
     params = dict(project.catalog.component("elrs-receiver-2g4").behavior.params)
     scene = scene_for_project(project, "receiver", params)
     assert scene.ground_material == "medium_dry_ground" and scene.ground_custom is None
-    assert [b.name for b in scene.obstacles] == ["cone_a"] and scene.obstacles[0].material_estimated
+    assert [b.name for b in scene.obstacles] == ["cone_a"]
+    # Authored material in robot.yaml is used verbatim; only missing materials are estimates.
+    assert scene.obstacles[0].material == "plastic" and not scene.obstacles[0].material_estimated
     materials = {m.material: m for m in scene.body}
     assert "chassis" in materials["metal"].parts and "pi" in materials["metal"].parts and "deck" in materials["plastic"].parts
     assert "receiver" not in sum((m.parts for m in scene.body), [])

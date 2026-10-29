@@ -16,8 +16,6 @@ manifold3d==3.5.4
 trimesh==5.2.0
 # Orchestrator MCP server.
 mcp==2.3.0
-# KiCad IPC API client (talks to a running KiCad, see r3-kicad-headless).
-kicad-python==0.8.0
 pytest==9.2.0
 # BLITZ deployment tooling (backend/, cicd/): `r3 deploy`, the firmware bundle
 # and its tests. Mirrors the root requirements.txt.

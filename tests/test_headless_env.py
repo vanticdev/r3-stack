@@ -73,7 +73,7 @@ def _fake_tools(monkeypatch, **available: bool) -> None:
     monkeypatch.setattr(doctor, "probe_matplotlib", lambda: tool("matplotlib"))
     monkeypatch.setattr(doctor, "probe_ngspice", lambda: [tool("libngspice", flags["ngspice"]), tool("ngspice", flags["ngspice"])])
     monkeypatch.setattr(doctor, "probe_kicad_cli", lambda: tool("kicad-cli", flags["kicad"]))
-    monkeypatch.setattr(doctor, "probe_kicad_ipc", lambda: tool("kicad-ipc", flags["kicad"]))
+    monkeypatch.setattr(doctor, "probe_kicad_pcbnew", lambda: tool("kicad-pcbnew", flags["kicad"]))
     monkeypatch.setattr(doctor, "probe_java", lambda: tool("java"))
     monkeypatch.setattr(doctor, "probe_freerouting", lambda java: tool("freerouting"))
     monkeypatch.setattr(doctor, "probe_docker", lambda: tool("docker", flags["docker"]))
@@ -122,7 +122,7 @@ def test_doctor_mcp_tool(monkeypatch):
 def test_doctor_real_probes_run():
     """The real probes complete and report a consistent shape on this machine."""
     payload = doctor.run_doctor()
-    assert {"mujoco", "libngspice", "kicad-cli", "kicad-ipc", "freerouting", "java", "docker", "onshape", "sionna-rt"} <= set(payload["tools"])
+    assert {"mujoco", "libngspice", "kicad-cli", "kicad-pcbnew", "freerouting", "java", "docker", "onshape", "sionna-rt"} <= set(payload["tools"])
     for tool in payload["tools"].values():
         assert isinstance(tool["available"], bool) and isinstance(tool["detail"], str)
     assert next(s for s in payload["stages"] if s["stage"] == "model")["headless"] is True
@@ -142,11 +142,11 @@ def test_platform_workflow_runs_pytest_in_worker_image():
 
 def test_worker_dockerfile_contents():
     text = (ROOT / "docker/r3-worker/Dockerfile").read_text()
-    for needle in ("kicad-10.0-releases", "kicad-cli version", "libngspice0", "libosmesa6", "libegl1", "xvfb", "openjdk-25-jre-headless",
-                   "freerouting", "docker-ce-cli", "WITH_SIONNA", "r3-kicad-headless", "requirements.txt"):
+    for needle in ("kicad-10.0-releases", "kicad-cli version", "libngspice0", "libosmesa6", "libegl1", "openjdk-25-jre-headless",
+                   "freerouting", "docker-ce-cli", "WITH_SIONNA", "import pcbnew", "requirements.txt"):
         assert needle in text, needle
     requirements = (ROOT / "docker/r3-worker/requirements.txt").read_text()
-    for package in ("mujoco", "scipy", "numpy", "matplotlib", "manifold3d", "trimesh", "mcp", "kicad-python"):
+    for package in ("mujoco", "scipy", "numpy", "matplotlib", "manifold3d", "trimesh", "mcp"):
         assert f"\n{package}==" in requirements, package
 
 

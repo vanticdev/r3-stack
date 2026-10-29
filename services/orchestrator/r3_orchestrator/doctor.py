@@ -145,37 +145,28 @@ def probe_kicad_cli() -> Tool:
     return Tool("kicad-cli", code == 0, version, executable)
 
 
-def _kicad_sockets() -> list[str]:
-    explicit = os.environ.get("KICAD_API_SOCKET")
-    if explicit:
-        return [explicit.removeprefix("ipc://")]
-    return [str(p) for p in sorted(Path("/tmp/kicad").glob("api*.sock"))] if Path("/tmp/kicad").is_dir() else []
+def _kicad_python() -> str | None:
+    """Interpreter that can import KiCad's pcbnew module (system python3 on Linux
+    with the KiCad PPA; KiCad's bundled Python on macOS)."""
+    candidates = [os.environ.get("R3_KICAD_PYTHON", ""), "python3",
+                  str(Path.home() / "Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3"),
+                  "/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/Current/bin/python3"]
+    for candidate in candidates:
+        if candidate and (shutil.which(candidate) or Path(candidate).exists()):
+            code, _ = _run([candidate, "-c", "import pcbnew"], timeout=30)
+            if code == 0:
+                return candidate
+    return None
 
 
-def probe_kicad_ipc() -> Tool:
-    """KiCad IPC API: needs a running KiCad GUI; headless via Xvfb (r3-kicad-headless)."""
-    kipy = _dist_version("kicad-python")
-    gui = shutil.which("kicad") or (("/Applications/KiCad/KiCad.app" if Path("/Applications/KiCad/KiCad.app").exists() else None))
-    xvfb = shutil.which("Xvfb")
-    launcher = shutil.which("r3-kicad-headless")
-    sockets = [s for s in _kicad_sockets() if Path(s).exists()]
-    connected, version = False, None
-    if kipy and sockets:
-        script = ("from kipy import KiCad\nk = KiCad(socket_path=%r, timeout_ms=3000)\nprint(str(k.get_version()).split()[0])"
-                  % ("ipc://" + sockets[0]))
-        code, out = _run([sys.executable, "-c", script], timeout=15)
-        connected = code == 0
-        version = out.strip().splitlines()[-1] if connected and out.strip() else None
-    can_start = bool(gui and kipy and (xvfb or os.environ.get("DISPLAY") or sys.platform == "darwin"))
-    if connected:
-        detail = f"connected to {sockets[0]}"
-    elif can_start:
-        detail = "no running KiCad; start one with `r3-kicad-headless`" if launcher else "no running KiCad (start the KiCad app with the API enabled)"
-    else:
-        missing = [n for n, ok in (("KiCad GUI", gui), ("kicad-python", kipy), ("Xvfb or a display", xvfb or os.environ.get("DISPLAY"))) if not ok]
-        detail = "unavailable: missing " + ", ".join(missing)
-    return Tool("kicad-ipc", connected or can_start, version, detail,
-                {"connected": connected, "sockets": sockets, "kicad_python": kipy, "gui": gui, "xvfb": xvfb, "launcher": launcher})
+def probe_kicad_pcbnew() -> Tool:
+    """KiCad's board engine as a Python module: headless board editing, never a GUI."""
+    python = _kicad_python()
+    if python is None:
+        return Tool("kicad-pcbnew", False, detail="no interpreter can import pcbnew (install KiCad / python3-pcbnew)")
+    code, out = _run([python, "-c", "import pcbnew; print(pcbnew.Version())"], timeout=30)
+    version = out.strip().splitlines()[-1] if code == 0 and out.strip() else None
+    return Tool("kicad-pcbnew", code == 0, version, python)
 
 
 def _jar_version(jar: Path) -> str | None:
@@ -311,10 +302,11 @@ def _stages(tools: dict[str, Tool]) -> list[StageReadiness]:
         out.append(StageReadiness("cad", True, "degraded", ["onshape API keys"],
                                   "Reuses a current build/cad/cad_model.json, else downstream stages use catalog geometry."))
     pcb_missing = [n for n in ("kicad-cli",) if not ok(n)]
-    extras = [n for n in ("freerouting", "kicad-ipc") if not ok(n)]
+    pcb_missing += [n for n in ("kicad-pcbnew",) if not ok(n)]
+    extras = [n for n in ("freerouting",) if not ok(n)]
     out.append(StageReadiness("pcb", not pcb_missing, "unavailable" if pcb_missing else "degraded" if extras else "full",
-                              pcb_missing + extras, "kicad-cli for ERC/DRC/exports; Freerouting CLI for autorouting; "
-                              "IPC API through r3-kicad-headless (Xvfb)."))
+                              pcb_missing + extras, "kicad-cli for ERC/DRC/exports, KiCad's pcbnew module for board edits, "
+                              "Freerouting CLI for autorouting. KiCad never opens a window."))
     out.append(StageReadiness("wiring", True, "full", [], "Python + MuJoCo cable physics (no GL); plots use Agg."))
     out.append(StageReadiness("electrical", True, "full" if ok("ngspice") or ok("libngspice") else "degraded",
                               [] if ok("ngspice") or ok("libngspice") else ["ngspice"], "ngspice cross-check runs when available."))
@@ -329,9 +321,8 @@ def _stages(tools: dict[str, Tool]) -> list[StageReadiness]:
 
 
 def run_doctor(only: list[str] | None = None) -> dict[str, Any]:
-    probes: list[Callable[[], Tool | list[Tool]]] = [probe_mujoco, probe_matplotlib, probe_ngspice, probe_kicad_cli, probe_kicad_ipc,
+    probes: list[Callable[[], Tool | list[Tool]]] = [probe_mujoco, probe_matplotlib, probe_ngspice, probe_kicad_cli, probe_kicad_pcbnew,
                                                      probe_java, probe_docker, probe_onshape, probe_sionna,
-                                                     lambda: probe_simple("xvfb", "Xvfb", ["-version"], r"X\.Org X Server (\S+)"),
                                                      lambda: probe_simple("ffmpeg", "ffmpeg", ["-version"], r"ffmpeg version (\S+)")]
     tools: dict[str, Tool] = {}
     for probe in probes:

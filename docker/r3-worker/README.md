@@ -122,3 +122,10 @@ The firmware image is `linux/arm64`. On amd64 hosts, register QEMU once:
 `--build-arg WITH_SIONNA=1` adds `sionna-rt` on Dr.Jit's LLVM (CPU) backend. It
 is off by default while Sionna is integrated in `r3_sim` (separate work).
 `r3 doctor` reports the Mitsuba variant it would use.
+
+
+> **Update (user directive):** KiCad never opens a window, not even under Xvfb.
+> The IPC API (which needs the KiCad GUI) and the `r3-kicad-headless` launcher
+> were removed. Board editing uses KiCad's bundled `pcbnew` Python module
+> (`python3-pcbnew` from the KiCad PPA on Linux), and checks, netlists and
+> exports use `kicad-cli`. `r3 doctor` reports this as `kicad-pcbnew`.

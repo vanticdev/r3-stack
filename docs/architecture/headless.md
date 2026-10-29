@@ -96,3 +96,10 @@ r3-kicad-headless -- python -c "from kipy import KiCad; print(KiCad().get_versio
 * **Specctra DSN export** has no `kicad-cli` command in KiCad 10. It uses pcbnew's
   SWIG module (system `python3`), which KiCad has deprecated in favour of the
   IPC API; the IPC path runs under `r3-kicad-headless`.
+
+
+> **Update (user directive):** KiCad never opens a window, not even under Xvfb.
+> The IPC API (which needs the KiCad GUI) and the `r3-kicad-headless` launcher
+> were removed. Board editing uses KiCad's bundled `pcbnew` Python module
+> (`python3-pcbnew` from the KiCad PPA on Linux), and checks, netlists and
+> exports use `kicad-cli`. `r3 doctor` reports this as `kicad-pcbnew`.

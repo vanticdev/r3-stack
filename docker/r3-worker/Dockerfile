@@ -5,7 +5,7 @@
 #
 #   docker buildx build --platform linux/amd64,linux/arm64 -f docker/r3-worker/Dockerfile -t r3-worker .
 #
-# See docker/r3-worker/README.md for build arguments, Docker access and KiCad IPC.
+# See docker/r3-worker/README.md for build arguments, Docker access and headless KiCad.
 
 ARG UBUNTU_VERSION=24.04
 FROM ubuntu:${UBUNTU_VERSION} AS r3-worker
@@ -42,8 +42,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     R3_WORKER_IMAGE=1
 
 # --------------------------------------------------------------- system tools
-# Headless GL (EGL + OSMesa), ngspice (binary + libngspice), Java, Xvfb for the
-# KiCad IPC API, ffmpeg for sim clips, tini as PID 1.
+# Headless GL (EGL + OSMesa), ngspice (binary + libngspice), Java, ffmpeg for sim
+# clips, tini as PID 1. KiCad never runs a GUI here (no Xvfb): board edits use the
+# pcbnew Python module and checks/exports use kicad-cli.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     rm -f /etc/apt/apt.conf.d/docker-clean \
@@ -54,7 +55,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       libegl1 libegl-mesa0 libgl1 libgl1-mesa-dri libglx-mesa0 libgles2 libopengl0 libosmesa6 \
       ngspice libngspice0 libngspice0-dev \
       ${JAVA_PACKAGE} \
-      xvfb xauth \
       ffmpeg
 
 # ------------------------------------------------------------------ Docker CLI
@@ -82,9 +82,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
  && apt-get install -y --no-install-recommends \
       kicad kicad-symbols kicad-footprints kicad-templates \
       $( [ "${KICAD_3D_MODELS}" = "1" ] && echo kicad-packages3d ) \
- && kicad-cli version
+ && kicad-cli version \
+ && python3 -c "import pcbnew; print('pcbnew', pcbnew.Version())"
 
-COPY docker/r3-worker/r3-kicad-headless /usr/local/bin/r3-kicad-headless
 
 # ---------------------------------------------------------------- Freerouting
 # The release jar runs in CLI mode (--gui.enabled=false) on the headless JRE.
@@ -94,7 +94,7 @@ RUN mkdir -p /opt/freerouting \
  && echo "${FREEROUTING_VERSION}" > /opt/freerouting/VERSION \
  && printf '#!/bin/sh\nexec java -Djava.awt.headless=true -jar "${R3_FREEROUTING_JAR:-/opt/freerouting/freerouting.jar}" --gui.enabled=false "$@"\n' \
       > /usr/local/bin/freerouting \
- && chmod 0755 /usr/local/bin/freerouting /usr/local/bin/r3-kicad-headless
+ && chmod 0755 /usr/local/bin/freerouting
 
 # -------------------------------------------------------------------- Node.js
 RUN case "${TARGETARCH}" in amd64) node_arch=x64 ;; arm64) node_arch=arm64 ;; *) echo "unsupported ${TARGETARCH}"; exit 1 ;; esac \
