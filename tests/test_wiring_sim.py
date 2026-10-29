@@ -26,7 +26,8 @@ G = 9.80665
 def _bundle(vertices: np.ndarray, od: float, ei: float, mass_per_m: float, dt: float = 0.001) -> CableBundle:
     length = float(np.mean(np.linalg.norm(np.diff(vertices, axis=0), axis=1)))
     span = CableSpan("c", vertices, ROOT, ROOT, _damping(ei, mass_per_m, od / 2, length, dt))
-    return CableBundle("c", "h", ["w"], ["red"], od, ei, mass_per_m, 0.0, 0.0, [span], (ROOT, ROOT))
+    total = length * span.segments
+    return CableBundle("c", "h", ["w"], ["red"], od, ei, mass_per_m, total, total, [span], (ROOT, ROOT))
 
 
 def _single_cable(vertices: np.ndarray, bundle: CableBundle, initial: str, end: str, gravity: float = -G) -> str:
@@ -52,6 +53,23 @@ def _vertices(model: mujoco.MjModel, data: mujoco.MjData, segment: float) -> np.
     ids = [i for i in range(model.nbody) if (mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, i) or "").startswith("cB_")]
     tip = data.xpos[ids[-1]] + data.xmat[ids[-1]].reshape(3, 3)[:, 0] * segment
     return np.vstack([data.xpos[ids], tip])
+
+
+def test_unequal_spans_preserve_cut_wire_mass():
+    from dataclasses import replace
+
+    short = np.column_stack([np.linspace(0, .03, 7), np.zeros((7, 2))])
+    long = np.column_stack([np.linspace(0, .4, 9), np.zeros((9, 2))])
+    bundle = _bundle(short, od=.003, ei=1e-5, mass_per_m=.02)
+    other = _bundle(long, od=.003, ei=1e-5, mass_per_m=.02).spans[0]
+    bundle.spans.append(other)
+    bundle.free_length = .44  # discretized slack curve is slightly shorter than the cut wire
+    mass = 0.0
+    for span in bundle.spans:
+        ordered = replace(bundle, spans=[span, *[s for s in bundle.spans if s is not span]])
+        model = mujoco.MjModel.from_xml_string(_single_cable(span.vertices, ordered, initial="none", end="clamp"))
+        mass += sum(model.body_mass)
+    assert mass == pytest.approx(bundle.mass_per_m * bundle.free_length, rel=1e-7)  # MJCF uses 9 significant digits
 
 
 def test_hanging_cable_matches_catenary():

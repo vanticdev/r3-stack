@@ -24,9 +24,10 @@ Model
   ``I = pi r^4 / 4``, so ``E = EI / I`` reproduces the catalog EI; ``twist`` is
   ``G = E / (2 (1 + nu))`` (``nu`` estimated). ``flat``: the stress-free shape is
   straight (limp, silicone-insulated stranded wire is not formed to its route).
-* **Mass.** Capsule density is chosen so that each segment carries
-  ``m' l``; MuJoCo includes the hemispherical caps in the capsule volume, so
-  ``rho = m' l / (pi r^2 l + 4/3 pi r^3)``.
+* **Mass.** Capsule density is chosen from the bundle's cut mass divided by
+  the sum of its actual capsule volumes, including hemispherical caps. This
+  preserves wire mass when tied spans have different segment lengths or the
+  discrete slack curve approximates the requested free length.
 * **Slack.** A span's free length is its route length times
   ``(cut length - termination allowances) / routed length``. The extra length
   is laid out as a ``sin^2`` bulge (zero slope at both pins, so the pins clamp
@@ -177,10 +178,11 @@ class CableBundle:
 
     @property
     def density(self) -> float:
-        """Capsule density giving mass_per_m per segment, caps included."""
-        length = float(np.mean([s.segment_length for s in self.spans]))
+        """Density preserving the routed cut mass across unequal discrete spans."""
         r = self.radius
-        return self.mass_per_m * length / (math.pi * r * r * length + 4.0 / 3.0 * math.pi * r ** 3)
+        volume = sum(math.pi * r * r * s.segment_length * s.segments
+                     + s.segments * 4.0 / 3.0 * math.pi * r ** 3 for s in self.spans)
+        return self.mass_per_m * self.free_length / volume
 
 
 @dataclass
