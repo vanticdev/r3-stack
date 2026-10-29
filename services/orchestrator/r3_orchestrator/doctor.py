@@ -239,6 +239,8 @@ def probe_onshape() -> Tool:
     selected = info["selected"]
     if selected is None:
         detail = "no transport: set ONSHAPE_ACCESS_KEY/ONSHAPE_SECRET_KEY (headless) or start the onshape-native bridge (local only)"
+    elif selected == "onshape-session":
+        detail = "headless Onshape session (stored cookies; validity is checked on first use)"
     elif info["headless"]:
         detail = f"API keys ({info['api_keys']['auth']}) to {info['api_keys']['base']}"
     else:

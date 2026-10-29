@@ -7,10 +7,13 @@ import math
 
 import firmware_fake_hal  # noqa: F401
 import pytest
+import yaml
 from control import (BatteryConfig, BatteryMonitor, LinkMonitor, PulseMap, PurePursuit, PurePursuitConfig,
                      SpeedController, SpeedPlanner, SpeedPlannerConfig, State, Supervisor, SupervisorConfig,
                      WaypointPath, stick_to_normalised)
+from settings import DEFAULT_CONFIG
 
+RC_CAR_SPEC = firmware_fake_hal.ROOT / "examples" / "robots" / "rc-car" / "robot.yaml"
 WHEELBASE = 0.26
 MAX_STEER = 0.45
 
@@ -80,8 +83,13 @@ def test_path_projection_and_corners() -> None:
 
 def test_pulse_mapping() -> None:
     pulses = PulseMap()
+    # Built-in defaults match the firmware config defaults and robot.yaml software.config (the CAD linkage end points).
+    software = yaml.safe_load(RC_CAR_SPEC.read_text())["software"]["config"]
+    assert DEFAULT_CONFIG["steering_pulse_us"] == software["steering_pulse_us"]
+    steer = software["steering_pulse_us"]
     assert pulses.esc_pulse(0.0) == 1500 and pulses.esc_pulse(1.0) == 2000 and pulses.esc_pulse(-1.0) == 1000
-    assert pulses.steer_pulse(1.0) == 1722 and pulses.steer_pulse(-1.0) == 1278 and pulses.steer_pulse(0) == 1500
+    assert pulses.steer_pulse(1.0) == steer["left"] and pulses.steer_pulse(-1.0) == steer["right"]
+    assert pulses.steer_pulse(0) == steer["center"]
     assert pulses.steer_from_angle(0.45) == 1.0 and pulses.steer_from_angle(-1.0) == -1.0
     assert stick_to_normalised(1500.0 + 512.0) == 1.0 and stick_to_normalised(1505.0) == 0.0
 

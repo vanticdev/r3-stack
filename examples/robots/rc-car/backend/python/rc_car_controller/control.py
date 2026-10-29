@@ -31,9 +31,10 @@ class PulseMap:
     esc_reverse_us: float = 1000.0
     esc_neutral_us: float = 1500.0
     esc_forward_us: float = 2000.0
-    steer_left_us: float = 1878.0
+    # Defaults equal settings.DEFAULT_CONFIG["steering_pulse_us"]: the CAD-solved linkage end points (+-30 deg horn).
+    steer_left_us: float = 1722.0
     steer_center_us: float = 1500.0
-    steer_right_us: float = 1122.0
+    steer_right_us: float = 1278.0
     max_steer_rad: float = 0.45
 
     def esc_pulse(self, throttle: float) -> float:

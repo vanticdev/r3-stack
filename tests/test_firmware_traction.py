@@ -245,7 +245,8 @@ def test_remapped_channels_drive_manual_mode(tmp_path: Path) -> None:
     path = tmp_path / "firmware.json"
     path.write_text(json.dumps(fake.firmware_document(None, mode="manual", crsf_channels=channels, traction=ASSISTS_OFF)))
     RcCarController(hal, load_settings(str(path), environ={})).run(2.0)
-    assert hal.pulse_us(2) > 1700.0 and hal.pulse_us(3) > 1850.0
+    full_left = DEFAULT_CONFIG["steering_pulse_us"]["left"]
+    assert hal.pulse_us(2) > 1700.0 and hal.pulse_us(3) > full_left - 0.05 * (full_left - 1500.0)
 
 
 def test_flat_hal_document_lifts_mission_and_origin() -> None:

@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from r3_model.project import Project
+from r3_model.units import to_si
 from r3_sim.geometry import MassProperties, box_inertia, combine
 from r3_sim.kernel import CoSimKernel
 from r3_sim.vehicle import Vehicle, build_vehicle_model
@@ -23,17 +24,53 @@ def test_mjcf_compiles_with_expected_structure(project):
     vm = build_vehicle_model(project)
     model = mujoco.MjModel.from_xml_string(vm.xml)
     cad = project.read_build_json("cad/cad_model.json")
-    if cad:  # CAD mass properties take precedence over catalog estimates
-        expected_mass = sum(cad["parts"][cid]["mass"] for cid in project.spec.components)
-    else:
-        expected_mass = sum(project.catalog.component(c.type).mechanical.mass for c in project.spec.components.values())
+    cad_parts = (cad or {}).get("parts", {})
+    # CAD mass properties take precedence over catalog estimates, per part (a stale cad_model may lack new parts).
+    expected_mass = sum(cad_parts[cid]["mass"] if vm.mass_source[cid] != "catalog"
+                        else project.spec.components[cid].params.get("mass", project.catalog.component(c.type).mechanical.mass)
+                        for cid, c in project.spec.components.items())
+    expected_mass += sum(cad_parts[name]["mass"] for extras in vm.cad_extras.values() for name in extras)
     assert sum(model.body_mass) == pytest.approx(expected_mass, rel=1e-6)
-    assert set(vm.bodies) == {"chassis", "knuckle_fl", "knuckle_fr", "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"}
+    # One body per joint child plus the free root; everything else rides with its mount chain.
+    joints = project.spec.mechanical.joints
+    assert set(vm.bodies) == {"chassis"} | {j.child for j in joints}
     assert "battery" in vm.bodies["chassis"] and "pi" in vm.bodies["chassis"]
-    # Rotor inertia reflected through the ratio onto the differential tendon: J_m N^2 + J_out.
-    assert model.tendon_armature[0] == pytest.approx(1.2e-5 * 9.6 ** 2 + 4.0e-5)
-    assert any(d.code == "cad_mass_estimated" for d in vm.diagnostics) == (cad is None)
+    for cid, comp in project.spec.components.items():
+        if comp.mount in vm.bodies and cid not in vm.bodies:  # e.g. stub axles on knuckles, axles on wheels
+            assert cid in vm.bodies[comp.mount], cid
+    # CAD fasteners and nuts ride with the body of their owner (front wheel nuts on the stub axles -> knuckles).
+    for body, extras in vm.cad_extras.items():
+        for name in extras:
+            assert cad_parts[name]["owner"] in vm.bodies[body] or cad_parts[name]["owner"] == body
+    # Rotor inertia reflected through the ratio onto the differential tendon: J_m N^2 + J_out (gearbox via the path).
+    drive = next(t for t in project.spec.mechanical.transmissions if t.type == "differential")
+    params = lambda cid: {**project.catalog.component(project.spec.components[cid].type).behavior.params,  # noqa: E731
+                          **project.spec.components[cid].params}
+    expected_armature = to_si(params(drive.actuator)["rotor_inertia"]) * drive.ratio ** 2 + to_si(params("gearbox")["output_inertia"])
+    assert expected_armature > 0
+    assert model.tendon_armature[0] == pytest.approx(expected_armature)
+    estimated = [cid for cid, source in vm.mass_source.items() if source == "catalog"]
+    assert any(d.code == "cad_mass_estimated" for d in vm.diagnostics) == bool(estimated)
     assert model.geom_type[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "tire_wheel_rl")] == mujoco.mjtGeom.mjGEOM_CYLINDER
+
+
+def test_steering_follows_cad_linkage_table(project):
+    vm = build_vehicle_model(project)
+    (steer,) = vm.steering
+    table = ((project.read_build_json("cad/cad_model.json") or {}).get("kinematics") or {}).get("steering")
+    if not table:
+        assert steer.source == "ackermann_ratio"
+        assert steer.wheel_angles(0.2) == ackermann_angles(steer.ratio * 0.2, steer.wheelbase, steer.kingpin_track,
+                                                            steer.max_steer)
+        return
+    assert steer.source == "cad_linkage"
+    for row in table["table"]:
+        assert steer.wheel_angles(row["servo_rad"]) == pytest.approx([row[j] for j in steer.joints], abs=1e-9)
+    # Horn travel stops hold the end rows; the inner wheel turns more than the outer one.
+    end = max(row["servo_rad"] for row in table["table"])
+    assert steer.wheel_angles(end + 0.2) == pytest.approx(steer.wheel_angles(end))
+    left, right = steer.wheel_angles(0.3)
+    assert left > right > 0
 
 
 def test_composite_inertia_parallel_axis():

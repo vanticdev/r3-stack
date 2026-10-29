@@ -5,13 +5,19 @@ Every other component belongs to the body of its ``mount`` chain. Joint origins
 and axes are authored in the robot frame at the nominal (zero) configuration,
 so a body's transform is the composition, root first, of rotations about those
 nominal axes: ``x = T_1(q_1) o T_2(q_2) o ... (x_nominal)``.
+
+Steering: when the cad stage solved the tie-rod linkage
+(``build/cad/cad_model.json`` ``kinematics.steering``), kingpin angles follow
+that table instead of ideal Ackermann geometry, and each kingpin sweeps only the
+travel the linkage can reach within the servo's horn travel.
 """
 
 from __future__ import annotations
 
 import itertools
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Any
 
 import numpy as np
 
@@ -63,15 +69,40 @@ def invert(t: Transform) -> Transform:
     return t[0].T, -t[0].T @ t[1]
 
 
+def cad_steering_table(cad: dict[str, Any] | None) -> tuple[np.ndarray, dict[str, np.ndarray], dict[str, tuple[float, float]]] | None:
+    """CAD linkage solution: (servo angles ascending, joint -> kingpin angles, joint -> reachable range), or None
+    when absent or when any side failed inside the horn travel."""
+    steering = ((cad or {}).get("kinematics") or {}).get("steering") if isinstance(cad, dict) else None
+    rows = (steering or {}).get("table") or []
+    sides = (steering or {}).get("sides") or {}
+    if len(rows) < 2 or not sides or any(side.get("status") != "ok" for side in sides.values()):
+        return None
+    if any(row.get(joint) is None for row in rows for joint in sides):
+        return None
+    rows = sorted(rows, key=lambda row: float(row["servo_rad"]))
+    servo = np.array([float(row["servo_rad"]) for row in rows])
+    angles = {joint: np.array([float(row[joint]) for row in rows]) for joint in sides}
+    ranges = {joint: (float(a.min()), float(a.max())) for joint, a in angles.items()}
+    return servo, angles, ranges
+
+
 class Kinematics:
-    def __init__(self, spec: RobotSpec) -> None:
+    def __init__(self, spec: RobotSpec, cad: dict[str, Any] | None = None) -> None:
         self.spec = spec
         self.joints: dict[str, JointInfo] = {}
         self.joint_of_child: dict[str, JointInfo] = {}
+        self.steering_table = cad_steering_table(cad)
+        reach = self.steering_table[2] if self.steering_table else {}
         for joint in spec.mechanical.joints:
             axis = np.asarray(joint.axis, dtype=float)
             info = JointInfo(joint.id, joint.type, joint.parent, joint.child, np.asarray(joint.origin, dtype=float),
                              axis / np.linalg.norm(axis), tuple(joint.limits) if joint.limits else None)
+            if joint.id in reach:
+                # The linkage, not the joint stop, bounds the kingpin travel.
+                lower, upper = reach[joint.id]
+                if info.limits:
+                    lower, upper = max(lower, info.limits[0]), min(upper, info.limits[1])
+                info = replace(info, limits=(lower, upper))
             self.joints[joint.id] = info
             self.joint_of_child[joint.child] = info
 
@@ -140,8 +171,14 @@ class Kinematics:
         commanded centre steer angle (rad, +left). Inner wheel:
         tan(d_i) = L / (L / tan d - T/2); outer: tan(d_o) = L / (L / tan d + T/2)."""
         out: dict[str, float] = {}
+        if self.steering_table:
+            # CAD linkage: find the horn angle whose mean kingpin angle is ``steer`` (monotonic), then read each side.
+            servo, angles, _ = self.steering_table
+            centre = np.mean([a for a in angles.values()], axis=0)
+            horn = float(np.interp(steer, centre, servo))
+            out.update({joint: float(np.interp(horn, servo, a)) for joint, a in angles.items() if joint in self.joints})
         for trans in self.spec.mechanical.transmissions:
-            if trans.type != "ackermann_steering":
+            if trans.type != "ackermann_steering" or all(j in out for j in trans.joints):
                 continue
             from r3_model.units import to_si
 
@@ -166,6 +203,11 @@ class Kinematics:
         return out
 
     def steering_limit(self) -> float:
+        """Largest centre steer angle reachable on both sides (rad)."""
+        if self.steering_table:
+            servo, angles, _ = self.steering_table
+            centre = np.mean([a for a in angles.values()], axis=0)
+            return float(min(abs(centre[0]), abs(centre[-1])))
         limits = [min(abs(j.limits[0]), abs(j.limits[1])) for j in self.joints.values()
                   if j.type == "revolute" and j.limits and abs(j.axis[2]) > 0.9]
         return min(limits) if limits else 0.0

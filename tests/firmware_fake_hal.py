@@ -31,6 +31,16 @@ from settings import DEFAULT_CONFIG, channel_map  # noqa: E402
 from r3_hal.api import Clock, GpioLine, Hal, HalError, I2cBus, PwmChannel, SpiDevice, Uart  # noqa: E402
 
 GRAVITY = 9.80665
+#: Servo pulse half-spans (us) from the firmware's configured linkage end points: full lock = max_steer.
+STEER_CENTER_US = float(DEFAULT_CONFIG["steering_pulse_us"]["center"])
+STEER_LEFT_SPAN_US = float(DEFAULT_CONFIG["steering_pulse_us"]["left"]) - STEER_CENTER_US
+STEER_RIGHT_SPAN_US = STEER_CENTER_US - float(DEFAULT_CONFIG["steering_pulse_us"]["right"])
+
+
+def steer_fraction(servo_us: float) -> float:
+    """Servo pulse -> fraction of full lock in [-1, 1] (+ = left)."""
+    offset = servo_us - STEER_CENTER_US
+    return max(-1.0, min(1.0, offset / (STEER_LEFT_SPAN_US if offset >= 0.0 else STEER_RIGHT_SPAN_US)))
 ORIGIN = nmea.LocalTangentPlane(47.3977, 8.5456)
 
 
@@ -321,8 +331,7 @@ class FakeCarHal(Hal):
         servo = self.pulse_us(3)
         u = (esc - 1500.0) / 500.0
         u = 0.0 if abs(u) < 0.03 else u  # ESC deadband (catalog 0.03)
-        n = (servo - 1500.0) / (378.0 if servo >= 1500.0 else 378.0)
-        steer_cmd = max(-1.0, min(1.0, n)) * p.max_steer
+        steer_cmd = steer_fraction(servo) * p.max_steer
         car.steer += max(-p.steer_rate * dt, min(p.steer_rate * dt, steer_cmd - car.steer))
         if u > 0:
             accel = min(p.traction_accel, (u * p.free_speed - car.v) / p.motor_tau)
@@ -366,7 +375,7 @@ class FakeCarHal(Hal):
         u = (self.pulse_us(2) - 1500.0) / 500.0
         duty = 0.0 if u <= 0.03 else (u - 0.03) / 0.97  # forward drive only; ESC deadband rescaling
         servo = self.pulse_us(3)
-        steer_cmd = max(-1.0, min(1.0, (servo - 1500.0) / 378.0)) * p.max_steer
+        steer_cmd = steer_fraction(servo) * p.max_steer
         car.steer += max(-p.steer_rate * dt, min(p.steer_rate * dt, steer_cmd - car.steer))
         k_e = 60.0 / (2.0 * math.pi * p.motor_kv)
         omega_m = car.wheel_v / p.wheel_radius * p.gear_ratio

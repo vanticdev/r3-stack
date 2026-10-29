@@ -52,9 +52,11 @@ The radio channel between the pilot handset and the car antenna is ray-traced wi
 **Model.** The scene comes from the spec:
 * ground: an ITU-R P.2040 `medium_dry_ground` plane, or `radio_environment.ground_material`;
 * obstacle boxes, with ITU materials or a labeled plastic estimate;
-* the car body: chassis plate outline, CAD meshes or catalog primitives, merged per material;
+* the car body: chassis plate outline, CAD meshes or catalog primitives, merged per material (without the
+  receiver and the antenna itself);
 * half-wave dipoles, V-polarized, scaled to the catalog peak gains;
-* the car antenna at the receiver pose + `antenna_height_above_mount`, or CAD `rf.antenna_position`.
+* the car antenna at CAD `rf.antenna_position`, else the center of the antenna component's catalog `dipole`
+  solid, else the receiver pose + `antenna_height_above_mount`.
 
 `PathSolver` runs specular reflection to depth 3 with refraction and UTD wedge diffraction. Traces are cached on a
 0.25 m × 15° heading grid (20 traces/s at 5 m/s), with the car body posed for each trace. Between traces each path's

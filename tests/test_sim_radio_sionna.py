@@ -127,8 +127,18 @@ def test_scene_from_rc_car_spec(tmp_path):
     assert scene.obstacles[0].material == "plastic" and not scene.obstacles[0].material_estimated
     materials = {m.material: m for m in scene.body}
     assert "chassis" in materials["metal"].parts and "pi" in materials["metal"].parts and "deck" in materials["plastic"].parts
-    assert "receiver" not in sum((m.parts for m in scene.body), [])
-    assert np.allclose(scene.antenna_offset, [0.19, 0.04, 0.178]) and scene.antenna_offset_source == "catalog"
+    body_parts = sum((m.parts for m in scene.body), [])
+    assert "receiver" not in body_parts and "rx_antenna" not in body_parts  # the radiator does not shadow itself
+    # Without CAD the feed point is the middle of the antenna's catalog dipole, placed by its pose.
+    dipole = next(s for s in project.catalog.component(project.spec.components["rx_antenna"].type).mechanical.solids
+                  if s.name == "dipole")
+    position, rotation = project.graph.component_pose("rx_antenna")
+    expected = position + rotation @ (np.asarray(dipole.position, dtype=float)
+                                      + np.asarray(dipole.axis, dtype=float) * dipole.length / 2.0)
+    assert np.allclose(scene.antenna_offset, expected) and scene.antenna_offset_source == "catalog"
+    built = Project.load(RC_CAR).read_build_json("cad/cad_model.json") or {}
+    if (built.get("rf") or {}).get("antenna_position"):  # the CAD-derived feed point agrees with the catalog geometry
+        assert np.allclose(scene.antenna_offset, built["rf"]["antenna_position"], atol=1e-4)
     # The antenna must sit outside (above) every body part.
     assert all(m.vertices[:, 2].max() < scene.antenna_offset[2] for m in scene.body)
     (root / "build" / "cad").mkdir(parents=True)

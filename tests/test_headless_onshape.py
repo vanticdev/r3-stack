@@ -18,6 +18,7 @@ import pytest
 from PIL import Image
 
 from r3_onshape import client, views
+from r3_onshape import session as onshape_session
 from r3_onshape.client import ApiKeyTransport, sign_request
 from r3_onshape.policy import FeatureScriptForbidden
 
@@ -109,6 +110,8 @@ def test_policy_still_enforced_with_api_keys():
 @pytest.fixture
 def no_bridge(monkeypatch, tmp_path):
     monkeypatch.setattr(client.Path, "home", classmethod(lambda cls: tmp_path))
+    # Never pick up (or probe Onshape with) the developer's stored headless session.
+    monkeypatch.setattr(onshape_session, "SESSION_FILE", tmp_path / "onshape-session.json")
     monkeypatch.delenv("ONSHAPE_NATIVE_RUNTIME", raising=False)
     for key in ("ONSHAPE_ACCESS_KEY", "ONSHAPE_SECRET_KEY", "ONSHAPE_BASE_URL", "ONSHAPE_API_AUTH", "R3_ONSHAPE_TRANSPORT"):
         monkeypatch.delenv(key, raising=False)
@@ -134,9 +137,29 @@ def test_transport_selection_from_environment(no_bridge):
     monkeypatch.setenv("R3_ONSHAPE_TRANSPORT", "api-keys")
     monkeypatch.setenv("ONSHAPE_API_AUTH", "basic")
     assert client.default_transport().auth == "basic"
+    monkeypatch.setenv("R3_ONSHAPE_TRANSPORT", "session")
+    forced = client.default_transport()  # forced session is returned even before login, so it can report expiry
+    assert isinstance(forced, onshape_session.SessionTransport) and not forced.has_session
+    assert client.describe_transport()["selected"] == "onshape-session"
     monkeypatch.setenv("R3_ONSHAPE_TRANSPORT", "bogus")
     with pytest.raises(ValueError):
         client.default_transport()
+
+
+def test_auto_prefers_keys_then_stored_session(no_bridge, tmp_path):
+    monkeypatch = no_bridge
+    stored = onshape_session.SessionTransport()
+    stored.jar.set_cookie(onshape_session._dict_to_cookie({"name": "JSESSIONID", "value": "x"}))
+    stored.save()
+    monkeypatch.setattr(onshape_session.SessionTransport, "healthy", lambda self: self.has_session)  # no network
+    assert isinstance(client.default_transport(), onshape_session.SessionTransport)
+    info = client.describe_transport()
+    assert info["selected"] == "onshape-session" and info["headless"] is True and info["session"]["stored"] is True
+    assert "JSESSIONID" not in json.dumps(info)
+    monkeypatch.setenv("ONSHAPE_ACCESS_KEY", "AK")
+    monkeypatch.setenv("ONSHAPE_SECRET_KEY", "SK")
+    assert isinstance(client.default_transport(), ApiKeyTransport)
+    assert client.describe_transport()["selected"] == "onshape-api-keys"
 
 
 # ----------------------------------------------------------------- shaded views

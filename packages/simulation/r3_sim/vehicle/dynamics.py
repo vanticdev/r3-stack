@@ -13,7 +13,7 @@ from r3_model.project import Project
 
 from .mjcf import VehicleModel, _behavior_params
 from .overlap import MujocoWorker
-from .servo import SteeringServo, ackermann_angles
+from .servo import SteeringServo
 
 #: Frontal drag area C_d * A for a 1/10 touring/buggy body (estimate, m^2).
 DEFAULT_DRAG_AREA = 0.04
@@ -95,14 +95,14 @@ class Vehicle:
         servo = self.servos[index]
         # Reaction of the knuckles on the horn by virtual work: sum F_i d(delta_i)/d(theta).
         eps = 1e-4
-        plus = ackermann_angles(steer.ratio * (servo.theta + eps), steer.wheelbase, steer.kingpin_track, steer.max_steer)
-        minus = ackermann_angles(steer.ratio * (servo.theta - eps), steer.wheelbase, steer.kingpin_track, steer.max_steer)
+        plus = steer.wheel_angles(servo.theta + eps)
+        minus = steer.wheel_angles(servo.theta - eps)
         load = 0.0
         for k, act in enumerate(self.steer_actuators[index]):
             gain = (plus[k] - minus[k]) / (2 * eps)
             load += -self.data.actuator_force[act] * gain  # actuator force acts on knuckle; horn feels the opposite
         servo.step(dt, pulse_us, voltage, -load)
-        angles = ackermann_angles(steer.ratio * servo.theta, steer.wheelbase, steer.kingpin_track, steer.max_steer)
+        angles = steer.wheel_angles(servo.theta)
         self.steer_targets[index] = angles
         for act, angle in zip(self.steer_actuators[index], angles):
             self.data.ctrl[act] = angle

@@ -7,7 +7,8 @@ Pure geometry and materials, independent of the solver, built from the spec:
   pair only when *both* ``ground_permittivity`` and ``ground_conductivity`` are
   given explicitly;
 * static obstacles: ``environment.obstacles`` boxes (center, size, material);
-* the car body: every component of the robot except the receiver, as its CAD
+* the car body: every component of the robot except the receiver and the
+  antenna (its own radiator cannot shadow itself), as its CAD
   mesh (``build/cad/meshes``) when available, otherwise its catalog box /
   cylinder / plate outline, in the robot frame. Parts are merged per radio
   material so the solver can move the body with the car at each trace;
@@ -208,12 +209,40 @@ def car_body(project: Any, exclude: tuple[str, ...] = ()) -> list[BodyMesh]:
     return [groups[k] for k in sorted(groups)]
 
 
+def antenna_component(project: Any) -> str | None:
+    """The car's receive antenna: CAD ``rf.antenna_component``, else the first ``antenna`` catalog kind."""
+    rf = (project.read_build_json("cad/cad_model.json") or {}).get("rf") or {}
+    if rf.get("antenna_component") in project.spec.components:
+        return str(rf["antenna_component"])
+    for cid, comp in project.spec.components.items():
+        if comp.type in project.catalog.components and project.catalog.component(comp.type).kind == "antenna":
+            return cid
+    return None
+
+
+def _catalog_feed_point(project: Any, antenna_id: str) -> np.ndarray | None:
+    """Feed point of an antenna component without CAD: the middle of its catalog ``dipole`` solid, in the robot frame."""
+    mech = project.catalog.component(project.spec.components[antenna_id].type).mechanical
+    dipole = next((s for s in mech.solids if s.kind == "cylinder" and s.name == "dipole"), None)
+    if dipole is None:
+        return None
+    axis = np.asarray(dipole.axis, dtype=float)
+    local = np.asarray([to_si(v) for v in dipole.position], dtype=float) + axis / np.linalg.norm(axis) * to_si(dipole.length) / 2.0
+    position, rotation = project.graph.component_pose(antenna_id)
+    return np.asarray(position, dtype=float) + np.asarray(rotation) @ local
+
+
 def antenna_offset(project: Any, receiver_id: str | None, height_above_mount: float) -> tuple[np.ndarray, str]:
-    """Car antenna position in the robot frame: CAD ``rf.antenna_position`` when exposed, else receiver pose + height."""
+    """Car antenna position in the robot frame: CAD ``rf.antenna_position`` when exposed, else the catalog dipole
+    center of the antenna component, else receiver pose + height."""
     cad = project.read_build_json("cad/cad_model.json") or {}
     rf = cad.get("rf") or {}
     if rf.get("antenna_position") is not None:
         return np.asarray([to_si(v) for v in rf["antenna_position"]], dtype=float), "cad"
+    antenna = antenna_component(project)
+    feed = _catalog_feed_point(project, antenna) if antenna else None
+    if feed is not None:
+        return feed, "catalog"
     if receiver_id and receiver_id in project.spec.components:
         position, _ = project.graph.component_pose(receiver_id)
         return np.asarray(position, dtype=float) + np.array([0.0, 0.0, height_above_mount]), "catalog"
@@ -225,5 +254,6 @@ def scene_for_project(project: Any, receiver_id: str | None, receiver_params: di
     scene.antenna_offset, scene.antenna_offset_source = antenna_offset(
         project, receiver_id, to_si(receiver_params.get("antenna_height_above_mount", 0.1)))
     if include_body:
-        scene.body = car_body(project, exclude=(receiver_id,) if receiver_id else ())
+        antenna = antenna_component(project)
+        scene.body = car_body(project, exclude=tuple(c for c in (receiver_id, antenna) if c))
     return scene
