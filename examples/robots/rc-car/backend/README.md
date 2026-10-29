@@ -61,7 +61,9 @@ R3_HAL=virtual R3_HAL_ENDPOINT=tcp://127.0.0.1:7600 R3_FIRMWARE_CONFIG=$PWD/buil
   PYTHONPATH=examples/robots/rc-car/backend/python/rc_car_controller:packages/hardware-interface \
   python3 -u examples/robots/rc-car/backend/python/rc_car_controller/main.py
 # container (linux/arm64 debian:bookworm-slim, BLITZ device layout)
-python examples/robots/rc-car/backend/twin.py image            # or --blitz to package the real BLITZ bundle
+python examples/robots/rc-car/backend/twin.py image            # module folder + r3_hal
+python examples/robots/rc-car/backend/twin.py image --blitz --tag r3/rc-car-controller:sim   # the real BLITZ Pi 5 bundle
+#   (add --allow-stale-dependencies to reuse an older cached BLITZ dependency image offline)
 docker run --rm --platform linux/arm64 --add-host host.docker.internal:host-gateway \
   -e R3_HAL=virtual -e R3_HAL_ENDPOINT=tcp://host.docker.internal:7600 \
   -v $PWD/build/software/firmware.json:/etc/r3/firmware.json:ro -e R3_FIRMWARE_CONFIG=/etc/r3/firmware.json \

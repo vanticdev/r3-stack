@@ -24,6 +24,7 @@ import importlib.util
 import json
 import os
 import shlex
+import shutil
 import sys
 import zipfile
 from pathlib import Path
@@ -84,10 +85,17 @@ def host_command(port: int, config: Path | None = None, host: str = "127.0.0.1",
     return [python, "-u", str(MODULE_FOLDER / "main.py")], environment, MODULE_FOLDER
 
 
-def _blitz_bundle_spec(staging: Path) -> container.RuntimeSpec:
+# Catalog capabilities a Raspberry Pi 5 on Pi OS bookworm reports (GPIO chardev,
+# I2C/SPI dev nodes, V4L2 ISP/codec nodes); they are part of the BLITZ build key.
+PI5_CAPABILITIES = (("gpio", "present"), ("i2c", "present"), ("spi", "present"), ("v4l2", "present"))
+
+
+def _blitz_bundle_spec(staging: Path, allow_stale_dependencies: bool = False) -> container.RuntimeSpec:
     """Build the real BLITZ bundle for a Raspberry Pi 5 profile and describe how the
     watchdog would start it. Needs Docker and the BLITZ dependency cache (network
-    on first use)."""
+    on first use). ``allow_stale_dependencies`` explicitly accepts an older cached
+    dependency image of the same profile, as BLITZ's deploy prompt does (safe here:
+    the module has no third-party Python requirements)."""
     deploy = _load("rc_car_deploy", BACKEND / "deploy.py")
     deploy.stage_hal()
     from backend.deployment.bundler import CodeBundler
@@ -96,7 +104,7 @@ def _blitz_bundle_spec(staging: Path) -> container.RuntimeSpec:
 
     # Raspberry Pi OS bookworm on a Pi 5: glibc 2.36, aarch64, Debian 12, CPython 3.11.
     system = SystemId(c_lib_version="2.36", linux_distro=LinuxDistro.DEBIAN_12, architecture=Architecture.AARCH64,
-                      python_version=PythonVersion(major=3, minor=11))
+                      python_version=PythonVersion(major=3, minor=11), capabilities=PI5_CAPABILITIES)
     previous = Path.cwd()
     os.chdir(PROJECT)  # BLITZ reads requirements.txt from the working directory
     try:
@@ -104,14 +112,25 @@ def _blitz_bundle_spec(staging: Path) -> container.RuntimeSpec:
                               str(staging / "blitz-out"), system)
         bundler.prepare()
         builder = SystemBuilder(system, bundler.build_path, bundler.context_path, bundler.backend_local_path)
+        dependency_image = None
         if not builder.dependencies_cached():
-            builder.cache_dependencies()
-        archive = Path(bundler.bundle(prepared=True))
+            stale = builder.stale_dependency_images() if allow_stale_dependencies else []
+            if stale:
+                dependency_image = stale[0]
+                print(f"Using older cached BLITZ dependency image {dependency_image}", file=sys.stderr)
+            else:
+                builder.cache_dependencies()
+        archive = Path(bundler.bundle(prepared=True, dependency_image=dependency_image))
     finally:
         os.chdir(previous)
     extracted = staging / "bundle"
+    if extracted.exists():
+        shutil.rmtree(extracted)
     with zipfile.ZipFile(archive) as bundle:
         bundle.extractall(extracted)
+    children = [child for child in extracted.iterdir()]
+    if len(children) == 1 and children[0].is_dir():  # archives wrap the bundle in its build-key folder
+        extracted = children[0]
     module = deploy.get_modules()[0]
     local_root = str(extracted.resolve())
 
@@ -126,10 +145,11 @@ def _blitz_bundle_spec(staging: Path) -> container.RuntimeSpec:
         environment=environment, labels={"org.r3.bundle": f"blitz:{archive.name}"})
 
 
-def build_image(tag: str = IMAGE_TAG, blitz: bool = False, staging: Path | None = None) -> str:
+def build_image(tag: str = IMAGE_TAG, blitz: bool = False, staging: Path | None = None,
+                allow_stale_dependencies: bool = False) -> str:
     staging = Path(staging or PROJECT / "build" / "software" / "container")
     if blitz:
-        spec = _blitz_bundle_spec(staging)
+        spec = _blitz_bundle_spec(staging, allow_stale_dependencies)
     else:
         spec = container.spec_from_module(MODULE_FOLDER, staging)
     container.write_context(spec, staging / "context")
@@ -150,6 +170,8 @@ def main(argv: list[str] | None = None) -> int:
     image = commands.add_parser("image")
     image.add_argument("--tag", default=IMAGE_TAG)
     image.add_argument("--blitz", action="store_true", help="package the real BLITZ bundle into the image")
+    image.add_argument("--allow-stale-dependencies", action="store_true",
+                       help="accept an older cached BLITZ dependency image for the Pi 5 profile")
     for name in ("host-command", "container-command"):
         command = commands.add_parser(name)
         command.add_argument("--port", type=int, required=True)
@@ -160,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
         origin = tuple(float(v) for v in args.origin.split(",")) if args.origin else None
         print(write_config(args.out, args.scenario, origin))
     elif args.command == "image":
-        print(build_image(args.tag, args.blitz))
+        print(build_image(args.tag, args.blitz, allow_stale_dependencies=args.allow_stale_dependencies))
     elif args.command == "host-command":
         argv_, environment, cwd = host_command(args.port, args.config)
         print(f"cd {shlex.quote(str(cwd))} && " + " ".join(f"{k}={shlex.quote(v)}" for k, v in environment.items())

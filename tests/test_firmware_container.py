@@ -80,3 +80,32 @@ def test_firmware_runs_in_container_against_tcp_stub(image: str) -> None:
         "no radio link: ESC and servo held at neutral"
     uarts = {r["device"]: r["baud"] for r in stub.requests if r["op"] == "uart.configure"}
     assert uarts == {"/dev/ttyAMA0": 420000, "/dev/ttyAMA2": 115200}
+
+
+def _pi5_dependency_cache_present() -> bool:
+    if not container.docker_available():
+        return False
+    images = subprocess.run(["docker", "image", "ls", "--format", "{{.Repository}}"], capture_output=True, text=True).stdout
+    return any(line.startswith("blitz-deps-2.36-aarch64-debian-12-python3-11") for line in images.splitlines())
+
+
+@pytest.mark.skipif(not _pi5_dependency_cache_present(), reason="no cached BLITZ Pi 5 dependency image (run deploy.py cache)")
+def test_real_blitz_bundle_runs_in_container(tmp_path: Path) -> None:
+    import runpy
+    twin = runpy.run_path(str(ROOT / "examples/robots/rc-car/backend/twin.py"), run_name="rc_car_twin_blitz_test")
+    tag = twin["build_image"]("r3/rc-car-controller:smoke-test-blitz", blitz=True, staging=tmp_path,
+                              allow_stale_dependencies=True)
+    spec = json.loads((tmp_path / "context/runtime-spec.json").read_text())
+    assert spec["argv"] == ["/opt/blitz/.venv/bin/python", "-u", "/opt/blitz/backend/python/rc_car_controller/main.py"]
+    assert (tmp_path / "context/bundle/runtime-manifest.json").is_file()
+    assert (tmp_path / "context/bundle/python/rc_car_controller/_vendor/r3_hal/virtual.py").is_file()
+    stub = LockstepStub()
+    server = serve(stub)
+    try:
+        result = subprocess.run(container.run_command(tag, server.server_address[1], extra_args=["--duration", "1.0"]),
+                                capture_output=True, text=True, timeout=180)
+    finally:
+        server.shutdown()
+        server.server_close()
+    assert result.returncode == 0, result.stderr
+    assert stub.done.is_set() and sum(r["op"] == "clock.sleep_until" for r in stub.requests) == 100
