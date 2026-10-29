@@ -564,13 +564,57 @@ class ModelChecker:
                         return found
         return None
 
-    def _wire_length_estimate(self, harness: Any, wire: Any) -> float:
-        ends = []
+    def _far_ends(self, ref: str) -> list[np.ndarray]:
+        """Known positions at the far end of every wire attached to harness connector ``ref``."""
+        owner, _, name = ref.partition(".")
+        harness = next((h for h in self.spec.electrical.harnesses if h.id == owner), None)
+        if harness is None:
+            return []
+        points = []
+        for wire in harness.wires:
+            for near, far in ((wire.from_, wire.to), (wire.to, wire.from_)):
+                if near.partition(".")[0] != name:
+                    continue
+                if far in harness.splices:
+                    points.append(np.asarray(harness.splices[far].position))
+                else:
+                    found = self._connector_position(f"{owner}.{far.partition('.')[0]}", set())
+                    if found is not None:
+                        points.append(found)
+        return points
+
+    def _free_pair_estimate(self, ref: str) -> np.ndarray | None:
+        """An in-line connector pair with no authored position (e.g. XT60 battery plug) is placed at the
+        centroid of the known far ends of both mating halves (estimate)."""
+        partners = [ref]
+        owner, _, name = ref.partition(".")
+        for harness in self.spec.electrical.harnesses:
+            for other, hconn in harness.connectors.items():
+                if hconn.mates == ref:
+                    partners.append(f"{harness.id}.{other}")
+                if harness.id == owner and other == name and hconn.mates:
+                    partners.append(hconn.mates)
+        points = [p for partner in partners for p in self._far_ends(partner)]
+        return np.mean(points, axis=0) if points else None
+
+    def wire_ends(self, harness: Any, wire: Any) -> tuple[list[np.ndarray | None], bool]:
+        """Robot-frame positions of a wire's two ends (connector or splice) and whether any is estimated."""
+        ends: list[np.ndarray | None] = []
+        estimated = False
         for end in (wire.from_, wire.to):
             if end in harness.splices:
                 ends.append(np.asarray(harness.splices[end].position))
-            else:
-                ends.append(self._connector_position(f"{harness.id}.{end.partition('.')[0]}", set()))
+                continue
+            ref = f"{harness.id}.{end.partition('.')[0]}"
+            position = self._connector_position(ref, set())
+            if position is None:
+                position = self._free_pair_estimate(ref)
+                estimated |= position is not None
+            ends.append(position)
+        return ends, estimated
+
+    def _wire_length_estimate(self, harness: Any, wire: Any) -> float:
+        ends, _ = self.wire_ends(harness, wire)
         if any(e is None for e in ends):
             return DEFAULT_WIRE_LENGTH
         return float(np.linalg.norm(ends[0] - ends[1])) * ROUTE_FACTOR_ESTIMATE + harness.route.slack
@@ -608,6 +652,17 @@ def _component_geometry(checker: ModelChecker, solids: dict[str, Solid]) -> dict
                     "size": list(mech.size), "axis": mech.axis, "xyz": list(comp.pose.xyz), "rpy": list(comp.pose.rpy),
                     "color": mech.color, "moving": mech.moving, "mass": mech.mass,
                     "aabb_min": lo.tolist(), "aabb_max": hi.tolist(), "volume": solids[cid].volume}
+    return out
+
+
+def _wires(checker: ModelChecker) -> dict[str, Any]:
+    out = {}
+    for harness in checker.spec.electrical.harnesses:
+        for wire in harness.wires:
+            ends, estimated = checker.wire_ends(harness, wire)
+            out[wire.id] = {"harness": harness.id, "awg": wire.awg, "color": wire.color, "signal": wire.signal,
+                            "from": wire.from_, "to": wire.to, "ends_estimated": estimated,
+                            "ends": [e.tolist() if e is not None else None for e in ends]}
     return out
 
 
@@ -671,6 +726,7 @@ def run(project: Project) -> StageResult:
     graph_json.update({
         "net_names": _net_names(checker),
         "components": geometry,
+        "wires": _wires(checker),
         "rails": rails,
         "i2c_buses": buses,
         "interference": overlaps,

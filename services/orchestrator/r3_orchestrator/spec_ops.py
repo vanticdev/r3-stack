@@ -137,6 +137,19 @@ def validation_errors(data: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _graph_diagnostics(root: Path, data: Any) -> list[dict[str, Any]]:
+    """Connectivity problems in the patched spec (dangling connectors, mate mismatches). Reported, not
+    rejected: an agent may need several patches to rewire a harness. ``r3 validate`` runs the full checks."""
+    from r3_catalog import load_catalog
+    from r3_model.graph import RobotGraph
+
+    try:
+        graph = RobotGraph(RobotSpec.model_validate(_plain(data)), load_catalog(root / "catalog"))
+    except Exception as error:  # a broken project catalog must not block spec edits
+        return [{"code": "graph_unavailable", "severity": "warning", "message": str(error)}]
+    return [d.model_dump(mode="json") for d in graph.diagnostics]
+
+
 def patch_spec(root: str | Path, patch: dict[str, Any], expected_sha256: str, dry_run: bool = False) -> dict[str, Any]:
     """Apply a merge patch to robot.yaml if its SHA still equals ``expected_sha256``.
 
@@ -157,6 +170,7 @@ def patch_spec(root: str | Path, patch: dict[str, Any], expected_sha256: str, dr
         if errors:
             return {"ok": False, "code": "spec_invalid", "errors": errors, "current_sha256": current,
                     "message": f"patched spec fails schema validation ({len(errors)} error(s)); file unchanged"}
+        graph_diagnostics = _graph_diagnostics(Path(root), patched)
         new_text = _dump(loader, patched)
         if loader is not None:
             new_text = _restore_unchanged_lines(text, new_text)
@@ -169,4 +183,4 @@ def patch_spec(root: str | Path, patch: dict[str, Any], expected_sha256: str, dr
             os.replace(tmp, path)
         return {"ok": True, "dry_run": dry_run, "changed": new_text != text, "previous_sha256": current,
                 "sha256": new_sha if not dry_run else current, "patched_sha256": new_sha,
-                "preserves_comments": loader is not None}
+                "preserves_comments": loader is not None, "graph_diagnostics": graph_diagnostics}
