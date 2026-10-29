@@ -11,7 +11,9 @@ import yaml
 from r3_catalog import DATA_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
-RC_CAR = ROOT / "examples" / "robots" / "rc-car"
+# Frozen copy of the first RC-car layout (with its known interferences), so these
+# tests do not change whenever the example design is improved.
+RC_CAR = ROOT / "tests" / "fixtures" / "rc_car_layout_v0"
 
 
 def rc_car_spec() -> dict[str, Any]:

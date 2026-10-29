@@ -1,0 +1,242 @@
+schema: r3/robot@1
+robot:
+  name: r3-rc-car
+  description: >
+    1/10-scale rear-wheel-drive autonomous RC car. Raspberry Pi 5 + custom carrier HAT,
+    brushed 540 motor, 2S LiPo, ExpressLRS radio as safety link/override, GPS + IMU + wheel encoder.
+  version: 0.1.0
+
+requirements:
+  max_mass: 2.2 kg
+  top_speed: 8 m/s
+  min_runtime: 15 min
+  radio_range: 300 m
+  failsafe_stop_distance: 3 m
+  max_wire_voltage_drop_fraction: 0.03
+  min_wire_clearance_moving: 8 mm
+  max_component_temperature_c: 85
+
+# Robot frame: +x forward, +y left, +z up; origin on the ground below the rear axle center.
+components:
+  chassis:     {type: chassis-plate-al6061, pose: {xyz: [130 mm, 0, 25 mm]}}
+  deck:        {type: upper-deck-petg, mount: chassis, pose: {xyz: [120 mm, 0, 75 mm]}}
+  standoff_rl: {type: standoff-m3-47, mount: chassis, pose: {xyz: [45 mm, 45 mm, 28 mm]}}
+  standoff_rr: {type: standoff-m3-47, mount: chassis, pose: {xyz: [45 mm, -45 mm, 28 mm]}}
+  standoff_fl: {type: standoff-m3-47, mount: chassis, pose: {xyz: [195 mm, 28 mm, 28 mm]}}
+  standoff_fr: {type: standoff-m3-47, mount: chassis, pose: {xyz: [195 mm, -28 mm, 28 mm]}}
+  knuckle_fl:  {type: steering-knuckle, mount: chassis, pose: {xyz: [260 mm, 68 mm, 35 mm]}}
+  knuckle_fr:  {type: steering-knuckle, mount: chassis, pose: {xyz: [260 mm, -68 mm, 35 mm]}}
+  wheel_fl:    {type: wheel-110x45, mount: knuckle_fl, pose: {xyz: [260 mm, 100 mm, 55 mm]}}
+  wheel_fr:    {type: wheel-110x45, mount: knuckle_fr, pose: {xyz: [260 mm, -100 mm, 55 mm]}}
+  wheel_rl:    {type: wheel-110x45, mount: gearbox, pose: {xyz: [0, 100 mm, 55 mm]}}
+  wheel_rr:    {type: wheel-110x45, mount: gearbox, pose: {xyz: [0, -100 mm, 55 mm]}}
+  gearbox:     {type: gearbox-spur-diff-9.6, mount: chassis, pose: {xyz: [0, 0, 28 mm]}}
+  motor:       {type: motor-540-brushed, mount: chassis, pose: {xyz: [50 mm, -35 mm, 46 mm]}}
+  esc:         {type: esc-brushed-60a, mount: chassis, pose: {xyz: [65 mm, 40 mm, 28 mm]}}
+  battery:     {type: lipo-2s-5000-25c, mount: chassis, pose: {xyz: [158 mm, 0, 28 mm]}}
+  servo:       {type: servo-digital-20kg, mount: chassis, pose: {xyz: [250 mm, 0, 28 mm]}}
+  fuse:        {type: fuse-atc-10a, mount: chassis, pose: {xyz: [75 mm, 0, 28 mm], rpy: [0, 0, 90 deg]}}
+  pi:          {type: raspberry-pi-5-8gb, mount: deck, pose: {xyz: [110 mm, 0, 81 mm]}}
+  hat:         {type: r3-carrier-hat, mount: pi, pose: {xyz: [102.5 mm, 0, 93.5 mm]}}
+  receiver:    {type: elrs-receiver-2g4, mount: deck, pose: {xyz: [190 mm, 40 mm, 78 mm]}}
+  gps:         {type: gps-ublox-m10, mount: deck, pose: {xyz: [50 mm, -35 mm, 78 mm]}}
+  encoder:     {type: hall-encoder-a1120, mount: gearbox, pose: {xyz: [0, 36 mm, 40 mm]}}
+
+mechanical:
+  joints:
+    - {id: steer_fl, type: revolute, parent: chassis, child: knuckle_fl, origin: [260 mm, 85 mm, 55 mm], axis: [0, 0, 1], limits: [-0.45, 0.45], damping: 0.02}
+    - {id: steer_fr, type: revolute, parent: chassis, child: knuckle_fr, origin: [260 mm, -85 mm, 55 mm], axis: [0, 0, 1], limits: [-0.45, 0.45], damping: 0.02}
+    - {id: spin_fl, type: continuous, parent: knuckle_fl, child: wheel_fl, origin: [260 mm, 100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005}
+    - {id: spin_fr, type: continuous, parent: knuckle_fr, child: wheel_fr, origin: [260 mm, -100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005}
+    - {id: spin_rl, type: continuous, parent: chassis, child: wheel_rl, origin: [0, 100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005}
+    - {id: spin_rr, type: continuous, parent: chassis, child: wheel_rr, origin: [0, -100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005}
+  transmissions:
+    - {id: drivetrain, type: differential, actuator: motor, joints: [spin_rl, spin_rr], ratio: 9.6, efficiency: 0.88}
+    - id: steering
+      type: ackermann_steering
+      actuator: servo
+      joints: [steer_fl, steer_fr]
+      ratio: 0.5            # wheel steer angle per servo horn angle
+      params: {wheelbase: 260 mm, kingpin_track: 170 mm, max_steer: 0.45}
+
+electrical:
+  ground_net: GND
+  direct_mates:
+    - {a: hat.J_GPIO, b: pi.J8}
+  harnesses:
+    - id: battery_lead
+      description: Battery's own 12 AWG pigtail ending in XT60 female.
+      connectors:
+        A: {type: integral, mates: battery.J1}
+        B: {type: xt60-female}
+      wires:
+        - {id: W_BAT_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
+        - {id: W_BAT_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
+      route: {slack: 20 mm}
+    - id: power_y
+      description: XT60 Y-harness splitting battery power to the ESC (12 AWG) and, through a 10 A fuse, the HAT (18 AWG).
+      connectors:
+        P1: {type: xt60-male, mates: battery_lead.B}
+        P2: {type: xt60-female}
+        P3: {type: xt30-female, mates: hat.J_BATT}
+        F1: {type: integral, mates: fuse.J1}
+        F2: {type: integral, mates: fuse.J2}
+      splices:
+        SP: {position: [85 mm, 10 mm, 40 mm]}
+        SN: {position: [85 mm, -10 mm, 40 mm]}
+      wires:
+        - {id: W_Y_P_IN, from: P1.1, to: SP, awg: 12, color: red, signal: VBAT}
+        - {id: W_Y_P_ESC, from: SP, to: P2.1, awg: 12, color: red, signal: VBAT}
+        - {id: W_Y_P_FUSE, from: SP, to: F1.1, awg: 18, color: red, signal: VBAT}
+        - {id: W_Y_P_HAT, from: F2.1, to: P3.1, awg: 18, color: red, signal: VBAT_FUSED}
+        - {id: W_Y_N_IN, from: P1.2, to: SN, awg: 12, color: black, signal: GND}
+        - {id: W_Y_N_ESC, from: SN, to: P2.2, awg: 12, color: black, signal: GND}
+        - {id: W_Y_N_HAT, from: SN, to: P3.2, awg: 18, color: black, signal: GND}
+      route: {slack: 25 mm, keep_away: [motor, gearbox]}
+    - id: esc_power
+      connectors:
+        A: {type: integral, mates: esc.J_PWR}
+        B: {type: xt60-male, mates: power_y.P2}
+      wires:
+        - {id: W_ESC_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
+        - {id: W_ESC_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
+      route: {slack: 20 mm}
+    - id: esc_motor
+      connectors:
+        A: {type: integral, mates: esc.J_MOT}
+        BP: {type: bullet-3.5-female, mates: motor.J_POS}
+        BN: {type: bullet-3.5-female, mates: motor.J_NEG}
+      wires:
+        - {id: W_MOT_A, from: A.1, to: BP.1, awg: 14, color: blue, signal: MOTOR_A}
+        - {id: W_MOT_B, from: A.2, to: BN.1, awg: 14, color: yellow, signal: MOTOR_B}
+      route: {slack: 15 mm, keep_away: [wheel_rl, wheel_rr, gearbox]}
+    - id: esc_signal
+      connectors:
+        A: {type: integral, mates: esc.J_SIG}
+        B: {type: servo-3-female, mates: hat.J_ESC}
+      wires:
+        - {id: W_ESC_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: ESC_PWM}
+        - {id: W_ESC_BEC, from: A.2, to: B.2, awg: 22, color: red, signal: BEC_6V}
+        - {id: W_ESC_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
+      route: {slack: 30 mm}
+    - id: servo_lead
+      connectors:
+        A: {type: integral, mates: servo.J1}
+        B: {type: servo-3-female, mates: hat.J_SERVO}
+      wires:
+        - {id: W_SRV_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: SERVO_PWM}
+        - {id: W_SRV_VCC, from: A.2, to: B.2, awg: 22, color: red, signal: BEC_6V}
+        - {id: W_SRV_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
+      route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr]}
+    - id: rx_lead
+      connectors:
+        A: {type: integral, mates: receiver.J1}
+        B: {type: jst-gh-4-housing, mates: hat.J_RX}
+      wires:
+        - {id: W_RX_5V, from: A.1, to: B.1, awg: 28, color: red, signal: 5V}
+        - {id: W_RX_PI_TX, from: A.3, to: B.2, awg: 28, color: white, signal: CRSF_TX}
+        - {id: W_RX_PI_RX, from: A.2, to: B.3, awg: 28, color: green, signal: CRSF_RX}
+        - {id: W_RX_GND, from: A.4, to: B.4, awg: 28, color: black, signal: GND}
+      route: {slack: 20 mm}
+    - id: gps_lead
+      connectors:
+        A: {type: integral, mates: gps.J1}
+        B: {type: jst-gh-4-housing, mates: hat.J_GPS}
+      wires:
+        - {id: W_GPS_5V, from: A.1, to: B.1, awg: 28, color: red, signal: 5V}
+        - {id: W_GPS_PI_TX, from: A.2, to: B.2, awg: 28, color: white, signal: GPS_TX}
+        - {id: W_GPS_PI_RX, from: A.3, to: B.3, awg: 28, color: green, signal: GPS_RX}
+        - {id: W_GPS_GND, from: A.4, to: B.4, awg: 28, color: black, signal: GND}
+      route: {slack: 20 mm}
+    - id: encoder_lead
+      connectors:
+        A: {type: integral, mates: encoder.J1}
+        B: {type: jst-xh-3-housing, mates: hat.J_ENC}
+      wires:
+        - {id: W_ENC_VCC, from: A.1, to: B.1, awg: 26, color: red, signal: 3V3}
+        - {id: W_ENC_OUT, from: A.2, to: B.2, awg: 26, color: yellow, signal: ENC}
+        - {id: W_ENC_GND, from: A.3, to: B.3, awg: 26, color: black, signal: GND}
+      route: {slack: 25 mm, keep_away: [wheel_rl, gearbox]}
+
+pcb:
+  boards:
+    - {component: hat, tool: kicad, source: pcb/carrier-hat, layers: 2, copper_oz: 1.0}
+
+cad:
+  provider: onshape
+  generator: cad/rc_car.fs
+  folder: c3f7706a252cbfca26630a10
+  document_name: R3 RC Car
+
+software:
+  modules:
+    - {name: rc_car_controller, language: python, runs_on: pi, entrypoint: main.py}
+  bindings:
+    esc_pwm:   {interface: pwm, computer: pi, pins: [pi.J8.12], device: pwmchip0, channel: 2, frequency: 50 Hz, expects: [esc.J_SIG.1]}
+    servo_pwm: {interface: pwm, computer: pi, pins: [pi.J8.35], device: pwmchip0, channel: 3, frequency: 50 Hz, expects: [servo.J1.1]}
+    crsf:      {interface: uart, computer: pi, pins: [pi.J8.8, pi.J8.10], device: /dev/ttyAMA0, baud: 420000, expects: [receiver.J1.3, receiver.J1.2]}
+    gps:       {interface: uart, computer: pi, pins: [pi.J8.7, pi.J8.29], device: /dev/ttyAMA2, baud: 115200, expects: [gps.J1.2, gps.J1.3]}
+    i2c:       {interface: i2c, computer: pi, pins: [pi.J8.3, pi.J8.5], device: /dev/i2c-1, expects: [hat.I2C_SDA, hat.I2C_SCL]}
+    encoder:   {interface: gpio, computer: pi, pins: [pi.J8.11], device: gpiochip0, channel: 17, expects: [encoder.J1.2]}
+  config:
+    control_rate_hz: 100
+    mode: autonomous            # autonomous | manual
+    radio_failsafe_timeout_s: 0.25
+    failsafe_action: brake
+    low_voltage_cutoff_v: 6.6   # 3.3 V/cell under load
+    low_voltage_limit_v: 7.0    # start limiting throttle
+    max_cruise_speed_mps: 4.0
+    esc_pulse_us: {reverse: 1000, neutral: 1500, forward: 2000}
+    steering_pulse_us: {left: 1878, center: 1500, right: 1122}
+    max_steer_rad: 0.45
+    wheelbase_m: 0.26
+    wheel_radius_m: 0.055
+    encoder_pulses_per_rev: 4
+    arm_channel: 5              # CRSF AUX channel that arms autonomy (>1700 us)
+
+simulation:
+  timestep: 1 ms
+  seed: 7
+  environment:
+    ground_friction: 0.9
+    ground_rolling_resistance: 0.015
+    ambient_temperature_c: 25
+    terrain: flat-grass
+    radio_transmitter: {position: [-2 m, 0, 1.2 m], power_dbm: 20, antenna_gain_dbi: 2.0}
+    radio_environment: {model: two_ray_ground_log_normal, shadowing_sigma_db: 4.0, ground_permittivity: 15, interference_dbm: -100}
+    obstacles:
+      - {id: cone_a, center: [12 m, 6 m, 0.15 m], size: [0.3 m, 0.3 m, 0.3 m]}
+  scenarios:
+    - id: autonomous_course
+      description: Arm by radio, then follow a 30 x 15 m rectangular GPS course twice at cruise speed.
+      duration: 90 s
+      initial: {battery_soc: 0.95}
+      pilot: {arm_at: 1.0 s}
+      mission: {type: waypoints, laps: 2, speed: 4.0, waypoints: [[5, 0], [35, 0], [35, 15], [5, 15]]}
+      expect: {laps_completed: 2, max_cross_track_error_m: 1.5, failsafe_events: 0, min_battery_voltage_v: 6.8, brownouts: 0}
+    - id: full_throttle
+      description: Manual mode, full throttle from rest for 6 s straight, then neutral.
+      duration: 10 s
+      initial: {battery_soc: 1.0, mode: manual}
+      pilot: {throttle: [[0, 0.0], [1.0, 1.0], [7.0, 0.0]], steering: [[0, 0.0]]}
+      expect: {min_top_speed_mps: 8.0, brownouts: 0}
+    - id: range_failsafe
+      description: Autonomous straight run away from the transmitter until the radio link is lost; car must brake.
+      duration: 300 s
+      initial: {battery_soc: 0.95}
+      pilot: {arm_at: 1.0 s}
+      mission: {type: waypoints, laps: 1, speed: 5.0, waypoints: [[5, 0], [1500, 0]]}
+      expect: {link_lost_beyond_m: 300, stop_within_m_of_link_loss: 3.0}
+    - id: low_battery
+      description: Start nearly empty; firmware must cut throttle before cells drop below 3.0 V and the Pi must not brown out.
+      duration: 120 s
+      initial: {battery_soc: 0.08}
+      pilot: {arm_at: 1.0 s}
+      mission: {type: waypoints, laps: 5, speed: 4.0, waypoints: [[5, 0], [35, 0], [35, 15], [5, 15]]}
+      expect: {min_cell_voltage_v: 3.0, low_voltage_cutoff_engaged: true, brownouts: 0}
+    - id: steering_sweep
+      description: Manual lock-to-lock steering at standstill and at 2 m/s to exercise wire slack near the front wheels.
+      duration: 12 s
+      initial: {battery_soc: 0.9, mode: manual}
+      pilot: {throttle: [[0, 0.0], [6.0, 0.25]], steering: [[0, 0.0], [1, 1.0], [2, -1.0], [3, 1.0], [4, -1.0], [5, 0.0], [7, 1.0], [8, -1.0], [9, 1.0], [10, -1.0], [11, 0.0]]}
+      expect: {min_wire_clearance_m: 0.008}

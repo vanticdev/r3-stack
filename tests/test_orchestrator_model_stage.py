@@ -170,3 +170,16 @@ def test_geometry_box_and_cylinder_volumes():
     assert cylinder.volume == pytest.approx(math.pi * 0.25 * 2, rel=4e-3)
     z_cylinder = make_solid("f", "cylinder", [0.1, 1], "z", [0, 0, 0], [0, 0, 0])
     assert np.allclose([z_cylinder.aabb[0][2], z_cylinder.aabb[1][2]], [0, 1])
+
+
+def test_concave_outline_does_not_fill_notch():
+    from r3_orchestrator.geometry import make_solid, outline_solid, overlap
+
+    # The RC-car plate tapers from 130 mm to 70 mm wide: a box inside the notch must not collide.
+    outline = [[-0.17, -0.065], [0.04, -0.065], [0.07, -0.035], [0.17, -0.035], [0.17, 0.035], [0.07, 0.035], [0.04, 0.065], [-0.17, 0.065]]
+    plate = outline_solid("plate", outline, 0.003, [0.13, 0, 0.025], [0, 0, 0])
+    assert abs(plate.volume - 0.003 * (0.21 * 0.13 + 0.03 * 0.10 + 0.10 * 0.07)) < 1e-9
+    in_notch = make_solid("arm", "box", [0.02, 0.025, 0.01], "z", [0.26, 0.0475, 0.025], [0, 0, 0])
+    assert overlap(plate, in_notch) is None
+    on_plate = make_solid("blk", "box", [0.02, 0.02, 0.01], "z", [0.20, 0.03, 0.024], [0, 0, 0])
+    assert overlap(plate, on_plate)["volume"] > 0

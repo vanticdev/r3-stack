@@ -38,7 +38,9 @@ from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.graph import RobotGraph, _UnionFind
 from r3_model.project import Project
 
-from .geometry import Solid, make_solid, overlap
+from r3_model.units import to_si
+
+from .geometry import Solid, make_solid, outline_solid, overlap
 
 STAGE = "model"
 
@@ -468,10 +470,24 @@ class ModelChecker:
             if comp.type not in self.catalog.components:
                 continue
             mech = self.catalog.component(comp.type).mechanical
-            result[cid] = make_solid(cid, mech.shape, list(mech.size), mech.axis, comp.pose.xyz, comp.pose.rpy)
+            outline = comp.params.get("outline") if mech.shape == "custom" else None
+            if outline:
+                # Plates authored as an outline polygon: extrude it (convex hull) instead of using the bounding box.
+                result[cid] = outline_solid(cid, [[to_si(a), to_si(b)] for a, b in outline], float(mech.size[2]),
+                                            comp.pose.xyz, comp.pose.rpy)
+            else:
+                result[cid] = make_solid(cid, mech.shape, list(mech.size), mech.axis, comp.pose.xyz, comp.pose.rpy)
         return result
 
     def check_interference(self, solids: dict[str, Solid]) -> list[dict[str, Any]]:
+        # Exact B-rep interference from the CAD stage supersedes envelope estimates,
+        # but only when it was computed for this exact component set.
+        cad = self.project.read_build_json("cad/cad_model.json") or {}
+        if isinstance(cad, dict) and "contacts" in cad and set(cad.get("parts", {})) >= set(self.spec.components):
+            self.add(Diagnostic.info("interference_checked_by_cad",
+                                     "static interference evaluated on exact Onshape B-rep by the cad stage; envelope check skipped",
+                                     data={"document": cad.get("source", {}).get("url")}))
+            return []
         self.result.assume("mechanical", "Interference uses catalog envelopes: boxes exact, cylinders as 48-gon prisms, 'custom' "
                                          "shapes as their bounding box. Overlaps thinner than 0.1 mm count as contact.")
         self.result.assume("mechanical", "Static interference at the authored pose only; steering and wheel sweep are checked in simulation.")
