@@ -343,7 +343,9 @@ def main(argv: list[str] | None = None, hal: Hal | None = None) -> int:
     hal = hal or open_hal(MODULE_NAME)
     controller: RcCarController | None = None
     try:
-        settings = load_settings(args.config, hal_bindings=hal.bindings())
+        offered = getattr(hal, "config", None)  # optional HAL-provided document (see requests/firmware.md)
+        settings = load_settings(args.config, hal_bindings=hal.bindings(),
+                                 hal_document=offered() if callable(offered) else None)
         controller = RcCarController(hal, settings)
         controller.run(args.duration)
         return EXIT_OK

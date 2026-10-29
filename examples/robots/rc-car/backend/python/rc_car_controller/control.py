@@ -207,6 +207,10 @@ class PurePursuit:
         lookahead = self.lookahead(speed)
         s, cross = self.path.project(x, y, self.progress, behind=1.0, ahead=max(5.0, 2.0 * lookahead))
         self.progress = clamp(max(s, self.progress - 1.0), 0.0, self.end_s)
+        if self.progress <= 1e-9:
+            # Approach to the first waypoint: report the lateral offset from the first leg's line.
+            first = self.path.segments[0]
+            cross = (first.dx * (y - first.y0) - first.dy * (x - first.x0)) / first.length
         remaining = self.end_s - self.progress
         target_s = min(self.progress + lookahead, self.end_s)
         tx, ty = self.path.point_at(target_s)

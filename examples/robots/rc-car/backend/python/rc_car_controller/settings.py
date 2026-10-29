@@ -124,7 +124,10 @@ def _config_path(argv_config: str | None, environ: Mapping[str, str]) -> tuple[s
 
 
 def load_settings(argv_config: str | None = None, environ: Mapping[str, str] | None = None,
-                  hal_bindings: Mapping[str, Mapping[str, Any]] | None = None) -> FirmwareSettings:
+                  hal_bindings: Mapping[str, Mapping[str, Any]] | None = None,
+                  hal_document: Mapping[str, Any] | None = None) -> FirmwareSettings:
+    """``hal_document`` is a config document offered by the HAL (a future ``hello``
+    field); it is used only when no config file is given."""
     environ = os.environ if environ is None else environ
     path, source = _config_path(argv_config, environ)
     document: dict[str, Any] = {}
@@ -134,6 +137,9 @@ def load_settings(argv_config: str | None = None, environ: Mapping[str, str] | N
         if file.is_file() and file.stat().st_size > 0:
             document = decode_document(file.read_text())
             sources.append(f"{source}:{path}")
+    elif hal_document:
+        document = dict(hal_document)
+        sources.append("hal_config")
     structured = isinstance(document.get("config"), dict)
     config = deep_merge(DEFAULT_CONFIG, document["config"] if structured else document)
     bindings = copy.deepcopy(DEFAULT_BINDINGS)
