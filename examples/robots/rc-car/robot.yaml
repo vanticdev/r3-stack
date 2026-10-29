@@ -293,7 +293,7 @@ mechanical:
       path: [servo_output, horn_spline, bs_hl, bj_hl, bj_kl, bs_kl, bs_hr, bj_hr, bj_kr, bs_kr]
   # Sensing only (not an attachment): checked on exact geometry, axis in the encoder frame (sensor face, facing the ring).
   interfaces:
-    - {id: enc_target, kind: magnetic_target, parts: [enc_ring, encoder], frame: encoder, axis_point: [0, 0, 16 mm], axis_dir: [0, 0, 1],
+    - {id: enc_target, kind: magnetic_target, parts: [enc_ring, encoder], frame: encoder, axis_point: [0, 0, 20 mm], axis_dir: [0, 0, 1],
        params: {magnets: [enc_magnet_1, enc_magnet_2, enc_magnet_3, enc_magnet_4], gap: [0.5 mm, 2.0 mm]}}
 
 electrical:
@@ -399,8 +399,8 @@ electrical:
         - {id: W_ENC_VCC, from: A.1, to: B.1, awg: 26, color: red, signal: 3V3}
         - {id: W_ENC_OUT, from: A.2, to: B.2, awg: 26, color: yellow, signal: ENC}
         - {id: W_ENC_GND, from: A.3, to: B.3, awg: 26, color: black, signal: GND}
-      # The Hall board's lead leaves its outward face, away from the spur cover and the magnet carrier, runs along
-      # the plate and wraps the deck's right edge behind the rear-right standoff (not the HAT lead slot).
+      # The Hall board's lead leaves its lower corner along the plate, away from the spur cover, the magnet carrier
+      # and the rear wheel, and wraps the deck's right edge behind the rear-right standoff (not the HAT lead slot).
       route: {slack: 25 mm, keep_away: [wheel_rr, gearbox, motor, lead_post]}
 
 pcb:

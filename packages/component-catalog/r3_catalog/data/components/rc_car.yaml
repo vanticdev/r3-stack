@@ -629,25 +629,27 @@ components:
     name: Hall-effect drivetrain encoder (Allegro A1120 + magnets on the spur shaft)
     description: >
       Frame at the board's bottom center; the sensor die faces +z, 0.5 mm below the top face. The board hangs
-      10 mm below its mount so the 3-pin lead leaves the outward face (+y, away from the gear cover) at the lower
-      edge, 15 mm from the spinning magnet carrier (a lead under the ring would sit 4 mm from it).
+      14 mm below its mount, to 3 mm above the chassis plate, and its 3-pin lead leaves the lower outer corner
+      along -x (aft of the gearbox's spur cover, robot +x): 18 mm below the spinning magnet carrier, >= 8.6 mm
+      from the gear cover and the motor, 25 mm from the rear wheel, and straight along the plate. A lead under
+      the ring sat 4 mm from it; one pointing outward ran toward the rear wheel.
     mechanical:
       shape: box
-      size: [12 mm, 8 mm, 16 mm]
-      mass: 0.004
+      size: [12 mm, 8 mm, 20 mm]
+      mass: 0.005
       features:
-        - {id: mount_a, kind: clearance_hole, position: [-3.5 mm, 4 mm, 13 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
-        - {id: mount_b, kind: clearance_hole, position: [3.5 mm, 4 mm, 13 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
-        - {id: sensor_face, kind: face, position: [0, 0, 16 mm], axis: [0, 0, 1]}
-      provenance: {status: estimated, source: "R3 Hall board layout: A1120 at the top edge, 3-pin lead exit on the outward face 2 mm above the bottom edge"}
+        - {id: mount_a, kind: clearance_hole, position: [-3.5 mm, 4 mm, 17 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
+        - {id: mount_b, kind: clearance_hole, position: [3.5 mm, 4 mm, 17 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
+        - {id: sensor_face, kind: face, position: [0, 0, 20 mm], axis: [0, 0, 1]}
+      provenance: {status: estimated, source: "R3 Hall board layout: A1120 at the top edge, 3-pin lead exit at the lower outer corner"}
     interfaces:
-      mount: {kind: hole_pattern, origin: [0, -4 mm, 13 mm], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[3.5 mm, 0, 2.4 mm, clearance, 8 mm], [-3.5 mm, 0, 2.4 mm, clearance, 8 mm]]}}
+      mount: {kind: hole_pattern, origin: [0, -4 mm, 17 mm], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[3.5 mm, 0, 2.4 mm, clearance, 8 mm], [-3.5 mm, 0, 2.4 mm, clearance, 8 mm]]}}
     pins:
       VCC: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.0, voltage_max: 24.0, current_max: 0.004}
       OUT: {role: gpio, logic_level: 3.3}
       GND: {role: ground}
     connectors:
-      J1: {type: integral, position: [0, 4 mm, 2 mm], direction: [0, 1, 0], pins: {"1": VCC, "2": OUT, "3": GND}}
+      J1: {type: integral, position: [-6 mm, 3 mm, 2 mm], direction: [-1, 0, 0], pins: {"1": VCC, "2": OUT, "3": GND}}
     behavior:
       model: encoder.hall
       params: {pulses_per_wheel_rev: 4, output: open_drain_active_low, jitter: 20 us, die_depth: 0.5 mm, b_op_max: 0.0175,

@@ -55,6 +55,35 @@ and the per-user quota on the Part Studio features endpoint is used up for this 
 | `wire_clearance_violation` encoder_lead: enc_ring 4.0 mm, motor 5.7 mm | The Hall board's lead leaves 4 mm under the ring it senses. | The 8 mm moving-part rule should treat the sensed ring as the sensor's own target. The lead clears the motor once the ESC move frees the space behind it. |
 | `wire_clearance_violation` power_y: motor 4.5 mm, gearbox 4.0 mm | The splice sits 6 mm off the fuse input, beside the motor can. | Resolved with the ESC move (the Y-harness then runs along the battery). |
 
+## Finish lane A: layout and wiring fixes (2026-10-29)
+
+Every change goes through the joins and the object interfaces. The Onshape Part Studio features quota was
+exhausted for the whole session (probe: HTTP 429 on `/partstudios/.../features`, retry after 7.3 h at
+12:47). So `cad_model.json` is recomposed offline with `python -m r3_onshape.recompose examples/robots/rc-car`.
+Unchanged parts keep their recorded Onshape geometry and move to the compiled poses. Parts whose plan solid
+changed are built from their plan with exact manifold3d booleans and analytic faces, and the cad stage
+reports them as `cad_part_rebuild_pending` until the next organized build (`R3_CAD_FORCE=1`).
+
+| Change | Why | Onshape |
+| --- | --- | --- |
+| Routing floor = base plate (largest footprint) | The battery strap loops under the plate. As the "lowest structure" it had set the router's floor at 54.5 mm, so no harness could run along the plate. | - |
+| ESC clocked 180 deg, pad moved beside the battery (chassis `esc_pad` (-7, 47)) | The motor bullets' solder cups were inside the ESC envelope (W_MOT_B 11.5 mm). `J_MOT` now faces the motor. | pose only |
+| Battery 17 mm aft (`battery_seat`, `strap_slots` x 11 mm) | The 12 AWG lead's 16 mm U-turn hit servo post A. | chassis slots |
+| Fuse on the right of the battery, clocked 180 deg (`fuse_seat`, `tie_slots` (36, -37)) | Its old place is now under the battery; SP stays 7 mm from the fuse input. | chassis slots |
+| `so_rl` standoff to (-99, 47) chassis / (-89, 47) deck, deck rear-left tab | It stood in the motor-lead corridor right behind the bullets. | chassis + deck |
+| GPS tape joint clocked +90 deg | The lead now leaves toward the HAT instead of over the deck edge, 2.5 mm from the spur cover. | pose only |
+| Hall board 10 mm taller, lead on its outward lower edge | The lead sat 4 mm under the spinning magnet carrier. It is now 15 mm away (sensor face and air gap unchanged). | library part |
+| `servo_post_b` -> `servo-post-al6061-cable`: lead pocket through the post, open on its +y side | The DS3218 lead leaves 0.5 mm in front of post B. It now turns inside the post and runs aft along the plate under the linkage. Web 7 x 9 mm, ~10 MPa at stall. | new part |
+| Deck lead slot (24 x 9 mm) and power slot (16 x 10 mm), printed `lead_post` on a deck edge tab | The servo/ESC leads climb to top-entry headers. The HAT's fused feed comes up in line with its XT30. | deck + new part |
+| Support placement: tie posts per slender solid (mast tube), hull-shaped tie loops, flat-face projections, printed saddles (6/10/16 mm), re-placement of supports that make a route infeasible, spans across unheld junctions, CAD slots as grommeted pass-throughs | Supports had only been found where the first pass already lay flat on a face. | - |
+
+Still open (see the final report): the power-harness 12 AWG bends around the fuse/splice corner and the ESC
+XT60 pair placement, the servo pigtail fan-out bend inside post B, and the climb spans to the HAT's top-entry
+headers. Also open: `cad_mesh_invalid` (lane C), the HAT `J_RX`/`J_BATT` exits over the Pi USB block
+(lane B, `.r3-agents/requests/lane-b.md`), the Pi 1.276 mm board (queue item 20, deferred: lowering the stack
+by 0.324 mm drives the 8.5 mm HAT socket 0.10 mm into the STEP header insulator), and the Onshape rebuild of
+the pending parts plus the organization pass (queue item 26), both waiting on the quota.
+
 ## Direct-CAD history (before phase B)
 
 | # | Check / diagnostic | Problem | Fix |
