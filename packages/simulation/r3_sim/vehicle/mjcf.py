@@ -264,10 +264,16 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
             motor_params = _behavior_params(project, trans.actuator)
             gear_params: dict[str, Any] = {}
             for joint_id in trans.joints:
-                for cid in spec.components:
-                    ctype = catalog.component(spec.components[cid].type)
-                    if ctype.kind == "gearbox" and joint_id in joints_by_id and spec.components[joints_by_id[joint_id].child].mount == cid:
+                if joint_id not in joints_by_id:
+                    continue
+                # Walk the mount chain from the driven part (wheel -> axle -> gearbox ...) to its gearbox.
+                cid, seen = joints_by_id[joint_id].child, set()
+                while cid in spec.components and cid not in seen:
+                    seen.add(cid)
+                    if catalog.component(spec.components[cid].type).kind == "gearbox":
                         gear_params = _behavior_params(project, cid)
+                        break
+                    cid = spec.components[cid].mount
             drives.append(DriveInfo(
                 id=trans.id, actuator_component=trans.actuator, joints=list(trans.joints), ratio=float(trans.ratio),
                 efficiency=float(trans.efficiency), tendon=f"tendon_{trans.id}",

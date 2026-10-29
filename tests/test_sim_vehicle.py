@@ -22,13 +22,17 @@ def project() -> Project:
 def test_mjcf_compiles_with_expected_structure(project):
     vm = build_vehicle_model(project)
     model = mujoco.MjModel.from_xml_string(vm.xml)
-    catalog_mass = sum(project.catalog.component(c.type).mechanical.mass for c in project.spec.components.values())
-    assert sum(model.body_mass) == pytest.approx(catalog_mass, rel=1e-6)
+    cad = project.read_build_json("cad/cad_model.json")
+    if cad:  # CAD mass properties take precedence over catalog estimates
+        expected_mass = sum(cad["parts"][cid]["mass"] for cid in project.spec.components)
+    else:
+        expected_mass = sum(project.catalog.component(c.type).mechanical.mass for c in project.spec.components.values())
+    assert sum(model.body_mass) == pytest.approx(expected_mass, rel=1e-6)
     assert set(vm.bodies) == {"chassis", "knuckle_fl", "knuckle_fr", "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"}
     assert "battery" in vm.bodies["chassis"] and "pi" in vm.bodies["chassis"]
     # Rotor inertia reflected through the ratio onto the differential tendon: J_m N^2 + J_out.
     assert model.tendon_armature[0] == pytest.approx(1.2e-5 * 9.6 ** 2 + 4.0e-5)
-    assert any(d.code == "cad_mass_estimated" for d in vm.diagnostics)
+    assert any(d.code == "cad_mass_estimated" for d in vm.diagnostics) == (cad is None)
     assert model.geom_type[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "tire_wheel_rl")] == mujoco.mjtGeom.mjGEOM_CYLINDER
 
 
@@ -74,9 +78,11 @@ def test_top_speed_consistent_with_motor_limit(project):
         kernel.pwm_state[key] = {"period_ns": 20_000_000, "duty_ns": int(pulse * 1000), "enabled": True}
         kernel.step()
     speed = kernel.vehicle.forward_speed()
-    motor = kernel.electrical
+    # Motor constants from the catalog, independent of which electrical model the kernel uses.
+    params = project.catalog.component(project.spec.components["motor"].type).behavior.params
+    ke = 60.0 / (2 * math.pi * float(params["kv_rpm_per_v"]))
     v_batt = kernel.last_outputs[kernel.battery_id]["v_terminal"]
-    omega_max = (v_batt - motor.brush_drop) / motor.ke  # no-load motor speed at this supply
+    omega_max = (v_batt - float(params.get("brush_drop", 0.2))) / ke  # no-load motor speed at this supply
     bound = omega_max * 0.055 / 9.6
     assert 0.8 * bound < speed < bound
     assert speed == pytest.approx(kernel.vehicle.motor_omega() * 0.055 / 9.6, rel=0.03)
