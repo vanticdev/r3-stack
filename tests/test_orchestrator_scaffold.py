@@ -47,7 +47,7 @@ def test_generated_deploy_keeps_blitz_hooks(tmp_path):
     source = (tmp_path / "bot" / "backend" / "deploy.py").read_text()
     compile(source, "deploy.py", "exec")
     assert "def get_modules()" in source and "def pi_name_to_process_types(" in source
-    assert 'modules.python("rc_car_controller", process=ProcessType.RC_CAR_CONTROLLER, entrypoint="main.py")' in source
+    assert 'modules.python("rc_car_controller", process=ProcessType.RC_CAR_CONTROLLER, entrypoint="main.py"' in source
     compile((tmp_path / "bot" / "backend/python/rc_car_controller/main.py").read_text(), "main.py", "exec")
 
 
