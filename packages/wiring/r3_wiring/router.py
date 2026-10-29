@@ -370,7 +370,7 @@ class HarnessRouter:
                     offset = exit_offset(self.catalog, conn.type)
                     node = NodePoint(harness.id, name, "connector", endpoint.position + direction * offset, direction,
                                      conn.type, conn.mates, component, self.kin.body_of(component),
-                                     set(self.kin.mount_chain(component)), endpoint.position.copy(), offset, od)
+                                     {component}, endpoint.position.copy(), offset, od)
                     board_half = component_connector_frame(self.project, conn.mates)
                     # A pigtail leaves the component's own connector frame; a mated half is turned about x.
                     node.frame = board_half if conn.type == "integral" else board_half.mated()
