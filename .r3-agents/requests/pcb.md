@@ -32,22 +32,23 @@ Replace the whole entry with:
     cad_name: R3 carrier HAT
     name: R3 RC carrier HAT (custom KiCad board)
     description: >
-      65 x 56.5 mm HAT made headlessly in KiCad 10. XT30 battery input -> DMP3013SFV reverse-polarity FET ->
+      65 x 70 mm extended HAT made headlessly in KiCad 10. XT30 battery input -> DMP3013SFV reverse-polarity FET ->
       2 mOhm Kelvin shunt (INA226, I2C 0x40, HAT branch only) -> TPS568230 5.1 V / 5 A buck back-powering the Pi
       (VIN UVLO 4.4 V max, 220 uF hold-up) and an LM5175 4-switch buck-boost 6.0 V / 3 A servo rail (no dropout
       down to its 4.18 V UVLO; 4.9-8.8 A current limit, hiccup); 220 uF + ceramic input bulk; SMAJ10A input TVS
-      (17.0 V clamp, below the TPS568230's 22 V VIN absolute maximum); MPU-6050 IMU (I2C 0x68); ATtiny412 failsafe
-      arbiter between the Pi's ESC PWM and the ESC (active brake, then neutral, 100 ms after the last GPIO27 heartbeat
+      (17.0 V clamp, below the TPS568230's 22 V VIN absolute maximum); keyed external GY-521 I2C header (0x68); ATtiny412 failsafe
+      arbiter between the Pi's ESC PWM and the ESC (active brake, then neutral, 60 ms after the last GPIO27 heartbeat
       edge) followed by an ISO6720F digital isolator: J_ESC's PWM and ground are the ESC's side (ESC_GND is not HAT
       GND, so no motor return flows in the signal lead), powered from the ESC BEC (J_ESC.2) by an AP7381 LDO;
       220 Ohm series resistor on the servo PWM; encoder pull-up.
     mechanical:
       shape: custom
-      size: [65 mm, 56.5 mm, 20.5 mm]
-      mass: 0.028
+      size: [65 mm, 70 mm, 20.5 mm]
+      envelope_offset: [0, -6.75 mm, 0]
+      mass: 0.031
       color: "#0b4f2b"
       solids:
-        - {kind: box, name: pcb, position: [0, 0, 0.8 mm], size: [65 mm, 56.5 mm, 1.6 mm]}
+        - {kind: box, name: pcb, position: [0, -6.75 mm, 0.8 mm], size: [65 mm, 70 mm, 1.6 mm]}
         - {kind: box, name: components, position: [0, 0, 6.8 mm], size: [52 mm, 43.5 mm, 10.4 mm]}
         - {kind: box, name: gpio socket, position: [0, 24.75 mm, -4.25 mm], size: [51 mm, 5.1 mm, 8.5 mm]}
       features:
@@ -56,13 +57,13 @@ Replace the whole entry with:
         - {id: hole_2, kind: clearance_hole, position: [29 mm, -24.25 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
         - {id: hole_3, kind: clearance_hole, position: [-29 mm, 24.75 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
         - {id: hole_4, kind: clearance_hole, position: [29 mm, 24.75 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
-      provenance: {status: derived, source: "Raspberry Pi HAT+ mechanical spec and the KiCad board: 65 x 56.5 board, holes 3.5 mm from the top edge on the Pi's 58 x 49 pattern (y = 24.75 / -24.25 about the board centre), header centered on the holes"}
+      provenance: {status: derived, source: "Raspberry Pi HAT+ mechanical spec and the KiCad board: 65 x 70 board (13.5 mm south connector extension), holes 3.5 mm from the top edge on the Pi's 58 x 49 pattern (y = 24.75 / -24.25 about the original HAT datum), header centered on the holes"}
     model:
       source: kicad_board
       path: build/pcb/carrier-hat/board.step
       units: mm
       placement: {origin: [-132.5 mm, 72.25 mm, 0], x: [1, 0, 0], z: [0, 0, 1]}
-      provenance: {status: derived, source: "kicad-cli pcb export step of pcb/carrier-hat (KiCad library models; page coordinates, board outline 100..165 x 44..100.5 mm)", notes: "XT30PW-M has no KiCad 3D model; its catalog proxy is rendered instead"}
+      provenance: {status: derived, source: "kicad-cli pcb export step of pcb/carrier-hat (KiCad library models; page coordinates, board outline 100..165 x 44..114 mm)", notes: "XT30PW-M has no KiCad 3D model; its catalog proxy is rendered instead"}
     interfaces:
     # Hole and socket positions follow the PCB stage's board.json (mounting.holes, connector_geometry.J_GPIO):
     # the 58 x 49 mm pattern sits 0.25 mm toward the GPIO edge of the 56.5 mm board (HAT+ mechanical spec).
@@ -103,18 +104,21 @@ Replace the whole entry with:
       J_GPIO: {type: socket-2x20-2.54, position: [0, 24.75 mm, -8.5 mm], direction: [0, 0, -1], x: [1, 0, 0], embedded: true,
                source: "kicad:J1 PinSocket_2x20_P2.54mm_Vertical (bottom)",
                pins: {"1": 3V3, "2": 5V, "3": I2C_SDA, "4": 5V, "5": I2C_SCL, "6": GND, "7": GPS_TX, "8": CRSF_TX, "9": GND, "10": CRSF_RX, "11": ENC, "12": PI_ESC_PWM, "13": HEARTBEAT, "14": GND, "17": 3V3, "20": GND, "25": GND, "29": GPS_RX, "30": GND, "34": GND, "35": PI_SERVO_PWM, "39": GND}}
-      J_BATT: {type: xt30pw-male, position: [32.4 mm, -13.75 mm, 4.7 mm], direction: [1, 0, 0], x: [0, 1, 0], embedded: false,
+      J_BATT: {type: xt30pw-male, position: [19 mm, -42.15 mm, 4.7 mm], direction: [0, -1, 0], x: [1, 0, 0], embedded: false,
                source: "kicad:J2 AMASS_XT30PW-M_1x02_P2.50mm_Horizontal (top)",
                pins: {"1": VBAT, "2": GND}}
-      J_ESC: {type: header-1x3-2.54, position: [-16.96 mm, -25.25 mm, 4.14 mm], direction: [0, 0, 1], x: [1, 0, 0], embedded: true,
-              source: "kicad:J3 PinHeader_1x03_P2.54mm_Vertical (top)",
+      J_ESC: {type: header-1x3-2.54-ra, position: [-24.5 mm, -40.69 mm, 2.87 mm], direction: [0, -1, 0], x: [-1, 0, 0], embedded: true,
+              source: "kicad:J3 PinHeader_1x03_P2.54mm_Horizontal (top)",
               pins: {"1": ESC_PWM, "2": ESC_BEC, "3": ESC_GND}}
-      J_SERVO: {type: header-1x3-2.54, position: [-4.96 mm, -25.25 mm, 4.14 mm], direction: [0, 0, 1], x: [1, 0, 0], embedded: true,
-                source: "kicad:J4 PinHeader_1x03_P2.54mm_Vertical (top)",
+      J_SERVO: {type: header-1x3-2.54-ra, position: [-14.5 mm, -40.69 mm, 2.87 mm], direction: [0, -1, 0], x: [-1, 0, 0], embedded: true,
+                source: "kicad:J4 PinHeader_1x03_P2.54mm_Horizontal (top)",
                 pins: {"1": SERVO_PWM, "2": SERVO_6V, "3": GND}}
-      J_RX: {type: jst-gh-4-header, position: [29.07 mm, 3.25 mm, 2.97 mm], direction: [1, 0, 0], x: [0, 1, 0], embedded: true,
+      J_RX: {type: jst-gh-4-header, position: [-4.5 mm, -37.92 mm, 2.97 mm], direction: [0, -1, 0], x: [1, 0, 0], embedded: true,
              source: "kicad:J5 JST_GH_SM04B-GHS-TB_1x04-1MP_P1.25mm_Horizontal (top)",
              pins: {"1": 5V, "2": CRSF_TX, "3": CRSF_RX, "4": GND}}
+      J_IMU: {type: jst-gh-4-header, position: [6.5 mm, -37.92 mm, 2.97 mm], direction: [0, -1, 0], x: [1, 0, 0], embedded: true,
+              source: "kicad:J9 JST_GH_SM04B-GHS-TB_1x04-1MP_P1.25mm_Horizontal (top)",
+              pins: {"1": 3V3, "2": GND, "3": I2C_SDA, "4": I2C_SCL}}
       J_GPS: {type: jst-gh-4-header, position: [-29.07 mm, 5.75 mm, 2.97 mm], direction: [-1, 0, 0], x: [0, -1, 0], embedded: true,
               source: "kicad:J6 JST_GH_SM04B-GHS-TB_1x04-1MP_P1.25mm_Horizontal (top)",
               pins: {"1": 5V, "2": GPS_TX, "3": GPS_RX, "4": GND}}
@@ -122,7 +126,7 @@ Replace the whole entry with:
               source: "kicad:J7 JST_XH_S3B-XH-A_1x03_P2.50mm_Horizontal (top)",
               pins: {"1": 3V3, "2": ENC, "3": GND}}
     internal_links:
-      - {a: PI_ESC_PWM, b: ESC_PWM, kind: failsafe_arbiter, value: 0.1}    # value = heartbeat timeout (s)
+      - {a: PI_ESC_PWM, b: ESC_PWM, kind: failsafe_arbiter, value: 0.06}    # value = heartbeat timeout (s)
       - {a: PI_SERVO_PWM, b: SERVO_PWM, kind: series_resistor, value: 220}
     behavior:
       model: board.pcb
@@ -151,8 +155,8 @@ Replace the whole entry with:
         # Active brake first (QuicRun 1060 Fwd/Rev/Brk: reverse stick after forward = brake), then neutral:
         # r3_kicad.arbiter. brake_hold covers the longest stop (8 m/s top speed); deadband_us and
         # esc_reverse_delay mirror the ESC's own neutral deadband (3 %) and reverse delay.
-        failsafe: {part: ATtiny412, heartbeat: HEARTBEAT, timeout: 0.1, neutral_us: 1500, frame: 0.02, rearm_edges: 3,
-                   rearm_band_us: 50, supply: 3V3, brake_us: 1000, brake_hold: 3.0 s, deadband_us: 15,
+        failsafe: {part: ATtiny412, heartbeat: HEARTBEAT, timeout: 0.06, neutral_us: 1500, frame: 0.02, rearm_edges: 3,
+                   rearm_band_us: 50, supply: 3V3, brake_us: 1000, brake_hold: 3.0 s, brake_pattern_us: [1460, 1484], deadband_us: 15,
                    esc_reverse_delay: 0.1 s}
         reverse_protection: {part: DMP3013SFV, rds_on: 12 mohm}
         tvs: {part: SMAJ10A, v_standoff: 10.0, v_breakdown_min: 11.1, v_breakdown_max: 12.3, v_clamp: 17.0, i_pp: 23.5}
@@ -161,9 +165,8 @@ Replace the whole entry with:
         isolator_hat_side: {part: ISO6720FBD, bus: digital_isolator, supply_pin: 3V3, current: 1.5 mA}
         isolator_esc_side: {part: ISO6720FBD + AP7381-33, bus: digital_isolator, supply_pin: ESC_BEC, ground_pin: ESC_GND,
                             current: 2.0 mA}
-        mpu6050: {address: 0x68, bus: I2C}
         encoder_pullup: 10 kohm
-        i2c_pullups: 4.7 kohm
+        i2c_pullups: 0  # none fitted: Pi 1.8k || GY-521 typical 4.7k = 1.30k
         spice_model: build/pcb/carrier-hat/carrier-hat_power.cir   # subckt R3_CARRIER_HAT_POWER VBAT GND V5 V6
         mounting: {screw: ISO 4762 M2.5 socket head cap screw, holes: 4, pattern: [58 mm, 49 mm], drill: 2.7 mm,
                    head_diameter: 4.5 mm, head_height: 2.5 mm, print_clearance: 0.3 mm,
@@ -171,8 +174,7 @@ Replace the whole entry with:
       provenance: {status: datasheet, source: "TI TPS568230 (SLVSEY5C), LM5175 (SNVSA37A), CSD17577Q3A, ISO6720F, Diodes AP7381, Littelfuse SMAJ series, DMP3013SFV; efficiencies estimated by r3_kicad.regulators (efficiency_curve, buck_boost_efficiency_curve); isolator supply currents estimated"}
     software:
       - {bus: i2c, address: 0x40, protocol: ina226}
-      - {bus: i2c, address: 0x68, protocol: mpu6050}
-      - {bus: gpio, protocol: heartbeat, params: {pin: HEARTBEAT, min_rate_hz: 20, timeout: 0.1}}
+      - {bus: gpio, protocol: heartbeat, params: {pin: HEARTBEAT, min_rate_hz: 100, timeout: 0.06}}
     thermal: {theta_ja_c_per_w: 55.0, max_temp_c: 125, notes: "TPS568230 on a 2-layer board (estimated); JEDEC 44.9 C/W"}
 ```
 

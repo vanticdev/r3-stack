@@ -37,8 +37,8 @@ raise the whole HAT without a deliberate GPIO engagement design.
 The PCB is extended 13.5 mm south (65 x 70 mm); its original datum, GPIO socket,
 four mounting holes and stack height are unchanged. Native KiCad DRC/ ERC/
 unconnected/ schematic parity: **0 / 0 / 0 / 0 errors**. Native DRC retains
-133 silkscreen warnings. The PCB stage has 0 errors and one pre-existing
-SW_5V pour warning (2.50 mm, 4.96 A IPC-2152 rating at the 5 A design load).
+133 silkscreen warnings. After the final reroute, the PCB stage has 0 errors
+and 0 warnings, including all power-pour current-capacity checks.
 
 All five cable axes face robot -y. Coordinates are mating-frame origins in the
 current robot assembly, in millimetres (PCB coordinates are from its top-left,
@@ -54,7 +54,8 @@ x right, y down). The catalog poses match the PCB read-back:
 
 The header pins and cable ends are all west of the USB/Ethernet block's x=133 mm.
 J3/J4 are right-angle 2.54 mm headers. J9 is keyed JST-GH: 1=3.3 V, 2=GND,
-3=SDA, 4=SCL, with two PESD3V3U1UL ESD clamps. U5 and its support capacitors,
+3=SDA, 4=SCL, with two unidirectional PESD3V3U1UL ESD clamps (pin 1 cathode to signal,
+pin 2 anode to GND; 2.6 pF per the [Nexperia datasheet](https://assets.nexperia.com/documents/data-sheet/PESD3V3U1UL.pdf)). U5 and its support capacitors,
 and R18/R19 I2C pull-ups, are removed. The Pi's 1.8 kohm and typical GY-521
 4.7 kohm pull-ups give 1.30 kohm and 2.23 mA at VOL=0.4 V; verify the owned
 board's fitted values before assembly.

@@ -317,9 +317,9 @@ def build() -> BoardIntent:
              mpn="SM04B-GHS-TB(LF)(SN)", manufacturer="JST", connector="J_IMU",
              description="Keyed 3.3 V / GND / SDA / SCL header for the owned GY-521 (AD0 low, 0x68)"))
     for ref, net in (("D7", "I2C_SDA"), ("D8", "I2C_SCL")):
-        add(Part(ref, "Device:D_TVS", "PESD3V3U1UL", "Diode_SMD:D_SOD-882",
+        add(Part(ref, "Diode:PESD3V3U1UL", "PESD3V3U1UL", "Diode_SMD:D_SOD-882",
                  {"1": net, "2": "GND"}, mpn="PESD3V3U1UL", manufacturer="Nexperia",
-                 description="Low-capacitance 3.3 V bidirectional ESD clamp on external I2C lead"))
+                 description="2.6 pF unidirectional ESD clamp: pin 1 cathode to I2C, pin 2 anode to ground"))
     # No HAT pull-ups: Pi 1.8k in parallel with typical GY-521 4.7k gives 1.30k, ~2.23 mA at VOL=0.4 V.
     add(r("R20", "10k", "3V3", "ENC", (355.6, 129.54, 0), P(8.5, 33.0, 90), "RC0603FR-0710KL", "Encoder open-drain pull-up"))
 

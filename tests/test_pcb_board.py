@@ -74,7 +74,7 @@ def test_netlist_equals_design_intent(checked, intent):
 @needs_kicad
 def test_board_geometry(checked, intent):
     board = checked["board"]
-    assert board.size == pytest.approx((65.0, 56.5), abs=0.01)
+    assert board.size == pytest.approx((65.0, 70.0), abs=0.01)
     pads = {(p.ref, p.number): (p.x, p.y) for p in board.pads}
     # HAT specification: header pin 1 inboard at (8.37, 4.77), pin 2 at the edge, pin 40 at the far end.
     assert pads[("J1", "1")] == pytest.approx((8.37, 4.77), abs=1e-3)

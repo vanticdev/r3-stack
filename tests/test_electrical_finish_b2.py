@@ -58,6 +58,9 @@ def test_hat_edge_headers_and_owned_imu_circuit():
     assert not {"U5", "R18", "R19", "C26", "C27", "C28", "C29"} & parts.keys()
     assert parts["J9"].pins == {"1": "3V3", "2": "GND", "3": "I2C_SDA", "4": "I2C_SCL", "MP": "GND"}
     assert {"D7", "D8"} <= parts.keys()
+    assert parts["D7"].lib_id == parts["D8"].lib_id == "Diode:PESD3V3U1UL"
+    assert parts["D7"].pins == {"1": "I2C_SDA", "2": "GND"}
+    assert parts["D8"].pins == {"1": "I2C_SCL", "2": "GND"}
     hat = project.catalog.component("r3-carrier-hat")
     pos, rotation = project.graph.component_pose("hat")
     for name in ("J_BATT", "J_RX", "J_ESC", "J_SERVO", "J_IMU"):

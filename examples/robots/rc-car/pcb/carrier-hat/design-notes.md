@@ -29,24 +29,24 @@ External-conductor fit (Brooks, PCD&F 2015): dT = 215.3 I^2 W^-1.15 Th^-1 (mil, 
 
 | Net | Design current | Pour area (mm^2) | Vias (capacity) | Narrowest hand-routed track |
 | --- | --- | --- | --- | --- |
-| 5V | 5 A | - | 3 (5.56 A) | 0.50 mm (1.97 A) |
-| CS_6V | 4.55 A | F.Cu 25.16 | 2 (3.17 A) | 0.30 mm (1.47 A) |
-| GND | 5 A | F.Cu 2750.74, B.Cu 3529.67 | 138 (218.78 A) | - |
+| 5V | 5 A | - | 2 (3.71 A) | 0.50 mm (1.97 A) |
+| CS_6V | 4.55 A | F.Cu 25.17 | 2 (3.17 A) | 0.30 mm (1.47 A) |
+| GND | 5 A | F.Cu 2555.13, B.Cu 3522.53 | 133 (210.85 A) | - |
 | SERVO_6V | 3 A | F.Cu 43.05 | 2 (3.71 A) | 0.30 mm (1.47 A) |
 | SW1_6V | 4.55 A | F.Cu 36.62 | 0 (0 A) | 0.30 mm (1.47 A) |
 | SW2_6V | 4.55 A | F.Cu 32.36 | 0 (0 A) | 1.00 mm (2.93 A) |
-| SW_5V | 5 A | F.Cu 14.2 | 2 (3.17 A) | 0.50 mm (1.97 A) |
+| SW_5V | 5 A | F.Cu 14.42 | 2 (3.17 A) | 0.50 mm (1.97 A) |
 | VBAT | 5 A | - | 0 (0 A) | 2.59 mm (5.06 A) |
-| VBAT_PROT | 5 A | F.Cu 14.88 | 2 (3.71 A) | 1.00 mm (2.93 A) |
-| VIN_HAT | 5 A | F.Cu 46.01 | 2 (3.17 A) | 0.30 mm (1.47 A) |
+| VBAT_PROT | 5 A | F.Cu 14.5 | 4 (7.41 A) | 1.00 mm (2.93 A) |
+| VIN_HAT | 5 A | F.Cu 45.12 | 2 (3.17 A) | 0.30 mm (1.47 A) |
 
 Power pours (KiCad-filled copper on F.Cu where the current enters fine-pitch pins or crosses between large pads); narrowest filled cross-section between the terminals, measured by `r3_kicad.pours`:
 
 | Pour | Terminals | Current | Narrowest cross-section | IPC-2152 rating |
 | --- | --- | --- | --- | --- |
-| SW_5V pour | L1.1 -> U2.19+U2.20 | 5 A | 2.50 mm | 4.96 A |
+| SW_5V pour | L1.1 -> U2.19+U2.20 | 5 A | 2.74 mm | 5.22 A |
 | VIN_HAT pour | bus -> U2.2+U2.3+U2.4+U2.5 | 4.42 A | 3.74 mm | 6.25 A |
-| VIN_HAT pour | C17.2+C18.2 -> Q2.5 | 4.28 A | 3.74 mm | 6.25 A |
+| VIN_HAT pour | C17.2+C18.2 -> Q2.5 | 4.28 A | 3.18 mm | 5.69 A |
 | SW1_6V pour | L2.2 -> Q3.5 -> Q2.1+Q2.2+Q2.3 | 4.55 A | 3.94 mm | 6.44 A |
 | CS_6V pour | R21.2 -> Q3.1+Q3.2+Q3.3 -> Q4.1+Q4.2+Q4.3 | 4.55 A | 2.70 mm | 5.18 A |
 | SW2_6V pour | L2.1 -> Q4.5 -> Q5.1+Q5.2+Q5.3 | 4.55 A | 2.26 mm | 4.68 A |
