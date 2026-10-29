@@ -1034,6 +1034,10 @@ def build_problem(project: Any, router: Any, routing: Any, harnesses: list[str],
     fanned: set[str] = set()  # node refs whose conductors fan out from their pins
     jacket = {h.id: h.jacket for h in project.spec.electrical.harnesses}
     for pair in routing.floating:
+        # Other groups must not move this pair after its pin fan-outs were
+        # fixed by its own planner pass. Their segments do not constrain it.
+        if pair.a.split(".", 1)[0] not in harnesses or pair.b.split(".", 1)[0] not in harnesses:
+            continue
         key = f"F:{pair.a}|{pair.b}"
         from .terminations import body_width
 
