@@ -1,0 +1,22 @@
+# Fit allowances for 3D-printed parts: one table per process, used by the
+# assembly compiler and the CAD fit checks instead of ISO 286 / ISO 273 metal
+# fits whenever the hole or bore is in a printed part. All values are diametral
+# (bore minus shaft, hole minus screw), except cap_clearance which is radial.
+# Values are ESTIMATES for well-calibrated printers; tune per printer/material.
+print_fits:
+  - process: fdm
+    description: Fused-filament (PETG, PLA, ABS), 0.4 mm nozzle, 0.2 mm layers, holes printed vertically
+    materials: [petg, pla, abs, asa]
+    hole_clearance: [0.2 mm, 0.6 mm]      # an M3 screw passes a 3.2-3.6 mm printed hole
+    sliding_clearance: [0.2 mm, 0.5 mm]   # running/sliding fit on a steel pin
+    press_interference: [0.05 mm, 0.2 mm] # pin pressed into a printed bore
+    cap_clearance: 0.3 mm                 # cap inner diameter = head + 2 x 0.3 mm
+    provenance: {status: estimated, source: "Common FDM tolerance-test results (0.2-0.3 mm per side for slip fits); R3 estimate"}
+  - process: sls
+    description: Selective laser sintering (PA12, PA11)
+    materials: [pa12, pa11, nylon pa]
+    hole_clearance: [0.15 mm, 0.5 mm]
+    sliding_clearance: [0.1 mm, 0.3 mm]
+    press_interference: [0.02 mm, 0.12 mm]
+    cap_clearance: 0.2 mm
+    provenance: {status: estimated, source: "SLS PA12 design guides (0.1-0.2 mm assembly clearance per side); R3 estimate"}

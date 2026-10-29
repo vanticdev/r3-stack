@@ -215,6 +215,28 @@ class Cylinder(Shape):
         return lines
 
 
+def cluster_decimate(vertices: np.ndarray, faces: np.ndarray, cell: float) -> tuple[np.ndarray, np.ndarray]:
+    """Vertex-clustering decimation: merge vertices on a ``cell`` grid and drop the
+    triangles that collapse. A closed mesh stays closed (its winding number stays
+    1 inside); the surface moves by at most cell * sqrt(3) / 2. Used for routing
+    obstacles, whose voxels are millimetres, not for the CAD fit checks."""
+    vertices = np.asarray(vertices, dtype=float)
+    faces = np.asarray(faces, dtype=int)
+    keys = np.floor(vertices / cell).astype(np.int64)
+    _, inverse, counts = np.unique(keys, axis=0, return_inverse=True, return_counts=True)
+    inverse = inverse.reshape(-1)
+    merged = np.zeros((counts.size, 3))
+    np.add.at(merged, inverse, vertices)
+    merged /= counts[:, None]
+    tri = inverse[faces]
+    keep = (tri[:, 0] != tri[:, 1]) & (tri[:, 1] != tri[:, 2]) & (tri[:, 0] != tri[:, 2])
+    tri = tri[keep]
+    if len(tri):
+        _, first = np.unique(np.sort(tri, axis=1), axis=0, return_index=True)
+        tri = tri[np.sort(first)]
+    return merged, tri
+
+
 class MeshShape(Shape):
     """Closed triangle mesh (e.g. a CAD STL export). Distance is measured to a
     dense set of surface samples. The sign is exact for closed meshes: points

@@ -36,7 +36,7 @@ def test_motor_model_round_trips_current_and_duty() -> None:
     assert motor.duty_for_throttle(motor.throttle_for_duty(0.4)) == pytest.approx(0.4)
     assert motor.duty_for_throttle(0.02) == 0.0
     # Force -> current: F r / (N eta k_t) + I_0.
-    expected = 7.0 * WHEEL_RADIUS / (9.6 * 0.88 * motor.k_e) + 1.6
+    expected = 7.0 * WHEEL_RADIUS / (9.066 * 0.88 * motor.k_e) + 1.6
     assert motor.current_for_force(7.0) == pytest.approx(expected)
 
 

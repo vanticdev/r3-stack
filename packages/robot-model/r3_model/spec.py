@@ -145,10 +145,13 @@ class Fastener(_Model):
     nut: str | None = Field(default=None, description="Catalog nut id when the fastener ends in a nut.")
     grip: Quantity | None = Field(default=None, description="Clamp length from the head seat to the nut seat (through bolts).")
     preloaded: bool = True
+    body: str | None = Field(default=None, description="Component that is this fastener (a kingpin screw, ball stud, stacking "
+                                                       "standoff or nut modeled as an assembly object); default: its own part.")
+    join: str | None = Field(default=None, description="Assembly join this fastener was derived from.")
 
     @property
     def part(self) -> str:
-        return f"fastener:{self.id}"
+        return self.body or f"fastener:{self.id}"
 
     @property
     def nut_part(self) -> str | None:
@@ -175,7 +178,10 @@ class Interface(_Model):
     parts: list[str] = Field(min_length=2, max_length=2)
     axis_point: Vector | None = None
     axis_dir: Vector | None = None
+    frame: str | None = Field(default=None, description="Component whose frame axis_point/axis_dir are written in (default: robot "
+                                                        "frame). Resolved to the robot frame once the assembly is compiled.")
     params: dict[str, Any] = Field(default_factory=dict)
+    join: str | None = Field(default=None, description="Assembly join this interface was derived from.")
 
 
 class Mechanical(_Model):
@@ -260,6 +266,9 @@ class Cad(_Model):
     folder: str | None = Field(default=None, description="Provider folder id where documents are created.")
     document_name: str | None = None
     parts: dict[str, str] = Field(default_factory=dict, description="component id -> CAD part name.")
+    library_name: str = Field(default="R3 Parts Library", description="Reusable document holding purchased parts and fasteners.")
+    subassemblies: dict[str, list[str]] = Field(
+        default_factory=dict, description="Subassembly name -> component ids; the rest sit in the top-level assembly.")
 
 
 class HardwareBinding(_Model):
@@ -326,10 +335,23 @@ class Simulation(_Model):
 
 class Fasteners(_Model):
     """Fasteners that close a ``fasten`` join, e.g. ``{type: "M3x10", count: 2}``.
-    ``type`` is ``M<d>x<length>`` (ISO metric, length under the head, mm)."""
+    ``type`` is ``M<d>x<length>`` (ISO metric, length under the head, mm).
+
+    Each matched hole pair becomes one fastener in ``mechanical.fasteners``
+    (id ``<join id>`` for a single pair, else ``<join id>_<n>``): a screw
+    (``part``, default ``shcs-m<d>``) whose head seats on the far face of the
+    clearance side, threading into the tapped side, or a through bolt ending in
+    ``nut`` with the head on side ``head``. A stud on an object (``thread``
+    hole) or a nut object produces a fastener whose body is that object.
+    ``clamps`` adds parts clamped in the stack beyond the two joined objects."""
 
     type: str
     count: int | None = Field(default=None, description="Default: every matched hole pair.")
+    part: str | None = Field(default=None, description="Catalog fastener id (fasteners.yaml); default from the thread size.")
+    nut: str | None = Field(default=None, description="Catalog nut id for a through bolt (both holes clearance).")
+    head: Literal["a", "b"] = Field(default="a", description="Head side of a through bolt.")
+    clamps: list[str] = Field(default_factory=list, description="Further clamped components, in stack order.")
+    preloaded: bool = True
 
 
 class Join(_Model):
@@ -350,6 +372,10 @@ class Join(_Model):
     limits: Vector | None = Field(default=None, description="[lower, upper] rad or m for a derived joint.")
     fit: Literal["clearance", "transition", "interference", "any"] | None = Field(
         default=None, description="Required shaft/bore fit; default clearance for revolute/slider, any otherwise.")
+    damping: Quantity = 0.0
+    friction: Quantity = 0.0
+    verify: dict[str, Any] = Field(default_factory=dict, description="Exact-geometry verification limits copied into the derived "
+                                                                     "mechanical interface (clearance, min_engagement, retainers, ...).")
 
     @property
     def join_id(self) -> str:
@@ -462,6 +488,15 @@ class RobotSpec(_Model):
         return parts
 
     def _check_mechanical(self, ids: set[str]) -> None:
+        if self.assembly is not None:
+            # Fasteners, interfaces and joints are derived from the joins when the
+            # assembly compiles; r3_model.mechanics validates the result afterwards.
+            return
+        self.validate_mechanical(ids)
+
+    def validate_mechanical(self, ids: set[str] | None = None) -> None:
+        """Reference checks of mechanical.fasteners/interfaces/joints/transmissions (raises ValueError)."""
+        ids = set(self.components) if ids is None else ids
         mech = self.mechanical
         for label, values in (("joint", [j.id for j in mech.joints]), ("transmission", [t.id for t in mech.transmissions]),
                               ("fastener", [f.id for f in mech.fasteners]), ("interface", [i.id for i in mech.interfaces])):
@@ -518,7 +553,8 @@ class RobotSpec(_Model):
                 interface = interfaces.get(joint.interface)
                 if interface is None:
                     raise ValueError(f"joint {joint.id!r} references unknown interface {joint.interface!r}")
-                if joint.type in ("revolute", "continuous") and interface.kind != "revolute_fit":
+                rotating_flat = interface.kind == "drive_flat" and interface.params.get("rotating_bore")
+                if joint.type in ("revolute", "continuous") and interface.kind not in ("revolute_fit", "spline") and not rotating_flat:
                     raise ValueError(f"joint {joint.id!r} is {joint.type} but interface {interface.id!r} is {interface.kind}")
         for transmission in mech.transmissions:
             if transmission.actuator not in ids:

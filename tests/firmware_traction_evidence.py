@@ -59,7 +59,7 @@ def main() -> None:
 
     figure, (speed_axis, path_axis, current_axis) = plt.subplots(1, 3, figsize=(17, 5))
     for run, label, color, top in ((off, "assists off", "C3", top_off), (on, "traction + yaw assist", "C0", top_on)):
-        wheel = run["motor_omega"] / 9.6 * 0.055  # differential carrier speed at the tire (ratio 9.6, r 55 mm)
+        wheel = run["motor_omega"] / 9.066 * 0.055  # differential carrier speed at the tire (ratio 9.066, r 55 mm)
         speed_axis.plot(run["t"], run["speed"], color=color, label=f"{label}: ground (top {top:.2f} m/s)")
         speed_axis.plot(run["t"], wheel, color=color, ls=":", label=f"{label}: driven wheels (carrier)")
         path_axis.plot(run["x"], run["y"], color=color, label=label)

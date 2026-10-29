@@ -54,9 +54,11 @@ class Project:
             return None
         if not hasattr(self, "_assembly"):
             from .assembly import apply_to_spec, compile_assembly
+            from .mechanics import derive_mechanical
 
             result = compile_assembly(self.spec, self.catalog)
             result.diagnostics.extend(apply_to_spec(self.spec, result))
+            result.diagnostics.extend(derive_mechanical(self.spec, self.catalog, result))
             self._assembly = result
         return self._assembly
 

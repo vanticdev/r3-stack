@@ -229,7 +229,9 @@ class FitChecker:
         for fastener in self.spec.mechanical.fasteners:
             if self.in_scope(self.spec.link_parts(fastener.id) or []):
                 self.check_fastener(fastener)
-        for interface in self.spec.mechanical.interfaces:
+        # Sensing checks last: a magnetic target counts only magnets whose bonds were verified before it.
+        ordered = sorted(self.spec.mechanical.interfaces, key=lambda i: i.kind == "magnetic_target")
+        for interface in ordered:
             extra = interface.params.get("magnets", []) if interface.kind == "magnetic_target" else interface.params.get("through", [])
             if self.in_scope([*interface.parts, *(extra or [])]):
                 self.check_interface(interface)

@@ -20,7 +20,9 @@ from r3_model.diagnostics import Diagnostic
 from r3_model.project import Project
 
 from .bodies import ROOT, Kinematics, Transform
-from .geometry import Box, Cylinder, MeshShape, Shape, SweptShape, axis_matrix, load_stl
+from .geometry import Box, Cylinder, MeshShape, Shape, SweptShape, axis_matrix, cluster_decimate, load_stl
+
+ROUTING_MESH_CELL = 1e-3  # m: vertex-clustering cell for routing obstacles (3 mm voxels; see _cad_shape)
 
 # A structure plate thinner than this may get drilled pass-through holes.
 PLATE_MAX_THICKNESS = 0.005
@@ -121,6 +123,9 @@ def _cad_shape(project: Project, part: dict[str, Any]) -> tuple[Shape, str] | No
         if path.exists():
             vertices, faces = load_stl(path)
             if len(faces):
+                # The CAD export is tessellated for exact fit checks (0.05 mm chord, 2 deg); routing works on 3 mm voxels
+                # and 1.5 mm surface samples, so 1 mm vertex clustering keeps the distance field and cuts winding-number cost.
+                vertices, faces = cluster_decimate(vertices, faces, ROUTING_MESH_CELL)
                 return MeshShape(vertices, faces), "cad_mesh"
     if "bbox_min" in part and "bbox_max" in part:
         lo, hi = np.asarray(part["bbox_min"], dtype=float), np.asarray(part["bbox_max"], dtype=float)

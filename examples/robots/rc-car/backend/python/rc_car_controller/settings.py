@@ -39,10 +39,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "max_cruise_speed_mps": 4.0,
     "esc_pulse_us": {"reverse": 1000, "neutral": 1500, "forward": 2000},
     "steering_pulse_us": {"left": 1722, "center": 1500, "right": 1278},  # CAD-solved linkage end points (+-30 deg horn)
-    "max_steer_rad": 0.45,
+    "max_steer_rad": 0.4021,  # CAD steering table (Ackermann-equivalent single-track angle)
     "wheelbase_m": 0.26,
     "wheel_radius_m": 0.055,
-    "encoder_pulses_per_rev": 4,
+    "encoder_pulses_per_rev": 9.891,  # magnets on the spur shaft: carrier (mean wheel) revolutions
     "arm_channel": 5,                    # legacy; crsf_channels.arm takes precedence
     "crsf_channels": {"steering": 1, "throttle": 2, "arm": 5},
     # Firmware-level defaults (not in robot.yaml).
@@ -57,7 +57,8 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # Traction/launch control, motor current limit and gyro yaw assist; any
     # traction.TractionConfig field may be overridden here.
     "traction": {"enabled": True, "yaw_assist_enabled": True, "target_slip": 0.10,
-                 "motor_current_limit_a": 50.0, "launch_slew_per_s": 3.0, "yaw_gain": 0.6},
+                 "motor_current_limit_a": 50.0, "launch_slew_per_s": 3.0, "yaw_gain": 0.6,
+                 "gear_ratio": 9.066},  # 18T pinion / 66T spur x 2.4727 (rear transmission catalog)
 }
 
 CHANNEL_ROLES = ("steering", "throttle", "arm")

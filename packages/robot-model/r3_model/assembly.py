@@ -288,6 +288,7 @@ class ResolvedInterface:
     kind: str
     frame: np.ndarray  # 4x4 in the object frame
     params: dict[str, Any]
+    material: str = ""
 
     @property
     def ref(self) -> str:
@@ -325,6 +326,31 @@ class ResolvedInterface:
             holes = self.holes
             return bool(holes) and all(h.radius_from_origin < POSITION_EPS for h in holes) and not self.params.get("keyed")
         return False
+
+
+def mirrored_interface(iface: ResolvedInterface, mirror: list[float]) -> ResolvedInterface:
+    """The interface of a mirrored instance (``params.mirror``, e.g. [1, -1, 1]):
+    origin, z and x are mirrored, the frame stays right-handed (y = z × x), and
+    in-plane coordinates (hole and pin positions) are re-expressed in it."""
+    m = np.diag(mirror)
+    old = iface.frame
+    origin, z, x = m @ old[:3, 3], m @ old[:3, 2], m @ old[:3, 0]
+    frame = frame_matrix(origin, z, x)
+
+    def remap(px: float, py: float) -> tuple[float, float]:
+        local = m @ (old[:3, 0] * px + old[:3, 1] * py)  # in-plane offset, mirrored
+        return float(local @ frame[:3, 0]), float(local @ frame[:3, 1])
+
+    params = dict(iface.params)
+    if "holes" in params:
+        holes = []
+        for entry in params["holes"]:
+            px, py = remap(to_si(entry[0]), to_si(entry[1]))
+            holes.append([px, py, *entry[2:]])
+        params["holes"] = holes
+    if params.get("pin1") is not None:
+        params["pin1"] = list(remap(to_si(params["pin1"][0]), to_si(params["pin1"][1])))
+    return ResolvedInterface(iface.obj, iface.name, iface.kind, frame, params, iface.material)
 
 
 def b_in_a_plane(x: float, y: float, clock: float) -> np.ndarray:
@@ -493,6 +519,8 @@ class AssemblyResult:
     diagnostics: list[Diagnostic] = field(default_factory=list)
     interfaces: dict[str, ResolvedInterface] = field(default_factory=dict)
     root_pose: np.ndarray = field(default_factory=lambda: np.eye(4))
+    matches: dict[str, "PatternMatch"] = field(default_factory=dict)  # join id -> matched hole pairs
+    valid: dict[str, tuple[ResolvedInterface, ResolvedInterface]] = field(default_factory=dict)
 
     @property
     def errors(self) -> list[Diagnostic]:
@@ -544,6 +572,7 @@ class AssemblyCompiler:
         self.result = AssemblyResult(root=self.assembly.root)
         self.valid: dict[str, tuple[ResolvedInterface, ResolvedInterface]] = {}
         self.clocks: dict[str, float] = {}
+        self.matches: dict[str, PatternMatch] = {}
 
     # ------------------------------------------------------------- helpers
     def add(self, diagnostic: Diagnostic) -> None:
@@ -569,6 +598,10 @@ class AssemblyCompiler:
             return None
         resolved = ResolvedInterface(obj, name, spec_iface.kind, frame_matrix(spec_iface.origin, spec_iface.z, spec_iface.x),
                                      dict(spec_iface.params))
+        mirror = comp.params.get("mirror")
+        if mirror is not None:
+            resolved = mirrored_interface(resolved, [float(v) for v in mirror])
+        resolved.material = ctype.mechanical.material or ""
         self.result.interfaces[ref] = resolved
         return resolved
 
@@ -594,6 +627,8 @@ class AssemblyCompiler:
         self._check_loops()
         self._derive_joints()
         self._record_joins()
+        self.result.matches = self.matches
+        self.result.valid = self.valid
         return self.result
 
     # ------------------------------------------------------------- kinds
@@ -683,6 +718,7 @@ class AssemblyCompiler:
                     match_holes(holes_a, holes_b, 0.0, fastener_d, required)
                 clock = match.clock
                 self._hole_mismatch(join, a, b, match, holes_a, holes_b, [])
+        self.matches[join.join_id] = match
         self._check_hole_sizes(join, a, b, match, holes_a, holes_b, fastener_d)
         if fastener or any(h.kind == "thread" for h in holes_a + holes_b):
             self._check_fastener_length(join, a, b, match, holes_a, holes_b, fastener)
@@ -740,8 +776,17 @@ class AssemblyCompiler:
             if fastener_d is not None and abs(fastener_d - nominal) > POSITION_EPS:
                 violations.append({**pair, "nominal": nominal, "fastener_d": fastener_d, "reason": "fastener size differs from thread"})
             key = _nominal_key(nominal)
-            for hole in (ha, hb):
+            for hole, iface in ((ha, a), (hb, b)):
                 if hole.kind != "clearance":
+                    continue
+                printed = self.catalog.print_fit(iface.material) if hasattr(self.catalog, "print_fit") else None
+                if printed is not None:
+                    # Printed holes print undersize: the process table, not ISO 273, sets the clearance.
+                    lo, hi = (to_si(v) for v in printed.hole_clearance)
+                    if not nominal + lo - POSITION_EPS <= hole.d <= nominal + hi + POSITION_EPS:
+                        violations.append({**pair, "nominal": nominal, "hole_d": hole.d, "print_min": nominal + lo,
+                                           "print_max": nominal + hi, "process": printed.process,
+                                           "reason": f"printed ({printed.process}) clearance hole outside the print-fit table"})
                     continue
                 if key is None:
                     if hole.d <= nominal:
@@ -777,7 +822,9 @@ class AssemblyCompiler:
                 if "tapped" in holes:
                     tapped, iface = holes["tapped"]
                     factor = iface.quantity("min_engagement_factor", 1.0)
-                    low, high = grip + factor * d, grip + tapped.depth
+                    # A nut (through thread) may be passed by the stud; a blind tapped hole bottoms out.
+                    low = grip + factor * d
+                    high = math.inf if iface.params.get("through_thread") else grip + tapped.depth
                 else:
                     # A stud through a clearance hole: the female part beyond is joined separately.
                     low, high = grip, math.inf
@@ -825,6 +872,13 @@ class AssemblyCompiler:
         actual = "clearance" if clearance_min >= 0 else "interference" if clearance_max <= 0 else "transition"
         required = join.fit or ("clearance" if join.kind in ("revolute", "slider") else "any")
         limits = {"clearance": (0.0, loose), "transition": (-press, loose), "interference": (-press, 0.0), "any": (-press, loose)}[required]
+        printed = next((fit for fit in (self._print_fit(bore), self._print_fit(shaft)) if fit is not None), None)
+        if printed is not None:
+            # Printed parts: the process table replaces ISO 286 (holes shrink, pins grow).
+            slide = [to_si(v) for v in printed.sliding_clearance]
+            interference = [to_si(v) for v in printed.press_interference]
+            limits = {"clearance": (slide[0], slide[1]), "transition": (-interference[1], slide[1]),
+                      "interference": (-interference[1], -interference[0]), "any": (-interference[1], slide[1])}[required]
         class_ok = required == "any" or actual == required
         if not class_ok or clearance_min < limits[0] - POSITION_EPS * 1e-3 or clearance_max > limits[1] + POSITION_EPS * 1e-3:
             self.add(Diagnostic.error(
@@ -835,7 +889,8 @@ class AssemblyCompiler:
                 subjects=subjects,
                 data={"shaft_d": shaft_d, "bore_d": bore_d, "shaft_tol": shaft_tol, "bore_tol": bore_tol,
                       "clearance_min": clearance_min, "clearance_max": clearance_max, "actual_fit": actual,
-                      "required_fit": required, "limit_min": limits[0], "limit_max": limits[1]},
+                      "required_fit": required, "limit_min": limits[0], "limit_max": limits[1],
+                      "print_process": printed.process if printed is not None else None},
                 hint="Change the bore or shaft diameter / ISO 286 grade so the clearance range lies within the limits."))
         flat_shaft, flat_bore = shaft.quantity("flat_offset"), bore.quantity("flat_offset")
         if join.kind == "drive_flat":
@@ -854,7 +909,9 @@ class AssemblyCompiler:
                         subjects=subjects, data={"clock": clock, "misalignment": angle_distance(clock, 0.0)},
                         hint="Flats sit on each interface's +x side; drive_flat joins need clock 0."))
         shaft_length, bore_depth = shaft.quantity("length"), bore.quantity("depth")
-        if shaft_length is not None and bore_depth is not None:
+        # Rolling bearings, bonded inserts and bushed journals are not plain 1 x d journals.
+        exempt = bool(shaft.params.get("short_engagement_ok") or bore.params.get("short_engagement_ok"))
+        if shaft_length is not None and bore_depth is not None and not exempt:
             engaged = min(shaft_length - join.offset, bore_depth)
             if engaged < shaft_d - POSITION_EPS:
                 # Rule of thumb: a bearing/hub length below 1 x d tilts and wears quickly.
@@ -863,6 +920,11 @@ class AssemblyCompiler:
                     subjects=subjects, data={"engaged_length": engaged, "shaft_d": shaft_d, "shaft_length": shaft_length,
                                              "bore_depth": bore_depth, "offset": join.offset}))
         return clock
+
+    def _print_fit(self, iface: ResolvedInterface):
+        """Print-fit table entry when the interface's object is 3D printed (else None)."""
+        finder = getattr(self.catalog, "print_fit", None)
+        return finder(iface.material) if finder is not None and iface.material else None
 
     def _check_header(self, join: Join, a: ResolvedInterface, b: ResolvedInterface) -> float:
         header, socket = (a, b) if a.kind == "header" else (b, a)

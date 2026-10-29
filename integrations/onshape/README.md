@@ -28,35 +28,49 @@ order without network calls (a stored session is reported, not verified). Screen
 Onshape's `shadedviews` endpoint and steering poses are set through `matevalues`, so the
 whole pipeline (build, verify, assemble, render) runs on a server.
 
-## Pipeline (`stage.run`)
+## Pipeline (`stage.run`, phase B: `organized.py`)
 
-1. `plan.py`: spec + catalog -> per-part plans. Purchased parts are their catalog
-   envelope (`mechanical.solids`) plus only their datasheet `features`; fabricated
-   parts get clearance/tapped holes from the fasteners that use them, bores from the
-   interfaces whose bore side they are, and strap slots. Every fastener, nut, strap and
-   magnet is its own part.
-2. `direct.py`: plans -> standard features in a new document (failed attempts are
-   deleted); names, appearance, material density (fabricated) or catalog mass override.
-3. `model.py`: `bodydetails` (analytic faces) + fine tessellations (chord 0.05 mm,
-   angle 2 deg), recorded to `build/cad/fixtures/` for offline tests.
-4. `fit.py`: fasteners (head seating, clamp-face contact, ISO 273 hole presence, edge
-   distance, thread engagement from the screw/tapped-hole intersection volume, nut
-   engagement and protrusion, tool access), interfaces (revolute/press/spline fits,
-   D-flats, ball joints, adhesive area, straps, magnet air gap and field, header
-   retention), global interference, joint axes, transmission paths, retention graph of
-   verified attachments only.
-5. `motion.py` + `kinematics.py`: steering linkage solved from the verified axes and
-   ball centers; table written to `cad_model.json` (`kinematics.steering`); motion
-   sweep (11 servo samples, 0.5 mm margin) and wheel-spin sweeps.
-6. `assembly.py`: Assembly from verified interfaces; connectors corrected to coincide in
-   the modeled pose; every joint checked against its mate (type, axis, origin, limits).
-7. Headless renders and `cad_model.json` (+ microversion and mesh hashes pinned in
-   `r3.lock.yaml`).
+The robot is compiled from objects joined at interfaces (`r3_model.assembly`). Its fasteners,
+fit interfaces and joints are derived from those joins (`r3_model.mechanics`). The CAD is then
+built the way an engineer organizes Onshape:
 
-Negative tests (deliberately broken designs): `python -m r3_onshape.negative
-examples/robots/rc-car` -> `build/cad/negative_tests.json`.
+1. `parts.py`: one local part per geometry variant. Every object type is modeled at its own
+   origin (catalog frame); right-hand parts mirror left ones. Fabricated parts cut their holes,
+   bores, sockets and slots from their interfaces; purchased parts keep only catalog solids and
+   datasheet features. Each part gets `mc_<interface>` mate connectors, plus far-face seats
+   `mc_<interface>_h<n>` for screw heads and nuts. Every plain fastener and nut is a part.
+2. `studio.py`: one Part Studio per object type or family, using standard features on the
+   Top/Front/Right planes only (start-offset extrudes, face-started Hole features, Mirror).
+   Sketches are fully dimensioned (`WELL_DEFINED`), features are named and grouped into the
+   feature-folder passes *Base shape / Bores & shafts / Cutouts / Mounting holes / Mirror /
+   Mate connectors*, and key dimensions reference the Variable Studio (`#plate_thickness`,
+   `#wheelbase`, ...). Part properties are set: name, appearance, material, mass override,
+   part number, vendor.
+3. `organized.py`:
+   * the `R3 Parts Library` document (purchased parts and fasteners, versioned, reused while
+     its digest is unchanged);
+   * the robot document: `01 Variables`, `02 Fabricated parts`, `04 Subassemblies`,
+     `05 Top-level assembly`;
+   * subassemblies from `cad.subassemblies`, mated on interface connectors. Each mate
+     reproduces the compiler's `Rz(clock)·Tz(offset)·Rx(π)`, and the solved transforms must
+     equal the compiled poses;
+   * organization through the onshape-native bridge when it is connected (`bridge.py`): feature,
+     tab and assembly folders, hidden reference geometry;
+   * the organization check (`cad_default_feature_name`, `cad_feature_not_in_folder`,
+     `cad_tab_not_in_folder`, `cad_part_name_mismatch`, `cad_missing_mate_connector`,
+     `cad_unconstrained_sketch`, `cad_assembly_unfoldered`, `cad_missing_variable_reference`,
+     `cad_visible_construction_geometry`, `cad_excess_construction_planes`), REST first;
+   * exact-geometry fit checks (`fit.py`) on the Part Studio geometry at the solved transforms,
+     plus the steering motion sweep and calibration (`motion.py`);
+   * meshes, mass properties, headless shaded views of every Part Studio, subassembly and the
+     top level, and `cad_model.json`. The document is pinned in `r3.lock.yaml` (`cad`,
+     `cad_library`), and the superseded document is trashed.
 
-See [repository layout](../../docs/architecture/repository-layout.md).
+Negative tests: `python -m r3_onshape.negative_organized examples/robots/rc-car` runs a
+misaligned hole pattern, a default-named feature, an unfoldered tab and an unconstrained
+sketch, and writes `build/cad/negative_tests.json`. The legacy single-Part-Studio builder
+(`direct.py`, `sync.py`, `plan.py`, `negative.py`) is kept for robot-frame specs without an
+`assembly:` section.
 
 ## Headless use
 

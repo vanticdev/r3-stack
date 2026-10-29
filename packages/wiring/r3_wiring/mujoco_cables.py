@@ -62,8 +62,11 @@ Model
   its signed surface distance ``dist``. Only pairs with ``dist < margin``, i.e.
   real penetrations, reach the constraint solver; the rest are flagged
   ``exclude = 1`` (in gap). :class:`CableMonitor` reads that
-  contact data every step; :meth:`CableMonitor.exact_distances` cross-checks it
-  with ``mj_geomDistance``.
+  contact data every step to find the close pairs, then measures each distinct
+  pair with ``mj_geomDistance``: the convex (MPR) narrow phase reports approximate
+  ``dist`` for e.g. capsule/cylinder pairs (several micrometres off at a few mm),
+  so the contact list selects pairs and GJK measures them.
+  :meth:`CableMonitor.exact_distances` cross-checks the result over all pairs.
 """
 
 from __future__ import annotations
@@ -822,23 +825,29 @@ class CableMonitor:
 
     # -------------------------------------------------------------- clearance
     def update(self) -> np.ndarray:
-        """Per-bundle clearance to moving parts from this step's contact data."""
+        """Per-bundle clearance to moving parts: the pairs this step's contact data lists, measured by GJK."""
         data = self.data
         self.current.fill(self.margin)
         self.current_part.fill(-1)
         n = data.ncon
         if n:
             geoms = data.contact.geom[:n]
-            dist = data.contact.dist[:n]
             g1, g2 = geoms[:, 0], geoms[:, 1]
             b1, b2 = self.geom_bundle[g1], self.geom_bundle[g2]
             cable_first = (b1 >= 0) & self.geom_moving[g2]
             cable_second = (b2 >= 0) & self.geom_moving[g1]
             relevant = cable_first | cable_second
             if relevant.any():
-                bundle = np.where(cable_first, b1, b2)[relevant]
-                part = np.where(cable_first, self.geom_part[g2], self.geom_part[g1])[relevant]
-                d = dist[relevant]
+                import mujoco
+
+                cable_geom = np.where(cable_first, g1, g2)[relevant]
+                part_geom = np.where(cable_first, g2, g1)[relevant]
+                pairs = np.unique(np.stack([cable_geom, part_geom], axis=1), axis=0)
+                fromto = np.zeros(6)
+                exact = np.array([mujoco.mj_geomDistance(self.model, data, int(gc), int(gp), self.margin, fromto) for gc, gp in pairs])
+                bundle = self.geom_bundle[pairs[:, 0]]
+                part = self.geom_part[pairs[:, 1]]
+                d = np.minimum(exact, self.margin)
                 np.minimum.at(self.current, bundle, d)
                 closest = d <= self.current[bundle]
                 self.current_part[bundle[closest]] = part[closest]

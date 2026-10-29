@@ -277,6 +277,8 @@ class ComponentType(_Model):
     pins: dict[str, Pin] = Field(default_factory=dict)
     connectors: dict[str, ConnectorInstance] = Field(default_factory=dict)
     interfaces: dict[str, Interface] = Field(default_factory=dict, description="Mating features for the assembly compiler.")
+    cad_name: str = Field(default="", description="Short part / Part Studio name in CAD, e.g. 'Steering knuckle'.")
+    cad_family: str = Field(default="", description="Part Studio shared by related types (e.g. left/right axles); default cad_name.")
     internal_links: list[InternalLink] = Field(default_factory=list)
     behavior: BehaviorModel | None = None
     software: list[SoftwareInterface] = Field(default_factory=list)
@@ -409,11 +411,40 @@ class FastenerType(_Model):
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="datasheet"))
 
 
+class PrintFit(_Model):
+    """Fit allowances of one additive process (diametral values, m).
+
+    Printed holes and bores shrink and printed pins grow, so ISO 286 metal fits
+    do not apply. ``hole_clearance``: screw clearance hole diameter minus the
+    nominal screw diameter; ``sliding_clearance``: bore minus shaft for a running
+    or sliding fit; ``press_interference``: shaft minus bore for a press fit (a
+    range); ``cap_clearance``: radial gap between a screw head and the inner wall
+    of a printed cap (cap inner diameter = head diameter + 2 x cap_clearance)."""
+
+    process: Literal["fdm", "sls"]
+    description: str = ""
+    materials: list[str] = Field(default_factory=list, description="Lower-case material keywords printed with this process.")
+    hole_clearance: Vector = Field(description="[min, max] diametral clearance over the nominal screw diameter.")
+    sliding_clearance: Vector
+    press_interference: Vector
+    cap_clearance: Quantity
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
+
+
 class Catalog(_Model):
     components: dict[str, ComponentType] = Field(default_factory=dict)
     connectors: dict[str, ConnectorType] = Field(default_factory=dict)
     wires: dict[int, WireGauge] = Field(default_factory=dict)
     fasteners: dict[str, FastenerType] = Field(default_factory=dict)
+    print_fits: dict[str, PrintFit] = Field(default_factory=dict)
+
+    def print_fit(self, material: str) -> PrintFit | None:
+        """The print-fit table entry for a printed material (None for machined parts)."""
+        text = material.lower()
+        for fit in self.print_fits.values():
+            if any(word in text for word in fit.materials):
+                return fit
+        return None
 
     def fastener(self, type_id: str) -> FastenerType:
         try:

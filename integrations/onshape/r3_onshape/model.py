@@ -211,3 +211,31 @@ def save_subset_fixture(source: Path, target: Path, names: Iterable[str]) -> Non
     target.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(target, "wt") as handle:
         json.dump(subset, handle)
+
+
+def load_local_fixture(path: Path, names: Iterable[str] | None = None) -> GeometryModel:
+    """A phase B recording (``onshape_local_geometry.json.gz``): each part's Part
+    Studio geometry once, plus every instance's solved robot-frame transform."""
+    from .organized import transform_part
+
+    with gzip.open(path, "rt") as handle:
+        raw = json.load(handle)
+    wanted = set(names) if names is not None else None
+    local = {key: part_from_onshape(key, item["part_id"], item["body"], item["tessellation"]) for key, item in raw["parts"].items()}
+    parts = {}
+    for iid, (key, matrix) in raw["placements"].items():
+        if (wanted is None or iid in wanted) and key in local:
+            parts[iid] = transform_part(local[key], np.asarray(matrix, dtype=float), iid)
+    return GeometryModel(parts=parts, microversion=raw.get("microversion", ""), source="fixture")
+
+
+def save_local_subset(source: Path, target: Path, instances: Iterable[str]) -> None:
+    """Copy the parts and placements of a few instances (compact unit-test data)."""
+    with gzip.open(source, "rt") as handle:
+        raw = json.load(handle)
+    placements = {iid: raw["placements"][iid] for iid in instances if iid in raw["placements"]}
+    keys = {key for key, _ in placements.values()}
+    subset = {"parts": {k: v for k, v in raw["parts"].items() if k in keys}, "placements": placements}
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(target, "wt") as handle:
+        json.dump(subset, handle)

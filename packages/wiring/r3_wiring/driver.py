@@ -79,13 +79,57 @@ class DriveResult:
     assumptions: list[tuple[str, str]] = field(default_factory=list)
     # wire -> {"end_tension": [start, end] peak N, "time": [s, s]}: cable force at the terminations
     terminal_loads: dict[str, dict[str, Any]] = field(default_factory=dict)
+    cap_clearance: dict[str, dict[str, Any]] = field(default_factory=dict)  # printed screw cap -> worst cable surface gap
 
     def summary(self) -> dict[str, Any]:
         return {"requirement": self.requirement, "worst": self.worst, "snapshot_time": self.snapshot_time,
+                "cap_clearance": self.cap_clearance,
                 "max_segment_speed": self.max_speed, "max_pin_error_m": self.max_strain,
                 "profile": self.profile.__dict__, "terminal_loads": self.terminal_loads,
                 "wires": {w: {**v, "sags_into_moving": self.sags_into_moving[w],
                               "below_requirement": self.below_requirement[w]} for w, v in self.min_clearance.items()}}
+
+
+def cap_obstacles(project: Project, obstacles: ObstacleSet | None) -> list[Any]:
+    """Obstacles of the printed screw caps (components with a ``cap_for`` interface)."""
+    if obstacles is None:
+        return []
+    out = []
+    for cid, comp in project.spec.components.items():
+        ctype = project.catalog.component(comp.type)
+        if any("cap_for" in (i.params or {}) for i in ctype.interfaces.values()):
+            obstacle = obstacles.by_component(cid)
+            if obstacle is not None:
+                out.append(obstacle)
+    return out
+
+
+def wire_radii(project: Project, routes: dict[str, Any]) -> dict[str, float]:
+    radii = {}
+    for harness in project.spec.electrical.harnesses:
+        for wire in harness.wires:
+            radii[wire.id] = float(project.catalog.wire(wire.awg).outer_diameter) / 2
+    return radii
+
+
+def track_caps(positions: dict[str, np.ndarray], caps: list[Any], radii: dict[str, float], t: float,
+               out: dict[str, dict[str, Any]]) -> None:
+    """Worst surface gap between each cap and every simulated cable (centerline distance minus wire radius)."""
+    for cap in caps:
+        lo, hi = cap.shape.aabb()
+        for wire, points in positions.items():
+            if not len(points):
+                continue
+            pts = np.atleast_2d(points)
+            r = radii.get(wire, 0.0)
+            # Distance to the cap's bounding box bounds the distance to the cap from below: only near points get the mesh SDF.
+            box_gap = np.linalg.norm(np.maximum(np.maximum(lo - pts, pts - hi), 0.0), axis=1) - r
+            near = box_gap < 2e-3
+            gap = float(box_gap.min())
+            if near.any():
+                gap = min(float(cap.shape.sdf_bounded(pts[near], 0.05).min()) - r, float(box_gap[~near].min()) if (~near).any() else np.inf)
+            if cap.component not in out or gap < out[cap.component]["min_gap"]:
+                out[cap.component] = {"min_gap": gap, "wire": wire, "time": t}
 
 
 def moving_poses(project: Project, kin: Kinematics, steer: float, spin: float) -> dict[str, dict[str, list[float]]]:
@@ -129,6 +173,10 @@ def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet |
     max_speed = max_strain = 0.0
     bundles = len(sim.plan.bundles)
     peak_tension, peak_time = np.zeros((bundles, 2)), np.zeros((bundles, 2))
+    caps = cap_obstacles(project, sim.obstacles if hasattr(sim, "obstacles") else obstacles)
+    radii = wire_radii(project, routes)
+    cap_clearance: dict[str, dict[str, Any]] = {}
+    track_caps(sim.positions(), caps, radii, 0.0, cap_clearance)
     for k in range(steps):
         t = (k + 1) * profile.dt
         steer = max_steer * profile.steer_fraction(t)
@@ -146,6 +194,8 @@ def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet |
             peak_tension[better], peak_time[better] = tension[better], t
         max_speed = max(max_speed, report.max_speed)
         max_strain = max(max_strain, report.max_strain)
+        if caps and k % 25 == 0:
+            track_caps(sim.positions(), caps, radii, t, cap_clearance)
         if pre_bump is None and t >= profile.bump_time - profile.dt:
             pre_bump = sim.positions()
         if pre_bump is not None and profile.bump_time <= t <= profile.bump_time + 0.08:
@@ -166,7 +216,7 @@ def run_drive(project: Project, routes: dict[str, Any], obstacles: ObstacleSet |
                        {w: v["min_distance"] < requirement for w, v in min_clearance.items()}, worst, snapshot,
                        snapshot_time, {"time": np.asarray(times), "min_clearance": np.asarray(clearance),
                                        "accel_z": np.asarray(accel), "steer": np.asarray(steer_log)},
-                       requirement, max_speed, max_strain, profile, list(sim.plan.assumptions), terminal_loads)
+                       requirement, max_speed, max_strain, profile, list(sim.plan.assumptions), terminal_loads, cap_clearance)
 
 
 def main(argv: list[str] | None = None) -> int:

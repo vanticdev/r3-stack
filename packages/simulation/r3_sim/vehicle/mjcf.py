@@ -63,6 +63,7 @@ class WheelInfo:
     rolling_resistance: float
     driven: bool = False
     steered_by: str | None = None
+    body: str = ""  # MuJoCo body carrying the tire: the wheel, or the axle the wheel is fixed to
 
 
 @dataclass
@@ -92,6 +93,8 @@ class SteeringInfo:
     actuators: list[str]
     table_servo: list[float] | None = None  # servo horn angles (rad, ascending) of the CAD linkage solution
     table_angles: dict[str, list[float]] = field(default_factory=dict)  # joint -> kingpin angle (rad) per table row
+    horn_joint: str | None = None  # servo output joint (the horn turns with the servo angle)
+    horn_actuator: str | None = None
 
     @property
     def source(self) -> str:
@@ -164,7 +167,56 @@ def cad_mass_properties(part: dict[str, Any]) -> MassProperties:
 
 
 def _joint_children(project: Project) -> dict[str, Any]:
-    return {joint.child: joint for joint in project.spec.mechanical.joints}
+    children: dict[str, Any] = {joint.child: joint for joint in project.spec.mechanical.joints}
+    children.update({rod.child: rod for rod in _linkage_rods(project, children)})
+    return children
+
+
+@dataclass
+class _BallLink:
+    """A tie rod as its own body: ball joint at the horn-side stud, closed to the
+    knuckle-side stud by an equality connect (so the rod moves with the linkage)."""
+
+    id: str
+    child: str
+    parent: str
+    origin: list[float]
+    closure: str  # component carrying the other ball stud
+    closure_point: list[float]
+    type: str = "ball"
+    axis: list[float] = field(default_factory=lambda: [0.0, 0.0, 1.0])
+    damping: float = 1e-4
+    friction: float = 0.0
+    limits: list[float] | None = None
+
+
+def _linkage_rods(project: Project, children: dict[str, Any]) -> list[_BallLink]:
+    """Rods joined by two ball joints whose horn side rides on the servo output joint."""
+    balls = [i for i in project.spec.mechanical.interfaces if i.kind == "ball_joint"]
+    servo_children = {j.child for j in project.spec.mechanical.joints if any(t.actuator == j.parent for t in project.spec.mechanical.transmissions
+                                                                            if t.type == "ackermann_steering")}
+
+    def on_horn(cid: str) -> bool:
+        seen = set()
+        while cid in project.spec.components and cid not in seen:
+            if cid in servo_children:
+                return True
+            seen.add(cid)
+            cid = project.spec.components[cid].mount
+        return False
+
+    rods = []
+    for rod in sorted({b.parts[1] for b in balls}):
+        ends = [b for b in balls if b.parts[1] == rod]
+        if len(ends) != 2:
+            continue
+        horn = next((b for b in ends if on_horn(b.parts[0])), None)
+        if horn is None:
+            continue
+        other = next(b for b in ends if b is not horn)
+        rods.append(_BallLink(id=f"ball_{rod}", child=rod, parent=horn.parts[0], origin=list(horn.axis_point),
+                              closure=other.parts[0], closure_point=list(other.axis_point)))
+    return rods
 
 
 def _owner_body(project: Project, cid: str, joint_children: dict[str, Any], root: str) -> str:
@@ -329,12 +381,15 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     env = spec.simulation.environment
     for cid, comp in spec.components.items():
         ctype = catalog.component(comp.type)
-        if ctype.kind != "wheel" or cid not in joint_children:
+        if ctype.kind != "wheel":
+            continue
+        body = _owner_body(project, cid, joint_children, root)  # the wheel, or the axle it is fixed to
+        if body not in joint_children or joint_children[body].type != "continuous":
             continue
         params = _behavior_params(project, cid)
         _, size, _ = _component_shape(project, cid)
         wheels[cid] = WheelInfo(
-            component=cid, joint=joint_children[cid].id,
+            component=cid, joint=joint_children[body].id, body=body,
             radius=_si(params.get("radius"), size[0] / 2.0), width=_si(params.get("width"), size[1]),
             friction=float(params.get("friction", env.ground_friction)),
             rolling_resistance=float(env.ground_rolling_resistance if env.ground_rolling_resistance is not None
@@ -370,7 +425,10 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
                 id=trans.id, actuator_component=trans.actuator, joints=ordered, ratio=float(trans.ratio),
                 wheelbase=_si(params.get("wheelbase"), 0.26), kingpin_track=track,
                 max_steer=_si(params.get("max_steer"), float(max(abs(v) for v in limits))),
-                actuators=[f"act_{j}" for j in ordered], table_servo=table_servo, table_angles=table_angles))
+                actuators=[f"act_{j}" for j in ordered], table_servo=table_servo, table_angles=table_angles,
+                horn_joint=next((j.id for j in spec.mechanical.joints if j.parent == trans.actuator), None)))
+            if steering[-1].horn_joint:
+                steering[-1].horn_actuator = f"act_{steering[-1].horn_joint}"
             if table_servo:
                 assumptions.append(("mechanical", f"Steering {trans.id}: kingpin targets interpolate the CAD-solved linkage "
                                                   f"table ({len(table_servo)} rows over servo "
@@ -381,9 +439,13 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     for steer in steering:
         for joint_id in steer.joints:
             for wheel in wheels.values():
-                parent = joints_by_id[wheel.joint].parent
-                if parent in joint_children and joint_children[parent].id == joint_id:
-                    wheel.steered_by = joint_id
+                # Walk the body chain from the wheel's spin joint toward the root (stub -> knuckle ...).
+                body = _owner_body(project, joints_by_id[wheel.joint].parent, joint_children, root)
+                while body != root:
+                    if joint_children[body].id == joint_id:
+                        wheel.steered_by = joint_id
+                        break
+                    body = _owner_body(project, joint_children[body].parent, joint_children, root)
 
     # --- XML
     mj = ET.Element("mujoco", model=spec.robot.name)
@@ -446,8 +508,10 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
         else:
             el = ET.SubElement(parent_el, "body", name=body, pos=_fmt(origin - parent_origin))
             joint = joint_children[body]
-            jtype = {"revolute": "hinge", "continuous": "hinge", "prismatic": "slide"}.get(joint.type)
-            if jtype:
+            jtype = {"revolute": "hinge", "continuous": "hinge", "prismatic": "slide", "ball": "ball"}.get(joint.type)
+            if jtype == "ball":
+                ET.SubElement(el, "joint", name=joint.id, type="ball", damping=f"{joint.damping:.9g}")
+            elif jtype:
                 attrs = {"name": joint.id, "type": jtype, "axis": _fmt(joint.axis), "damping": f"{joint.damping:.9g}"}
                 if joint.friction:
                     attrs["frictionloss"] = f"{joint.friction:.9g}"
@@ -485,8 +549,7 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
             if name in meshes_used:
                 ET.SubElement(el, "geom", name=f"vis_{name.replace(':', '__')}", type="mesh", mesh=meshes_used[name],
                               pos=_fmt(-origin), contype="0", conaffinity="0", group="1", mass="0", rgba="0.62 0.63 0.66 1")
-        if body in wheels:
-            wheel = wheels[body]
+        for wheel in [w for w in wheels.values() if w.body == body]:
             joint = joint_children[body]
             axis_vec = np.asarray(joint.axis, dtype=float)
             # Cylinder local z -> wheel spin axis.
@@ -495,8 +558,8 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
             x = np.cross(ref, z)
             x /= np.linalg.norm(x)
             rot = np.column_stack([x, np.cross(z, x), z])
-            wheel_center = project.graph.component_pose(body)[0] - origin
-            ET.SubElement(el, "geom", name=f"tire_{body}", type="cylinder", pos=_fmt(wheel_center), quat=_fmt(rotation_to_quat(rot)),
+            wheel_center = project.graph.component_pose(wheel.component)[0] - origin
+            ET.SubElement(el, "geom", name=f"tire_{wheel.component}", type="cylinder", pos=_fmt(wheel_center), quat=_fmt(rotation_to_quat(rot)),
                           size=f"{wheel.radius:.9g} {wheel.width / 2:.9g}", friction=f"{wheel.friction:.6g} 0.005 0.0001",
                           condim="3", solref="0.004 1", solimp="0.95 0.99 0.001", mass="0",
                           contype=str(ROBOT_CONTYPE), conaffinity=str(ROBOT_CONAFFINITY), rgba="0.12 0.12 0.12 0.0", group="3")
@@ -549,6 +612,19 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
             # Stiff tie-rod linkage: knuckle tracks its Ackermann target angle through a PD
             # element (kp = linkage stiffness N*m/rad, kv = damping N*m*s/rad, estimated).
             ET.SubElement(actuator, "general", name=act, joint=joint_id, gainprm="40", biastype="affine", biasprm="0 -40 -0.4")
+        if steer.horn_actuator:
+            # The horn (servo output) follows the simulated servo angle; tie rods close the linkage by equality constraints.
+            ET.SubElement(actuator, "general", name=steer.horn_actuator, joint=steer.horn_joint, gainprm="4", biastype="affine",
+                          biasprm="0 -4 -0.02")
+    rods = [j for j in joint_children.values() if isinstance(j, _BallLink)]
+    if rods:
+        equality = ET.SubElement(mj, "equality")
+        for rod in rods:
+            anchor = np.asarray(rod.closure_point, dtype=float) - body_origin[rod.child]
+            ET.SubElement(equality, "connect", name=f"close_{rod.child}", body1=rod.child,
+                          body2=_owner_body(project, rod.closure, joint_children, root), anchor=_fmt(anchor), solref="0.004 1")
+        assumptions.append(("mechanical", f"Steering linkage animated: horn on its servo-output joint, {len(rods)} tie rods on ball "
+                                          "joints closed to the knuckle studs by equality constraints."))
     if drives:
         assumptions.append(("mechanical", "Open differential splits carrier torque equally (fixed tendon, coef 1/n); motor "
                                           "rotor inertia is reflected through ratio^2 onto the carrier; gear backlash is not modeled."))

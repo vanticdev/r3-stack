@@ -187,6 +187,7 @@ class NativeBridgeTransport(_HttpTransport):
                 cfg = json.loads(config.read_text())
                 self.base = f"http://{cfg.get('host', '127.0.0.1')}:{cfg['port']}"
                 self._token = cfg["token"]
+                self.runtime = candidate
                 return
         raise FileNotFoundError("onshape-native bridge.json not found (set ONSHAPE_NATIVE_RUNTIME)")
 

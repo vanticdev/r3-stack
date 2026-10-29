@@ -102,7 +102,9 @@ class Motion:
             return None
         axes = self.fit.interface_axes
         interfaces = {i.id: i for i in spec.mechanical.interfaces}
-        spline = next((i for i in spec.mechanical.interfaces if i.kind == "spline" and steering.actuator in i.parts), None)
+        # The horn's spline sits on the servo, or on the servo's output shaft object (mounted on the servo by its revolute join).
+        on_servo = {steering.actuator} | {cid for cid, c in spec.components.items() if c.mount == steering.actuator}
+        spline = next((i for i in spec.mechanical.interfaces if i.kind == "spline" and on_servo & set(i.parts)), None)
         if spline is None or spline.id not in axes:
             self.result.add(Diagnostic.error("steering_linkage_unverified", "servo spline interface not verified", subjects=[steering.id]))
             return None
@@ -113,7 +115,8 @@ class Motion:
         sides: list[Side] = []
         groups: dict[str, set[str]] = {}
         ball_joints = [i for i in spec.mechanical.interfaces if i.kind == "ball_joint"]
-        cut_all = {i.id for i in ball_joints} | {spline.id} | {joints[j].interface for j in steering.joints}
+        output_bearing = {i.id for i in spec.mechanical.interfaces if i.kind == "revolute_fit" and steering.actuator in i.parts}
+        cut_all = {i.id for i in ball_joints} | {spline.id} | {joints[j].interface for j in steering.joints} | output_bearing
         horn_group = _subtree(spline.parts[1], self.links, cut_all)
         groups["horn"] = horn_group
         for jid in steering.joints:
@@ -302,7 +305,43 @@ class Motion:
         return out
 
 
+def steering_calibration(table: list[dict[str, Any]], joints: list[str]) -> dict[str, Any]:
+    """Bicycle-model steering limit from the solved linkage at full servo travel.
+
+    A bicycle model (the firmware's pure pursuit, delta = atan(L kappa)) needs the
+    single-track angle equivalent to the two kingpin angles: both wheels turn about
+    one center, so cot(delta) = (cot(delta_inner) + cot(delta_outer)) / 2 (exact for
+    a perfect Ackermann linkage; the mean of the cotangents otherwise). Averaged over
+    both lock directions."""
+    if not table or len(joints) != 2:
+        return {}
+    rows = sorted(table, key=lambda r: float(r["servo_rad"]))
+    out = {}
+    for label, row in (("left", rows[-1]), ("right", rows[0])):
+        angles = [abs(float(row[j])) for j in joints]
+        cot = sum(1.0 / math.tan(a) for a in angles) / 2.0
+        out[label] = {"servo_rad": float(row["servo_rad"]), "inner_rad": max(angles), "outer_rad": min(angles),
+                      "bicycle_rad": math.atan(1.0 / cot), "mean_rad": sum(angles) / 2.0}
+    bicycle = (out["left"]["bicycle_rad"] + out["right"]["bicycle_rad"]) / 2.0
+    mean = (out["left"]["mean_rad"] + out["right"]["mean_rad"]) / 2.0
+    return {"max_steer_rad": round(bicycle, 4), "mean_kingpin_rad": round(mean, 4), "locks": out,
+            "method": "Ackermann-equivalent single-track angle at full servo travel: cot d = (cot d_in + cot d_out) / 2"}
+
+
 def run_motion(project: Project, model: GeometryModel, fit: FitReport, result: StageResult) -> dict[str, Any]:
     result.assume("mechanical", f"Motion sweep: linkage solved in Python from verified CAD axes; {SWEEP_SAMPLES} servo samples, "
                                 f"{MARGIN * 1e3:.1f} mm clearance margin moving vs static; wheel spin at {SPIN_ANGLES} deg.")
-    return Motion(project, model, fit, result).steering()
+    out = Motion(project, model, fit, result).steering()
+    steering = next((t for t in project.spec.mechanical.transmissions if t.type == "ackermann_steering"), None)
+    if out.get("table") and steering is not None:
+        calibration = steering_calibration(out["table"], list(steering.joints))
+        out["calibration"] = calibration
+        configured = project.spec.software.config.get("max_steer_rad")
+        if calibration and configured is not None and abs(float(configured) - calibration["max_steer_rad"]) > 2e-3:
+            result.add(Diagnostic.warning(
+                "steering_calibration_mismatch",
+                f"software.config.max_steer_rad {float(configured):.4f} rad differs from the CAD linkage "
+                f"({calibration['max_steer_rad']:.4f} rad single-track equivalent at full servo travel)",
+                subjects=[steering.id], data={"configured": float(configured), **calibration},
+                hint=f"Set software.config.max_steer_rad: {calibration['max_steer_rad']}"))
+    return out

@@ -154,3 +154,17 @@ then built into the robot. Proposed mechanism (catalog/orchestrator areas, not `
 4. **Build-up**: the chosen candidate becomes a project-local catalog entry (`catalog/components/*.yaml`)
    with `provenance: {status: vendor, source: ...}`, the vendor STEP or a parametric proxy, and estimated
    values labelled as such. The pipeline then runs unchanged.
+
+## From phase B (mechanical/assembly, branch r3/phase-b)
+
+1. **Mounting-hole keep-out vs printed screw caps.** The HAT screws now get printed PETG caps (catalog
+   `screw-cap-m2.5-petg`: inner Ø = head 4.5 mm + 2 × 0.3 mm FDM clearance = 5.1 mm, 0.8 mm wall, outer
+   Ø 6.7 mm). `board.json` `mounting.keepouts.top_components_radius` is 2.55 mm, but the cap needs
+   **≥ 3.35 mm** (3.45 mm with a 0.1 mm margin). The assembly stage reports this as `cap_keepout_exceeded`
+   (warning, data: `excess` 0.80 mm per hole). Request: widen the KiCad top-side rule areas around H1–H4 to a
+   3.45 mm radius and regenerate `board.json`. The check reads the new value from `board.json` automatically.
+2. **`connectors.J_GPIO.position`** in the `r3-carrier-hat` catalog entry is `[0, 24.5 mm, 0]`, but `board.json`
+   `connector_geometry.J_GPIO.pad_centroid` is `[0, 24.75 mm]` (`deviation_xy` 0.25 mm). Phase B set the HAT's
+   mechanical solids, features and interfaces to the board.json values (holes at y +24.75/−24.25, socket at
+   24.75). The electrical connector position belongs to the PCB rollout's edit of the HAT entry: please set
+   it to 24.75 mm there.

@@ -1,0 +1,482 @@
+schema: r3/robot@1
+robot:
+  name: r3-rc-car
+  description: >
+    1/10-scale rear-wheel-drive autonomous RC car. Raspberry Pi 5 + custom carrier HAT,
+    brushed 540 motor, 2S LiPo, ExpressLRS radio as safety link/override, GPS + IMU + wheel encoder.
+  version: 0.1.0
+
+requirements:
+  max_mass: 2.2 kg
+  top_speed: 8 m/s
+  min_runtime: 15 min
+  radio_range: 300 m
+  failsafe_stop_distance: 3 m
+  max_wire_voltage_drop_fraction: 0.03
+  min_wire_clearance_moving: 8 mm
+  max_component_temperature_c: 85
+
+# Robot frame: +x forward, +y left, +z up; origin on the ground below the rear axle center.
+# Every part is retained by verified physical interfaces (fasteners, fits, straps, adhesive); see
+# mechanical.fasteners / mechanical.interfaces. Right-hand fabricated parts mirror the left ones (params.mirror).
+components:
+  chassis:
+    type: chassis-plate-al6061
+    pose: {xyz: [130 mm, 0, 25 mm]}
+    params:
+      # Plate outline in the chassis frame: 130 mm wide rear, tapering to 80 mm ahead of
+      # the battery so the steered front wheels sweep clear of the plate.
+      outline: [[-170 mm, -65 mm], [40 mm, -65 mm], [70 mm, -40 mm], [170 mm, -40 mm],
+                [170 mm, 40 mm], [70 mm, 40 mm], [40 mm, 65 mm], [-170 mm, 65 mm]]
+  deck:
+    type: upper-deck-petg
+    mount: chassis
+    pose: {xyz: [120 mm, 0, 75 mm]}
+    params:
+      # Rear-right notch clears the transmission's gear cover.
+      outline: [[-66 mm, -55 mm], [85 mm, -55 mm], [85 mm, 55 mm], [-85 mm, 55 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
+  standoff_rl: {type: standoff-m3-47, mount: chassis, pose: {xyz: [40 mm, 45 mm, 28 mm]}}
+  standoff_rr: {type: standoff-m3-47, mount: chassis, pose: {xyz: [78 mm, -45 mm, 28 mm]}}
+  standoff_fl: {type: standoff-m3-47, mount: chassis, pose: {xyz: [195 mm, 28 mm, 28 mm]}}
+  standoff_fr: {type: standoff-m3-47, mount: chassis, pose: {xyz: [195 mm, -28 mm, 28 mm]}}
+  # Front steering: arms screwed to the chassis, knuckles pivot on M3 kingpin screws threaded into the arms.
+  arm_fl:      {type: suspension-arm-pa12, mount: chassis, pose: {xyz: [260 mm, 47.5 mm, 28 mm]}}
+  arm_fr:      {type: suspension-arm-pa12, mount: chassis, pose: {xyz: [260 mm, -47.5 mm, 28 mm]}, params: {mirror: [1, -1, 1]}}
+  knuckle_fl:  {type: steering-knuckle, mount: arm_fl, pose: {xyz: [260 mm, 67.5 mm, 36 mm]}}
+  knuckle_fr:  {type: steering-knuckle, mount: arm_fr, pose: {xyz: [260 mm, -67.5 mm, 36 mm]}, params: {mirror: [1, -1, 1]}}
+  stub_fl:     {type: stub-axle-6mm, mount: knuckle_fl, pose: {xyz: [260 mm, 79 mm, 55 mm]}}
+  stub_fr:     {type: stub-axle-6mm, mount: knuckle_fr, pose: {xyz: [260 mm, -79 mm, 55 mm]}, params: {mirror: [1, -1, 1]}}
+  wheel_fl:    {type: wheel-110x45, mount: knuckle_fl, pose: {xyz: [260 mm, 100 mm, 55 mm]}}
+  wheel_fr:    {type: wheel-110x45, mount: knuckle_fr, pose: {xyz: [260 mm, -100 mm, 55 mm], rpy: [0, 0, 180 deg]}}
+  servo_post_a: {type: servo-post-al6061, mount: chassis, pose: {xyz: [239.8 mm, 0, 28 mm]}}
+  servo_post_b: {type: servo-post-al6061, mount: chassis, pose: {xyz: [289.8 mm, 0, 28 mm]}}
+  servo:       {type: servo-digital-20kg, mount: servo_post_a, pose: {xyz: [264.8 mm, 0, 29 mm], rpy: [0, 0, 90 deg]}}
+  servo_horn:  {type: servo-horn-al7075, mount: servo, pose: {xyz: [254.8 mm, 0, 70.5 mm]}}
+  tie_rod:     {type: steering-tie-rod, mount: servo_horn, pose: {xyz: [235 mm, 6 mm, 82.6 mm]}}
+  tie_rod_r:   {type: steering-tie-rod, mount: servo_horn, pose: {xyz: [235 mm, -6 mm, 82.6 mm]}, params: {mirror: [1, -1, 1]}}
+  # Rear drivetrain: transmission outputs drive D-flat axles running in MR106 bearings in the hub carriers.
+  gearbox:     {type: gearbox-spur-diff-9.6, mount: chassis, pose: {xyz: [0, 0, 28 mm]}}
+  motor:       {type: motor-540-brushed, mount: gearbox, pose: {xyz: [49 mm, -5 mm, 46 mm], rpy: [0, -50 deg, 0]}}
+  hub_rl:      {type: rear-hub-carrier-al6061, mount: chassis, pose: {xyz: [0, 40 mm, 28 mm]}}
+  hub_rr:      {type: rear-hub-carrier-al6061, mount: chassis, pose: {xyz: [0, -40 mm, 28 mm]}, params: {mirror: [1, -1, 1]}}
+  bearing_rl:  {type: bearing-mr106zz, mount: hub_rl, pose: {xyz: [0, 83.5 mm, 55 mm]}}
+  bearing_rr:  {type: bearing-mr106zz, mount: hub_rr, pose: {xyz: [0, -83.5 mm, 55 mm]}}
+  wheel_rl:    {type: wheel-110x45-d, mount: chassis, pose: {xyz: [0, 100 mm, 55 mm]}}
+  wheel_rr:    {type: wheel-110x45-d, mount: chassis, pose: {xyz: [0, -100 mm, 55 mm], rpy: [0, 0, 180 deg]}}
+  axle_rl:
+    type: axle-shaft-6mm
+    mount: wheel_rl
+    pose: {xyz: [0, 0, 55 mm]}
+    params:
+      solids:
+        - {kind: revolve, name: axle, position: [0, 0, 0], axis: [0, 1, 0],
+           profile: [[0, 20.5 mm], [3 mm, 20.5 mm], [3 mm, 80 mm], [4 mm, 80 mm], [4 mm, 82 mm], [3 mm, 82 mm], [3 mm, 121.8 mm], [0, 121.8 mm]]}
+        - {kind: box, op: remove, name: output flat, position: [0, 25.5 mm, 3.5 mm], size: [10 mm, 10.2 mm, 2 mm]}
+        - {kind: box, op: remove, name: wheel flat, position: [0, 102.75 mm, 3.5 mm], size: [10 mm, 23.5 mm, 2 mm]}
+  axle_rr:
+    type: axle-shaft-6mm
+    mount: wheel_rr
+    pose: {xyz: [0, 0, 55 mm]}
+    params:
+      mirror: [1, -1, 1]
+      solids:
+        - {kind: revolve, name: axle, position: [0, 0, 0], axis: [0, 1, 0],
+           profile: [[0, 23.5 mm], [3 mm, 23.5 mm], [3 mm, 80 mm], [4 mm, 80 mm], [4 mm, 82 mm], [3 mm, 82 mm], [3 mm, 121.8 mm], [0, 121.8 mm]]}
+        - {kind: box, op: remove, name: output flat, position: [0, 28.5 mm, 3.5 mm], size: [10 mm, 10.2 mm, 2 mm]}
+        - {kind: box, op: remove, name: wheel flat, position: [0, 102.75 mm, 3.5 mm], size: [10 mm, 23.5 mm, 2 mm]}
+  spacer_rl:   {type: wheel-spacer-6x9, mount: axle_rl, pose: {xyz: [0, 88.25 mm, 55 mm]}}
+  spacer_rr:   {type: wheel-spacer-6x9, mount: axle_rr, pose: {xyz: [0, -88.25 mm, 55 mm]}}
+  encoder:     {type: hall-encoder-a1120, mount: gearbox, pose: {xyz: [0, 34 mm, 38 mm]}}
+  enc_ring:    {type: encoder-magnet-ring, mount: axle_rl, pose: {xyz: [0, 34 mm, 55 mm]}}
+  enc_magnet_1: {type: magnet-n52-2x1, mount: enc_ring, pose: {xyz: [0, 34 mm, 45 mm]}}
+  enc_magnet_2: {type: magnet-n52-2x1, mount: enc_ring, pose: {xyz: [0, 34 mm, 64 mm]}}
+  enc_magnet_3: {type: magnet-n52-2x1, mount: enc_ring, pose: {xyz: [9 mm, 34 mm, 55 mm], rpy: [0, 90 deg, 0]}}
+  enc_magnet_4: {type: magnet-n52-2x1, mount: enc_ring, pose: {xyz: [-10 mm, 34 mm, 55 mm], rpy: [0, 90 deg, 0]}}
+  # Electronics.
+  tape_esc:    {type: foam-tape-3m-4026, mount: chassis, pose: {xyz: [70 mm, 42 mm, 28 mm]}, params: {size: [44 mm, 32 mm, 1.6 mm]}}
+  esc:         {type: esc-brushed-60a, mount: tape_esc, pose: {xyz: [70 mm, 42 mm, 29.6 mm]}}
+  battery:     {type: lipo-2s-5000-25c, mount: chassis, pose: {xyz: [158 mm, 0, 28 mm]}}
+  battery_strap:
+    type: strap-hook-loop-20
+    mount: chassis
+    pose: {xyz: [158 mm, 0, 0]}
+    params:
+      solids:
+        - {kind: prism, name: strap loop, position: [-10 mm, 0, 0], axis: [1, 0, 0], u_axis: [0, 1, 0], depth: 20 mm,
+           profile: [[-25 mm, 23.5 mm], [25 mm, 23.5 mm], [25 mm, 54.5 mm], [-25 mm, 54.5 mm]],
+           inner: [[[-23.5 mm, 25 mm], [23.5 mm, 25 mm], [23.5 mm, 53 mm], [-23.5 mm, 53 mm]]]}
+  fuse:        {type: fuse-atc-10a, mount: chassis, pose: {xyz: [75 mm, 0, 28 mm], rpy: [0, 0, 90 deg]}}
+  fuse_tie:
+    type: zip-tie-2.5
+    mount: chassis
+    pose: {xyz: [75 mm, 0, 0]}
+    params:
+      solids:
+        - {kind: prism, name: tie loop, position: [0, -1.25 mm, 0], axis: [0, 1, 0], u_axis: [-1, 0, 0], depth: 2.5 mm,
+           profile: [[-7 mm, 24 mm], [7 mm, 24 mm], [7 mm, 51 mm], [-7 mm, 51 mm]],
+           inner: [[[-6 mm, 25 mm], [6 mm, 25 mm], [6 mm, 50 mm], [-6 mm, 50 mm]]]}
+  pi_spacer_1: {type: spacer-m2.5-ff-10, mount: deck, pose: {xyz: [71 mm, -24.5 mm, 78 mm]}}
+  pi_spacer_2: {type: spacer-m2.5-ff-10, mount: deck, pose: {xyz: [129 mm, -24.5 mm, 78 mm]}}
+  pi_spacer_3: {type: spacer-m2.5-ff-10, mount: deck, pose: {xyz: [71 mm, 24.5 mm, 78 mm]}}
+  pi_spacer_4: {type: spacer-m2.5-ff-10, mount: deck, pose: {xyz: [129 mm, 24.5 mm, 78 mm]}}
+  pi:          {type: raspberry-pi-5-8gb, mount: deck, pose: {xyz: [110 mm, 0, 88 mm]}}
+  # HAT holes and header coincide with the Pi's (HAT left edge flush with the Pi's left edge).
+  hat:         {type: r3-carrier-hat, mount: pi, pose: {xyz: [100 mm, 0, 100.6 mm]}}
+  tape_rx:     {type: foam-tape-3m-4026, mount: deck, pose: {xyz: [190 mm, 40 mm, 78 mm]}, params: {size: [11 mm, 9 mm, 1.6 mm]}}
+  receiver:    {type: elrs-receiver-2g4, mount: tape_rx, pose: {xyz: [190 mm, 40 mm, 79.6 mm]}}
+  antenna_mast: {type: antenna-mast-petg, mount: deck, pose: {xyz: [175 mm, 0, 78 mm]}}
+  rx_antenna:  {type: elrs-t-antenna, mount: antenna_mast, pose: {xyz: [175 mm, 0, 81 mm]}}
+  tape_gps:    {type: foam-tape-3m-4026, mount: deck, pose: {xyz: [55 mm, 30 mm, 78 mm]}, params: {size: [18 mm, 18 mm, 1.6 mm]}}
+  gps:         {type: gps-ublox-m10, mount: tape_gps, pose: {xyz: [55 mm, 30 mm, 79.6 mm]}}
+
+mechanical:
+  joints:
+    - {id: steer_fl, type: revolute, parent: chassis, child: knuckle_fl, origin: [260 mm, 67.5 mm, 55 mm], axis: [0, 0, 1], limits: [-0.45, 0.45], damping: 0.02, interface: kingpin_fl}
+    - {id: steer_fr, type: revolute, parent: chassis, child: knuckle_fr, origin: [260 mm, -67.5 mm, 55 mm], axis: [0, 0, 1], limits: [-0.45, 0.45], damping: 0.02, interface: kingpin_fr}
+    - {id: spin_fl, type: continuous, parent: knuckle_fl, child: wheel_fl, origin: [260 mm, 100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005, interface: hub_fl}
+    - {id: spin_fr, type: continuous, parent: knuckle_fr, child: wheel_fr, origin: [260 mm, -100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005, interface: hub_fr}
+    - {id: spin_rl, type: continuous, parent: chassis, child: wheel_rl, origin: [0, 100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005, interface: bearing_axle_rl}
+    - {id: spin_rr, type: continuous, parent: chassis, child: wheel_rr, origin: [0, -100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005, interface: bearing_axle_rr}
+  transmissions:
+    - id: drivetrain
+      type: differential
+      actuator: motor
+      joints: [spin_rl, spin_rr]
+      ratio: 9.6
+      efficiency: 0.88
+      path: [motor_pinion, output_l, output_r, wheel_drive_rl, wheel_drive_rr]
+    - id: steering
+      type: ackermann_steering
+      actuator: servo
+      joints: [steer_fl, steer_fr]
+      ratio: 0.85           # wheel angle per horn angle near full lock; the CAD steering table supersedes it
+      params: {wheelbase: 260 mm, kingpin_track: 135 mm, max_steer: 0.45, servo_travel: 30 deg}
+      path: [horn_spline, bs_hl, bj_hl, bj_kl, bs_kl, bs_hr, bj_hr, bj_kr, bs_kr]
+
+  # Fastener position = head seat (or nut bearing face), axis = insertion direction.
+  fasteners:
+    # Transmission to chassis (from below into the case's tapped holes).
+    - {id: gb_1, type: shcs-m3, length: 10 mm, position: [-18 mm, -22 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: gearbox}
+    - {id: gb_2, type: shcs-m3, length: 10 mm, position: [-18 mm, 22 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: gearbox}
+    - {id: gb_3, type: shcs-m3, length: 10 mm, position: [18 mm, -22 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: gearbox}
+    - {id: gb_4, type: shcs-m3, length: 10 mm, position: [18 mm, 22 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: gearbox}
+    # Motor to the transmission's motor plate (through the mesh-adjust slots).
+    - {id: mot_1, type: shcs-m3, length: 8 mm, position: [57.0348 mm, -33 mm, 55.5756 mm], axis: [0, 1, 0], clamps: [gearbox], thread_into: motor}
+    - {id: mot_2, type: shcs-m3, length: 8 mm, position: [40.9652 mm, -33 mm, 36.4244 mm], axis: [0, 1, 0], clamps: [gearbox], thread_into: motor}
+    # Rear hub carriers to chassis.
+    - {id: hub_l1, type: shcs-m3, length: 8 mm, position: [-7 mm, 47 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: hub_rl}
+    - {id: hub_l2, type: shcs-m3, length: 8 mm, position: [7 mm, 47 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: hub_rl}
+    - {id: hub_l3, type: shcs-m3, length: 8 mm, position: [-7 mm, 59 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: hub_rl}
+    - {id: hub_l4, type: shcs-m3, length: 8 mm, position: [7 mm, 59 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: hub_rl}
+    - {id: hub_r1, type: shcs-m3, length: 8 mm, position: [-7 mm, -47 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: hub_rr}
+    - {id: hub_r2, type: shcs-m3, length: 8 mm, position: [7 mm, -47 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: hub_rr}
+    - {id: hub_r3, type: shcs-m3, length: 8 mm, position: [-7 mm, -59 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: hub_rr}
+    - {id: hub_r4, type: shcs-m3, length: 8 mm, position: [7 mm, -59 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: hub_rr}
+    # Rear wheel stacks: nyloc clamps wheel, spacer and bearing inner race against the axle collar.
+    - {id: nut_rl, type: nut-m6-nyloc, position: [0, 114.5 mm, 55 mm], axis: [0, -1, 0], clamps: [wheel_rl, spacer_rl, bearing_rl], thread_into: axle_rl}
+    - {id: nut_rr, type: nut-m6-nyloc, position: [0, -114.5 mm, 55 mm], axis: [0, 1, 0], clamps: [wheel_rr, spacer_rr, bearing_rr], thread_into: axle_rr}
+    # Encoder board to the transmission case.
+    - {id: enc_1, type: shcs-m2, length: 16 mm, position: [-3.5 mm, 38 mm, 41 mm], axis: [0, -1, 0], clamps: [encoder], thread_into: gearbox}
+    - {id: enc_2, type: shcs-m2, length: 16 mm, position: [3.5 mm, 38 mm, 41 mm], axis: [0, -1, 0], clamps: [encoder], thread_into: gearbox}
+    # Deck stack: chassis -> standoffs from below, deck -> standoffs from above.
+    - {id: so_rl_b, type: shcs-m3, length: 8 mm, position: [40 mm, 45 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: standoff_rl}
+    - {id: so_rr_b, type: shcs-m3, length: 8 mm, position: [78 mm, -45 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: standoff_rr}
+    - {id: so_fl_b, type: shcs-m3, length: 8 mm, position: [195 mm, 28 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: standoff_fl}
+    - {id: so_fr_b, type: shcs-m3, length: 8 mm, position: [195 mm, -28 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: standoff_fr}
+    - {id: so_rl_t, type: shcs-m3, length: 8 mm, position: [40 mm, 45 mm, 78 mm], axis: [0, 0, -1], clamps: [deck], thread_into: standoff_rl}
+    - {id: so_rr_t, type: shcs-m3, length: 8 mm, position: [78 mm, -45 mm, 78 mm], axis: [0, 0, -1], clamps: [deck], thread_into: standoff_rr}
+    - {id: so_fl_t, type: shcs-m3, length: 8 mm, position: [195 mm, 28 mm, 78 mm], axis: [0, 0, -1], clamps: [deck], thread_into: standoff_fl}
+    - {id: so_fr_t, type: shcs-m3, length: 8 mm, position: [195 mm, -28 mm, 78 mm], axis: [0, 0, -1], clamps: [deck], thread_into: standoff_fr}
+    # Front suspension arms to chassis.
+    - {id: arm_l1, type: shcs-m3, length: 10 mm, position: [260 mm, 27 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: arm_fl}
+    - {id: arm_l2, type: shcs-m3, length: 10 mm, position: [260 mm, 35 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: arm_fl}
+    - {id: arm_r1, type: shcs-m3, length: 10 mm, position: [260 mm, -27 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: arm_fr}
+    - {id: arm_r2, type: shcs-m3, length: 10 mm, position: [260 mm, -35 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: arm_fr}
+    # Kingpins: threadlocked M3 screws into the arms; the knuckle turns on the shank (0.15 mm head clearance).
+    - {id: kp_fl, type: shcs-m3, length: 20 mm, position: [260 mm, 67.5 mm, 48.15 mm], axis: [0, 0, -1], thread_into: arm_fl, preloaded: false}
+    - {id: kp_fr, type: shcs-m3, length: 20 mm, position: [260 mm, -67.5 mm, 48.15 mm], axis: [0, 0, -1], thread_into: arm_fr, preloaded: false}
+    # Front wheels retained on the stub axles by nylocs set with 0.1 mm end play.
+    - {id: nut_fl, type: nut-m6-nyloc, position: [260 mm, 114.6 mm, 55 mm], axis: [0, -1, 0], thread_into: stub_fl, preloaded: false}
+    - {id: nut_fr, type: nut-m6-nyloc, position: [260 mm, -114.6 mm, 55 mm], axis: [0, 1, 0], thread_into: stub_fr, preloaded: false}
+    # Steering linkage ball studs (horn and knuckle steering arms).
+    - {id: bs_hl, type: ball-stud-m3-5.8, length: 6 mm, position: [235 mm, 6 mm, 76.5 mm], axis: [0, 0, -1], thread_into: servo_horn}
+    - {id: bs_hr, type: ball-stud-m3-5.8, length: 6 mm, position: [235 mm, -6 mm, 76.5 mm], axis: [0, 0, -1], thread_into: servo_horn}
+    - {id: bs_kl, type: ball-stud-m3-5.8, length: 8 mm, position: [235 mm, 67.5 mm, 76.5 mm], axis: [0, 0, -1], thread_into: knuckle_fl}
+    - {id: bs_kr, type: ball-stud-m3-5.8, length: 8 mm, position: [235 mm, -67.5 mm, 76.5 mm], axis: [0, 0, -1], thread_into: knuckle_fr}
+    # Servo horn screw into the output spline; servo ears onto the posts; posts to chassis.
+    - {id: horn_screw, type: shcs-m3, length: 10 mm, position: [254.8 mm, 0, 78 mm], axis: [0, 0, -1], clamps: [servo_horn], thread_into: servo}
+    - {id: ear_1, type: shcs-m3, length: 8 mm, position: [240.05 mm, 5 mm, 58 mm], axis: [0, 0, -1], clamps: [servo], thread_into: servo_post_a}
+    - {id: ear_2, type: shcs-m3, length: 8 mm, position: [240.05 mm, -5 mm, 58 mm], axis: [0, 0, -1], clamps: [servo], thread_into: servo_post_a}
+    - {id: ear_3, type: shcs-m3, length: 8 mm, position: [289.55 mm, 5 mm, 58 mm], axis: [0, 0, -1], clamps: [servo], thread_into: servo_post_b}
+    - {id: ear_4, type: shcs-m3, length: 8 mm, position: [289.55 mm, -5 mm, 58 mm], axis: [0, 0, -1], clamps: [servo], thread_into: servo_post_b}
+    - {id: post_1, type: shcs-m3, length: 8 mm, position: [240.05 mm, 5 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: servo_post_a}
+    - {id: post_2, type: shcs-m3, length: 8 mm, position: [240.05 mm, -5 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: servo_post_a}
+    - {id: post_3, type: shcs-m3, length: 8 mm, position: [289.55 mm, 5 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: servo_post_b}
+    - {id: post_4, type: shcs-m3, length: 8 mm, position: [289.55 mm, -5 mm, 25 mm], axis: [0, 0, 1], clamps: [chassis], thread_into: servo_post_b}
+    # Pi stack: deck -> spacers (below), Pi clamped by male-female standoffs, HAT screwed onto the standoffs.
+    - {id: pi_d1, type: shcs-m2.5, length: 8 mm, position: [71 mm, -24.5 mm, 75 mm], axis: [0, 0, 1], clamps: [deck], thread_into: pi_spacer_1}
+    - {id: pi_d2, type: shcs-m2.5, length: 8 mm, position: [129 mm, -24.5 mm, 75 mm], axis: [0, 0, 1], clamps: [deck], thread_into: pi_spacer_2}
+    - {id: pi_d3, type: shcs-m2.5, length: 8 mm, position: [71 mm, 24.5 mm, 75 mm], axis: [0, 0, 1], clamps: [deck], thread_into: pi_spacer_3}
+    - {id: pi_d4, type: shcs-m2.5, length: 8 mm, position: [129 mm, 24.5 mm, 75 mm], axis: [0, 0, 1], clamps: [deck], thread_into: pi_spacer_4}
+    - {id: pi_s1, type: standoff-mf-m2.5-11, position: [71 mm, -24.5 mm, 89.6 mm], axis: [0, 0, -1], clamps: [pi], thread_into: pi_spacer_1}
+    - {id: pi_s2, type: standoff-mf-m2.5-11, position: [129 mm, -24.5 mm, 89.6 mm], axis: [0, 0, -1], clamps: [pi], thread_into: pi_spacer_2}
+    - {id: pi_s3, type: standoff-mf-m2.5-11, position: [71 mm, 24.5 mm, 89.6 mm], axis: [0, 0, -1], clamps: [pi], thread_into: pi_spacer_3}
+    - {id: pi_s4, type: standoff-mf-m2.5-11, position: [129 mm, 24.5 mm, 89.6 mm], axis: [0, 0, -1], clamps: [pi], thread_into: pi_spacer_4}
+    - {id: hat_1, type: shcs-m2.5, length: 6 mm, position: [71 mm, -24.5 mm, 102.2 mm], axis: [0, 0, -1], clamps: [hat], thread_into: "fastener:pi_s1"}
+    - {id: hat_2, type: shcs-m2.5, length: 6 mm, position: [129 mm, -24.5 mm, 102.2 mm], axis: [0, 0, -1], clamps: [hat], thread_into: "fastener:pi_s2"}
+    - {id: hat_3, type: shcs-m2.5, length: 6 mm, position: [71 mm, 24.5 mm, 102.2 mm], axis: [0, 0, -1], clamps: [hat], thread_into: "fastener:pi_s3"}
+    - {id: hat_4, type: shcs-m2.5, length: 6 mm, position: [129 mm, 24.5 mm, 102.2 mm], axis: [0, 0, -1], clamps: [hat], thread_into: "fastener:pi_s4"}
+    # Antenna mast through-bolted to the PETG deck with nylocs underneath.
+    - {id: mast_1, type: shcs-m3, length: 12 mm, position: [168 mm, 0, 81 mm], axis: [0, 0, -1], clamps: [antenna_mast, deck], nut: nut-m3-nyloc, grip: 6 mm}
+    - {id: mast_2, type: shcs-m3, length: 12 mm, position: [182 mm, 0, 81 mm], axis: [0, 0, -1], clamps: [antenna_mast, deck], nut: nut-m3-nyloc, grip: 6 mm}
+
+  # parts[0] carries the shaft (ball, magnet, pins), parts[1] the bore. A `bore` param on an interface whose
+  # parts[1] is fabricated cuts that bore (from axis_point along axis_dir); purchased parts use catalog features only.
+  interfaces:
+    - {id: motor_pinion, kind: drive_flat, parts: [motor, gearbox], axis_point: [49 mm, -30 mm, 46 mm], axis_dir: [0, -1, 0],
+       params: {internal: true, flat_offset: 1.385 mm, clearance: [1 mm, 3 mm], min_engagement: 8 mm}}
+    - {id: output_l, kind: drive_flat, parts: [axle_rl, gearbox], axis_point: [0, 30 mm, 55 mm], axis_dir: [0, -1, 0],
+       params: {flat_offset: 2.5 mm, clearance: [0.002 mm, 0.03 mm], min_engagement: 8 mm, rotating_bore: true}}
+    - {id: output_r, kind: drive_flat, parts: [axle_rr, gearbox], axis_point: [0, -33 mm, 55 mm], axis_dir: [0, 1, 0],
+       params: {flat_offset: 2.5 mm, clearance: [0.002 mm, 0.03 mm], min_engagement: 8 mm, rotating_bore: true}}
+    - {id: wheel_drive_rl, kind: drive_flat, parts: [axle_rl, wheel_rl], axis_point: [0, 91.5 mm, 55 mm], axis_dir: [0, 1, 0],
+       params: {flat_offset: 2.5 mm, clearance: [0.002 mm, 0.03 mm], min_engagement: 20 mm}}
+    - {id: wheel_drive_rr, kind: drive_flat, parts: [axle_rr, wheel_rr], axis_point: [0, -91.5 mm, 55 mm], axis_dir: [0, -1, 0],
+       params: {flat_offset: 2.5 mm, clearance: [0.002 mm, 0.03 mm], min_engagement: 20 mm}}
+    - {id: bearing_seat_rl, kind: press_fit, parts: [bearing_rl, hub_rl], axis_point: [0, 82 mm, 55 mm], axis_dir: [0, 1, 0],
+       params: {interference: [0.002 mm, 0.02 mm], min_engagement: 2.5 mm, bore: {diameter: 9.99 mm}}}
+    - {id: bearing_seat_rr, kind: press_fit, parts: [bearing_rr, hub_rr], axis_point: [0, -82 mm, 55 mm], axis_dir: [0, -1, 0],
+       params: {interference: [0.002 mm, 0.02 mm], min_engagement: 2.5 mm, bore: {diameter: 9.99 mm}}}
+    - {id: bearing_axle_rl, kind: revolute_fit, parts: [axle_rl, bearing_rl], axis_point: [0, 82 mm, 55 mm], axis_dir: [0, 1, 0],
+       params: {clearance: [-0.005 mm, 0.01 mm], min_engagement: 2.5 mm, retainers: ["fastener:nut_rl"], internal_rotation: true}}
+    - {id: bearing_axle_rr, kind: revolute_fit, parts: [axle_rr, bearing_rr], axis_point: [0, -82 mm, 55 mm], axis_dir: [0, -1, 0],
+       params: {clearance: [-0.005 mm, 0.01 mm], min_engagement: 2.5 mm, retainers: ["fastener:nut_rr"], internal_rotation: true}}
+    - {id: enc_ring_press, kind: press_fit, parts: [axle_rl, enc_ring], axis_point: [0, 31 mm, 55 mm], axis_dir: [0, 1, 0],
+       params: {interference: [0.002 mm, 0.02 mm], min_engagement: 5 mm, bore: {diameter: 5.98 mm}}}
+    - {id: enc_magnet_1_bond, kind: adhesive, parts: [enc_magnet_1, enc_ring], axis_point: [0, 34 mm, 45 mm], axis_dir: [0, 0, 1],
+       params: {min_fraction: 0.8, bore: {diameter: 2.05 mm, depth: 1 mm}}}
+    - {id: enc_magnet_2_bond, kind: adhesive, parts: [enc_magnet_2, enc_ring], axis_point: [0, 34 mm, 65 mm], axis_dir: [0, 0, -1],
+       params: {min_fraction: 0.8, bore: {diameter: 2.05 mm, depth: 1 mm}}}
+    - {id: enc_magnet_3_bond, kind: adhesive, parts: [enc_magnet_3, enc_ring], axis_point: [10 mm, 34 mm, 55 mm], axis_dir: [-1, 0, 0],
+       params: {min_fraction: 0.8, bore: {diameter: 2.05 mm, depth: 1 mm}}}
+    - {id: enc_magnet_4_bond, kind: adhesive, parts: [enc_magnet_4, enc_ring], axis_point: [-10 mm, 34 mm, 55 mm], axis_dir: [1, 0, 0],
+       params: {min_fraction: 0.8, bore: {diameter: 2.05 mm, depth: 1 mm}}}
+    - {id: enc_target, kind: magnetic_target, parts: [enc_ring, encoder], axis_point: [0, 34 mm, 44 mm], axis_dir: [0, 0, 1],
+       params: {magnets: [enc_magnet_1, enc_magnet_2, enc_magnet_3, enc_magnet_4], gap: [0.5 mm, 2.0 mm]}}
+    - {id: kingpin_fl, kind: revolute_fit, parts: ["fastener:kp_fl", knuckle_fl], axis_point: [260 mm, 67.5 mm, 36 mm], axis_dir: [0, 0, 1],
+       params: {clearance: [0.05 mm, 0.15 mm], min_engagement: 10 mm, retainers: ["fastener:kp_fl"], thrust: [arm_fl], bore: {diameter: 3.2 mm}}}
+    - {id: kingpin_fr, kind: revolute_fit, parts: ["fastener:kp_fr", knuckle_fr], axis_point: [260 mm, -67.5 mm, 36 mm], axis_dir: [0, 0, 1],
+       params: {clearance: [0.05 mm, 0.15 mm], min_engagement: 10 mm, retainers: ["fastener:kp_fr"], thrust: [arm_fr], bore: {diameter: 3.2 mm}}}
+    - {id: stub_press_fl, kind: press_fit, parts: [stub_fl, knuckle_fl], axis_point: [260 mm, 89 mm, 55 mm], axis_dir: [0, -1, 0],
+       params: {interference: [0.002 mm, 0.02 mm], min_engagement: 8 mm, bore: {diameter: 5.98 mm, depth: 10 mm}}}
+    - {id: stub_press_fr, kind: press_fit, parts: [stub_fr, knuckle_fr], axis_point: [260 mm, -89 mm, 55 mm], axis_dir: [0, 1, 0],
+       params: {interference: [0.002 mm, 0.02 mm], min_engagement: 8 mm, bore: {diameter: 5.98 mm, depth: 10 mm}}}
+    - {id: hub_fl, kind: revolute_fit, parts: [stub_fl, wheel_fl], axis_point: [260 mm, 91.5 mm, 55 mm], axis_dir: [0, 1, 0],
+       params: {clearance: [0.01 mm, 0.05 mm], min_engagement: 15 mm, retainers: ["fastener:nut_fl"], thrust: [stub_fl]}}
+    - {id: hub_fr, kind: revolute_fit, parts: [stub_fr, wheel_fr], axis_point: [260 mm, -91.5 mm, 55 mm], axis_dir: [0, -1, 0],
+       params: {clearance: [0.01 mm, 0.05 mm], min_engagement: 15 mm, retainers: ["fastener:nut_fr"], thrust: [stub_fr]}}
+    - {id: horn_spline, kind: spline, parts: [servo, servo_horn], axis_point: [254.8 mm, 0, 70.5 mm], axis_dir: [0, 0, 1],
+       params: {clearance: [-0.005 mm, 0.02 mm], min_engagement: 3.5 mm, bore: {diameter: 5.92 mm, depth: 4 mm}}}
+    - {id: bj_hl, kind: ball_joint, parts: ["fastener:bs_hl", tie_rod], axis_point: [235 mm, 6 mm, 82.6 mm], axis_dir: [0, 0, 1],
+       params: {clearance: [0.0, 0.05 mm], bore: {kind: socket, diameter: 5.85 mm, opening: 4.2 mm}}}
+    - {id: bj_kl, kind: ball_joint, parts: ["fastener:bs_kl", tie_rod], axis_point: [235 mm, 67.5 mm, 82.6 mm], axis_dir: [0, 0, 1],
+       params: {clearance: [0.0, 0.05 mm], bore: {kind: socket, diameter: 5.85 mm, opening: 4.2 mm}}}
+    - {id: bj_hr, kind: ball_joint, parts: ["fastener:bs_hr", tie_rod_r], axis_point: [235 mm, -6 mm, 82.6 mm], axis_dir: [0, 0, 1],
+       params: {clearance: [0.0, 0.05 mm], bore: {kind: socket, diameter: 5.85 mm, opening: 4.2 mm}}}
+    - {id: bj_kr, kind: ball_joint, parts: ["fastener:bs_kr", tie_rod_r], axis_point: [235 mm, -67.5 mm, 82.6 mm], axis_dir: [0, 0, 1],
+       params: {clearance: [0.0, 0.05 mm], bore: {kind: socket, diameter: 5.85 mm, opening: 4.2 mm}}}
+    - {id: gpio_header, kind: connector_retention, parts: [pi, hat], axis_point: [100 mm, 24.5 mm, 92.1 mm], axis_dir: [0, 0, 1],
+       params: {min_insertion: 5.5 mm, lateral_tolerance: 0.2 mm}}
+    - {id: battery_strap_loop, kind: strap, parts: [battery_strap, battery],
+       params: {through: [chassis], slots: [[147 mm, 23 mm, 169 mm, 25.5 mm], [147 mm, -25.5 mm, 169 mm, -23 mm]]}}
+    - {id: fuse_tie_loop, kind: strap, parts: [fuse_tie, fuse],
+       params: {through: [chassis], slots: [[67.5 mm, -2 mm, 69.5 mm, 2 mm], [80.5 mm, -2 mm, 82.5 mm, 2 mm]]}}
+    - {id: esc_tape_top, kind: adhesive, parts: [esc, tape_esc], params: {min_fraction: 0.8}}
+    - {id: esc_tape_bottom, kind: adhesive, parts: [tape_esc, chassis], params: {min_fraction: 0.8}}
+    - {id: rx_tape_top, kind: adhesive, parts: [receiver, tape_rx], params: {min_fraction: 0.8}}
+    - {id: rx_tape_bottom, kind: adhesive, parts: [tape_rx, deck], params: {min_fraction: 0.8}}
+    - {id: gps_tape_top, kind: adhesive, parts: [gps, tape_gps], params: {min_fraction: 0.8}}
+    - {id: gps_tape_bottom, kind: adhesive, parts: [tape_gps, deck], params: {min_fraction: 0.8}}
+    - {id: antenna_bond, kind: adhesive, parts: [rx_antenna, antenna_mast], params: {min_fraction: 0.8}}
+
+electrical:
+  ground_net: GND
+  direct_mates:
+    - {a: hat.J_GPIO, b: pi.J8}
+  harnesses:
+    - id: battery_lead
+      description: Battery's own 12 AWG pigtail ending in XT60 female.
+      connectors:
+        A: {type: integral, mates: battery.J1}
+        B: {type: xt60-female}
+      wires:
+        - {id: W_BAT_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
+        - {id: W_BAT_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
+      route: {slack: 20 mm}
+    - id: power_y
+      description: XT60 Y-harness splitting battery power to the ESC (12 AWG) and, through a 10 A fuse, the HAT (18 AWG).
+      connectors:
+        P1: {type: xt60-male, mates: battery_lead.B}
+        P2: {type: xt60-female}
+        P3: {type: xt30-female, mates: hat.J_BATT}
+        F1: {type: integral, mates: fuse.J1}
+        F2: {type: integral, mates: fuse.J2}
+      splices:
+        SP: {position: [85 mm, 10 mm, 40 mm]}
+        SN: {position: [85 mm, -10 mm, 40 mm]}
+      wires:
+        - {id: W_Y_P_IN, from: P1.1, to: SP, awg: 12, color: red, signal: VBAT}
+        - {id: W_Y_P_ESC, from: SP, to: P2.1, awg: 12, color: red, signal: VBAT}
+        - {id: W_Y_P_FUSE, from: SP, to: F1.1, awg: 18, color: red, signal: VBAT}
+        - {id: W_Y_P_HAT, from: F2.1, to: P3.1, awg: 18, color: red, signal: VBAT_FUSED}
+        - {id: W_Y_N_IN, from: P1.2, to: SN, awg: 12, color: black, signal: GND}
+        - {id: W_Y_N_ESC, from: SN, to: P2.2, awg: 12, color: black, signal: GND}
+        - {id: W_Y_N_HAT, from: SN, to: P3.2, awg: 18, color: black, signal: GND}
+      route: {slack: 25 mm, keep_away: [motor, gearbox]}
+    - id: esc_power
+      connectors:
+        A: {type: integral, mates: esc.J_PWR}
+        B: {type: xt60-male, mates: power_y.P2}
+      wires:
+        - {id: W_ESC_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
+        - {id: W_ESC_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
+      route: {slack: 20 mm}
+    - id: esc_motor
+      connectors:
+        A: {type: integral, mates: esc.J_MOT}
+        BP: {type: bullet-3.5-female, mates: motor.J_POS}
+        BN: {type: bullet-3.5-female, mates: motor.J_NEG}
+      wires:
+        - {id: W_MOT_A, from: A.1, to: BP.1, awg: 14, color: blue, signal: MOTOR_A}
+        - {id: W_MOT_B, from: A.2, to: BN.1, awg: 14, color: yellow, signal: MOTOR_B}
+      route: {slack: 15 mm, keep_away: [wheel_rl, wheel_rr, gearbox]}
+    - id: esc_signal
+      connectors:
+        A: {type: integral, mates: esc.J_SIG}
+        B: {type: servo-3-female, mates: hat.J_ESC}
+      wires:
+        - {id: W_ESC_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: ESC_PWM}
+        - {id: W_ESC_BEC, from: A.2, to: B.2, awg: 22, color: red, signal: BEC_6V}
+        - {id: W_ESC_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
+      route: {slack: 30 mm}
+    - id: servo_lead
+      connectors:
+        A: {type: integral, mates: servo.J1}
+        B: {type: servo-3-female, mates: hat.J_SERVO}
+      wires:
+        - {id: W_SRV_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: SERVO_PWM}
+        - {id: W_SRV_VCC, from: A.2, to: B.2, awg: 22, color: red, signal: BEC_6V}
+        - {id: W_SRV_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
+      route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr]}
+    - id: rx_lead
+      connectors:
+        A: {type: integral, mates: receiver.J1}
+        B: {type: jst-gh-4-housing, mates: hat.J_RX}
+      wires:
+        - {id: W_RX_5V, from: A.1, to: B.1, awg: 28, color: red, signal: 5V}
+        - {id: W_RX_PI_TX, from: A.3, to: B.2, awg: 28, color: white, signal: CRSF_TX}
+        - {id: W_RX_PI_RX, from: A.2, to: B.3, awg: 28, color: green, signal: CRSF_RX}
+        - {id: W_RX_GND, from: A.4, to: B.4, awg: 28, color: black, signal: GND}
+      route: {slack: 20 mm}
+    - id: gps_lead
+      connectors:
+        A: {type: integral, mates: gps.J1}
+        B: {type: jst-gh-4-housing, mates: hat.J_GPS}
+      wires:
+        - {id: W_GPS_5V, from: A.1, to: B.1, awg: 28, color: red, signal: 5V}
+        - {id: W_GPS_PI_TX, from: A.2, to: B.2, awg: 28, color: white, signal: GPS_TX}
+        - {id: W_GPS_PI_RX, from: A.3, to: B.3, awg: 28, color: green, signal: GPS_RX}
+        - {id: W_GPS_GND, from: A.4, to: B.4, awg: 28, color: black, signal: GND}
+      route: {slack: 20 mm}
+    - id: encoder_lead
+      connectors:
+        A: {type: integral, mates: encoder.J1}
+        B: {type: jst-xh-3-housing, mates: hat.J_ENC}
+      wires:
+        - {id: W_ENC_VCC, from: A.1, to: B.1, awg: 26, color: red, signal: 3V3}
+        - {id: W_ENC_OUT, from: A.2, to: B.2, awg: 26, color: yellow, signal: ENC}
+        - {id: W_ENC_GND, from: A.3, to: B.3, awg: 26, color: black, signal: GND}
+      route: {slack: 25 mm, keep_away: [wheel_rl, gearbox]}
+
+pcb:
+  boards:
+    - {component: hat, tool: kicad, source: pcb/carrier-hat, layers: 2, copper_oz: 1.0}
+
+cad:
+  provider: onshape
+  folder: c3f7706a252cbfca26630a10
+  document_name: R3 RC Car
+
+software:
+  modules:
+    - {name: rc_car_controller, language: python, runs_on: pi, entrypoint: main.py}
+  bindings:
+    esc_pwm:   {interface: pwm, computer: pi, pins: [pi.J8.12], device: pwmchip0, channel: 2, frequency: 50 Hz, expects: [esc.J_SIG.1]}
+    servo_pwm: {interface: pwm, computer: pi, pins: [pi.J8.35], device: pwmchip0, channel: 3, frequency: 50 Hz, expects: [servo.J1.1]}
+    crsf:      {interface: uart, computer: pi, pins: [pi.J8.8, pi.J8.10], device: /dev/ttyAMA0, baud: 420000, expects: [receiver.J1.3, receiver.J1.2]}
+    gps:       {interface: uart, computer: pi, pins: [pi.J8.7, pi.J8.29], device: /dev/ttyAMA2, baud: 115200, expects: [gps.J1.2, gps.J1.3]}
+    i2c:       {interface: i2c, computer: pi, pins: [pi.J8.3, pi.J8.5], device: /dev/i2c-1, expects: [hat.I2C_SDA, hat.I2C_SCL]}
+    encoder:   {interface: gpio, computer: pi, pins: [pi.J8.11], device: gpiochip0, channel: 17, expects: [encoder.J1.2]}
+  config:
+    control_rate_hz: 100
+    mode: autonomous            # autonomous | manual
+    radio_failsafe_timeout_s: 0.25
+    failsafe_action: brake
+    low_voltage_cutoff_v: 6.6   # 3.3 V/cell under load
+    low_voltage_limit_v: 7.0    # start limiting throttle
+    max_cruise_speed_mps: 4.0
+    esc_pulse_us: {reverse: 1000, neutral: 1500, forward: 2000}
+    steering_pulse_us: {left: 1722, center: 1500, right: 1278}   # +-30 deg horn travel: CAD linkage end points
+    max_steer_rad: 0.45
+    wheelbase_m: 0.26
+    wheel_radius_m: 0.055
+    encoder_pulses_per_rev: 4
+    arm_channel: 5              # CRSF AUX channel that arms autonomy (>1700 us)
+    crsf_channels: {steering: 1, throttle: 2, arm: 5}
+
+simulation:
+  timestep: 1 ms
+  seed: 7
+  environment:
+    ground_friction: 0.9
+    ground_rolling_resistance: 0.015
+    ambient_temperature_c: 25
+    terrain: flat-grass
+    radio_transmitter: {position: [-2 m, 0, 1.2 m], power_dbm: 20, antenna_gain_dbi: 2.0}
+    radio_environment: {model: sionna_rt, shadowing_sigma_db: 4.0, ground_permittivity: 15, interference_dbm: -100, gps_origin: [37.4275, -122.1697, 30.0]}
+    obstacles:
+      - {id: cone_a, center: [12 m, 6 m, 0.15 m], size: [0.3 m, 0.3 m, 0.3 m], material: plastic}
+  scenarios:
+    - id: autonomous_course
+      description: Arm by radio, then follow a 30 x 15 m rectangular GPS course twice at cruise speed.
+      duration: 90 s
+      initial: {battery_soc: 0.95}
+      pilot: {arm_at: 1.0 s}
+      mission: {type: waypoints, laps: 2, speed: 4.0, waypoints: [[5, 0], [35, 0], [35, 15], [5, 15]]}
+      expect: {laps_completed: 2, max_cross_track_error_m: 1.5, failsafe_events: 0, min_battery_voltage_v: 6.8, brownouts: 0}
+    - id: full_throttle
+      description: Manual mode, full throttle from rest for 6 s straight, then neutral.
+      duration: 10 s
+      initial: {battery_soc: 1.0, mode: manual}
+      pilot: {arm_at: 0.5 s, throttle: [[0, 0.0], [1.0, 1.0], [7.0, 0.0]], steering: [[0, 0.0]]}
+      expect: {min_top_speed_mps: 8.0, brownouts: 0}
+    - id: range_failsafe
+      description: Autonomous straight run away from the transmitter until the radio link is lost; car must brake.
+      duration: 300 s
+      initial: {battery_soc: 0.95}
+      pilot: {arm_at: 1.0 s}
+      mission: {type: waypoints, laps: 1, speed: 5.0, waypoints: [[5, 0], [1500, 0]]}
+      expect: {link_lost_beyond_m: 300, stop_within_m_of_link_loss: 3.0}
+    - id: low_battery
+      description: Start nearly empty; firmware must cut throttle before cells drop below 3.0 V and the Pi must not brown out.
+      duration: 120 s
+      initial: {battery_soc: 0.02}
+      pilot: {arm_at: 1.0 s}
+      mission: {type: waypoints, laps: 5, speed: 4.0, waypoints: [[5, 0], [35, 0], [35, 15], [5, 15]]}
+      expect: {min_cell_voltage_v: 3.0, low_voltage_cutoff_engaged: true, brownouts: 0}
+    - id: steering_sweep
+      description: Manual lock-to-lock steering at standstill and at 2 m/s to exercise wire slack near the front wheels.
+      duration: 12 s
+      initial: {battery_soc: 0.9, mode: manual}
+      pilot: {arm_at: 0.5 s, throttle: [[0, 0.0], [6.0, 0.25]], steering: [[0, 0.0], [1, 1.0], [2, -1.0], [3, 1.0], [4, -1.0], [5, 0.0], [7, 1.0], [8, -1.0], [9, 1.0], [10, -1.0], [11, 0.0]]}
+      expect: {min_wire_clearance_m: 0.008}

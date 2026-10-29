@@ -225,6 +225,7 @@ class Prism:
     direction: float = 1.0
     op: Op = "add"
     name: str = ""
+    folder: str = ""  # feature folder in an organized Part Studio
 
 
 @dataclass
@@ -240,6 +241,7 @@ class Revolve:
     op: Op = "add"
     name: str = ""
     radial: np.ndarray | None = None
+    folder: str = ""
 
     def radial_dir(self) -> np.ndarray:
         if self.radial is not None:
@@ -274,6 +276,7 @@ class Hole:
     tapped_depth: float | None = None
     fit: str = "Normal"
     name: str = ""
+    folder: str = ""
 
 
 Operation = Prism | Revolve | Hole
