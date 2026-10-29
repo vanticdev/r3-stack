@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "r3": {
+      "command": "/path/to/r3-stack/.venv/bin/python",
+      "args": ["-m", "r3_orchestrator.mcp_server"],
+      "env": {"R3_PROJECT": "/path/to/r3-stack/examples/robots/rc-car"}
+    }
+  }
+}

@@ -1,0 +1,107 @@
+{
+ "schema": "r3/report-summary@1",
+ "generated_at": 1793000000.0,
+ "robot": {
+  "name": "fixture-car",
+  "description": "Web dashboard loader fixture",
+  "version": "0.1.0"
+ },
+ "inputs": {
+  "robot_yaml_sha256": "0123456789abcdef"
+ },
+ "ok": false,
+ "counts": {
+  "error": 1,
+  "warning": 1,
+  "info": 0
+ },
+ "stages": [
+  {
+   "stage": "model",
+   "status": "failed",
+   "ok": false,
+   "stale": false,
+   "counts": {
+    "error": 1,
+    "warning": 0,
+    "info": 0
+   },
+   "metrics": {},
+   "duration_s": 0.4,
+   "artifacts": []
+  },
+  {
+   "stage": "wiring",
+   "status": "ok",
+   "ok": true,
+   "stale": false,
+   "counts": {
+    "error": 0,
+    "warning": 1,
+    "info": 0
+   },
+   "metrics": {},
+   "duration_s": 2.1,
+   "artifacts": []
+  }
+ ],
+ "diagnostics": [
+  {
+   "code": "component_interference",
+   "severity": "error",
+   "message": "esc and standoff_rl overlap by 841 mm^3",
+   "subjects": [
+    "esc",
+    "standoff_rl"
+   ],
+   "data": {
+    "overlap_volume": 8.41e-07,
+    "depth": 0.0055
+   },
+   "stage": "model",
+   "hint": "Move one component."
+  },
+  {
+   "code": "wire_clearance_low",
+   "severity": "warning",
+   "message": "W_ESC_SIG passes 6 mm from wheel_rl",
+   "subjects": [
+    "W_ESC_SIG",
+    "wheel_rl"
+   ],
+   "data": {
+    "min_distance": 0.006,
+    "required": 0.008
+   },
+   "stage": "wiring",
+   "hint": ""
+  }
+ ],
+ "scenarios": [
+  {
+   "id": "full_throttle",
+   "passed": true,
+   "path": "sim/full_throttle/summary.json",
+   "metrics": {
+    "top_speed_mps": 8.6
+   },
+   "checks": {}
+  }
+ ],
+ "artifacts": {
+  "graph": "model/graph.json",
+  "routes": "wiring/routes.json",
+  "cad_model": null,
+  "operating_points": null,
+  "images": [
+   "model/layout.png"
+  ]
+ },
+ "assumptions": [
+  {
+   "stage": "model",
+   "domain": "mechanical",
+   "statement": "Static interference only."
+  }
+ ]
+}
