@@ -275,6 +275,7 @@ def test_brake_slip_controller_releases_a_locking_wheel_and_never_reaches_neutra
         brake.update(dt, 8.0, 2.0)
     assert brake.fraction == pytest.approx(cfg.brake_min_fraction)  # floored, never neutral (would arm reverse)
     assert brake.update(dt, 0.5, 0.0) == 1.0                # slow: full brake
+    assert brake.update(dt, 4.0, 3.9) == 1.0                # cruise speed: full brake (no lock-up)
 
 
 def test_brake_command_stays_on_the_brake_side_of_the_esc_deadband() -> None:

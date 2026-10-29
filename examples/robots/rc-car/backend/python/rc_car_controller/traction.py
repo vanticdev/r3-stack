@@ -82,10 +82,14 @@ class TractionConfig:
     yaw_integral_limit_rad: float = 0.15
     # --- anti-lock braking (supervisor BRAKING state)
     brake_target_slip: float = 0.12           # braking slip ratio (v_g - v_w) / v_g held by the modulation
-    brake_gain_per_s: float = 60.0            # d ln(b)/dt per unit slip error
+    brake_apply_gain_per_s: float = 60.0      # d ln(b)/dt per unit slip error while the wheel grips (ramp up)
+    brake_release_gain_per_s: float = 150.0   # d ln(b)/dt per unit slip error while it locks (fast release)
     brake_min_fraction: float = 0.02          # brake fraction floor: never back to neutral (that arms reverse)
-    brake_initial_fraction: float = 0.3       # first brake frame (full brake locks the wheels within 0.1 s)
-    brake_full_below_mps: float = 1.0         # below this ground speed the brake is applied fully
+    brake_initial_fraction: float = 0.02      # the brake ramps up from the floor (a step locks the wheels in 50 ms)
+    # Below this ground speed the brake is applied fully: the shorted motor's torque scales with the back-EMF, so
+    # at cruise speed (4 m/s) full brake stops the car straight (twin pi_hang/range_failsafe); the rear wheels lock
+    # and the car yaws only from higher speeds.
+    brake_full_below_mps: float = 5.0
     free_rolling_current_a: float = 2.5       # below this estimated motor current the wheel rolls freely
     steer_lag_s: float = 0.08                 # servo first-order lag for the yaw reference (estimate)
     yaw_error_throttle_cut_rps: float = 0.6   # yaw error beyond which forward force is cut back
@@ -412,13 +416,14 @@ class BrakeSlipController:
 
         d ln(b) / dt = -k (lambda_b - lambda*),   b in [b_min, 1],
 
-    a multiplicative (log-domain) integral law: the brake-to-current map of a
+    with a slow apply gain (k while lambda_b < lambda*) and a fast release gain, starting from b_min: a
+    multiplicative (log-domain) integral law: the brake-to-current map of a
     shorted motor is strongly nonlinear in ``b``, and the log domain gives the same
     relative authority at every operating point. The command never returns to
     neutral: after a brake, neutral followed by a reverse pulse is *reverse* on a
     hobby ESC (forward/brake/reverse logic), so ``b`` is floored at ``b_min``.
-    Below ``brake_full_below_mps`` (where the 4-pulse encoder is too slow for slip
-    feedback and the back-EMF torque is small) the brake is full.
+    Below ``brake_full_below_mps`` (where the back-EMF braking torque is small enough
+    not to lock the wheels) the brake is full.
     """
 
     def __init__(self, config: TractionConfig) -> None:
@@ -440,7 +445,8 @@ class BrakeSlipController:
             return self.fraction
         self.slip = (v_g - max(0.0, wheel_speed)) / max(v_g, cfg.slip_speed_floor_mps)
         error = self.slip - cfg.brake_target_slip
-        self.fraction = _clamp(self.fraction * math.exp(-cfg.brake_gain_per_s * error * dt), cfg.brake_min_fraction, 1.0)
+        gain = cfg.brake_release_gain_per_s if error > 0.0 else cfg.brake_apply_gain_per_s
+        self.fraction = _clamp(self.fraction * math.exp(-gain * error * dt), cfg.brake_min_fraction, 1.0)
         return self.fraction
 
 

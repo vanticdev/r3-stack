@@ -92,14 +92,25 @@ class Branch:
         return k * (1.0 + alpha * (ambient_c - 20.0)) / denominator
 
     def transient_rise(self, current: float, duration: float, ambient_c: float, initial_rise: float = 0.0) -> float:
-        """Rise after ``duration`` s at constant ``current`` starting from ``initial_rise``."""
-        steady = self.steady_rise(current, ambient_c)
-        if not math.isfinite(steady):
-            return math.inf
+        """Rise after ``duration`` s at constant ``current`` starting from ``initial_rise``.
+
+        Lumped conductor with R(T): C dT/dt = I^2 R20 (1 + alpha (T_a + T - 20)) - T / Rth, linear in the rise T:
+        dT/dt = A + B T with A = I^2 R20 (1 + alpha (T_a - 20)) / C and B = (I^2 R20 alpha - 1 / Rth) / C, so
+        T(t) = (T0 + A / B) e^(B t) - A / B (T0 + A t for B = 0). B < 0 relaxes to the steady rise; B >= 0 is
+        thermal runaway, which still takes a finite time: a short burst far above the ampacity heats the copper
+        by a finite amount (near the adiabatic limit), not to infinity."""
         tau = self.thermal_resistance * self.heat_capacity
-        if tau <= 0 or not math.isfinite(tau):
-            return steady
-        return steady + (initial_rise - steady) * math.exp(-duration / tau)
+        if self.heat_capacity <= 0 or not math.isfinite(tau):
+            return self.steady_rise(current, ambient_c)
+        i2r = current * current * self.resistance_ref
+        a = i2r * (1.0 + self.temperature_coefficient * (ambient_c - 20.0)) / self.heat_capacity
+        b = (i2r * self.temperature_coefficient - 1.0 / self.thermal_resistance) / self.heat_capacity
+        if abs(b) * duration < 1e-9:
+            return initial_rise + a * duration
+        exponent = b * duration
+        if exponent > 700.0:
+            return math.inf
+        return (initial_rise + a / b) * math.exp(exponent) - a / b
 
 
 def adiabatic_i2t_withstand(area_m2: float, initial_c: float, final_c: float) -> float:
