@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__plugin_onshape-native_onshape_native__evaluate"
+    ]
+  }
+}

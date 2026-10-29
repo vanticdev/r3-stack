@@ -18,6 +18,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from .policy import check_request
+
 API = "/api/v17"
 
 
@@ -55,6 +57,7 @@ class _HttpTransport(Transport):
 
     def request(self, method: str, path: str, query: dict[str, Any] | None = None, body: Any = None,
                 accept: str = "application/json", timeout: float = 120.0) -> bytes:
+        check_request(method, path, body)  # direct-CAD policy: no FeatureScript, ever
         data = json.dumps(body).encode() if body is not None else None
         headers = {"Accept": accept, **self._headers()}
         if data is not None:

@@ -20,8 +20,17 @@ from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
 
 from .client import default_transport
-from .featurescript import source_digest
 from .sync import sync, write_cad_model
+
+
+def _direct_builder():
+    """The direct-CAD builder (standard Onshape features only). Returns
+    (builder, digest_fn) or None while it is not installed."""
+    try:
+        from .direct import build_robot, input_digest
+    except ImportError:
+        return None
+    return build_robot, input_digest
 
 
 def run(project: Project) -> StageResult:
@@ -33,7 +42,13 @@ def run(project: Project) -> StageResult:
     if project.spec.cad.provider == "none":
         result.add(Diagnostic.info("cad_disabled", "cad.provider is none"))
         return result
-    digest = source_digest(project)
+    direct = _direct_builder()
+    if direct is None:
+        result.add(Diagnostic.error("cad_builder_unavailable", "direct-CAD builder (r3_onshape.direct) is not installed",
+                                    hint="FeatureScript generation was removed by policy; CAD is built with standard Onshape features."))
+        return result
+    builder, input_digest = direct
+    digest = input_digest(project)
     existing = project.read_build_json("cad/cad_model.json")
     force = os.environ.get("R3_CAD_FORCE") == "1"
     if existing and existing.get("source", {}).get("generator_digest") == digest and not force:
@@ -49,7 +64,7 @@ def run(project: Project) -> StageResult:
         return result
     previous = (project.lock.get("cad", {}) or {})
     attempt = previous.get("attempt", 0) + 1
-    report = sync(project, api, result, attempt_label=f"attempt-{attempt}")
+    report = sync(project, api, result, builder, attempt_label=f"attempt-{attempt}")
     if result.ok and report.document:
         path = write_cad_model(project, report, api.name)
         result.artifact(path.relative_to(project.build_dir()), "json", "Per-part mass properties, bounding boxes, meshes, contacts")

@@ -1,9 +1,9 @@
 """Build the robot in Onshape from scratch and import verified engineering data.
 
-``sync(project)`` creates a new document in the configured folder, writes the
-generated Feature Studio, instantiates the robot feature in a Part Studio, then
-reads back per-part mass properties, bounding boxes and STL meshes, and writes
-``build/cad/cad_model.json``. The document revision is pinned in
+``sync(project, api, result, builder)`` creates a new document in the
+configured folder, lets ``builder`` model the robot with standard Onshape
+features only (see :mod:`r3_onshape.policy`), then reads back per-part mass
+properties, face geometry and meshes and writes ``build/cad/cad_model.json``. The document revision is pinned in
 ``r3.lock.yaml``. A failed build deletes its document (moved to trash), so each
 attempt starts from an empty folder.
 """
@@ -16,7 +16,7 @@ import struct
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 
@@ -25,7 +25,6 @@ from r3_model.graph import rpy_matrix
 from r3_model.project import Project
 
 from .client import OnshapeError, Transport
-from .featurescript import FEATURE_NAME, feature_studio_source, generate, source_digest
 
 
 @dataclass
@@ -33,7 +32,6 @@ class DocumentRef:
     did: str
     wid: str
     part_studio: str = ""
-    feature_studio: str = ""
     name: str = ""
 
     def url(self, eid: str | None = None) -> str:
@@ -71,45 +69,6 @@ def delete_document(api: Transport, did: str) -> None:
 def find_documents(api: Transport, folder: str) -> list[dict[str, Any]]:
     listing = api.json("GET", f"/globaltreenodes/folder/{folder}")
     return [item for item in listing.get("items", []) if item.get("jsonType") == "document-summary" or item.get("resourceType") == "document"]
-
-
-# --------------------------------------------------------------- feature studio
-def write_feature_studio(api: Transport, doc: DocumentRef, project: Project) -> str:
-    created = api.json("POST", f"/featurestudios/d/{doc.did}/w/{doc.wid}", body={"name": "R3 Robot Generator"})
-    doc.feature_studio = created["id"]
-    current = api.json("GET", f"/featurestudios/d/{doc.did}/w/{doc.wid}/e/{doc.feature_studio}")
-    match = re.search(r"FeatureScript\s+(\d+)", current.get("contents", ""))
-    fs_version = match.group(1) if match else "2770"
-    source = feature_studio_source(project, fs_version)
-    body = {"btType": "BTFeatureStudioContents-2239", "contents": source,
-            "serializationVersion": current.get("serializationVersion"),
-            "sourceMicroversion": current.get("sourceMicroversion"), "rejectMicroversionSkew": False}
-    updated = api.json("POST", f"/featurestudios/d/{doc.did}/w/{doc.wid}/e/{doc.feature_studio}", body=body)
-    return updated.get("sourceMicroversion") or current.get("sourceMicroversion")
-
-
-def add_robot_feature(api: Transport, doc: DocumentRef, microversion: str, robot_name: str) -> dict[str, Any]:
-    feature = {"btType": "BTMFeature-134", "featureType": FEATURE_NAME, "name": f"R3 Robot ({robot_name})",
-               "namespace": f"e{doc.feature_studio}::m{microversion}", "parameters": []}
-    body = {"btType": "BTFeatureDefinitionCall-1406", "feature": feature}
-    return api.json("POST", f"/partstudios/d/{doc.did}/w/{doc.wid}/e/{doc.part_studio}/features", body=body)
-
-
-def feature_status(api: Transport, doc: DocumentRef) -> tuple[str, list[str]]:
-    data = api.json("GET", f"/partstudios/d/{doc.did}/w/{doc.wid}/e/{doc.part_studio}/features")
-    states = data.get("featureStates", {})
-    statuses = [state.get("featureStatus", "") for state in states.values()]
-    errors = [f"{fid}: {state}" for fid, state in states.items() if state.get("featureStatus") not in ("OK", None)]
-    return ("OK" if statuses and all(s == "OK" for s in statuses) else ",".join(statuses) or "MISSING"), errors
-
-
-def feature_studio_problems(api: Transport, doc: DocumentRef) -> list[str]:
-    specs = api.json("GET", f"/featurestudios/d/{doc.did}/w/{doc.wid}/e/{doc.feature_studio}/featurespecs")
-    problems = []
-    for key in ("parseErrors", "notices", "errors"):
-        for item in specs.get(key, []) or []:
-            problems.append(json.dumps(item)[:400])
-    return problems
 
 
 # ------------------------------------------------------------------ data import
@@ -191,15 +150,6 @@ def _unwrap(value: Any) -> Any:
     return value
 
 
-def part_contacts(api: Transport, doc: DocumentRef) -> list[tuple[str, str, float, float]]:
-    """Exact B-rep pairwise check inside Onshape: for every part pair closer
-    than 3 mm return (a, b, minimum distance m, intersection volume m^3)."""
-    script = (Path(__file__).parent / "interference.fs").read_text()
-    reply = api.json("POST", f"/partstudios/d/{doc.did}/w/{doc.wid}/e/{doc.part_studio}/featurescript", body={"script": script})
-    rows = _unwrap(reply.get("result")) or []
-    return [(str(a), str(b), float(d), float(v)) for a, b, d, v in rows]
-
-
 CONTACT_TOLERANCE = 5e-5   # parts closer than 0.05 mm are considered attached
 INTERFERENCE_VOLUME = 1e-9  # 1 mm^3
 TIGHT_CLEARANCE = 1.5e-3
@@ -262,8 +212,8 @@ def expected_bbox(project: Project, cid: str) -> tuple[np.ndarray, np.ndarray]:
     return rotated.min(axis=0), rotated.max(axis=0)
 
 
-def verify(project: Project, parts: dict[str, dict[str, Any]], result: StageResult, tolerance: float = 0.0015) -> None:
-    _, meta = generate(project)
+def verify(project: Project, parts: dict[str, dict[str, Any]], result: StageResult, meta: dict[str, dict[str, Any]],
+           tolerance: float = 0.0015) -> None:
     for cid in project.spec.components:
         part = parts.get(cid)
         if part is None:
@@ -293,7 +243,12 @@ def verify(project: Project, parts: dict[str, dict[str, Any]], result: StageResu
 
 
 # --------------------------------------------------------------------- pipeline
-def sync(project: Project, api: Transport, result: StageResult, keep_failed: bool = False,
+Builder = Callable[[Transport, DocumentRef, Project, StageResult], dict[str, dict[str, Any]]]
+"""Models the robot in ``doc`` with standard features; returns per-component metadata
+(``fabricated``, ``catalog_mass``, ``density``, ``material``) used by verification."""
+
+
+def sync(project: Project, api: Transport, result: StageResult, builder: Builder, keep_failed: bool = False,
          attempt_label: str = "") -> SyncReport:
     spec = project.spec
     name = spec.cad.document_name or spec.robot.name
@@ -305,28 +260,13 @@ def sync(project: Project, api: Transport, result: StageResult, keep_failed: boo
     result.metrics["onshape_document"] = doc.url()
     ok = False
     try:
-        microversion = write_feature_studio(api, doc, project)
-        problems = feature_studio_problems(api, doc)
-        if problems:
-            result.add(Diagnostic.error("featurescript_compile_error", "Feature Studio failed to compile",
-                                        subjects=["cad"], data={"problems": problems[:20]}))
-            return report
-        add_robot_feature(api, doc, microversion, spec.robot.name)
-        status, errors = "", []
-        for _ in range(30):
-            status, errors = feature_status(api, doc)
-            if status == "OK" or errors:
-                break
-            time.sleep(1.0)
-        report.feature_status, report.feature_errors = status, errors
-        if status != "OK":
-            result.add(Diagnostic.error("cad_regeneration_failed", f"robot feature status {status}", subjects=["cad"], data={"errors": errors}))
+        meta = builder(api, doc, project, result)
+        if not result.ok:
             return report
         mesh_dir = project.build_dir("cad") / "meshes"
         report.parts = import_parts(api, doc, project, mesh_dir)
         before = len(result.errors)
-        verify(project, report.parts, result)
-        report.contacts = verify_contacts(project, part_contacts(api, doc), result)
+        verify(project, report.parts, result, meta)
         ok = len(result.errors) == before
         return report
     except (OnshapeError, ValueError, KeyError, AttributeError, TypeError) as error:
@@ -336,11 +276,11 @@ def sync(project: Project, api: Transport, result: StageResult, keep_failed: boo
         if not ok and not keep_failed and report.document:
             try:
                 delete_document(api, report.document.did)
+                result.add(Diagnostic.warning("cad_attempt_deleted", f"failed CAD attempt deleted: {report.document.url()}",
+                                              subjects=["cad"], data={"document_id": report.document.did}))
             except OnshapeError as error:
                 result.add(Diagnostic.error("cad_attempt_delete_failed", str(error), subjects=["cad"],
                                             data={"document_id": report.document.did}))
-            result.add(Diagnostic.warning("cad_attempt_deleted", f"failed CAD attempt deleted: {report.document.url()}",
-                                          subjects=["cad"], data={"document_id": report.document.did}))
 
 
 def write_cad_model(project: Project, report: SyncReport, api_name: str) -> Path:
@@ -353,8 +293,7 @@ def write_cad_model(project: Project, report: SyncReport, api_name: str) -> Path
         pass
     model = {
         "source": {"provider": "onshape", "transport": api_name, "document_id": doc.did, "workspace_id": doc.wid,
-                   "element_id": doc.part_studio, "feature_studio_id": doc.feature_studio, "url": doc.url(),
-                   "generator_digest": source_digest(project), **workspace},
+                   "element_id": doc.part_studio, "url": doc.url(), **workspace},
         "parts": report.parts,
         "contacts": report.contacts,
     }
