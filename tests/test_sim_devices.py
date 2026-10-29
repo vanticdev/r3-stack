@@ -104,3 +104,14 @@ def test_hall_encoder_four_rising_edges_per_rev():
         edges += encoder.update((k - 1) * 0.001, k * 0.001, 2 * np.pi * k / 1000)
     assert sum(1 for _, rising in edges if rising) == 4
     assert len(edges) == 8
+
+
+def test_hall_encoder_aligned_magnet_is_not_a_switching_boundary():
+    encoder = HallEncoder(4, 0.0, np.random.default_rng(3))
+    assert encoder.update(0, 0, 0) == []
+    assert encoder.level == 0  # nominal magnet directly faces the Hall die
+    for k in range(1, 101):
+        assert encoder.update((k-1)*.001, k*.001, (-1)**k * 1e-4) == []
+    edges = encoder.update(.1, .2, np.pi/4)
+    assert len(edges) == 1 and edges[0][1] is True
+    assert edges[0][0] == pytest.approx(.15, abs=2e-5)

@@ -314,6 +314,8 @@ class CoSimKernel:
                     params = _behavior_params(project, cid)
                     self.encoder = HallEncoder(int(params.get("pulses_per_wheel_rev", 1)), to_si(params.get("jitter", 0.0)),
                                                self.rng_encoder)
+                    self.assumptions.append(("sensors", "Hall pulse phase assumes a magnet centred over the sensor at zero "
+                                             "shaft angle; pulse width is the existing 50% duty approximation."))
                     self.encoder_line = (bmap.device, int(bmap.channel or 0))
                     if params.get("target") == "differential_carrier" and self.vm.drives:
                         # Magnets on the spur shaft: carrier angle (mean of the driven wheels) x spur/carrier ratio.

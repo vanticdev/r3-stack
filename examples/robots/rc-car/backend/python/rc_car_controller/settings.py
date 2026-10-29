@@ -90,7 +90,7 @@ DEFAULT_BINDINGS: dict[str, dict[str, Any]] = {
     "i2c": {"interface": "i2c", "device": "/dev/i2c-1"},
     "encoder": {"interface": "gpio", "device": "gpiochip0", "channel": 17},
     # Failsafe heartbeat to the HAT's ATtiny412 arbiter (J8 pin 13): toggled once per control cycle; after
-    # 100 ms without an edge the arbiter holds the ESC at neutral.
+    # 60 ms without an edge the arbiter applies its brake pattern, then neutral.
     "heartbeat": {"interface": "gpio", "device": "gpiochip0", "channel": 27},
 }
 
