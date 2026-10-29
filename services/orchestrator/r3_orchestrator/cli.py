@@ -142,12 +142,13 @@ def cmd_create(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_serve(args: argparse.Namespace) -> dict[str, Any]:
     try:
-        from .api.server import serve
+        from .api.server import dev_mode, serve
     except ImportError as error:
         return {"ok": False, "code": "api_unavailable",
                 "message": f"r3 serve needs the api extra (pip install 'r3-platform[api]'): {error}"}
-    serve(host=args.host, port=args.port, projects_roots=args.projects_root, web_dist=args.web_dist)
-    return {"ok": True, "code": "", "served": f"http://{args.host}:{args.port}"}
+    reload = dev_mode() if args.reload is None else args.reload
+    serve(host=args.host, port=args.port, projects_roots=args.projects_root, web_dist=args.web_dist, reload=reload)
+    return {"ok": True, "code": "", "served": f"http://{args.host}:{args.port}", "reload": reload}
 
 
 def cmd_doctor(args: argparse.Namespace) -> dict[str, Any]:
@@ -278,6 +279,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--projects-root", action="append", metavar="DIR",
                    help="Directory containing projects (repeatable; default: examples/robots).")
     p.add_argument("--web-dist", default=None, help="Built web app to serve (default: apps/web/dist).")
+    reload = p.add_mutually_exclusive_group()
+    reload.add_argument("--reload", dest="reload", action="store_true", default=None,
+                        help="Restart on Python changes under packages/, services/ and integrations/ "
+                             "(default in dev: a source checkout or R3_DEV=1).")
+    reload.add_argument("--no-reload", dest="reload", action="store_false", help="Never reload (production behavior).")
     p.set_defaults(func=cmd_serve)
 
     p = sub.add_parser("create", parents=[common], help="Scaffold a new R3 robot project repository.")

@@ -7,6 +7,8 @@ way whichever interface produced it.
 
 from __future__ import annotations
 
+import traceback
+from pathlib import Path
 from typing import Any
 
 #: HTTP status per error code; anything else is 400.
@@ -38,6 +40,7 @@ STATUS_BY_CODE: dict[str, int] = {
     "confirmation_required": 428,
     "agent_cli_missing": 503,
     "api_unavailable": 503,
+    "server_code_stale": 503,
     "internal_error": 500,
 }
 
@@ -61,3 +64,52 @@ def raise_for(payload: dict[str, Any], default_code: str = "operation_failed") -
     code = str(payload.get("code") or default_code)
     data = {k: v for k, v in payload.items() if k not in ("ok", "code", "message")}
     raise ApiError(code, str(payload.get("message") or code.replace("_", " ")), data)
+
+
+#: Validation errors listed in ``data.errors`` of a ``project_invalid`` error; the rest are counted.
+MAX_LISTED_ERRORS = 5
+
+
+def _first_line(text: str, limit: int = 300) -> str:
+    line = next((part.strip() for part in str(text).splitlines() if part.strip()), "")
+    return line if len(line) <= limit else line[: limit - 1] + "\u2026"
+
+
+def project_load_error(error: Exception, spec_path: str | Path, data: dict[str, Any] | None = None) -> ApiError:
+    """A readable ``project_invalid`` error for a project that does not load.
+
+    ``message`` is one short sentence; ``data.errors`` lists up to
+    ``MAX_LISTED_ERRORS`` problems as ``{path, message, type}`` (pydantic field
+    paths joined with ``.``, e.g. ``components.gps.type``), ``data.total`` counts
+    them all and ``data.details`` keeps the full text (pydantic dump or traceback).
+    """
+    from pydantic import ValidationError
+    import yaml
+
+    name = Path(spec_path).name
+    errors: list[dict[str, str]]
+    if isinstance(error, ValidationError):
+        raw = error.errors(include_url=False)
+        errors = [{"path": ".".join(str(part) for part in e.get("loc", ())), "message": str(e.get("msg", "")),
+                   "type": str(e.get("type", ""))} for e in raw]
+        total = error.error_count()
+        first = errors[0] if errors else {"path": "", "message": ""}
+        where = f"{first['path']}: " if first["path"] else ""
+        message = (f"{name} is invalid: {total} validation error{'s' if total != 1 else ''} in {error.title}; "
+                   f"first: {where}{first['message']}")
+        details = str(error)
+    elif isinstance(error, yaml.YAMLError):
+        mark = getattr(error, "problem_mark", None)
+        problem = getattr(error, "problem", None) or _first_line(str(error))
+        at = f"line {mark.line + 1}, column {mark.column + 1}: " if mark is not None else ""
+        errors = [{"path": "", "message": f"{at}{problem}", "type": "yaml_syntax"}]
+        total = 1
+        message = f"{name} is not valid YAML: {at}{problem}"
+        details = str(error)
+    else:
+        errors = [{"path": "", "message": _first_line(str(error)) or type(error).__name__, "type": type(error).__name__}]
+        total = 1
+        message = f"{name} does not load: {type(error).__name__}: {errors[0]['message']}"
+        details = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    return ApiError("project_invalid", message, {**(data or {}), "exception": type(error).__name__, "file": str(spec_path),
+                                                 "errors": errors[:MAX_LISTED_ERRORS], "total": total, "details": details})

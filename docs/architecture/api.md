@@ -13,13 +13,29 @@ as the `r3` CLI and the MCP server. The implementation lives in
 | `agents.py` | Headless Claude Code / Codex sessions |
 | `events.py` | SSE event logs |
 | `errors.py` | `{code, message, data}` errors |
+| `freshness.py` | Schema code version (`server_code_stale`) and the project cache |
 
 The release gate is `r3_orchestrator/release.py`.
 
 ```bash
 pip install 'r3-platform[api]'        # fastapi, uvicorn, mcp, ruamel.yaml
-r3 serve [--host 127.0.0.1] [--port 8321] [--projects-root DIR ...] [--web-dist apps/web/dist]
+r3 serve [--host 127.0.0.1] [--port 8321] [--projects-root DIR ...] [--web-dist apps/web/dist] [--reload | --no-reload]
 ```
+
+- **Dev reload:** in dev, `r3 serve` runs uvicorn with `reload=True` and restarts its
+  worker whenever a Python file under the checkout's `packages/`, `services/` or
+  `integrations/` changes. Dev means running from a source checkout (`pyproject.toml`
+  and `.git` or `packages/` next to the package) or `R3_DEV=1`; `R3_DEV=0` or
+  `--no-reload` turns it off, `--reload` forces it on. The worker builds the app with
+  the factory `r3_orchestrator.api.server:app_from_environment`, so `serve()` passes
+  the options as `$R3_PROJECTS_ROOTS` and `$R3_WEB_DIST`. An installed package serves
+  without reloading, as before.
+- **Never stale:** a server that cannot re-import changed code (no reload) answers
+  every project request with `503 server_code_stale` once the `r3_model` / `r3_catalog`
+  source on disk differs from what it imported (`data.changed[]` lists the files):
+  restart it. Loaded projects are cached keyed on that code version plus the mtimes
+  of `robot.yaml`, `r3.lock.yaml` and the project and bundled catalog files, so an
+  edit is visible on the next request.
 
 - `--projects-root` (repeatable; also `$R3_PROJECTS_ROOTS`, `:`-separated) holds the
   projects. A root is either a project itself (it contains `robot.yaml`) or a directory
@@ -53,7 +69,14 @@ r3 serve [--host 127.0.0.1] [--port 8321] [--projects-root DIR ...] [--web-dist 
 | 428 | `confirmation_required` |
 | 500 | `internal_error` |
 | 502 | `github_failed` (the scaffold exists; `data` holds it) |
-| 503 | `agent_cli_missing` (`data.providers`) |
+| 503 | `agent_cli_missing` (`data.providers`), `server_code_stale` (`data.changed[]`; restart `r3 serve`) |
+
+- **`project_invalid`** (a project that does not load) has a one-line `message` naming
+  the first problem, `data.errors[]` with the first five problems as
+  `{path, message, type}` (`path` is the pydantic field path joined with `.`, e.g.
+  `components.gps.type`; empty for YAML syntax errors, whose `message` has the line),
+  `data.total` (all problems), `data.details` (the full pydantic text or traceback) and
+  `data.project`, `data.file`, `data.exception`. The raw dump is never in `message`.
 
 - **Artifact URLs:** files under a project's `build/` are referenced as
   `/api/projects/{pid}/artifacts/<path relative to build/>`. Views return these URLs
@@ -126,7 +149,9 @@ Fields:
 - `stages`: `{stage: ok|failed|unavailable|missing}`
 - `last_run`: `{status: ok|failed, finished_at, failed_stages[], stale, counts, run_id?, run_status?}` or `null`
 - `onshape_url`
-- `error`: set when `robot.yaml` does not load; the project is still listed.
+- `error`: set when `robot.yaml` does not load; the project is still listed. `error` is
+  the concise `project_invalid` message and `error_detail` the full error body (see
+  Conventions).
 
 ### `ProjectDetail`
 

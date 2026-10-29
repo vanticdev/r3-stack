@@ -229,6 +229,15 @@ tbody tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .empty { display: grid; place-items: center; gap: 8px; padding: 36px 16px; color: var(--text-muted); text-align: center; }
 .error-box { padding: 10px 12px; border-radius: 6px; border: 1px solid var(--critical); background: var(--critical-bg); color: var(--text-primary); }
 .error-box code { color: var(--text-secondary); }
+.load-error { display: grid; gap: 6px; min-width: 0; }
+.load-error-message { color: var(--critical); }
+.error-box .load-error-message { color: var(--text-primary); }
+.load-error-issues { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 12.5px; }
+.load-error-issues li { overflow-wrap: anywhere; }
+.load-error-issues code { margin-right: 6px; color: var(--text-primary); }
+.load-error pre.code { max-height: 280px; white-space: pre-wrap; }
+.load-error.compact .load-error-issues { font-size: 12px; }
+.project-row .status .load-error { flex: 1 1 100%; }
 .skeleton { background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
