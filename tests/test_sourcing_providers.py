@@ -75,8 +75,7 @@ def test_expresslrs_targets(tmp_path):
     assert not provider.handles(requirement({"requires": {"kind": "radio", "protocol": "sbus"}}))
 
 
-def test_expresslrs_900_mhz_band_selection(tmp_path):
-    provider = ExpressLrsProvider(http=recorded_http(tmp_path))
+def test_expresslrs_900_mhz_band_selection():
     req = requirement({"requires": {"kind": "radio", "band": "915 MHz"}})
     from r3_catalog.sourcing.providers.expresslrs import _categories
 

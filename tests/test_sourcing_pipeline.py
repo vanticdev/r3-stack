@@ -284,8 +284,6 @@ def test_import_vendor_step_and_add_mate_connectors(tmp_path, monkeypatch):
         sourcing.search_slot(project, slot, providers=providers(tmp_path, monkeypatch))
         sourcing.choose(root, slot, 1)
     project = Project.load(root)
-    step_url = next(m["url"] for m in yaml.safe_load((root / project.lock["sourcing"]["pi"]["catalog_file"]).read_text())["sourced"]["models"]
-                    if m["format"] == "step_zip")
     archive = io.BytesIO()
     with zipfile.ZipFile(archive, "w") as zf:
         zf.writestr("rpi5/RPi5.step", "ISO-10303-21; fixture")

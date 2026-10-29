@@ -28,8 +28,8 @@ from typing import Any, Callable
 
 import yaml
 
-from r3_catalog.sourcing import (Candidate, HttpClient, Ranked, Requirement, TwinCheck, build_entry, catalog_params, entry_id,
-                                 file_name, rank, render_file, search, select_template, substituted_catalog)
+from r3_catalog.sourcing import (Candidate, HttpClient, Ranked, Requirement, TwinCheck, build_entry, catalog_params, file_name,
+                                 rank, render_file, search, select_template, substituted_catalog)
 from r3_catalog.sourcing.build import digest as text_digest
 from r3_catalog.sourcing.providers import PROVIDERS, make_providers
 from r3_model.diagnostics import Diagnostic, StageResult
@@ -215,12 +215,72 @@ def search_slot(project: Project, slot: str, provider_ids: list[str] | None = No
     folder = _slot_dir(project, requirement.slot)
     folder.mkdir(parents=True, exist_ok=True)
     (folder / CANDIDATES_FILE).write_text(json.dumps(payload, indent=1, default=str))
+    if _plot_ranking(payload, folder / "ranking.png"):
+        payload["plot"] = f"build/{BUILD}/{requirement.slot}/ranking.png"
+        (folder / CANDIDATES_FILE).write_text(json.dumps(payload, indent=1, default=str))
     for provider in providers:
         if getattr(provider, "last_output", ""):
             (folder / f"{provider.id}_output.json").write_text(provider.last_output)
     emit("search_finished", {"slot": requirement.slot, "counts": payload["counts"],
                              "best": _summary(ranked[0]) if ranked and ranked[0].tier != "rejected" else None})
     return payload
+
+
+def _plot_ranking(payload: dict[str, Any], path: Path) -> bool:
+    """Score vs unit price per tier (rejected omitted), the top candidates labelled."""
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        return False
+    ranked = [r for r in payload["ranked"] if r["tier"] != "rejected"][:40]
+    if not ranked:
+        return False
+    fig, (left, right) = plt.subplots(1, 2, figsize=(12, 4.8), gridspec_kw={"width_ratios": [1.1, 1]})
+    colors = {"eligible": "#1a7f37", "unverified": "#bf8700"}
+    priced = any(r["unit_price"] is not None for r in ranked)
+    unpriced = max((r["unit_price"] or 0) for r in ranked) * 1.15 or 1.0
+
+    def x_of(r: dict[str, Any]) -> float:
+        if not priced:
+            return float(r["rank"])
+        return r["unit_price"] if r["unit_price"] is not None else unpriced
+
+    for tier, color in colors.items():
+        rows = [r for r in ranked if r["tier"] == tier]
+        left.scatter([x_of(r) for r in rows], [r["score"] for r in rows], c=color, label=tier, s=36,
+                     edgecolors=["#cf222e" if r["twin"]["errors"] else "none" for r in rows], linewidths=1.5)
+    for r in ranked[:5]:
+        left.annotate(f"{r['rank']}. {r['candidate']['name'][:28]}", (x_of(r), r["score"]), fontsize=7, xytext=(4, 3),
+                      textcoords="offset points", rotation=20)
+    left.set_xlabel(f"unit price ({ranked[0]['currency']}; unpriced at the right edge)" if priced
+                    else "rank (these sources publish no prices)")
+    left.set_ylabel("score (100 = no penalties)")
+    left.set_title(f"{payload['slot']}: {payload['counts']['eligible']} eligible, {payload['counts']['unverified']} unverified, "
+                   f"{payload['counts']['rejected']} rejected", fontsize=10)
+    left.legend(fontsize=8)
+    top = ranked[:10]
+    keys = sorted({k for r in top for k in r["breakdown"]})
+    labels = [f"{r['rank']}. {r['candidate']['name'][:30]}" for r in top]
+    negative, positive = [0.0] * len(top), [0.0] * len(top)
+    for key in keys:
+        values = [r["breakdown"].get(key, 0.0) for r in top]
+        starts = [n if v < 0 else p for v, n, p in zip(values, negative, positive)]
+        right.barh(labels, values, left=starts, label=key)
+        negative = [n + min(v, 0.0) for n, v in zip(negative, values)]
+        positive = [p + max(v, 0.0) for p, v in zip(positive, values)]
+    right.axvline(0, color="#57606a", linewidth=0.8)
+    right.invert_yaxis()
+    right.set_xlabel("score penalties / bonuses")
+    right.tick_params(axis="y", labelsize=7)
+    right.legend(fontsize=7, loc="lower left")
+    right.set_title("top 10: score breakdown", fontsize=10)
+    fig.tight_layout()
+    fig.savefig(path, dpi=110)
+    plt.close(fig)
+    return True
 
 
 def _summary(entry: Ranked) -> dict[str, Any]:
