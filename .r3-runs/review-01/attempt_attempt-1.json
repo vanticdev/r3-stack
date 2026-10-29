@@ -1,0 +1,40 @@
+{
+  "stage": "cad",
+  "ok": false,
+  "started_at": 1793235592.6750982,
+  "duration_s": 8.858505964279175,
+  "diagnostics": [
+    {
+      "code": "onshape_request_failed",
+      "severity": "error",
+      "message": "Onshape HTTP 400: {\"error\":\"Export storage returned HTTP 401.\"}",
+      "subjects": [
+        "cad"
+      ],
+      "data": {
+        "status": 400
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_attempt_deleted",
+      "severity": "warning",
+      "message": "failed CAD attempt deleted: https://cad.onshape.com/documents/0a395b3f93bab2db0e18f591/w/5c6e91705300540754804c5b/e/1c0626493c52796a00903822",
+      "subjects": [
+        "cad"
+      ],
+      "data": {
+        "document_id": "0a395b3f93bab2db0e18f591"
+      },
+      "stage": "cad",
+      "hint": ""
+    }
+  ],
+  "artifacts": [],
+  "assumptions": [],
+  "metrics": {
+    "onshape_document": "https://cad.onshape.com/documents/0a395b3f93bab2db0e18f591/w/5c6e91705300540754804c5b/e/1c0626493c52796a00903822"
+  },
+  "inputs": {}
+}

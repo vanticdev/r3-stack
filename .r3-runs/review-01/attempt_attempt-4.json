@@ -1,0 +1,205 @@
+{
+  "stage": "cad",
+  "ok": false,
+  "started_at": 1793235680.4376588,
+  "duration_s": 25.138185024261475,
+  "diagnostics": [
+    {
+      "code": "cad_mass_computed",
+      "severity": "info",
+      "message": "chassis: CAD mass 301.5 g from geometry x 2700 kg/m3 (catalog estimate 330.0 g, delta -28.5 g)",
+      "subjects": [
+        "chassis"
+      ],
+      "data": {
+        "cad_mass": 0.30147855934735157,
+        "catalog_mass": 0.33
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_mass_computed",
+      "severity": "info",
+      "message": "deck: CAD mass 71.2 g from geometry x 1270 kg/m3 (catalog estimate 65.0 g, delta +6.2 g)",
+      "subjects": [
+        "deck"
+      ],
+      "data": {
+        "cad_mass": 0.07124700000000007,
+        "catalog_mass": 0.065
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_mass_computed",
+      "severity": "info",
+      "message": "standoff_rl: CAD mass 3.0 g from geometry x 2700 kg/m3 (catalog estimate 2.8 g, delta +0.2 g)",
+      "subjects": [
+        "standoff_rl"
+      ],
+      "data": {
+        "cad_mass": 0.003014927564787869,
+        "catalog_mass": 0.0028
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_mass_computed",
+      "severity": "info",
+      "message": "standoff_rr: CAD mass 3.0 g from geometry x 2700 kg/m3 (catalog estimate 2.8 g, delta +0.2 g)",
+      "subjects": [
+        "standoff_rr"
+      ],
+      "data": {
+        "cad_mass": 0.003014927564787869,
+        "catalog_mass": 0.0028
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_mass_computed",
+      "severity": "info",
+      "message": "standoff_fl: CAD mass 3.0 g from geometry x 2700 kg/m3 (catalog estimate 2.8 g, delta +0.2 g)",
+      "subjects": [
+        "standoff_fl"
+      ],
+      "data": {
+        "cad_mass": 0.003014927564787869,
+        "catalog_mass": 0.0028
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_mass_computed",
+      "severity": "info",
+      "message": "standoff_fr: CAD mass 3.0 g from geometry x 2700 kg/m3 (catalog estimate 2.8 g, delta +0.2 g)",
+      "subjects": [
+        "standoff_fr"
+      ],
+      "data": {
+        "cad_mass": 0.003014927564787869,
+        "catalog_mass": 0.0028
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_mass_computed",
+      "severity": "info",
+      "message": "knuckle_fl: CAD mass 24.2 g from geometry x 1010 kg/m3 (catalog estimate 18.0 g, delta +6.2 g)",
+      "subjects": [
+        "knuckle_fl"
+      ],
+      "data": {
+        "cad_mass": 0.024240000000000022,
+        "catalog_mass": 0.018
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_mass_computed",
+      "severity": "info",
+      "message": "knuckle_fr: CAD mass 24.2 g from geometry x 1010 kg/m3 (catalog estimate 18.0 g, delta +6.2 g)",
+      "subjects": [
+        "knuckle_fr"
+      ],
+      "data": {
+        "cad_mass": 0.024240000000000022,
+        "catalog_mass": 0.018
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_envelope_mismatch",
+      "severity": "error",
+      "message": "pi geometry deviates 2.00 mm from its catalog envelope at pose",
+      "subjects": [
+        "pi"
+      ],
+      "data": {
+        "max_deviation": 0.0019999927282333407,
+        "cad_min": [
+          0.06750000268220901,
+          -0.02800000086426735,
+          0.08100000023841858
+        ],
+        "cad_max": [
+          0.15449999272823334,
+          0.02800000086426735,
+          0.09799999743700027
+        ],
+        "expected_min": [
+          0.0675,
+          -0.028,
+          0.081
+        ],
+        "expected_max": [
+          0.1525,
+          0.028,
+          0.098
+        ]
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_envelope_mismatch",
+      "severity": "error",
+      "message": "hat geometry deviates 1.50 mm from its catalog envelope at pose",
+      "subjects": [
+        "hat"
+      ],
+      "data": {
+        "max_deviation": 0.0015000027418136663,
+        "cad_min": [
+          0.06849999725818634,
+          -0.02824999950826168,
+          0.09350000321865082
+        ],
+        "cad_max": [
+          0.13500000536441803,
+          0.02824999950826168,
+          0.1054999977350235
+        ],
+        "expected_min": [
+          0.07,
+          -0.02825,
+          0.0935
+        ],
+        "expected_max": [
+          0.135,
+          0.02825,
+          0.1055
+        ]
+      },
+      "stage": "cad",
+      "hint": ""
+    },
+    {
+      "code": "cad_attempt_deleted",
+      "severity": "warning",
+      "message": "failed CAD attempt deleted: https://cad.onshape.com/documents/d310765cc0669ccf911aa7e6/w/aeb2555e032e69e08238f32d/e/cff4791a9f59cffe9aff29ad",
+      "subjects": [
+        "cad"
+      ],
+      "data": {
+        "document_id": "d310765cc0669ccf911aa7e6"
+      },
+      "stage": "cad",
+      "hint": ""
+    }
+  ],
+  "artifacts": [],
+  "assumptions": [],
+  "metrics": {
+    "onshape_document": "https://cad.onshape.com/documents/d310765cc0669ccf911aa7e6/w/aeb2555e032e69e08238f32d/e/cff4791a9f59cffe9aff29ad"
+  },
+  "inputs": {}
+}
