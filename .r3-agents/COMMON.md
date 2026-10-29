@@ -54,3 +54,15 @@ Rules:
   and key numbers), what is approximated, any diagnostics found against the RC-car
   design, contract-change requests, and the exact commands to run your stage on
   `examples/robots/rc-car`.
+
+## CAD policy (user directive): NO FeatureScript, ever
+CAD is built only with Onshape's standard, user-editable features: sketches,
+extrude, revolve, hole, fillet, chamfer, patterns, mirror, boolean, mate
+connectors, and Assemblies with standard mates. This is how a human builds it in
+the Onshape UI. Feature Studios, custom features, FeatureScript evaluation and any
+generated `.fs` source are forbidden. `integrations/onshape/r3_onshape/policy.py`
+enforces this in the R3 client, `tests/test_cad_policy.py` tests it, and
+`.claude/settings.json` denies the onshape-native `evaluate` tool. Do not work
+around it. Verification uses native REST data instead: `bodydetails` face/edge
+surface definitions, mass properties, bounding boxes, and tessellated meshes with
+Python mesh booleans (manifold3d/trimesh are installed in the shared venv).
