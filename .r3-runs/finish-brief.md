@@ -40,3 +40,24 @@ Onshape note: the per-user quota on the Part Studio features endpoint was exhaus
 puzzle-piece model, objects are rigid Part Studios, so pose-only changes need NO Onshape rebuild:
 recompose cad_model.json from the per-object meshes and the compiled poses. Only changed part geometry
 needs rebuilding.
+
+## Final acceptance test (user requirement, runs LAST after lanes A–D merge)
+A completely independent Claude Opus 5.5 agent, using the default system prompt and given none of these
+internal briefs, builds an autonomous RC car from scratch ("literally nothing") with R3, as a user would
+(CLI / MCP / web / docs). Constraints from the user:
+- Do NOT create a GitHub repository or link.
+- Use as many off-the-shelf parts as possible.
+- Everything structural (frame, mounts, brackets, body) is 3D printed.
+- No custom gears or gearbox: the drivetrain (motor, gearbox/differential, axles, wheels) is bought
+  off the shelf.
+- The user already owns a Raspberry Pi 5 and an MPU-6050 IMU. Everything else is bought: GPS module, wheels,
+  motor(s), ESC/drivers, battery, servo, camera, and so on.
+- A camera faces forward. No LiDAR.
+- It must drive autonomously in the twin.
+The run passes when that agent's project meets the same finish line (sections 1–4 above), with only
+the project's own files authored. Its transcript, friction points and failures become the next
+improvement round.
+
+## Lane D: from-scratch readiness, so the acceptance test is possible
+Camera support (HAL + twin), off-the-shelf drivetrain catalog, FDM 3D-printing as a manufacturing
+process, a blank-project flow, and agent-facing docs. See the lane D task.
