@@ -15,7 +15,7 @@ requirements:
   # maximum cruise speed (software.config.max_cruise_speed_mps); proven by range_failsafe and pi_hang.
   failsafe_stop_distance: 3 m
   # At the 8 m/s top speed (manual driving) 3 m is physically impossible; the radio failsafe stop distance
-  # proven by top_speed_failsafe (7.1 m from 8.0 m/s, 0.25 s software failsafe then ESC brake) plus ~25 % margin.
+  # proven by top_speed_failsafe (6.0-7.1 m from 8.0 m/s over runs: 0.25 s software failsafe, then ESC brake) plus margin.
   failsafe_stop_distance_at_top_speed: 9 m
   max_wire_voltage_drop_fraction: 0.03
   min_wire_clearance_moving: 8 mm
