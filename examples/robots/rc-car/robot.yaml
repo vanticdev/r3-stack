@@ -130,6 +130,7 @@ components:
   rx_antenna:  {type: elrs-t-antenna}
   tape_gps:    {type: foam-tape-3m-4026, params: {size: [18 mm, 18 mm, 1.6 mm]}}
   gps:         {type: gps-ublox-m10}
+  lead_post:   {type: lead-post-petg}   # tie post for the leads climbing to the HAT's top-entry headers
 
 # Join ids name the derived fasteners (<id> or <id>_<n>) and fit interfaces; `verify` holds the exact-geometry limits
 # the CAD fit checks apply (radial clearances/interferences, engagement lengths, retainers).
@@ -258,6 +259,7 @@ assembly:
     - {id: rx_tape_top, a: tape_rx.top, b: receiver.bottom}
     - {id: gps_tape_bottom, a: deck.gps_pad, b: tape_gps.bottom}
     - {id: gps_tape_top, a: tape_gps.top, b: gps.bottom, clock: 90 deg}
+    - {id: lead_post_mount, a: deck.lead_post, b: lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
     # Antenna mast through-bolted to the PETG deck with nylocs underneath; antenna bonded to the mast top.
     - {id: mast_mount, a: deck.mast, b: antenna_mast.flange, clock: 0 deg, fasteners: {type: M3x12, nut: nut-m3-nyloc, head: b}}
     - {id: antenna_bond, a: antenna_mast.antenna_seat, b: rx_antenna.seat}
@@ -417,7 +419,7 @@ cad:
     Deck and electronics stack: [standoff_rl, standoff_rr, standoff_fl, standoff_fr, deck, cap_so_rl, cap_so_rr, cap_so_fl, cap_so_fr,
                                  pi_spacer_1, pi_spacer_2, pi_spacer_3, pi_spacer_4, pi, pi_standoff_1, pi_standoff_2, pi_standoff_3,
                                  pi_standoff_4, hat, cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, tape_rx, receiver, antenna_mast,
-                                 rx_antenna, tape_gps, gps]
+                                 rx_antenna, tape_gps, gps, lead_post]
     Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc]
 
 software:

@@ -81,6 +81,7 @@ components:
       pi_4: {kind: hole_pattern, origin: [9 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       rx_pad: {kind: adhesive_pad, origin: [70 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       gps_pad: {kind: adhesive_pad, origin: [-65 mm, 30 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      lead_post: {kind: hole_pattern, origin: [-22 mm, -48.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       mast: {kind: hole_pattern, origin: [55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
   - id: standoff-m3-47
     kind: structure
@@ -922,6 +923,27 @@ components:
     interfaces:
       base: {kind: hole_pattern, origin: [0.25 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 6 mm], [0, -5 mm, 3 mm, tapped, 6 mm]]}}
       top: {kind: hole_pattern, origin: [0.25 mm, 0, 27.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
+  - id: lead-post-petg
+    kind: structure
+    cad_name: Lead post
+    name: Printed cable tie post, PETG, 8 mm x 38 mm
+    description: >
+      Tie post beside the deck's lead slot. The ESC and servo leads plug into the HAT's top-entry headers, so they
+      climb ~45 mm above the deck; a cable tie around this post holds them halfway up (the climb alone exceeds
+      their unsupported-span limit). Screwed from below the deck into a 9 mm M3 thread.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [8 mm, 38 mm]
+      mass: 0.0024
+      material: PETG
+      density: 1270
+      color: "#2c6e9e"
+      fabricated: true
+      solids:
+        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 8 mm, length: 38 mm}
+    interfaces:
+      base: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 9 mm]]}}
   - id: servo-horn-al7075
     kind: structure
     cad_name: Servo horn
