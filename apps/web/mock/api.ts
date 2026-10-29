@@ -262,7 +262,7 @@ export function createMockApi(options: MockOptions) {
     for (const scenario of s.simulation?.scenarios ?? []) {
       for (const [key, expected] of Object.entries(scenario.expect ?? {})) {
         const c = check(scenario.id, key);
-        item(`scenario.${scenario.id}.${key}`, "scenario_expectation", `${scenario.id}.${key}`, expected, c ? [c] : [], c?.detail ?? "");
+        item(`scenario.${scenario.id}.${key}`, "scenario_expectation", scenario.id, expected, c ? [c] : [], c?.detail ?? "");
       }
     }
     for (const stage of STAGES.filter((x) => x !== "report")) {
@@ -532,7 +532,11 @@ export function createMockApi(options: MockOptions) {
       };
     });
     return {
-      bindings: graph ? bindingPinMaps(s.software?.bindings ?? {}, graph) : [],
+      // r3 serve returns the parsed spec (SI numbers, explicit nulls); normalize the raw YAML the same way.
+      bindings: graph ? bindingPinMaps(Object.fromEntries(Object.entries(s.software?.bindings ?? {}).map(([k, b]) => [k, {
+        ...b, channel: b.channel ?? null, baud: (b.baud as number | undefined) ?? null,
+        frequency: b.frequency === undefined || b.frequency === null ? null : quantity(b.frequency),
+      }])), graph) : [],
       modules: (s.software?.modules ?? []).map((m) => {
         const rel = path.join("backend", m.language ?? "python", m.name);
         const dir = path.join(projectDir(pid), rel);

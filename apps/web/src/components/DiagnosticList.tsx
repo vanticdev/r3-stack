@@ -1,15 +1,23 @@
 import type { Diagnostic } from "../api/types.ts";
-import { SeverityChip } from "./ui.tsx";
+import { diagnosticHeadline } from "../lib/labels.ts";
+import { Icon } from "./icons.tsx";
+import { Details } from "./ui.tsx";
 
-export function DiagnosticList({ items, onFocus, selected }: { items: Diagnostic[]; onFocus?: (d: Diagnostic) => void; selected?: Diagnostic | null }) {
-  if (!items.length) return <span className="muted small">No diagnostics.</span>;
+/** Compact diagnostics: a severity mark, the human headline and the suggested fix; codes and ids in details. */
+export function DiagnosticList({ items, onFocus, selected, empty = "No diagnostics." }: {
+  items: Diagnostic[]; onFocus?: (d: Diagnostic) => void; selected?: Diagnostic | null; empty?: string;
+}) {
+  if (!items.length) return <span className="muted small">{empty}</span>;
   return (
-    <div className="stack">
+    <div className="diag-list">
       {items.map((d, i) => (
-        <div key={`${d.code}${i}`} className={`diag${onFocus ? " clickable" : ""}${selected === d ? " selected" : ""}`} onClick={() => onFocus?.(d)}>
-          <div className="row"><SeverityChip severity={d.severity} /><code>{d.code}</code><span className="muted small">{d.stage}</span></div>
-          <span className="msg">{d.message}</span>
-          {d.hint && <span className="hint">{d.hint}</span>}
+        <div key={`${d.code}${i}`} className={`diag ${d.severity}${onFocus ? " clickable" : ""}${selected === d ? " selected" : ""}`} onClick={() => onFocus?.(d)}>
+          <span className="sev" aria-label={d.severity}><Icon name={d.severity === "error" ? "x" : d.severity === "warning" ? "alert" : "info"} size={12} /></span>
+          <div className="stack" style={{ gap: 3, minWidth: 0 }}>
+            <span className="msg">{diagnosticHeadline(d)}</span>
+            {d.hint && <span className="hint">Fix: {d.hint}</span>}
+            <Details rows={[["Code", d.code], ["Stage", d.stage], ["Subjects", d.subjects.join(", ")]]} />
+          </div>
         </div>
       ))}
     </div>

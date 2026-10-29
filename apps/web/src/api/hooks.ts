@@ -40,6 +40,9 @@ export const useScenario = (pid: string, scenario: string | null, hz = 30) =>
 export const useDiagnostics = (pid: string) =>
   useQuery({ queryKey: keys.section(pid, "diagnostics"), queryFn: ({ signal }) => api.diagnostics(pid, signal) });
 
+export const useAgentSessions = (pid: string) =>
+  useQuery({ queryKey: keys.section(pid, "agent"), queryFn: ({ signal }) => api.agentSessions(pid, signal) });
+
 export function invalidateProject(client: QueryClient, pid: string): Promise<void> {
   return Promise.all([
     client.invalidateQueries({ queryKey: keys.project(pid) }),

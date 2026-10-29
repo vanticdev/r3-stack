@@ -1,26 +1,22 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 
 import { agentProviders, api } from "../api/client.ts";
-import { invalidateProject, keys, useDoctor, useSpec } from "../api/hooks.ts";
+import { invalidateProject, keys, useAgentSessions, useDiagnostics, useDoctor, useSpec } from "../api/hooks.ts";
 import { streamEvents, type StreamHandle } from "../api/sse.ts";
-import type { AgentEvent, AgentProvider } from "../api/types.ts";
+import type { AgentEvent, AgentProvider, AgentStatus } from "../api/types.ts";
 import { Icon } from "../components/icons.tsx";
-import { Card, Chip, Empty, ErrorBox, Segmented } from "../components/ui.tsx";
+import { Details, ErrorBox, Segmented, Tabs } from "../components/ui.tsx";
+import { AGENT_NAMES } from "../lib/environment.ts";
+import { diagnosticHeadline, plural } from "../lib/labels.ts";
 import { diffHunks, diffLines, parseUnifiedDiff, type DiffLine } from "../lib/domain.ts";
-
-const EXAMPLES = [
-  "Make the battery lead shorter and re-run wiring and electrical.",
-  "Fix the BEC overload at servo stall without changing the ESC.",
-  "Route the motor leads away from the rear wheels so clearance is at least 8 mm.",
-  "Design a robot that follows a line at 2 m/s using the same Pi + HAT.",
-];
+import { timeAgo } from "../lib/units.ts";
 
 interface Session {
   id: string;
   prompt: string;
-  provider: AgentProvider;
+  provider: string;
   events: AgentEvent[];
   status: string;
   baseline: string;
@@ -48,6 +44,15 @@ export function transcriptEntries(events: readonly AgentEvent[]): TranscriptEntr
   return out;
 }
 
+/** What a session achieved: robot.yaml lines changed, checks run, errors left. */
+export function sessionOutcome(events: readonly AgentEvent[]): { changedLines: number; runs: number; failedRuns: number; errorsRemaining: number | null; diff: string | null } {
+  const diff = [...events].reverse().find((e) => typeof e.cumulative_diff === "string")?.cumulative_diff as string | undefined;
+  const changedLines = diff ? parseUnifiedDiff(diff).filter((l) => l && l.op !== " ").length : 0;
+  const runs = events.filter((e) => e.type === "run_finished");
+  const lastRun = runs[runs.length - 1];
+  return { changedLines, runs: runs.length, failedRuns: runs.filter((r) => r.ok === false).length, errorsRemaining: lastRun?.counts?.error ?? null, diff: diff ?? null };
+}
+
 function text(value: unknown): string {
   if (typeof value === "string") {
     try { return JSON.stringify(JSON.parse(value), null, 2); } catch { return value; }
@@ -60,9 +65,8 @@ function ToolEntry({ call, result }: { call: AgentEvent; result: AgentEvent | nu
     <details className="tool">
       <summary>
         <Icon name={!result ? "spinner" : result.ok === false ? "x" : "check"} size={13} />
-        <strong className="mono">{call.name}</strong>
-        <span className="muted">{call.server ? call.server : "built-in"}</span>
-        {result && result.ok === false && <Chip tone="critical">error</Chip>}
+        <span>{(call.name ?? "tool").replace(/^mcp__r3__/, "").replace(/_/g, " ")}</span>
+        {result && result.ok === false && <strong style={{ color: "var(--critical)" }}>failed</strong>}
       </summary>
       <pre className="code">{text(call.input)}</pre>
       {result && <pre className="code" style={{ borderTop: "1px solid var(--line)" }}>{text(result.content)}</pre>}
@@ -73,140 +77,255 @@ function ToolEntry({ call, result }: { call: AgentEvent; result: AgentEvent | nu
 function EventEntry({ event }: { event: AgentEvent }) {
   switch (event.type) {
     case "message":
-      if (event.role === "thinking") return <div className="small muted" style={{ whiteSpace: "pre-wrap" }}>💭 {event.text}</div>;
+      if (event.role === "thinking") return <div className="small muted" style={{ whiteSpace: "pre-wrap" }}>{event.text}</div>;
       if (event.role === "error") return <ErrorBox error={new Error(event.text ?? "agent error")} />;
-      if (event.role === "output" || event.role === "system") return <div className="small muted mono" style={{ whiteSpace: "pre-wrap" }}>{event.text}</div>;
+      if (event.role === "output" || event.role === "system") return <div className="small muted" style={{ whiteSpace: "pre-wrap" }}>{event.text}</div>;
       return <div className={`msg-bubble ${event.role === "user" ? "user" : ""}`}>{event.text}</div>;
     case "run_started":
-      return <div className="row small"><Icon name="play" size={13} />Run via <code>{event.tool}</code>{event.stages?.length ? <span className="muted">{event.stages.join(", ")}</span> : null}<Chip tone="running">running</Chip></div>;
+      return <div className="row small muted"><Icon name="play" size={12} />Running checks{event.stages?.length ? `: ${event.stages.join(", ")}` : ""}…</div>;
     case "run_finished":
       return (
-        <div className="row small"><Icon name={event.ok ? "check" : "x"} size={13} />Run via <code>{event.tool}</code> finished
-          <Chip tone={event.ok ? "good" : "critical"}>{event.ok ? "ok" : "failed"}</Chip>
-          {event.counts?.error ? <span className="muted">{event.counts.error} errors</span> : null}</div>
+        <div className="row small"><Icon name={event.ok ? "check" : "x"} size={12} />Checks {event.ok ? "passed" : "failed"}
+          {event.counts?.error ? <span className="muted">· {plural(event.counts.error, "error")} remaining</span> : null}</div>
       );
     case "spec_changed":
-      return <div className="row small"><Chip tone="info">robot.yaml changed</Chip><code className="muted">{event.previous_sha256?.slice(0, 10)} → {event.sha256?.slice(0, 10)}</code></div>;
-    case "session_started":
-      return <div className="small muted">Session started · <code>{Array.isArray(event.command) ? event.command.slice(0, 4).join(" ") : String(event.command ?? event.provider ?? "")}</code>
-        {event.cli_version ? <> · {String(event.cli_version)}</> : null}</div>;
+      return <div className="row small"><Icon name="code" size={12} />Edited robot.yaml</div>;
     case "stderr":
       return <div className="small mono" style={{ color: "var(--critical)" }}>{event.line}</div>;
+    case "session_started":
     case "session_finished":
-      return <div className="small muted">Session {event.status}{event.error ? `: ${event.error}` : ""}{typeof event.returncode === "number" ? ` (exit ${event.returncode})` : ""}</div>;
+      return null;
     default:
-      return <div className="small muted mono">{event.type}{event.text ? `: ${event.text}` : ""}</div>;
+      return null;
   }
+}
+
+function Outcome({ session }: { session: Session }) {
+  const o = sessionOutcome(session.events);
+  const finished = session.events.find((e) => e.type === "session_finished");
+  const started = session.events.find((e) => e.type === "session_started");
+  const usage = [...session.events].reverse().find((e) => e.type === "usage");
+  if (!finished) return null;
+  const failed = finished.status === "failed" || !!finished.error;
+  return (
+    <div className={`agent-result${failed ? " failed" : ""}`} data-testid="agent-outcome">
+      <div className="summary-line">
+        <strong>{failed ? "The agent stopped with an error" : finished.status === "cancelled" ? "Cancelled" : "Done"}</strong>
+        <span>{o.changedLines ? `changed ${plural(o.changedLines, "line")} of robot.yaml` : "robot.yaml unchanged"}</span>
+        <span>{o.runs ? `${plural(o.runs, "check run")}${o.failedRuns ? `, ${o.failedRuns} failed` : ", all passed"}` : "no checks run"}</span>
+        {o.errorsRemaining !== null && <span>{o.errorsRemaining ? `${plural(o.errorsRemaining, "error")} remaining` : "no errors remaining"}</span>}
+      </div>
+      {finished.error && <span className="small">{finished.error}</span>}
+      <Details rows={[
+        ["Session", session.id], ["Agent", AGENT_NAMES[session.provider] ?? session.provider], ["Model", (started?.model as string | undefined) ?? null],
+        ["Command", Array.isArray(started?.command) ? started.command.join(" ") : (started?.command as string | undefined) ?? null],
+        ["Exit code", typeof finished.returncode === "number" ? String(finished.returncode) : null],
+        ["Tokens", usage ? `${usage.input_tokens ?? 0} in / ${usage.output_tokens ?? 0} out${usage.cost_usd ? ` · $${usage.cost_usd.toFixed(3)}` : ""}` : null],
+      ]} />
+    </div>
+  );
+}
+
+function DiffView({ lines }: { lines: (DiffLine | null)[] }) {
+  return (
+    <div className="diff" data-testid="spec-diff">
+      {lines.map((l, i) => l === null ? <div key={i} className="gap">⋯</div> : (
+        <div key={i} className={l.op === "+" ? "add" : l.op === "-" ? "del" : ""}>
+          <span className="ln">{l.op === "+" ? "" : l.a}</span><span className="ln">{l.op === "-" ? "" : l.b}</span>{l.op} {l.text}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function AgentPage() {
   const { pid = "" } = useParams();
   const spec = useSpec(pid);
   const doctor = useDoctor();
+  const diagnostics = useDiagnostics(pid);
+  const history = useAgentSessions(pid);
   const client = useQueryClient();
   const [provider, setProvider] = useState<AgentProvider>("claude");
   const [model, setModel] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [session, setSession] = useState<Session | null>(null);
+  const [thread, setThread] = useState<Session[]>([]);
   const [error, setError] = useState<unknown>(null);
-  const stream = useRef<StreamHandle | null>(null);
+  const [tab, setTab] = useState<"chat" | "changes">("chat");
+  const [split, setSplit] = useState(58);
+  const streams = useRef(new Map<string, StreamHandle>());
   const bottom = useRef<HTMLDivElement>(null);
+  const layout = useRef<HTMLDivElement>(null);
 
-  useEffect(() => () => stream.current?.close(), []);
-  useEffect(() => { bottom.current?.scrollIntoView({ block: "nearest" }); }, [session?.events.length]);
+  useEffect(() => () => { for (const s of streams.current.values()) s.close(); }, []);
+  const eventCount = thread.reduce((n, s) => n + s.events.length, 0);
+  useEffect(() => { bottom.current?.scrollIntoView({ block: "nearest" }); }, [eventCount]);
 
-  const send = async () => {
+  const follow = useCallback((session_id: string) => {
+    streams.current.get(session_id)?.close();
+    streams.current.set(session_id, streamEvents<AgentEvent>(api.agentEventsUrl(session_id), (event) => {
+      setThread((list) => list.map((s) => (s.id === session_id ? {
+        ...s, events: [...s.events, event],
+        status: event.type === "session_finished" ? event.status ?? "completed" : event.type === "session_started" ? "running" : s.status,
+      } : s)));
+      if (event.type === "spec_changed") void client.invalidateQueries({ queryKey: keys.section(pid, "spec") });
+      if (event.type === "spec_changed" || event.type === "run_finished" || event.type === "session_finished") void invalidateProject(client, pid);
+    }, (e) => setError(e)));
+  }, [client, pid]);
+
+  const current = thread[thread.length - 1] ?? null;
+  const running = current?.status === "running" || current?.status === "starting";
+
+  const send = async (mode: "new" | "reply") => {
     setError(null);
+    const visible = prompt.trim();
+    // The API has no session resume: a reply starts a new session that carries the previous task and its result.
+    const previous = mode === "reply" ? current : null;
+    const previousResult = previous ? [...previous.events].reverse().find((e) => e.type === "session_finished")?.result : undefined;
+    const full = previous
+      ? `Follow-up to the previous task: "${previous.prompt}".${previousResult ? `\nIts result: ${String(previousResult).slice(0, 1200)}` : ""}\n\nNow: ${visible}`
+      : visible;
     try {
       const baseline = spec.data?.yaml ?? "";
-      const { session_id } = await api.startAgent(pid, { prompt, provider, ...(model ? { model } : {}) });
-      setSession({ id: session_id, prompt, provider, events: [{ type: "message", role: "user", text: prompt }], status: "starting", baseline });
+      const { session_id } = await api.startAgent(pid, { prompt: full, provider, ...(model ? { model } : {}) });
+      const session: Session = { id: session_id, prompt: visible, provider, events: [{ type: "message", role: "user", text: visible }], status: "starting", baseline };
+      setThread((list) => (mode === "reply" ? [...list, session] : [session]));
       setPrompt("");
-      stream.current?.close();
-      stream.current = streamEvents<AgentEvent>(api.agentEventsUrl(session_id), (event) => {
-        setSession((s) => (s && s.id === session_id ? {
-          ...s, events: [...s.events, event],
-          status: event.type === "session_finished" ? event.status ?? "completed" : event.type === "session_started" ? "running" : s.status,
-        } : s));
-        if (event.type === "spec_changed") void client.invalidateQueries({ queryKey: keys.section(pid, "spec") });
-        if (event.type === "spec_changed" || event.type === "run_finished" || event.type === "session_finished") void invalidateProject(client, pid);
-      }, (e) => setError(e));
+      follow(session_id);
+      void client.invalidateQueries({ queryKey: keys.section(pid, "agent") });
     } catch (e) {
       setError(e);
     }
   };
 
-  const cancel = async () => {
-    if (!session) return;
-    try { await api.cancelAgent(session.id); } catch (e) { setError(e); }
+  const open = (s: AgentStatus) => {
+    for (const h of streams.current.values()) h.close();
+    streams.current.clear();
+    setThread([{ id: s.session_id, prompt: s.prompt, provider: s.provider, events: [{ type: "message", role: "user", text: s.prompt }], status: s.status, baseline: "" }]);
+    follow(s.session_id);
   };
 
-  const entries = useMemo(() => transcriptEntries(session?.events ?? []), [session?.events]);
+  const cancel = async () => {
+    if (!current) return;
+    try { await api.cancelAgent(current.id); } catch (e) { setError(e); }
+  };
+
   const lines = useMemo<(DiffLine | null)[]>(() => {
-    if (!session) return [];
-    // The API sends the cumulative unified diff since the session started; fall back to a local diff.
-    const latest = [...session.events].reverse().find((e) => typeof e.cumulative_diff === "string");
-    if (latest) return parseUnifiedDiff(latest.cumulative_diff as string);
-    return spec.data ? diffHunks(diffLines(session.baseline, spec.data.yaml)) : [];
-  }, [session, spec.data]);
+    if (!thread.length) return [];
+    // One session: the API's cumulative diff. Several (replies): diff from the thread's start to now.
+    if (thread.length === 1) {
+      const diff = sessionOutcome(thread[0]!.events).diff;
+      if (diff) return parseUnifiedDiff(diff);
+    }
+    const base = thread[0]!.baseline;
+    return base && spec.data ? diffHunks(diffLines(base, spec.data.yaml)) : [];
+  }, [thread, spec.data]);
   const changes = lines.filter((l) => l && l.op !== " ").length;
   const info = agentProviders(doctor.data).find((p) => p.provider === provider);
-  const running = session?.status === "running" || session?.status === "starting";
-  const usage = [...(session?.events ?? [])].reverse().find((e) => e.type === "usage");
+  // Suggest the most specific errors: codes that occur once or twice (a brownout) before mass findings (34 bend radii).
+  const suggestions = useMemo(() => {
+    const byCode = new Map<string, NonNullable<typeof diagnostics.data>["diagnostics"]>();
+    for (const d of diagnostics.data?.diagnostics ?? []) if (d.severity === "error") (byCode.get(d.code) ?? byCode.set(d.code, []).get(d.code)!).push(d);
+    return [...byCode.values()].sort((a, b) => a.length - b.length).slice(0, 2).map((list) => list[0]!);
+  }, [diagnostics.data]);
+  const past = (history.data ?? []).slice().sort((a, b) => b.created_at - a.created_at);
+
+  const dragSplit = (e: React.PointerEvent) => {
+    const box = layout.current?.getBoundingClientRect();
+    if (!box) return;
+    const move = (ev: PointerEvent) => setSplit(Math.min(80, Math.max(30, ((ev.clientX - box.left) / box.width) * 100)));
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    e.preventDefault();
+  };
+
+  const composer = (
+    <div className={`composer${thread.length ? " docked" : ""}`}>
+      <textarea rows={thread.length ? 2 : 4} value={prompt} onChange={(e) => setPrompt(e.target.value)} aria-label="Prompt"
+                placeholder={thread.length ? "Reply with a follow-up, or describe a new task" : "e.g. Shorten the battery lead and keep 8 mm clearance from the rear wheels"}
+                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && prompt.trim() && !running) void send(thread.length ? "reply" : "new"); }} />
+      <div className="row">
+        <Segmented label="Agent" value={provider} onChange={setProvider} options={[{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }]} />
+        {info && !info.available && <span className="small muted" title={info.detail}>{AGENT_NAMES[provider]} is not available here · <Link to="/environment">set up</Link></span>}
+        <span className="spacer" style={{ flex: 1 }} />
+        {running && <button className="danger" onClick={() => void cancel()}><Icon name="stop" size={12} />Stop</button>}
+        {thread.length > 0 && <button disabled={!prompt.trim() || running} onClick={() => void send("new")}>New task</button>}
+        <button className="primary" disabled={!prompt.trim() || running} onClick={() => void send(thread.length ? "reply" : "new")}>
+          <Icon name="sparkle" size={14} />{thread.length ? "Reply" : "Send"}
+        </button>
+      </div>
+      <Details summary="Options">
+        <label className="row small"><span className="muted">Model</span>
+          <input type="text" placeholder="the agent's default" value={model} onChange={(e) => setModel(e.target.value)} style={{ width: 200 }} aria-label="Model" /></label>
+      </Details>
+    </div>
+  );
 
   return (
-    <div className="page">
-      <div className="page-head">
-        <div className="stack" style={{ gap: 2 }}>
-          <h1>Agent</h1>
-          <p>Claude Code or Codex, run headlessly through their own CLIs in the project directory, editing only through the R3 MCP tools.</p>
+    <div className={`agent-page${past.length || thread.length ? "" : " no-history"}`}>
+      {(past.length > 0 || thread.length > 0) && <aside className="agent-history" aria-label="Agent history">
+        <button className="small" onClick={() => { setThread([]); setPrompt(""); }} disabled={running}><Icon name="plus" size={12} />New task</button>
+        <div className="list">
+          {past.map((s) => (
+            <button key={s.session_id} className={`list-row${thread[0]?.id === s.session_id ? " selected" : ""}`} onClick={() => open(s)}>
+              <span className="stack" style={{ gap: 0, minWidth: 0 }}>
+                <span className="ellipsis">{s.prompt.split("\n").pop()}</span>
+                <span className="muted small">{s.status} · {timeAgo(s.created_at)}</span>
+              </span>
+            </button>
+          ))}
+          {!past.length && <span className="muted small" style={{ padding: "6px 2px" }}>No earlier tasks.</span>}
         </div>
-      </div>
-      <div className="grid cols-2" style={{ alignItems: "start" }}>
-        <Card title="Session" subtitle={session ? `${session.provider} · ${session.id}` : "Describe the change or the robot"}
-              actions={session && <div className="row">
-                {usage && <span className="small muted">{usage.input_tokens ?? 0} in / {usage.output_tokens ?? 0} out tokens{usage.cost_usd ? ` · $${usage.cost_usd.toFixed(3)}` : ""}</span>}
-                <Chip tone={running ? "running" : session.status === "completed" ? "good" : session.status === "failed" ? "critical" : "muted"}>{session.status}</Chip>
-              </div>}>
-          <div className="stack" style={{ gap: 12 }}>
-            <div className="transcript" style={{ maxHeight: 520, overflowY: "auto" }} data-testid="transcript">
-              {!session && <Empty icon="sparkle" title="No session yet">Pick a provider and send a prompt. Runs the agent starts refresh every page when they finish.</Empty>}
-              {entries.map((entry, i) => entry.kind === "tool"
-                ? <ToolEntry key={i} call={entry.call} result={entry.result} /> : <EventEntry key={i} event={entry.event} />)}
-              <div ref={bottom} />
-            </div>
-            {error ? <ErrorBox error={error} /> : null}
-            <div className="row">
-              <Segmented label="Provider" value={provider} onChange={setProvider} options={[{ value: "claude", label: "Claude Code" }, { value: "codex", label: "Codex" }]} />
-              <input type="text" placeholder="model (optional)" value={model} onChange={(e) => setModel(e.target.value)} style={{ width: 170 }} aria-label="Model" />
-              {info && !info.available && <Chip tone="warning" title={info.detail}>{provider} CLI unavailable</Chip>}
-              {info?.available && <Chip tone="good">{info.version ?? "available"}</Chip>}
-            </div>
-            {info && !info.available && info.detail && <span className="small muted">{info.detail}</span>}
-            <textarea rows={4} value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder='e.g. "make the battery lead shorter"' aria-label="Prompt"
-                      onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && prompt.trim() && !running) void send(); }} />
-            <div className="row">
-              {EXAMPLES.map((x) => <button key={x} className="small ghost" onClick={() => setPrompt(x)} style={{ whiteSpace: "normal", textAlign: "left" }}>{x}</button>)}
-            </div>
-            <div className="row">
-              <button className="primary" disabled={!prompt.trim() || running} onClick={() => void send()}><Icon name="sparkle" size={14} />Send</button>
-              {running && <button className="danger" onClick={() => void cancel()}><Icon name="stop" size={12} />Cancel</button>}
-              <span className="small muted">⌘/Ctrl + Enter</span>
-            </div>
-          </div>
-        </Card>
-        <Card title="robot.yaml diff" subtitle={session ? `${changes} changed line(s) since the session started` : "Live diff of the spec while the agent works"} flush>
-          {!session ? <Empty title="Nothing to compare yet" /> : changes === 0 ? <Empty title="No changes to robot.yaml yet" /> : (
-            <div className="diff" data-testid="spec-diff">
-              {lines.map((l, i) => l === null ? <div key={i} className="gap">⋯</div> : (
-                <div key={i} className={l.op === "+" ? "add" : l.op === "-" ? "del" : ""}>
-                  <span className="ln">{l.op === "+" ? "" : l.a}</span><span className="ln">{l.op === "-" ? "" : l.b}</span>{l.op} {l.text}
-                </div>
+      </aside>}
+
+      {!thread.length ? (
+        <div className="agent-start">
+          <h1>What should change?</h1>
+          <p className="secondary">Describe a robot change. The agent edits robot.yaml and runs the checks.</p>
+          {composer}
+          {error ? <ErrorBox error={error} /> : null}
+          {suggestions.length > 0 && (
+            <div className="suggestions">
+              <span className="muted small">Suggestions from current errors</span>
+              {suggestions.map((d, i) => (
+                <button key={i} className="ghost small suggestion" onClick={() => setPrompt(`Fix this ${d.stage} error: ${diagnosticHeadline(d)}${d.hint ? ` (${d.hint})` : ""}`)}>
+                  {diagnosticHeadline(d)}
+                </button>
               ))}
+              <Link className="small" to={`/p/${encodeURIComponent(pid)}/diagnostics`}>All diagnostics</Link>
             </div>
           )}
-        </Card>
-      </div>
+        </div>
+      ) : (
+        <div className="agent-session">
+          {changes > 0 && <Tabs label="Agent view" value={tab} onChange={setTab} options={[{ value: "chat", label: "Conversation" }, { value: "changes", label: `Changes · ${changes}` }]} />}
+          <div className={`agent-split show-${tab}${changes > 0 ? " with-changes" : ""}`} ref={layout} style={{ "--split": `${split}%` } as React.CSSProperties}>
+            <div className="agent-chat">
+              <div className="transcript" data-testid="transcript">
+                {thread.map((s) => (
+                  <div key={s.id} className="stack" style={{ gap: 10 }}>
+                    {transcriptEntries(s.events).map((entry, i) => entry.kind === "tool"
+                      ? <ToolEntry key={i} call={entry.call} result={entry.result} /> : <EventEntry key={i} event={entry.event} />)}
+                    {s.status === "running" || s.status === "starting" ? <div className="row small muted"><Icon name="spinner" size={12} />Working…</div> : <Outcome session={s} />}
+                  </div>
+                ))}
+                <div ref={bottom} />
+              </div>
+              {error ? <ErrorBox error={error} /> : null}
+              {composer}
+            </div>
+            {changes > 0 && (
+              <>
+                <div className="splitter" role="separator" aria-orientation="vertical" aria-label="Resize" onPointerDown={dragSplit} />
+                <div className="agent-changes">
+                  <div className="changes-head"><strong>robot.yaml</strong><span className="muted small">{plural(changes, "changed line")}</span></div>
+                  <DiffView lines={lines} />
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

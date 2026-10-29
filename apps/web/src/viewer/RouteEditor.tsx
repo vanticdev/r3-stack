@@ -13,9 +13,11 @@ export interface RouteEditState {
   /** Fixed bundle end points (connector exits), drawn for context. */
   ends: [Vec3, Vec3] | null;
   onChange: (via: Vec3[], ties: Vec3[]) => void;
+  /** the handle being dragged, for a coordinate readout */
+  onActiveChange?: (handle: HandleRef | null) => void;
 }
 
-type HandleRef = { kind: "via" | "tie"; index: number };
+export type HandleRef = { kind: "via" | "tie"; index: number };
 
 export function RouteEditor({ editor }: { editor: RouteEditState }) {
   const [active, setActive] = useState<HandleRef | null>(null);
@@ -34,7 +36,7 @@ export function RouteEditor({ editor }: { editor: RouteEditState }) {
     return (
       <mesh key={`${kind}${index}`} position={point} name={`${kind}-${index}`}
             ref={(m) => { if (isActive && m && m !== object) setObject(m); }}
-            onClick={(e) => { e.stopPropagation(); setActive({ kind, index }); }}>
+            onClick={(e) => { e.stopPropagation(); setActive({ kind, index }); editor.onActiveChange?.({ kind, index }); }}>
         {kind === "via" ? <sphereGeometry args={[0.0042, 18, 14]} /> : <boxGeometry args={[0.006, 0.006, 0.006]} />}
         <meshStandardMaterial color={isActive ? "#ffffff" : kind === "via" ? "#f97316" : "#1baf7a"} emissive={kind === "via" ? "#f97316" : "#1baf7a"}
                               emissiveIntensity={0.5} depthTest={false} transparent />

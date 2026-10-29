@@ -9,7 +9,7 @@ import { PcbPage } from "./pages/PcbPage.tsx";
 import { SoftwarePage } from "./pages/SoftwarePage.tsx";
 import { AgentPage } from "./pages/AgentPage.tsx";
 import { DeployPage } from "./pages/DeployPage.tsx";
-import { SettingsPage } from "./pages/SettingsPage.tsx";
+import { EnvironmentPage } from "./pages/EnvironmentPage.tsx";
 
 // three.js pages load on demand so the project list and tables paint without the 3D bundle.
 const ThreeDPage = lazy(() => import("./pages/ThreeDPage.tsx").then((m) => ({ default: m.ThreeDPage })));
@@ -26,7 +26,9 @@ const router = createHashRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <ProjectsPage /> },
-      { path: "settings", element: <SettingsPage /> },
+      { path: "environment", element: <EnvironmentPage /> },
+      // "Settings · r3 doctor" became the workspace-level Environment page; old links still resolve.
+      { path: "settings", element: <Navigate to="/environment" replace /> },
       {
         path: "p/:pid",
         element: <ProjectLayout />,
@@ -42,7 +44,7 @@ const router = createHashRouter([
           { path: "diagnostics", element: lazyPage(<DiagnosticsPage />) },
           { path: "agent", element: <AgentPage /> },
           { path: "deploy", element: <DeployPage /> },
-          { path: "settings", element: <SettingsPage /> },
+          { path: "settings", element: <Navigate to="/environment" replace /> },
         ],
       },
       { path: "*", element: <Navigate to="/" replace /> },

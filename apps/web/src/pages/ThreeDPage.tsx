@@ -1,12 +1,16 @@
 import { useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
+import { useProject } from "../api/hooks.ts";
+import { Icon } from "../components/icons.tsx";
 import { Empty, ErrorBox } from "../components/ui.tsx";
+import { timeAgo } from "../lib/units.ts";
+import { useProjectRuns } from "../state/runs.tsx";
 import { Inspector } from "../viewer/Inspector.tsx";
 import { RobotViewer, type Selection } from "../viewer/RobotViewer.tsx";
 import { useRobotScene } from "../viewer/useRobotScene.ts";
 
-/** ?sel=component:esc selects; ?focus=a,b highlights diagnostic subjects. */
+/** ?sel=component:esc selects; ?focus=a,b highlights diagnostic subjects; ?int=3 selects an interference region. */
 export function useSelectionParams() {
   const [params, setParams] = useSearchParams();
   const sel = params.get("sel");
@@ -17,6 +21,8 @@ export function useSelectionParams() {
   }, [sel]);
   const focusParam = params.get("focus");
   const focus = useMemo(() => (focusParam ? focusParam.split(",").filter(Boolean) : []), [focusParam]);
+  const intParam = params.get("int");
+  const interference = intParam !== null && /^\d+$/.test(intParam) ? Number(intParam) : null;
   const update = (changes: Record<string, string | null>) => {
     setParams((p) => {
       const next = new URLSearchParams(p);
@@ -25,24 +31,48 @@ export function useSelectionParams() {
     }, { replace: true });
   };
   return {
-    selection, focus,
-    select: (s: Selection | null) => update({ sel: s ? `${s.kind}:${s.id}` : null }),
+    selection, focus, interference,
+    select: (s: Selection | null) => update({ sel: s ? `${s.kind}:${s.id}` : null, int: null }),
     setFocus: (subjects: string[]) => update({ focus: subjects.length ? subjects.join(",") : null }),
+    selectInterference: (index: number | null, parts: string[] = []) =>
+      update({ int: index === null ? null : String(index), sel: null, focus: parts.length ? parts.join(",") : null }),
   };
+}
+
+/** Whether the displayed model matches the current inputs. */
+function ModelRevision({ pid }: { pid: string }) {
+  const project = useProject(pid);
+  const { start, active } = useProjectRuns(pid);
+  const rows = (project.data?.stages ?? []).filter((s) => ["assembly", "model", "cad"].includes(s.stage) && s.status !== "missing");
+  if (!rows.length) return null;
+  const outdated = rows.some((s) => s.stale);
+  const built = Math.max(...rows.map((s) => s.started_at ?? 0));
+  return outdated ? (
+    <span className="viewer-badge outdated" data-testid="model-revision">
+      <Icon name="clock" size={12} />Model out of date · inputs changed
+      <button className="small" disabled={!!active} onClick={() => void start({ stages: rows.filter((s) => s.stale).map((s) => s.stage) })}>Rebuild</button>
+    </span>
+  ) : <span className="viewer-badge" data-testid="model-revision"><Icon name="check" size={12} />Model current{built ? ` · built ${timeAgo(built)}` : ""}</span>;
 }
 
 export function ThreeDPage() {
   const { pid = "" } = useParams();
   const { data, isPending, error } = useRobotScene(pid);
-  const { selection, focus, select, setFocus } = useSelectionParams();
+  const { selection, focus, interference, select, setFocus, selectInterference } = useSelectionParams();
   if (error) return <div style={{ padding: 20 }}><ErrorBox error={error} /></div>;
   if (isPending || !data) return <div className="skeleton" style={{ margin: 20, flex: 1 }} />;
-  if (!data.components.length) return <Empty title="No compiled model">Run the model stage.</Empty>;
+  if (!data.components.length) return <Empty title="No compiled model">Run the 3D model stage.</Empty>;
   return (
     <div className="workspace">
-      <RobotViewer data={data} selected={selection} onSelect={select} highlight={focus} initialOptions={{ joints: false }}
-                   toolbarExtra={focus.length ? <div className="group"><button onClick={() => setFocus([])}>Clear highlight</button></div> : null} />
-      <Inspector data={data} selection={selection} onClear={() => select(null)} />
+      <RobotViewer data={data} selected={selection} onSelect={select} highlight={focus}
+                   selectedInterference={interference}
+                   onInterference={(i) => { const o = data.interference[i]!; selectInterference(i, [o.a, o.b]); }}
+                   toolbarExtra={<>
+                     {focus.length > 0 && <div className="group"><button onClick={() => { setFocus([]); selectInterference(null); }}>Clear highlight</button></div>}
+                     <ModelRevision pid={pid} />
+                   </>} />
+      <Inspector data={data} selection={selection} interference={interference} onSelect={select}
+                 onClear={() => { select(null); if (interference !== null) selectInterference(null); }} />
     </div>
   );
 }
