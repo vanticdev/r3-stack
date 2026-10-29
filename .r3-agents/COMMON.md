@@ -67,6 +67,34 @@ around it. Verification uses native REST data instead: `bodydetails` face/edge
 surface definitions, mass properties, bounding boxes, and tessellated meshes with
 Python mesh booleans (manifold3d/trimesh are installed in the shared venv).
 
+## Tool-use policy (user directive): use every tool the way a human engineer would
+For every external tool, the AI works through the same operations a person uses
+in that tool's UI. These are the tool's own editors, libraries, checkers and
+routers, reached through its official automation API (or, if none exists, through
+UI-level automation). It does not reverse-engineer or hand-write the tool's
+internal file formats, invent a scripting layer the user would never touch, or
+reimplement a capability the tool already has.
+- **Onshape:** standard features (sketch, extrude, revolve, hole, fillet, pattern,
+  mirror, boolean, mate connector) and Assemblies with standard mates. No
+  FeatureScript (see the CAD policy above).
+- **KiCad (headless, no window ever; user directive):** use KiCad's own engine with
+  no GUI: the `pcbnew` Python module bundled with KiCad (SWIG; on macOS
+  `~/Applications/KiCad/KiCad.app/Contents/Frameworks/Python.framework/Versions/3.9/bin/python3`)
+  for board editing, `kicad-cli` for ERC/DRC/netlist/exports, official KiCad symbol
+  and footprint libraries, and Freerouting in CLI mode. Never launch the KiCad, Eeschema
+  or Pcbnew apps, use the IPC API (it needs the GUI), or use UI automation. KiCad 10 has
+  no headless schematic-editing API, so schematics are written with a structured
+  KiCad-format library using official library symbols, then normalized by
+  `kicad-cli sch upgrade` and validated by `kicad-cli sch erc`. Never write a custom
+  router or DRC.
+- **GitHub:** the `gh` CLI and normal git.
+- **BLITZ / Docker / MuJoCo / ngspice:** their normal public interfaces.
+- **R3's own wiring editor** is the exception: no external tool covers it. Its
+  authored data is `robot.yaml`, which humans also edit.
+Independent verification is still encouraged. R3 may re-check results from the
+tool's own data, such as measured geometry or exported netlists, but the design
+itself must be produced inside the tool.
+
 ## Simulator policy (user directive): integrate the best existing simulators, never write your own
 R3's job is to INTEGRATE the best existing domain simulators into one lockstep
 co-simulation tool (`r3_sim`), plus the virtual-hardware glue. It must not
@@ -87,7 +115,7 @@ Every stage must run with no display and no interactive browser.
 - **MuJoCo rendering:** `MUJOCO_GL=egl` (or osmesa) on Linux.
 - **Onshape:** the official API-key transport. Images come from the REST shaded-view
   endpoints, never browser captures. The browser bridge is a local-dev convenience only.
-- **KiCad:** `kicad-cli`. If a step needs the KiCad app (IPC API), run it under Xvfb.
+- **KiCad:** `kicad-cli` plus the bundled `pcbnew` Python module. Never a GUI, not even under Xvfb.
 - **Freerouting:** CLI mode.
 - **Docker:** used for firmware.
 The supported server environment is the R3 worker Docker image. Any GUI-only step
