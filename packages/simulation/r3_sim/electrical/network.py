@@ -33,6 +33,7 @@ from typing import Any
 import numpy as np
 
 from r3_model.diagnostics import Diagnostic
+from r3_model.graph import ACTIVE_SIGNAL_LINKS
 
 from .netlist import Netlist, fmt, temperature
 
@@ -248,8 +249,8 @@ def build_passive_network(project: Any, routes: dict[str, Any] | None) -> Passiv
                       "burst_source": "catalog" if burst_values else f"estimated {CONNECTOR_BURST_FACTOR}x continuous"})
         else:
             link_kind = edge.data.get("link_kind")
-            if link_kind == "level_shifter":
-                continue  # active signal element, no DC conduction path
+            if link_kind in ACTIVE_SIGNAL_LINKS:
+                continue  # active signal element (level shifter, failsafe arbiter): no DC conduction path
             value = float(edge.data.get("value") or 0.0)
             params = _behavior_params(project, edge.ref)
             if link_kind == "fuse":

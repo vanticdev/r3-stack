@@ -59,8 +59,9 @@ OUTPUT_ROLES = {"uart_tx", "pwm_out", "gpio", "i2c_sda", "i2c_scl", "spi_mosi", 
 INPUT_ROLES = {"uart_rx", "pwm_in", "gpio", "i2c_sda", "i2c_scl", "spi_miso", "spi_mosi", "spi_sck", "spi_cs", "analog"}
 # Internal links that keep a supply rail at the same voltage (current limiting elements are ignored).
 POWER_LINKS = {"fuse", "switch", "shunt", "wire"}
-# Internal links a logic level passes through unchanged (a level shifter translates it).
-SIGNAL_LINKS = {"series_resistor", "switch", "wire"}
+# Internal links a logic level passes through unchanged (a level shifter translates it). A failsafe
+# arbiter re-drives its input at the same logic level (or neutral pulses when the heartbeat stops).
+SIGNAL_LINKS = {"series_resistor", "switch", "wire", "failsafe_arbiter"}  # graph.SIGNAL_LINK_KINDS minus level shifters
 # CMOS inputs: absolute maximum ~ VDD + 0.3 V, minimum high threshold V_IH ~ 0.7 VDD.
 CMOS_ABS_MAX_MARGIN = 0.3
 CMOS_VIH_FRACTION = 0.7
@@ -650,6 +651,76 @@ class ModelChecker:
         return float(np.linalg.norm(ends[0] - ends[1])) * ROUTE_FACTOR_ESTIMATE + harness.route.slack
 
 
+def check_failsafe_chain(checker: ModelChecker) -> dict[str, Any]:
+    """Failsafe timeouts, innermost to outermost, must be strictly increasing:
+
+    1. hardware arbiter (board ``failsafe``: heartbeat ``timeout`` + one output ``frame``): hung software;
+    2. software radio failsafe (``software.config.radio_failsafe_timeout_s``): link loss, active brake;
+    3. ESC signal-loss timeout (``signal_timeout``): no pulses at all (computer or arbiter unpowered);
+    4. receiver link-lost timeout (``failsafe_timeout``): the receiver declares failsafe.
+
+    The receiver must stop sending frames when packets stop (``failsafe_mode: no_pulses``); a receiver that
+    holds the last channels hides link loss from layer 2. The heartbeat period (one edge per control cycle) must
+    leave room for the arbiter's re-arm edges within its timeout."""
+    spec, catalog = checker.spec, checker.catalog
+    layers: list[tuple[str, str, float]] = []
+    config = spec.software.config
+    rate = float(config.get("control_rate_hz", 0) or 0)
+    report: dict[str, Any] = {"layers": [], "control_period": 1.0 / rate if rate else None}
+    arbiter = esc = receiver = None
+    for cid, comp in spec.components.items():
+        ctype = catalog.components.get(comp.type)
+        if ctype is None or ctype.behavior is None:
+            continue
+        params = {**ctype.behavior.params, **comp.params}
+        failsafe = params.get("failsafe")
+        if isinstance(failsafe, dict) and any(link.kind == "failsafe_arbiter" for link in ctype.internal_links):
+            arbiter = (cid, failsafe)
+            layers.append((cid, "arbiter neutral (heartbeat timeout + frame)",
+                           float(to_si(failsafe.get("timeout", 0.1))) + float(to_si(failsafe.get("frame", 0.02)))))
+        elif ctype.behavior.model == "esc.brushed" and params.get("signal_timeout") is not None:
+            esc = cid
+        elif ctype.behavior.model == "receiver.crsf":
+            receiver = (cid, params)
+    if config.get("radio_failsafe_timeout_s") is not None:
+        layers.append(("software", "software radio failsafe (brake)", float(config["radio_failsafe_timeout_s"])))
+    if esc is not None:
+        esc_params = {**catalog.component(spec.components[esc].type).behavior.params, **spec.components[esc].params}
+        layers.append((esc, "ESC signal-loss failsafe (coast)", float(to_si(esc_params["signal_timeout"]))))
+    if receiver is not None and receiver[1].get("failsafe_timeout") is not None:
+        layers.append((receiver[0], "receiver link lost", float(to_si(receiver[1]["failsafe_timeout"]))))
+    report["layers"] = [{"component": c, "layer": name, "timeout": value} for c, name, value in layers]
+    for (ca, na, va), (cb, nb, vb) in zip(layers, layers[1:]):
+        if va >= vb:
+            checker.add(Diagnostic.error(
+                "failsafe_chain_order", f"{na} ({ca}, {va:g} s) is not faster than {nb} ({cb}, {vb:g} s)",
+                subjects=[ca, cb], data={"inner": va, "outer": vb},
+                hint="each failsafe layer must act before the next outer one"))
+    if receiver is not None:
+        mode = str(receiver[1].get("failsafe_mode", "unspecified"))
+        report["receiver_failsafe_mode"] = mode
+        if mode not in ("no_pulses", "unspecified"):
+            checker.add(Diagnostic.error(
+                "receiver_failsafe_not_no_pulses", f"{receiver[0]}: failsafe mode {mode!r}; the receiver must send no frames on "
+                "link loss so the software sees the gap", subjects=[receiver[0]], data={},
+                hint="set the receiver's failsafe to 'no pulses' (ELRS: failsafe mode 'No Pulses')"))
+    if arbiter is not None and rate:
+        failsafe = arbiter[1]
+        timeout = float(to_si(failsafe.get("timeout", 0.1)))
+        edges = int(failsafe.get("rearm_edges", 3))
+        report["heartbeat_edges_per_timeout"] = timeout * rate
+        if timeout * rate < 2 * edges:
+            checker.add(Diagnostic.error(
+                "heartbeat_too_slow", f"{arbiter[0]}: {rate:g} Hz heartbeat gives {timeout * rate:.1f} edges per {timeout:g} s "
+                f"arbiter timeout; need >= {2 * edges} (re-arm takes {edges})", subjects=[arbiter[0], "software"],
+                data={"edges_per_timeout": timeout * rate, "required": 2 * edges}))
+    if layers:
+        checker.add(Diagnostic.info(
+            "failsafe_chain", "failsafe timeouts: " + " < ".join(f"{name} {value:g} s" for _, name, value in layers),
+            subjects=["failsafe_chain"], data={name: value for _, name, value in layers}))
+    return report
+
+
 def _net_names(checker: ModelChecker) -> dict[str, str]:
     """Human net names: the most common harness signal name on the net, else a component pin."""
     signals: dict[str, Counter] = defaultdict(Counter)
@@ -751,6 +822,7 @@ def run(project: Project) -> StageResult:
         from .sourcing import check_pins
 
         result.extend(check_pins(project))
+    failsafe_chain = check_failsafe_chain(checker)
     result.assume("electrical", "Rail voltages are the single power_out source's nominal/min/max; fuses, switches and shunts "
                                 "are treated as zero-drop. Load-dependent drops are computed by the electrical stage.")
 
@@ -765,6 +837,7 @@ def run(project: Project) -> StageResult:
         "i2c_buses": buses,
         "interference": overlaps,
         "mass": mass,
+        "failsafe_chain": failsafe_chain,
         "pins": {node[2:]: {"role": p.role, "passthrough": p.passthrough, "connector_pins": p.connector_pins}
                  for node, p in checker.pins.items()},
     })

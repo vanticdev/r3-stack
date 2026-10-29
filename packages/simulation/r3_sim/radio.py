@@ -134,6 +134,7 @@ class RadioLink:
         self.rx_gain_dbi = float(p.get("antenna_gain_dbi", 2.0))
         self.telemetry_power_dbm = float(p.get("telemetry_power_dbm", 17.0))
         self.failsafe_timeout = to_si(p.get("failsafe_timeout", 1.0))
+        self.failsafe_mode = str(p.get("failsafe_mode", "no_pulses"))
         self.antenna_height = to_si(p.get("antenna_height_above_mount", 0.1))
         rate = int(round(self.packet_rate))
         self.spreading_factor, self.bandwidth = ELRS_LORA_MODES.get(rate, (7, 812_500.0))
@@ -236,6 +237,12 @@ class ElrsReceiver:
     * LQ = % of the last 100 packet slots received (ELRS definition).
     * No packet for ``failsafe_timeout`` -> disconnected: no frames until resync
       (``sync_packets`` consecutive good packets).
+    * ``failsafe_mode`` (receiver behavior param): ``no_pulses`` (default) sends
+      nothing while packets are missing, so the flight software sees the gap;
+      ``hold`` (ELRS "last position") keeps repeating the last channels every
+      packet slot until resync, which hides the link loss from the software.
+    * ``transmitter_on`` = False models the pilot's transmitter switched off
+      (scenario fault ``transmitter_off``): no packet arrives.
     """
 
     def __init__(self, link: RadioLink, baud: float, rng: np.random.Generator, stats_interval: int = 10,
@@ -264,6 +271,9 @@ class ElrsReceiver:
         self.link_lost_events: list[float] = []
         self.packets_ok = 0
         self.packets_lost = 0
+        self.transmitter_on = True
+        self.failsafe_mode = str(getattr(link, "failsafe_mode", "no_pulses"))
+        self.last_channels: list[float] | None = None
 
     def _emit(self, t: float, data: bytes, out: list[tuple[float, int]]) -> None:
         start = max(t, self.tx_free_t)
@@ -292,7 +302,7 @@ class ElrsReceiver:
             frequency = self.link.hop_frequency(self.slot_index)
             sample = self.link.sample(rx_position, rotation=rotation, frequency=frequency)
             self.last_sample = sample
-            received = self.rng.random() >= sample.per
+            received = self.rng.random() >= sample.per and self.transmitter_on
             self.history.append(1 if received else 0)
             if len(self.history) > 100:
                 del self.history[0]
@@ -309,9 +319,12 @@ class ElrsReceiver:
                     self._emit(t, crsf.rc_channels_frame(channels_us), out)
                     self.frames_rc += 1
                     self.rc_frame_times.append(t)
+                    self.last_channels = list(channels_us)
             else:
                 self.packets_lost += 1
                 self.consecutive = 0
+                if self.failsafe_mode == "hold" and self.last_channels is not None:
+                    self._emit(t, crsf.rc_channels_frame(self.last_channels), out)  # hides the loss from the software
                 if self.connected and t - self.last_packet_t >= self.link.failsafe_timeout:
                     self.connected = False
                     self.link_lost_events.append(self.last_packet_t)

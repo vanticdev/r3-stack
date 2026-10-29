@@ -84,6 +84,9 @@ DEFAULT_BINDINGS: dict[str, dict[str, Any]] = {
     "gps": {"interface": "uart", "device": "/dev/ttyAMA2", "baud": 115200},
     "i2c": {"interface": "i2c", "device": "/dev/i2c-1"},
     "encoder": {"interface": "gpio", "device": "gpiochip0", "channel": 17},
+    # Failsafe heartbeat to the HAT's ATtiny412 arbiter (J8 pin 13): toggled once per control cycle; after
+    # 100 ms without an edge the arbiter holds the ESC at neutral.
+    "heartbeat": {"interface": "gpio", "device": "gpiochip0", "channel": 27},
 }
 
 _SI_PREFIX = {"": 1.0, "k": 1e3, "M": 1e6, "G": 1e9, "m": 1e-3, "u": 1e-6, "µ": 1e-6}

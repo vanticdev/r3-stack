@@ -184,7 +184,8 @@ The status of an item, in precedence order:
 | `top_speed` | the scenario check `min_top_speed_mps`, else the best `top_speed_mps` |
 | `min_runtime` | electrical `runtime`. Estimated if the vehicle mass or battery parameters are estimated. |
 | `radio_range` | the scenario check `link_lost_beyond_m` |
-| `failsafe_stop_distance` | the scenario check `stop_within_m_of_link_loss` |
+| `failsafe_stop_distance` | the scenario checks `stop_within_m_of_link_loss` and `stop_within_m_of_fault` whose expected distance equals it (scenarios at the autonomous maximum cruise speed) |
+| `failsafe_stop_distance_at_top_speed` | the same checks in scenarios that expect this distance (radio failsafe from top speed) |
 | `max_wire_voltage_drop_fraction` | electrical `voltage_drop_exceeded` diagnostics. Estimated if any wire length is not routed. |
 | `min_wire_clearance_moving` | wiring `wire_min_clearance_moving`, plus the scenario check `min_wire_clearance_m` |
 | `max_component_temperature_c` | the hottest component in electrical `thermal` |

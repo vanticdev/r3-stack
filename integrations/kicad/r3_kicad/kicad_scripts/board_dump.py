@@ -39,9 +39,11 @@ def main(argv):
                                   "rotation": fp.GetOrientationDegrees(),
                                   "layer": board.GetLayerName(fp.GetLayer())})
         for pad in fp.Pads():
+            box = pad.GetBoundingBox()
             out["pads"].append({"ref": ref, "number": pad.GetNumber(), "net": pad.GetNetname(),
                                 "position": loc(pad.GetPosition()),
-                                "layers": [board.GetLayerName(l) for l in pad.GetLayerSet().CuStack()]})
+                                "layers": [board.GetLayerName(l) for l in pad.GetLayerSet().CuStack()],
+                                "bbox": loc(box.GetOrigin()) + loc(box.GetEnd())})
     for item in board.GetTracks():
         if item.GetClass() == "PCB_VIA":
             out["vias"].append({"net": item.GetNetname(), "position": loc(item.GetPosition()),
@@ -55,8 +57,13 @@ def main(argv):
         for layer in zone.GetLayerSet().CuStack():
             poly = zone.GetFilledPolysList(layer)
             area = poly.Area() if poly is not None else 0.0
+            outlines = []
+            if poly is not None and zone.GetNetname() != "/GND":  # power pours: the filled polygons themselves
+                for i in range(poly.OutlineCount()):
+                    rings = [poly.Outline(i)] + [poly.Hole(i, h) for h in range(poly.HoleCount(i))]
+                    outlines.append([[loc(ring.CPoint(k)) for k in range(ring.PointCount())] for ring in rings])
             out["zones"].append({"net": zone.GetNetname(), "layer": board.GetLayerName(layer),
-                                 "name": zone.GetZoneName(), "area_mm2": round(area / 1e12, 4)})
+                                 "name": zone.GetZoneName(), "area_mm2": round(area / 1e12, 4), "polygons": outlines})
     json.dump(out, open(argv[2], "w"), indent=1)
     print("dumped", argv[1])
     return 0

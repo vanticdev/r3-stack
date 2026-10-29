@@ -170,15 +170,62 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
             if lost is None:
                 checks.append(Check(key, expected, None, False, "link was never lost; stop distance not exercised"))
                 continue
-            k0 = int(np.searchsorted(t, lost["t"]))
-            k1 = _first_stop_after(t, speed, lost["t"])
+            # Measure from the last RC frame before the first frame gap longer than the software's failsafe
+            # timeout that ends the run or precedes the declared loss: the software brakes on that gap, which can
+            # come well before the receiver declares the link lost (its own, longer timeout).
+            t_loss = lost["t"]
+            gaps = [g for g in context.get("failsafe_gaps", []) if g[0] <= t_loss + 1e-6]
+            moving = [g for g in gaps if abs(float(np.interp(g[0], t, speed))) > STOP_SPEED]
+            t0 = moving[0][0] if moving else t_loss
+            k0 = int(np.searchsorted(t, t0))
+            k1 = _first_stop_after(t, speed, t0)
             if k1 is None:
                 checks.append(Check(key, expected, None, False, "car never stopped after link loss"))
                 continue
             path = float(np.sum(np.hypot(np.diff(x[k0:k1 + 1]), np.diff(y[k0:k1 + 1])))) if k1 > k0 else 0.0
             checks.append(Check(key, expected, round(path, 3), path <= to_si(expected),
-                                f"stopped at t={t[k1]:.2f}s, {t[k1] - lost['t']:.2f}s after the last packet",
-                                {"speed_at_loss": float(speed[min(k0, len(speed) - 1)]), "stop_t": float(t[k1])}))
+                                f"last frame before the failsafe gap at t={t0:.2f}s (receiver declared loss at t={t_loss:.2f}s); "
+                                f"stopped at t={t[k1]:.2f}s, {t[k1] - t0:.2f}s later",
+                                {"speed_at_loss": float(speed[min(k0, len(speed) - 1)]), "stop_t": float(t[k1]),
+                                 "gap_start_t": float(t0)}))
+        elif key == "stop_within_m_of_fault":
+            fault = context.get("fault")
+            if fault is None:
+                checks.append(Check(key, expected, None, False, "no fault was injected; stop distance not exercised"))
+                continue
+            k0 = int(np.searchsorted(t, fault["t"]))
+            k1 = _first_stop_after(t, speed, fault["t"])
+            if k1 is None:
+                k_end = len(t) - 1
+                path = float(np.sum(np.hypot(np.diff(x[k0:]), np.diff(y[k0:])))) if k_end > k0 else 0.0
+                checks.append(Check(key, expected, None, False,
+                                    f"car never stopped after the {fault['type']} fault at t={fault['t']:.2f}s "
+                                    f"({path:.1f} m travelled, {float(speed[-1]):.2f} m/s at the end)",
+                                    {"speed_at_fault": float(speed[min(k0, len(speed) - 1)]), "distance_to_end": path,
+                                     "final_speed": float(speed[-1])}))
+                continue
+            path = float(np.sum(np.hypot(np.diff(x[k0:k1 + 1]), np.diff(y[k0:k1 + 1])))) if k1 > k0 else 0.0
+            checks.append(Check(key, expected, round(path, 3), path <= to_si(expected),
+                                f"{fault['type']} at t={fault['t']:.2f}s; stopped at t={t[k1]:.2f}s, {t[k1] - fault['t']:.2f}s later",
+                                {"speed_at_fault": float(speed[min(k0, len(speed) - 1)]), "stop_t": float(t[k1]),
+                                 "fault_t": float(fault["t"])}))
+        elif key == "arbiter_neutral_within_s":
+            fault = context.get("fault")
+            events = [e for e in context.get("events", []) if e.get("event") == "arbiter_failsafe"
+                      and (fault is None or e["t"] >= fault["t"] - 1e-9)]
+            if not events:
+                checks.append(Check(key, expected, None, False, "the arbiter never switched to failsafe"))
+                continue
+            event = events[0]
+            edge = event.get("last_heartbeat_edge_t")
+            latency = float(event["t"] - edge) if edge is not None else math.inf
+            after = t >= event["t"] + 0.02
+            neutral = float(context.get("esc_neutral_us", 1500.0))
+            held = bool(np.all(np.abs(rec["esc_pulse"][after] - neutral) < 1.0)) if after.any() else False
+            checks.append(Check(key, expected, round(latency, 4), latency <= float(expected) and held,
+                                f"last heartbeat edge t={edge}, neutral from t={event['t']:.3f}s; ESC held at neutral "
+                                f"afterwards: {held}", {"last_edge_t": edge if edge is not None else -1.0,
+                                                        "failsafe_t": float(event["t"])}))
         elif key == "min_cell_voltage_v":
             k = int(np.argmin(rec["cell_v"]))
             value = float(rec["cell_v"][k])

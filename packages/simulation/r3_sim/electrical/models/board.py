@@ -1,16 +1,26 @@
-"""``board.pcb``: a custom PCB's on-board regulator and loads (one ngspice subcircuit).
+"""``board.pcb``: a custom PCB's on-board regulators and loads (one ngspice subcircuit).
 
 Read from the board's behavior params:
 
-* ``regulator`` — a nested behavior (``model: regulator.buck``). Input pin:
-  ``input_pin`` or the ``power_in`` pin with the highest nominal voltage;
-  output: ``output_pin`` or the ``power_out`` pin closest to ``v_out``.
+* ``regulator`` and any other nested behavior with ``model: regulator.buck``
+  (e.g. ``servo_regulator``) — a synchronous buck each (:class:`BuckCore`).
+  Input pin: ``input_pin`` or the ``power_in`` pin with the highest nominal
+  voltage; output: ``output_pin`` or the ``power_out`` pin closest to ``v_out``.
+  All converters share the board input path below.
+* ``reverse_protection.rds_on`` — series P-FET resistance in the input path.
+* A nested dict with ``shunt`` (current monitor) — series shunt resistor
+  between the input pin and the converters; its reading is the whole board
+  branch (every converter and on-board load behind it).
+* ``input_capacitance`` is not modelled: with the input disconnected, the bulk
+  capacitor discharging into the converters' constant-power inputs through
+  dropout stalls ngspice's step control; the converters' output (hold-up)
+  capacitance is modelled (``hold_up_capacitance``).
+* ``tvs`` — the input TVS: not part of the circuit at battery voltages (it
+  conducts above its breakdown); checked statically against the converters'
+  input absolute maximum (:meth:`BoardPcb.tvs_clamp`).
 * Any nested dict with ``address``/``bus`` (an on-board IC, e.g. ``ina226``,
   ``mpu6050``) — constant-current load on ``supply_pin`` or the power pin
   closest to 3.3 V, current from ``current`` or a datasheet default.
-* A nested dict with ``shunt`` (current monitor) — series shunt resistor
-  between the regulator input pin and the regulator; reported as the
-  monitor's reading.
 """
 
 from __future__ import annotations
@@ -25,6 +35,8 @@ from .battery import ctype_thermal
 from .loads import DEVICE_CURRENTS, BuckCore
 from .regulator import ENABLE_CARD, ENABLE_MODEL
 
+PRIMARY = "regulator"
+
 
 class BoardPcb(BehaviorModel):
     model = "board.pcb"
@@ -33,23 +45,41 @@ class BoardPcb(BehaviorModel):
         super().__init__(*args, **kwargs)
         self.gnd = self.require(self.pin_by_role("ground"), "ground")
         values = self.params.values
-        self.regulator_params = values.get("regulator") if isinstance(values.get("regulator"), dict) else None
-        self.devices = {k: v for k, v in values.items() if isinstance(v, dict) and k != "regulator" and ("address" in v or "bus" in v)}
+        self.regulator_params = values.get(PRIMARY) if isinstance(values.get(PRIMARY), dict) else None
+        converters = {k: v for k, v in values.items() if isinstance(v, dict)
+                      and (k == PRIMARY or v.get("model") == "regulator.buck")}
+        self.devices = {k: v for k, v in values.items() if isinstance(v, dict) and k not in converters
+                        and ("address" in v or "bus" in v)}
         self.monitor = next((k for k, v in self.devices.items() if "shunt" in v), None)
-        self.core: BuckCore | None = None
+        self.cores: dict[str, BuckCore] = {}
+        self.outputs_of: dict[str, PinRef] = {}
+        self.core: BuckCore | None = None  # the primary converter (``regulator``)
         self.vin_pin: PinRef | None = None
         self.vout_pin: PinRef | None = None
         self.shunt_value = 0.0
+        self.fet_resistance = 0.0
         self.device_info: dict[str, dict[str, Any]] = {}
-        if self.regulator_params:
-            reg = Params(f"{self.id}.regulator", self.regulator_params)
-            v_out = reg.get("v_out")
-            self.vin_pin = self._pin(self.regulator_params.get("input_pin"), ("power_in",), 0.0, highest=True)
-            self.vout_pin = self._pin(self.regulator_params.get("output_pin"), ("power_out",), v_out)
-            self.core = BuckCore(self, reg, ctype_thermal(self.ctype))
+        thermal = ctype_thermal(self.ctype)
+        ordered = sorted(converters, key=lambda k: (k != PRIMARY, k))
+        for name in ordered:
+            reg = Params(f"{self.id}.{name}", converters[name])
+            prefix = "reg" if name == PRIMARY else spice_name(name)[:12]
+            core = BuckCore(self, reg, thermal, prefix=prefix)
+            out_pin = self._pin(converters[name].get("output_pin"), ("power_out",), core.v_out)
+            if out_pin is None:
+                continue
+            self.cores[name] = core
+            self.outputs_of[name] = out_pin
+            self.params.estimated.update({f"{name}.{k}": v for k, v in reg.estimated.items()})
+        if self.cores:
+            first = next(iter(self.cores))
+            self.core, self.vout_pin = self.cores[first], self.outputs_of[first]
+            self.vin_pin = self._pin((self.regulator_params or {}).get("input_pin"), ("power_in",), 0.0, highest=True)
             if self.monitor:
                 self.shunt_value = to_si(self.devices[self.monitor]["shunt"])
-            self.params.estimated.update({f"regulator.{k}": v for k, v in reg.estimated.items()})
+            protection = values.get("reverse_protection")
+            if isinstance(protection, dict) and protection.get("rds_on") is not None:
+                self.fet_resistance = to_si(protection["rds_on"])
         for name, device in self.devices.items():
             supply = self._pin(device.get("supply_pin"), ("power_in", "power_out"), float(device.get("supply_voltage", 3.3)))
             if supply is None:
@@ -79,22 +109,43 @@ class BoardPcb(BehaviorModel):
     def _port(pin: str) -> str:
         return "p_" + spice_name(pin)
 
+    # ------------------------------------------------------------------ static data
+    def tvs_clamp(self, current: float) -> float | None:
+        """Clamping voltage of the input TVS at ``current`` (A): the datasheet line from the maximum
+        breakdown voltage to V_C at I_PP, V_C(I) = V_BR,max + (V_C - V_BR,max) I / I_PP (linear dynamic
+        resistance, the usual first-order TVS model); None without ``tvs`` data."""
+        tvs = self.params.values.get("tvs")
+        if not isinstance(tvs, dict) or tvs.get("v_clamp") is None or tvs.get("i_pp") is None:
+            return None
+        v_c, i_pp = to_si(tvs["v_clamp"]), to_si(tvs["i_pp"])
+        v_br = to_si(tvs.get("v_breakdown_max", tvs.get("v_breakdown_min", v_c)))
+        return v_br + (v_c - v_br) * max(current, 0.0) / i_pp
+
     def build(self, net: Netlist) -> None:
         name = f"board_pcb_{self.inst[1:]}"
         used: dict[str, PinRef] = {self.gnd.name: self.gnd}
         lines: list[str] = []
-        control: str | None = None
+        controls: list[tuple[str, str]] = []  # (port, top-level node): enables (op), capacitor states (tran)
         gnd = self._port(self.gnd.name)
-        if self.core is not None:
+        if self.cores:
             net.model(ENABLE_MODEL, ENABLE_CARD)
-            vin, vout = self._port(self.vin_pin.name), self._port(self.vout_pin.name)
-            used[self.vin_pin.name], used[self.vout_pin.name] = self.vin_pin, self.vout_pin
-            regulator_input = vin
+            vin = self._port(self.vin_pin.name)
+            used[self.vin_pin.name] = self.vin_pin
+            node = vin
+            if self.fet_resistance:
+                lines.append(f"rfet {node} fet_out {fmt(self.fet_resistance)}")
+                node = "fet_out"
             if self.monitor:
-                regulator_input = "shunt_out"
-                lines.append(f"rshunt {vin} shunt_out {fmt(self.shunt_value)}")
-            core_lines, control = self.core.lines(net, regulator_input, vout, gnd)
-            lines += core_lines
+                lines.append(f"rshunt {node} shunt_out {fmt(self.shunt_value)}")
+                node = "shunt_out"
+            for key, core in self.cores.items():
+                pin = self.outputs_of[key]
+                used[pin.name] = pin
+                core_lines, control = core.lines(net, node, self._port(pin.name), gnd)
+                lines += core_lines
+                if control:
+                    controls.append((core.ctl_port, control))
+                controls += core.extra_ports(net)
         for device, info in self.device_info.items():
             supply = self.pins[info["supply_pin"]]
             used[supply.name] = supply
@@ -103,55 +154,84 @@ class BoardPcb(BehaviorModel):
                       f"bd_{tag} d_{tag} {gnd} i = {constant_current(info['current'], info['v_knee'], f'v({port},{gnd})')}"]
         if not lines:
             return
-        ports = [self._port(p) for p in used] + ["t", "tamb"] + (["reg_ctl"] if control else [])
-        nodes = [pin.node for pin in used.values()] + [self.core.t_node if self.core else self.local("t"), "tamb"]
-        nodes += [control] if control else []
-        if self.core is None:
+        ports = [self._port(p) for p in used] + [c.t_port for c in self.cores.values()] + ["tamb"]
+        nodes = [pin.node for pin in used.values()] + [c.t_node for c in self.cores.values()] + ["tamb"]
+        if not self.cores:
+            ports.insert(-1, "t")
+            nodes.insert(-1, self.local("t"))
             lines.append("rt t tamb 1")
-        net.subckt(name, ports, lines, doc=f"{self.id}: board {', '.join(['buck'] * bool(self.core) + list(self.device_info))}")
+        ports += [port for port, _ in controls]
+        nodes += [node for _, node in controls]
+        doc = ", ".join([f"buck {k}" for k in self.cores] + list(self.device_info))
+        net.subckt(name, ports, lines, doc=f"{self.id}: board {doc}")
         net.add(f"{self.inst} {' '.join(nodes)} {name}")
 
     def begin_step(self, dt: float | None, inputs: dict[str, Any], time: float) -> None:
-        if dt is None and self.core is not None:
-            self.core.prepare()
+        if dt is None:
+            for core in self.cores.values():
+                core.prepare()
+
+    def _regulator_input(self) -> str:
+        if self.monitor:
+            return self.internal("shunt_out")
+        if self.fet_resistance:
+            return self.internal("fet_out")
+        return self.vin_pin.node
 
     def resolve(self, sol: Solution) -> bool:
-        return self.core.resolve(sol, self.vin_pin.node, self.gnd.node) if self.core else False
+        if not self.cores:
+            return False
+        node = self._regulator_input()
+        return any([core.resolve(sol, node, self.gnd.node) for core in self.cores.values()])
 
     def end_step(self, dt: float | None, sol: Solution, time: float) -> list[Event]:
-        if self.core is None:
+        if not self.cores:
             return []
         if dt is not None:
             self.capture_states(sol)
-        return self.core.end_step(dt, sol, time, self.vin_pin.node, self.gnd.node)
+        node = self._regulator_input()
+        events: list[Event] = []
+        for core in self.cores.values():
+            events += core.end_step(dt, sol, time, node, self.gnd.node)
+        return events
 
     def outputs(self, sol: Solution) -> dict[str, Any]:
         out: dict[str, Any] = {"devices": {k: {"current": sol.i(f"v.{self.inst}.vd_{spice_name(k)}")} for k in self.device_info}}
-        if self.core:
-            regulator_input = self.internal("shunt_out") if self.monitor else self.vin_pin.node
-            reg = self.core.state(sol, regulator_input, self.vout_pin.node, self.gnd.node)
-            out["regulator"] = reg
-            out["v_in"] = sol.v(self.vin_pin.node, self.gnd.node)
-            out["v_out"] = reg["v_out"]
-            out["regulator_temperature_c"] = reg["temperature_c"]
-            out["uvlo"] = not reg["enabled"]
-            if self.monitor:
-                shunt_v = sol.v(self.vin_pin.node, self.internal("shunt_out"))
-                current = shunt_v / self.shunt_value
-                out[self.monitor] = {"current": current, "shunt_voltage": shunt_v, "bus_voltage": out["v_in"]}
-                out[f"{self.monitor}_current"] = current
-                out[f"{self.monitor}_bus_voltage"] = out["v_in"]
+        if not self.cores:
+            return out
+        node = self._regulator_input()
+        out["v_in"] = sol.v(self.vin_pin.node, self.gnd.node)
+        for key, core in self.cores.items():
+            reg = core.state(sol, node, self.outputs_of[key].node, self.gnd.node)
+            out[key] = reg
+            if key == PRIMARY or core is self.core:
+                out["v_out"] = reg["v_out"]
+                out["regulator_temperature_c"] = reg["temperature_c"]
+                out["uvlo"] = not reg["enabled"]
+            else:
+                out[f"{key}_v_out"] = reg["v_out"]
+                out[f"{key}_uvlo"] = not reg["enabled"]
+        out["current_in"] = sum(out[key]["i_in"] for key in self.cores)
+        if self.monitor:
+            high = self.internal("fet_out") if self.fet_resistance else self.vin_pin.node
+            shunt_v = sol.v(high, self.internal("shunt_out"))
+            current = shunt_v / self.shunt_value
+            bus = sol.v(self.internal("shunt_out"), self.gnd.node)  # INA226 VBUS senses the shunt's load side
+            out[self.monitor] = {"current": current, "shunt_voltage": shunt_v, "bus_voltage": bus}
+            out[f"{self.monitor}_current"] = current
+            out[f"{self.monitor}_bus_voltage"] = bus
+            out["current_in"] = current
         return out
 
     def snapshot(self) -> dict[str, Any]:
         state = super().snapshot()
-        if self.core:
-            state["core"] = self.core.snapshot()
+        state["cores"] = {k: c.snapshot() for k, c in self.cores.items()}
         return state
 
     def restore(self, state: dict[str, Any]) -> None:
         state = dict(state)
-        core = state.pop("core", None)
-        if self.core and core:
-            self.core.restore(core)
+        cores = state.pop("cores", {})
+        for key, core_state in cores.items():
+            if key in self.cores:
+                self.cores[key].restore(core_state)
         super().restore(state)

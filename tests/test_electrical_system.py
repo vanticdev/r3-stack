@@ -27,7 +27,7 @@ def test_contract_step_outputs(project):
                               "servo": {"pulse_us": 1500.0, "horn_torque": 0.2, "horn_speed": 0.5}, "pi": {"activity": 0.6}})
     assert out["pi"]["powered"] and out["_solver"]["converged"]
     assert out["_nets"]["5V"] == pytest.approx(5.1, abs=0.03)
-    assert out["_nets"]["BEC_6V"] == pytest.approx(6.0, abs=0.05)
+    assert out["_nets"]["SERVO_6V"] == pytest.approx(6.05, abs=0.05)  # HAT TPS56528 servo rail
     assert out["_branches"]["W_Y_P_IN"]["current"] == pytest.approx(out["battery"]["current"], rel=1e-6)
     for key in ("torque", "current"):
         assert key in out["motor"]

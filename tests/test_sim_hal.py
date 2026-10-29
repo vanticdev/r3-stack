@@ -58,6 +58,16 @@ def test_lockstep_round_trip(twin):
         hal.pwm("pwmchip0", 1).set_pulse_us(1500)
     assert unbound.value.code == "pin_not_bound"
     hal.clock.sleep(0.01)
+    # The HAT's failsafe arbiter boots in failsafe: without a heartbeat the ESC sees neutral.
+    assert kernel.pi_pulses[("pwmchip0", 2)] == pytest.approx(1600.0) and kernel.esc_pulse == pytest.approx(1500.0)
+    beat = hal.gpio("gpiochip0", 27, direction="out")
+    esc.set_pulse_us(1500.0)
+    for k in range(6):  # re-arm: heartbeat edges at the control rate with a neutral command
+        beat.write(k % 2 == 0)
+        hal.clock.sleep(0.01)
+    esc.set_pulse_us(1600.0)
+    beat.write(0)
+    hal.clock.sleep(0.01)
     assert kernel.esc_pulse == pytest.approx(1600.0)
 
 

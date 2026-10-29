@@ -59,3 +59,17 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
 20. The official Pi 5 STEP has a 1.28 mm PCB, but the catalog assumes 1.6 mm. That leaves a 0.22 mm gap between the header
     and socket faces (the 4.68 mm pin engagement is OK). Lower the Pi standoffs and the HAT by about 0.29 mm, per
     `.r3-agents/requests/connectors.md`. [mechanical, phase B follow-up]
+
+## From the PCB rollout (pcb-rollout agent)
+21. `pi_hang` FAILS: the arbiter sends a 1500 µs neutral 110 ms after the heartbeat stops, but the ESC coasts at neutral, so the car
+    travels 5.44 m against the 3 m limit. Fix: the ATtiny412 arbiter outputs an active-brake pulse sequence first (QuicRun: a
+    reverse pulse while moving forward = brake, held for N ms), then neutral. Update `r3_kicad.arbiter`, the twin model and the
+    scenario. Alternatively enable the ESC drag brake (QuicRun 1060 supports drag brake %; model it in esc.brushed).
+22. Ground loop: about 3.36 A of motor return current flows through the 22 AWG ESC signal-lead ground (header rated 3 A), because
+    the HAT ground and the ESC ground are paralleled by that lead. Fix: isolate the ESC PWM on the HAT (digital isolator, e.g.
+    ISO7710, with the ESC-side ground not connected to HAT GND) or use a single-point/star ground. Re-verify in ngspice.
+23. Servo supply sags to 4.80 V at minimum charge (the TPS56528 is in dropout below about 7.8 V in); 4.52 V at motor stall with
+    minimum charge. Fix: a buck-boost servo regulator (e.g. TPS63070 class, ≥3 A) or a servo rated 4.8–8.4 V straight off
+    VBAT. Re-run servo stall at minimum charge.
+24. The HAT input's 220 µF bulk cap is not modelled (an ngspice step-control stall when the input is disconnected). Model it with an
+    ESR and an initial condition so brownout and hold-up are realistic.

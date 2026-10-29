@@ -31,6 +31,8 @@ import numpy as np
 from scipy.optimize import brentq
 
 from r3_model.diagnostics import Diagnostic, StageResult
+from r3_model.graph import ACTIVE_SIGNAL_LINKS
+from r3_model.units import to_si
 
 from .models.battery import BatteryLipo
 from .models.board import BoardPcb
@@ -270,8 +272,9 @@ def summarize_point(system: ElectricalSystem, name: str, state: str, soc: float,
         if cid.startswith("_"):
             continue
         components[cid] = {k: v for k, v in values.items() if isinstance(v, (int, float, bool, str))}
-        if isinstance(values.get("regulator"), dict):
-            components[cid]["regulator"] = {k: v for k, v in values["regulator"].items() if isinstance(v, (int, float, bool))}
+        for key, nested in values.items():  # converter states (board.pcb: ``regulator``, ``servo_regulator``, ...)
+            if isinstance(nested, dict) and "power_loss" in nested:
+                components[cid][key] = {k: v for k, v in nested.items() if isinstance(v, (int, float, bool))}
     branches = out["_branches"]
     wires = {k: {"current": b["current"], "voltage_drop": b["voltage_drop"], "power_loss": b["power_loss"],
                  "temperature_rise": b["temperature_rise"], "ampacity": b["rating"], "awg": b["awg"], "harness": b["harness"],
@@ -502,21 +505,36 @@ def check_regulators_and_thermal(system: ElectricalSystem, points: list[dict[str
     report: dict[str, Any] = {}
     continuous = [p for p in points if p["kind"] == "continuous"]
     for cid, model in system.models.items():
-        core = model.core if isinstance(model, (BoardPcb, BuckRegulator)) else None
-        if core is not None:
-            point = max(continuous, key=lambda p: p["components"][cid]["regulator"]["power_loss"] if "regulator" in p["components"][cid] else p["components"][cid]["power_loss"])
-            reg = point["components"][cid].get("regulator", point["components"][cid])
+        for key, core in _cores(model).items():
+            name = cid if key is None else f"{cid}.{key}"
+
+            def values(p: dict[str, Any]) -> dict[str, Any]:
+                return p["components"][cid][key] if key is not None else p["components"][cid]
+
+            point = max(continuous, key=lambda p: values(p)["power_loss"])
+            reg = values(point)
             temperature = ambient + core.theta * reg["power_loss"]
             limit = min(core.max_temp_c, requirement)
-            report[cid] = {"power_loss": reg["power_loss"], "theta_ja": core.theta, "temperature_c": temperature, "limit_c": limit,
-                           "point": _op_label(point), "efficiency": reg["efficiency"], "i_out": reg["i_out"], "i_max": core.i_max}
+            # A converter's rated output current: the catalog design current (continuous). Short peaks up to
+            # the current limit are reported as regulator_current_limit when the limit is reached.
+            peak = max(points, key=lambda p: values(p)["i_out"])
+            report[name] = {"part": core.part, "power_loss": reg["power_loss"], "theta_ja": core.theta, "temperature_c": temperature,
+                            "limit_c": limit, "point": _op_label(point), "efficiency": reg["efficiency"], "i_out": reg["i_out"],
+                            "i_max": core.i_max, "current_limit": core.current_limit, "peak_i_out": values(peak)["i_out"],
+                            "peak_point": _op_label(peak), "v_out_at_peak": values(peak)["v_out"],
+                            "dropout_input_at_i_max": core.dropout_input(core.i_max)}
             if temperature > limit:
                 result.add(Diagnostic.error(
-                    "regulator_overtemperature", f"{cid} buck: {reg['power_loss']:.2f} W x {core.theta} C/W -> {temperature:.0f} C > {limit:.0f} C",
+                    "regulator_overtemperature", f"{name} buck: {reg['power_loss']:.2f} W x {core.theta} C/W -> {temperature:.0f} C > {limit:.0f} C",
                     subjects=[cid, f"op:{_op_label(point)}"], data={"temperature_c": temperature, "limit_c": limit, "power_loss": reg["power_loss"]}))
             if reg["i_out"] > core.i_max:
-                result.add(Diagnostic.error("regulator_overcurrent", f"{cid}: {reg['i_out']:.2f} A > {core.i_max} A",
+                result.add(Diagnostic.error("regulator_overcurrent", f"{name}: {reg['i_out']:.2f} A > {core.i_max} A",
                                             subjects=[cid], data={"current": reg["i_out"], "limit": core.i_max}))
+            if values(peak)["i_out"] >= core.current_limit * 0.98:
+                result.add(Diagnostic.warning(
+                    "regulator_current_limit", f"{name}: output reaches the {core.current_limit:g} A current limit at "
+                    f"{_op_label(peak)} ({values(peak)['v_out']:.2f} V)", subjects=[cid, f"op:{_op_label(peak)}"],
+                    data={"current": values(peak)["i_out"], "limit": core.current_limit, "v_out": values(peak)["v_out"]}))
         if isinstance(model, BrushedEsc):
             point = max(continuous, key=lambda p: p["components"][cid]["power_loss"])
             loss = point["components"][cid]["power_loss"]
@@ -560,6 +578,65 @@ def check_regulators_and_thermal(system: ElectricalSystem, points: list[dict[str
             if i > model.max_current:
                 result.add(Diagnostic.error("battery_overcurrent", f"{cid}: {i:.0f} A > {model.max_current:.0f} A",
                                             subjects=[cid], data={"current": i, "limit": model.max_current}))
+    return report
+
+
+def _cores(model: Any) -> dict[str | None, Any]:
+    """Buck converters of a model keyed by their output key (``None``: the model's own outputs)."""
+    if isinstance(model, BoardPcb):
+        return dict(model.cores)
+    if isinstance(model, BuckRegulator):
+        return {None: model.core}
+    return {}
+
+
+def check_tvs(system: ElectricalSystem, result: StageResult) -> dict[str, Any]:
+    """Input TVS clamp against the converters' input absolute maximum.
+
+    Expected surge: with a 2S pack nothing in the car drives the bus above the pack voltage for long (the
+    brushed ESC does not boost); surges are inductive kicks when the pack is unplugged or a fuse opens under
+    load, and the TVS current is at most the current interrupted in the board's supply branch. That branch is
+    fused, so the expected surge current is 2 x the fuse rating (a blade fuse carries 200 % for at least
+    ~0.15 s), and never more than the TVS's rated I_PP. The clamp is also checked at I_PP (the worst case the
+    part is specified for)."""
+    report: dict[str, Any] = {}
+    graph = system.project.graph
+    fuses = {cid: m for cid, m in system.models.items() if isinstance(m, FuseBlade)}
+    for cid, model in system.models.items():
+        if not isinstance(model, BoardPcb) or model.vin_pin is None:
+            continue
+        tvs = model.params.values.get("tvs")
+        if not isinstance(tvs, dict) or model.tvs_clamp(0.0) is None:
+            continue
+        abs_max = min((core.v_in_abs_max for core in model.cores.values()), default=math.inf)
+        if not math.isfinite(abs_max):
+            continue
+        board_net = graph.net_of(model.vin_pin.label)
+        feeding = [(fid, f) for fid, f in fuses.items()
+                   if any(graph.net_of(pin.label) == board_net for pin in f.pins.values())]
+        i_pp = float(to_si(tvs["i_pp"]))
+        surge = min(i_pp, 2.0 * min(f.rating for _, f in feeding)) if feeding else i_pp
+        v_surge, v_pp = model.tvs_clamp(surge), model.tvs_clamp(i_pp)
+        entry = {"part": tvs.get("part"), "abs_max": abs_max, "expected_surge_current": surge,
+                 "surge_source": f"2 x {feeding[0][0]} rating" if feeding else "TVS rated I_PP",
+                 "clamp_at_expected_surge": v_surge, "clamp_at_i_pp": v_pp, "i_pp": i_pp,
+                 "margin_at_expected_surge": abs_max - v_surge, "pack_max": max(
+                     (m.cells * m.ocv_cell(1.0) for m in system.models.values() if isinstance(m, BatteryLipo)), default=None),
+                 "v_standoff": float(to_si(tvs["v_standoff"])) if tvs.get("v_standoff") is not None else None}
+        report[cid] = entry
+        if v_surge > abs_max or v_pp > abs_max:
+            worst = max(v_surge, v_pp)
+            result.add(Diagnostic.error(
+                "tvs_clamp_exceeds_abs_max", f"{cid}: {tvs.get('part')} clamps at {v_surge:.1f} V at the expected "
+                f"{surge:.1f} A surge ({v_pp:.1f} V at I_PP {i_pp:g} A), above the converters' {abs_max:g} V VIN absolute maximum",
+                subjects=[cid, str(tvs.get("part"))],
+                data={"clamp_voltage": worst, "abs_max": abs_max, "surge_current": surge, "i_pp": i_pp},
+                hint="choose a TVS with a lower breakdown voltage that still stands off the full pack voltage"))
+        if entry["v_standoff"] is not None and entry["pack_max"] is not None and entry["v_standoff"] < entry["pack_max"]:
+            result.add(Diagnostic.error(
+                "tvs_standoff_below_pack", f"{cid}: {tvs.get('part')} stand-off {entry['v_standoff']:g} V is below the full pack "
+                f"{entry['pack_max']:.2f} V (the TVS would conduct in normal use)", subjects=[cid, str(tvs.get("part"))],
+                data={"v_standoff": entry["v_standoff"], "pack_max": entry["pack_max"]}))
     return report
 
 
@@ -654,10 +731,13 @@ def check_logic_levels(system: ElectricalSystem, result: StageResult) -> list[di
 
     series: dict[tuple[str, str], float] = {}
     for edge in graph.edges:
-        if edge.kind == "internal" and edge.data.get("link_kind") in ("series_resistor", "level_shifter"):
+        if edge.kind == "internal" and edge.data.get("link_kind") in ("series_resistor", *ACTIVE_SIGNAL_LINKS):
             ra, rb = find(graph.net_of(edge.a)), find(graph.net_of(edge.b))
             parent[ra] = rb
-            series[(graph.net_of(edge.a), graph.net_of(edge.b))] = float(edge.data.get("value") or 0.0)
+            # Active links re-drive the signal at their own logic level: no series resistance (their
+            # ``value`` is not an ohmic value, e.g. the arbiter's heartbeat timeout).
+            resistance = float(edge.data.get("value") or 0.0) if edge.data.get("link_kind") == "series_resistor" else 0.0
+            series[(graph.net_of(edge.a), graph.net_of(edge.b))] = resistance
     for node in graph.nodes:
         groups.setdefault(find(graph.net_of(node)), set()).add(node)
     pins: dict[str, Any] = {}
@@ -813,6 +893,7 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
     fuses = check_fuses(system, points, result)
     thermal = check_regulators_and_thermal(system, points, result)
     brownout = check_brownout(system, points, result)
+    tvs = check_tvs(system, result)
     check_pins(system, points, result)
     logic = check_logic_levels(system, result)
     duty = dict(project.spec.requirements.extra.get("duty_cycle", DEFAULT_DUTY_CYCLE))
@@ -836,7 +917,7 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
         "vehicle": vehicle, "battery_states": states,
         "operating_points": {_op_label(p): {k: v for k, v in p.items() if not k.startswith("_")} for p in points},
         "worst_case": {"wires": worst_wires, "connectors": worst_contacts, "harness_voltage_drop": drops},
-        "fuses": fuses, "thermal": thermal, "brownout": brownout, "logic_levels": logic, "runtime": runtime,
+        "fuses": fuses, "thermal": thermal, "brownout": brownout, "tvs": tvs, "logic_levels": logic, "runtime": runtime,
         "estimated_parameters": estimated, "wire_lengths": system.network.wire_lengths,
         "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics],
     }

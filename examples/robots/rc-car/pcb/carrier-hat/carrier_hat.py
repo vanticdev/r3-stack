@@ -136,9 +136,12 @@ def build() -> BoardIntent:
              sch=(66.04, 205.74, 270), pcb=P(52.5, 41.5, 180), mpn="BZT52B12-7-F", manufacturer="Diodes Inc.",
              description="12 V zener, Q1 gate-source clamp"))
     add(r("R1", "100k", "Q1_GATE", "GND", (50.8, 218.44, 0), P(48.5, 41.5, 90), "RC0603FR-07100KL", "Q1 gate pull-down"))
-    add(Part("D2", "Diode:SMAJ16A", "SMAJ16A", "Diode_SMD:D_SMA", {"1": "VBAT_PROT", "2": "GND"}, sch=(78.74, 203.2, 90),
-             pcb=P(45.0, 51.0, 0), mpn="SMAJ16A", manufacturer="Littelfuse",
-             description="400 W TVS, VRWM 16 V, VBR 17.8 V min, VC 26 V"))
+    # TVS: SMAJ10A. A 2S pack is 8.4 V full (below VRWM 10 V); the clamp, 17.0 V at I_PP 23.5 A (16.3 V at the
+    # 20 A expected surge, 2 x the HAT's 10 A fuse), stays below the TPS56528's 20 V VIN absolute maximum.
+    # The SMAJ16A it replaces clamped at 26 V. 2S only: a 3S pack (12.6 V) exceeds the stand-off.
+    add(Part("D2", "Diode:SMAJ10A", "SMAJ10A", "Diode_SMD:D_SMA", {"1": "VBAT_PROT", "2": "GND"}, sch=(78.74, 203.2, 90),
+             pcb=P(45.0, 51.0, 0), mpn="SMAJ10A", manufacturer="Littelfuse",
+             description="400 W TVS, VRWM 10 V, VBR 11.1 V min, VC 17.0 V at 23.5 A"))
     add(Part("R2", "Device:R_Shunt", "2m", "Resistor_SMD:R_Shunt_Vishay_WSK2512_6332Metric_T1.19mm",
              {"1": "VBAT_PROT", "2": "SENSE_P", "3": "SENSE_N", "4": "VIN_HAT"}, sch=(99.06, 190.5, 90), pcb=P(44.5, 45.5, 0),
              mpn="WSK25122L000FEA", manufacturer="Vishay Dale", description="2 mOhm 1 % 1 W four-terminal current shunt"))
@@ -309,21 +312,17 @@ def copper(w5: float, w_servo: float, i_in_5v: float, i_in_servo: float) -> tupl
     # minimum battery (regulators.py: Pout / (eta Vin)) on its own branch.
     T, V = PowerTrack, Via
     tracks = [
-        # battery -> P-FET drain -> source -> shunt -> TVS
+        # battery -> P-FET drain -> source -> shunt -> TVS (FET drain -> shunt: the VBAT_PROT pour below)
         T("VBAT", w5, ("J2.1", (46.2, 44.5)), current=5.0),
-        T("VBAT_PROT", 1.6, ((43.5, 44.1), (40.6, 44.1)), current=5.0),
         T("VBAT_PROT", 1.2, ((40.6, 44.6), (41.0, 48.9)), current=1.0),
         # VIN_HAT spine: shunt -> bulk C3 -> north to the 5 V buck input bus, west to the servo buck input bar
         T("VIN_HAT", w5, ((35.0, 42.4), (38.3, 38.6), (38.3, 31.0), (29.6, 31.0), (29.6, 18.6)), current=5.0),
         T("VIN_HAT", 2.2, ((20.7, 18.6), (29.6, 18.6)), current=round(i_in_5v, 2)),
-        T("VIN_HAT", 1.4, ((24.2, 18.6), (24.2, 14.4)), current=round(i_in_5v, 2)),
         T("VIN_HAT", 2.0, ((29.6, 31.0), (23.6, 36.6), (16.6, 36.6)), current=round(i_in_servo, 2)),
         T("VIN_HAT", 1.4, ((16.6, 36.6), (16.6, 42.9)), current=round(i_in_servo, 2)),
         T("VIN_HAT", 0.6, ((16.6, 41.075), "C19.1"), current=0.5),
         # 5.1 V buck: switch node L1 -> U2 pins 19/20 (necked at the pins), pin 6 over the back, bootstrap stub
         T("SW_5V", 2.6, ((18.0, 13.9), (19.9, 13.9)), current=5.0),
-        T("SW_5V", 1.6, ((19.9, 13.68), (21.2, 13.68)), current=5.0),
-        T("SW_5V", 0.65, ((21.2, 13.68), (22.5, 13.68)), current=5.0),
         T("SW_5V", 0.6, ("C13.2", (20.5, 14.0)), current=0.5),
         T("SW_5V", 0.25, ("U2.6", (26.0, 13.9), (26.0, 14.6))),
         T("SW_5V", 0.5, ((26.0, 14.6), (20.0, 14.6)), layer="B.Cu", current=1.5),
@@ -356,19 +355,20 @@ def copper(w5: float, w_servo: float, i_in_5v: float, i_in_servo: float) -> tupl
         T("GND", 0.2, ("U2.18", "U2.21")), T("GND", 0.2, ("U2.13", "U2.21")), T("GND", 0.2, ("U2.8", "U2.21")),
         T("GND", 0.2, ("U2.7", "U2.8")), T("GND", 0.3, ("U2.8", (26.6, 13.1))),
         # 5 V: L1 -> output capacitor column -> around H1 -> Pi pins 2 and 4, on both layers; hold-up C12
-        T("5V", 2.5, ((10.3, 13.0), (13.1, 13.0)), current=5.0),
+        T("5V", 2.6, ((10.3, 13.0), (13.1, 13.0)), current=5.0),
         T("5V", 2.6, ((10.3, 17.2), (10.3, 7.8)), current=5.0),
-        # Between H1's standoff/screw-head contact circle and J1 pins 1/2 only a 0.7 mm neck fits; it is
-        # doubled on the bottom layer (fed by one via) and 3.5 mm long. The bottom layer stays open below
-        # the header so pins 1-10 can escape.
-        T("5V", 2.0, ((10.0, 6.86), (6.85, 6.86)), current=5.0),
-        T("5V", 0.7, ((6.85, 6.86), (6.85, 2.23), (7.6, 2.23)), current=2.5),
-        T("5V", 1.6, ((7.6, 2.23), "J1.2", "J1.4"), current=2.5),
-        T("5V", 0.7, ((6.85, 7.3), (6.85, 2.23), (7.6, 2.23)), layer="B.Cu", current=2.5),
-        T("5V", 1.6, ((7.6, 2.23), "J1.2", "J1.4"), layer="B.Cu", current=2.5),
+        # Between H1's screw-head/standoff contact circles (2.25 mm top, 2.88 mm bottom) and J1 pin 1 the 5 V
+        # path is a parallel pair: 1.4 mm on top (the smaller top circle leaves room) and 0.8 mm on the bottom,
+        # joined by the via at its foot. Equal lengths, so the current splits by width: 5 A x 1.4 / 2.2 =
+        # 3.18 A on top, 1.82 A below. The 2.6 mm feed from the column stays clear of J1 pin 1. The bottom
+        # layer stays open below the header so pins 1-10 can escape.
+        T("5V", 2.6, ((10.3, 7.15), (7.9, 7.15)), current=5.0),
+        T("5V", 1.4, ((7.9, 7.15), (6.55, 7.15), (6.55, 2.23), (7.6, 2.23)), current=3.18),
+        T("5V", 1.6, ((7.6, 2.23), "J1.2", "J1.4"), current=3.18),
+        T("5V", 0.8, ((6.86, 7.3), (6.86, 2.23), (7.6, 2.23)), layer="B.Cu", current=1.82),
+        T("5V", 1.6, ((7.6, 2.23), "J1.2", "J1.4"), layer="B.Cu", current=1.82),
         T("5V", 1.2, ((10.3, 17.2), (10.9, 21.8)), current=1.0),
-        # 6.0 V servo buck: U3 SW -> L2 (necked at the pin), bootstrap, ground into the pad, output to J4.2
-        T("SW_6V", 0.6, ("U3.6", (18.0, 45.635)), current=3.0),
+        # 6.0 V servo buck: U3 SW -> L2 (the SW_6V pour at the pin), bootstrap, ground into the pad, output to J4.2
         T("SW_6V", 1.6, ((18.0, 45.635), (22.0, 45.635)), current=3.0),
         T("SW_6V", 0.6, ("C23.2", (20.1, 45.2))),
         T("BST_6V", 0.3, ("U3.7", "C23.1")),
@@ -377,12 +377,29 @@ def copper(w5: float, w_servo: float, i_in_5v: float, i_in_servo: float) -> tupl
         T("SERVO_6V", w_servo, ((27.56, 47.0), (29.9, 47.0), (29.9, 49.5), "C21.1"), current=1.0),
         T("SERVO_6V", w_servo, ((27.56, 42.0), "C22.1"), current=1.0),
     ]
-    vias = [V("5V", 6.85, 7.3, 0.8, 0.4), V("SW_5V", 26.0, 14.6), V("SW_5V", 20.0, 14.6), V("GND", 26.6, 13.1), V("GND", 53.3, 16.1), V("GND", 51.45, 16.6), V("CRSF_RX", 57.9, 24.375)]
+    vias = [V("5V", 6.86, 7.3, 0.8, 0.4), V("SW_5V", 26.0, 14.6), V("SW_5V", 20.0, 14.6), V("GND", 26.6, 13.1), V("GND", 53.3, 16.1), V("GND", 51.45, 16.6), V("CRSF_RX", 57.9, 24.375)]
     board = rect(0.3, 0.3, WIDTH - 0.3, HEIGHT - 0.3)
     # Bottom ground plane first (the autorouter drops GND pads to it with vias and still routes across it),
     # top ground pour after routing. Solid pad connections: reflow assembly, no starved thermal spokes.
+    # Power pours where the current enters fine-pitch pins or crosses between large pads: the copper fills
+    # right up to the pads at the net-class clearance instead of a fixed-width neck. The stage measures the
+    # narrowest filled cross-section between each pour's terminals (r3_kicad.pours) against IPC-2152.
+    def pour(net: str, polygon, current: float, terminals) -> Zone:
+        return Zone(net, "F.Cu", polygon, priority=1, name=f"{net} pour", clearance=0.2, solid=True, before_routing=True,
+                    current=current, terminals=terminals)
+
+    pours = [
+        pour("SW_5V", rect(17.0, 12.85, 22.35, 15.6), 5.0, (("L1.1",), ("U2.19", "U2.20"))),
+        pour("VIN_HAT", rect(22.95, 14.3, 26.7, 18.7), round(i_in_5v, 2),
+             (((22.5, 17.6, 26.5, 18.7),), ("U2.2", "U2.3", "U2.4", "U2.5"))),
+        pour("SW_6V", rect(16.9, 44.6, 22.3, 46.5), 3.0, (("U3.6",), ("L2.1",))),
+        # FET drain -> shunt: between the INA226 sense pad above and Q1's gate pin below; the pour widens into
+        # the free area under the shunt so the 1.5 mm gap is crossed by more than the shunt pad's 2 mm height.
+        pour("VBAT_PROT", ((39.9, 42.2), (43.95, 42.2), (43.95, 45.2), (42.9, 45.2), (42.9, 46.6), (39.9, 46.6)), 5.0,
+             (("R2.1",), ("Q1.1", "Q1.2", "Q1.3"))),
+    ]
     zones = [Zone("GND", "B.Cu", board, priority=0, name="GND back", clearance=0.25, solid=True, before_routing=True),
-             Zone("GND", "F.Cu", board, priority=0, name="GND front", clearance=0.25, solid=True)]
+             Zone("GND", "F.Cu", board, priority=0, name="GND front", clearance=0.25, solid=True), *pours]
     return zones, tracks, vias
 
 

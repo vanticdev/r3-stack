@@ -14,15 +14,16 @@ a separate process against virtual hardware, in lockstep with the physics.
 | `radio_sionna.py` | **Sionna RT** ray tracing (CPU, Dr.Jit LLVM): position-cached traces with the posed car body, float64 path lengths, coherent multipath at the hop frequency |
 | `radio_analytic.py` | **labeled fallback** two-ray + knife-edge model (diagnostic `radio_propagation_fallback`); closed-form dipole two-ray reference for validation |
 | `radio_plots.py` | `coverage_map.png`: Sionna radio map around the course + coherent path-solver RSSI along the route |
-| `devices/` | MPU-6050, INA226 (register level), u-blox NMEA GPS (byte timing), Hall encoder edges |
+| `devices/` | MPU-6050, INA226 (register level), u-blox NMEA GPS (byte timing), Hall encoder edges, board failsafe arbiter (`r3_kicad.arbiter` behind a `failsafe_arbiter` link: heartbeat GPIO edges, neutral pulses after the timeout) |
 | `signals.py` | binding → device reachability from the net graph (an unwired device sees nothing) |
 | `hal_server.py` | `r3-hal/1` server (see `packages/hardware-interface/PROTOCOL.md`), brownout errors |
-| `scenario.py`, `evaluation.py` | software subprocess, brownout reboot, watchdog restarts, `expect` evaluation, artifacts |
+| `scenario.py`, `evaluation.py` | software subprocess, brownout reboot, watchdog restarts, `expect` evaluation, artifacts; scenario `faults`: `software_freeze` (SIGSTOP at `at`; PWM keeps its duty) and `transmitter_off` (`at`, optional `until`), evaluated by `stop_within_m_of_fault` and `arbiter_neutral_within_s` |
 | `fallbacks.py` | **labeled fallbacks**, used only when `r3_sim.electrical` / `r3_wiring` are missing |
 | `stage.py` | `run(project) -> StageResult` over all scenarios |
 
 Outputs per scenario under `build/sim/<scenario>/`: `summary.json`, `recording.npz`,
 `trajectory.png`, `speed.png`, `battery.png`, `rssi_vs_distance.png`, `coverage_map.png`, `currents.png`,
+`failsafe.png` (scenarios with an injected fault),
 `renders/*.png`, `renders/clip.mp4`, `vehicle.xml`, `software.log`. `build/sim/overview.png`
 summarizes all scenarios.
 

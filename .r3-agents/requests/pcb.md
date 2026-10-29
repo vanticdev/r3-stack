@@ -8,6 +8,13 @@ entry `r3-carrier-hat` no longer matches, so the `pcb` stage reports `board_cata
 until these changes are applied. `tests/test_pcb_stage.py::test_board_matches_catalog_with_requested_patch`
 parses the YAML block below, applies it in memory, and checks that KiCad's netlist matches it exactly.
 
+**Status (branch `r3/pcb-rollout`): sections 1-4 are applied** to the catalog, the schema and `robot.yaml`;
+the `pcb` stage reports no `board_catalog_mismatch` and no `pcb_connector_position_mismatch`. Changes
+against the request: the input TVS is now an SMAJ10A (clamp 17.0 V at I_PP, below the TPS56528's 20 V VIN
+absolute maximum), so `VBAT.voltage_max` is its 10 V stand-off; the regulator blocks carry `output_pin`,
+`v_in_abs_max`, the FET/inductor resistances for the dropout model and the servo rail's output capacitance.
+The catalog entry keeps its current `mechanical` block (owned by the CAD/assembly work).
+
 ## 1. `packages/component-catalog/r3_catalog/data/components/rc_car.yaml`, component `r3-carrier-hat`
 
 Replace the whole entry with:
@@ -25,7 +32,7 @@ Replace the whole entry with:
       The ESC BEC (J_ESC.2) is not connected.
     mechanical: {shape: box, size: [65 mm, 56.5 mm, 12 mm], mass: 0.028, color: "#0b4f2b"}
     pins:
-      VBAT: {role: power_in, voltage_nominal: 7.4, voltage_min: 4.4, voltage_max: 17.0, current_max: 5.0}
+      VBAT: {role: power_in, voltage_nominal: 7.4, voltage_min: 4.4, voltage_max: 10.0, current_max: 5.0}
       GND: {role: ground}
       5V: {role: power_out, voltage_nominal: 5.1, current_max: 5.0}
       3V3: {role: power_in, voltage_nominal: 3.3, current_max: 0.05}
@@ -74,7 +81,7 @@ Replace the whole entry with:
         failsafe: {part: ATtiny412, heartbeat: HEARTBEAT, timeout: 0.1, neutral_us: 1500, frame: 0.02, rearm_edges: 3,
                    rearm_band_us: 50, supply: 3V3}
         reverse_protection: {part: DMP3013SFV, rds_on: 12 mohm}
-        tvs: {part: SMAJ16A, v_breakdown_min: 17.8, v_clamp: 26.0, i_pp: 15.4}
+        tvs: {part: SMAJ10A, v_standoff: 10.0, v_breakdown_min: 11.1, v_breakdown_max: 12.3, v_clamp: 17.0, i_pp: 23.5}
         ina226: {address: 0x40, shunt: 2 mohm, bus: I2C, measures: hat_branch_only}
         mpu6050: {address: 0x68, bus: I2C}
         encoder_pullup: 10 kohm

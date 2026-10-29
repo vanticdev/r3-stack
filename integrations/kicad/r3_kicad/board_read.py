@@ -21,6 +21,7 @@ class BoardPad:
     x: float
     y: float
     layers: tuple[str, ...]
+    bbox: tuple[float, float, float, float] | None = None  # x0, y0, x1, y1
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,8 @@ class ZoneFill:
     layer: str
     name: str
     area: float            # mm^2 of filled copper
+    # Filled polygons (power pours only): each a list of rings, outline first, then holes; points (x, y) mm.
+    polygons: tuple = ()
 
 
 @dataclass
@@ -79,14 +82,17 @@ def parse_dump(data: dict) -> BoardFile:
     for fp in data["footprints"]:
         out.footprints.append(BoardFootprint(fp["ref"], fp["lib_id"], *fp["position"], fp["rotation"], fp["layer"]))
     for pad in data["pads"]:
-        out.pads.append(BoardPad(pad["ref"], pad["number"], net_name(pad["net"]), *pad["position"], tuple(pad["layers"])))
+        bbox = tuple(pad["bbox"]) if "bbox" in pad else None
+        out.pads.append(BoardPad(pad["ref"], pad["number"], net_name(pad["net"]), *pad["position"], tuple(pad["layers"]),
+                                 bbox))  # type: ignore[arg-type]
     for t in data["tracks"]:
         out.segments.append(Segment(net_name(t["net"]), t["layer"], t["width"], tuple(t["start"]), tuple(t["end"]),  # type: ignore[arg-type]
                                     t["locked"]))
     for v in data["vias"]:
         out.vias.append(BoardVia(net_name(v["net"]), *v["position"], v["diameter"], v["drill"]))
     for z in data["zones"]:
-        out.zones.append(ZoneFill(net_name(z["net"]), z["layer"], z["name"], z["area_mm2"]))
+        out.zones.append(ZoneFill(net_name(z["net"]), z["layer"], z["name"], z["area_mm2"],
+                                  tuple(tuple(tuple(tuple(p) for p in ring) for ring in poly) for poly in z.get("polygons", []))))
     return out
 
 

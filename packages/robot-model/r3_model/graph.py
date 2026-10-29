@@ -28,6 +28,13 @@ if TYPE_CHECKING:  # catalog depends on r3_model, not the other way around at im
     from r3_catalog.schema import Catalog
 
 
+#: Internal-link kinds that carry a logic signal from ``a`` to ``b`` (signal continuity, like a wire).
+SIGNAL_LINK_KINDS = frozenset({"series_resistor", "switch", "wire", "level_shifter", "failsafe_arbiter"})
+#: Signal links that are active elements: they re-drive ``b`` and conduct no DC between the pins. A
+#: ``failsafe_arbiter`` passes ``a`` to ``b`` only while its heartbeat toggles (neutral pulses otherwise).
+ACTIVE_SIGNAL_LINKS = frozenset({"level_shifter", "failsafe_arbiter"})
+
+
 @dataclass
 class Edge:
     a: str
