@@ -291,8 +291,13 @@ class Circuit:
         result = self._newton(x, A, max_iterations, tolerance, voltage_step_limit)
         if result is not None:
             return result
-        # gmin stepping: solve with a large leakage first, then relax it.
-        x = np.zeros(self.size) if x0 is None or len(x0) != self.size else np.array(x0, dtype=float)
+        # A warm start can sit on the wrong branch of a constant-power load whose
+        # source just switched off (I = P/V has negative incremental conductance
+        # and a spurious root at V -> inf). Retry cold, then gmin stepping.
+        x = np.zeros(self.size)
+        result = self._newton(x, A, max_iterations, tolerance, voltage_step_limit)
+        if result is not None:
+            return result
         for gmin in (1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, self.gmin):
             stepped = self._newton(x, self.linear_matrix(gmin), max_iterations * 2, tolerance, voltage_step_limit)
             if stepped is None:

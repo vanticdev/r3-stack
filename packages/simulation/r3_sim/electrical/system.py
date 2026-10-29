@@ -262,7 +262,10 @@ class ElectricalSystem:
         for key, rise in state["branches"].items():
             self.network.branches[key].temperature_rise = rise
         self.time, self.x = state["time"], state["x"]
-        self.circuit.resistors.resistance[:] = state["resistance"][:len(self.circuit.resistors.resistance)]
+        resistance = self.circuit.resistors.resistance
+        resistance[:len(state["resistance"])] = state["resistance"]
+        for index in range(len(state["resistance"]), len(resistance)):
+            resistance[index] = 1e12  # fault resistors created after the snapshot: open
 
     def operating_point(self, inputs: dict[str, Any], *, soc: float | None = None, thermal: str = "ambient",
                         iterations: int = 4, export_spice: bool = False,
@@ -272,7 +275,10 @@ class ElectricalSystem:
         ``thermal="ambient"``: conductors at ambient (cold, highest current);
         ``"steady"``: conductor temperatures iterated to their steady rise."""
         saved = self.snapshot()
+        faults = inputs.get("_faults")
         try:
+            if faults is not None:
+                self._apply_faults(faults)
             for model in self.models.values():
                 if soc is not None and model.model == "battery.lipo":
                     model.s_soc = soc  # type: ignore[attr-defined]
@@ -298,6 +304,8 @@ class ElectricalSystem:
                                                      nodeset_scale=nodeset_scale)
             return out
         finally:
+            if faults is not None:
+                self._apply_faults([])
             self.restore(saved)
 
     # -------------------------------------------------------------- outputs
@@ -315,7 +323,8 @@ class ElectricalSystem:
         for key, branch in self.network.branches.items():
             i = currents[key]
             r = resistance[branch.index]
-            entry = {"kind": branch.kind, "current": i, "resistance": r, "voltage_drop": i * r, "power_loss": i * i * r,
+            # ``current`` flows from ``from`` to ``to`` (graph edge orientation).
+            entry = {"kind": branch.kind, "from": branch.node_a, "to": branch.node_b, "current": i, "resistance": r, "voltage_drop": i * r, "power_loss": i * i * r,
                      "temperature_rise": branch.temperature_rise, "rating": branch.rating}
             if branch.kind == "wire":
                 entry.update(harness=branch.meta["harness"], awg=branch.meta["awg"], length=branch.meta["length"],
