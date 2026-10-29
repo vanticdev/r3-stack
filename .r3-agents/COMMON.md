@@ -66,3 +66,28 @@ enforces this in the R3 client, `tests/test_cad_policy.py` tests it, and
 around it. Verification uses native REST data instead: `bodydetails` face/edge
 surface definitions, mass properties, bounding boxes, and tessellated meshes with
 Python mesh booleans (manifold3d/trimesh are installed in the shared venv).
+
+## Tool-use policy (user directive): use every tool the way a human engineer would
+For every external tool, the AI works through the same operations a person uses
+in that tool's UI. These are the tool's own editors, libraries, checkers and
+routers, reached through its official automation API (or, if none exists, through
+UI-level automation). It does not reverse-engineer or hand-write the tool's
+internal file formats, invent a scripting layer the user would never touch, or
+reimplement a capability the tool already has.
+- **Onshape:** standard features (sketch, extrude, revolve, hole, fillet, pattern,
+  mirror, boolean, mate connector) and Assemblies with standard mates. No
+  FeatureScript (see the CAD policy above).
+- **KiCad:** symbols and footprints from KiCad's installed official libraries.
+  Schematic capture, "Update PCB from Schematic", placement, routing (KiCad router,
+  or Freerouting, the autorouter people commonly use with KiCad), zone fill, ERC/DRC
+  and fabrication outputs, all done by KiCad itself through its IPC API (`kipy`,
+  the `kicad-python` package), `kicad-cli`, or KiCad's Python scripting console.
+  Never emit `.kicad_sch`/`.kicad_pcb` text yourself, and never write a custom
+  router or DRC to replace KiCad's.
+- **GitHub:** the `gh` CLI and normal git.
+- **BLITZ / Docker / MuJoCo / ngspice:** their normal public interfaces.
+- **R3's own wiring editor** is the exception: no external tool covers it. Its
+  authored data is `robot.yaml`, which humans also edit.
+Independent verification is still encouraged. R3 may re-check results from the
+tool's own data, such as measured geometry or exported netlists, but the design
+itself must be produced inside the tool.
