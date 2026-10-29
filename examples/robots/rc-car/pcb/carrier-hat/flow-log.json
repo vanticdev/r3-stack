@@ -3,16 +3,16 @@
   "kicad": "10.0.7",
   "steps": {
     "schematic": {
-      "seconds": 14.5,
+      "seconds": 16.5,
       "result": {
-        "symbols": 104,
-        "labels": 290,
-        "no_connects": 27,
+        "symbols": 100,
+        "labels": 277,
+        "no_connects": 24,
         "writer": "kicad-sch-api, normalized by kicad-cli sch upgrade"
       }
     },
     "erc": {
-      "seconds": 1.6,
+      "seconds": 2.6,
       "result": {
         "errors": 0,
         "warnings": 0,
@@ -20,18 +20,18 @@
       }
     },
     "netlist": {
-      "seconds": 0.3,
+      "seconds": 0.4,
       "result": {
-        "nets": 97,
+        "nets": 81,
         "matches_intent": true
       }
     },
     "board": {
-      "seconds": 3.0,
+      "seconds": 4.0,
       "result": {
-        "footprints": 97,
-        "tracks": 174,
-        "vias": 29,
+        "footprints": 93,
+        "tracks": 159,
+        "vias": 25,
         "zones": 9,
         "keepouts": 16,
         "anchored": {
@@ -43,7 +43,7 @@
       }
     },
     "route": {
-      "seconds": 60.6,
+      "seconds": 57.6,
       "result": {
         "freerouting": "2.5.0",
         "java": 25,
@@ -51,8 +51,8 @@
         "rounds": [
           {
             "round": 1,
-            "freerouting_unrouted": 19,
-            "kicad_unconnected": 9,
+            "freerouting_unrouted": 13,
+            "kicad_unconnected": 5,
             "signal_unconnected": 0,
             "open_nets": []
           }
@@ -67,11 +67,11 @@
       }
     },
     "pour": {
-      "seconds": 2.0,
+      "seconds": 2.7,
       "result": {
         "zones": 1,
-        "stitching_vias": 49,
-        "island_vias": 0,
+        "stitching_vias": 119,
+        "island_vias": 1,
         "untied_islands": 0
       }
     },
@@ -87,14 +87,14 @@
       }
     }
   },
-  "started": "2026-10-29T17:25:57",
+  "started": "2026-10-29T18:23:19",
   "headless": {
     "gui_processes_started": [],
-    "samples": 244,
+    "samples": 247,
     "preexisting_gui_processes": [],
     "tool_windows_opened": [],
-    "window_samples": 61
+    "window_samples": 62
   },
-  "total_seconds": 84.8,
-  "inputs_digest": "4fbb35e8da6500d7"
+  "total_seconds": 86.7,
+  "inputs_digest": "e7293deaac454a4c"
 }

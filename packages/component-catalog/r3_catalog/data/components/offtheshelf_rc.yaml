@@ -505,10 +505,13 @@ components:
       Generic breakout, about 21 x 16 mm with two 3 mm holes along the edge opposite the 8-pin header. Frame at the
       bottom centre; sensor axes (silkscreen X/Y) along the component x/y. Hole spacing varies by maker: MEASURE.
     mechanical:
-      shape: box
+      shape: custom
       size: [21 mm, 16 mm, 3.2 mm]
       mass: 0.0018
       color: "#14549a"
+      solids:
+        - {kind: box, name: PCB, position: [0, 0, 0.8 mm], size: [21 mm, 16 mm, 1.6 mm]}
+        - {kind: box, name: populated area, position: [0, 0, 2.4 mm], size: [10 mm, 6 mm, 1.6 mm]}
       features:
         - {id: hole_1, kind: clearance_hole, position: [7.6 mm, 5.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 3.0 mm, depth: 1.6 mm,
            provenance: {status: estimated, source: "Typical GY-521 layout (vendor listings give 2 x 3 mm holes; spacing unpublished)"}}
@@ -516,7 +519,7 @@ components:
       provenance: {status: vendor, source: "https://openelab.io/products/wheeltec-gy-521-mpu-6050 (about 20.5 x 15.5 mm, 2 x 3.2 mm holes, 1.8 g)"}
     interfaces:
       mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
-              params: {holes: [[7.6 mm, 5.5 mm, 3.0 mm, clearance, 1.6 mm], [-7.6 mm, 5.5 mm, 3.0 mm, clearance, 1.6 mm]]}}
+              params: {holes: [[7.6 mm, -5.5 mm, 3.0 mm, clearance, 1.6 mm], [-7.6 mm, -5.5 mm, 3.0 mm, clearance, 1.6 mm]]}}
       bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
     pins:
       VCC: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.0, voltage_max: 5.5, current_max: 0.01}
@@ -528,7 +531,7 @@ components:
       J1: {type: integral, position: [0, -8 mm, 1.6 mm], direction: [0, -1, 0], pins: {"1": VCC, "2": GND, "3": SCL, "4": SDA, "8": INT}}
     behavior:
       model: imu.mpu6050
-      params: {current: 0.0039}
+      params: {current: 0.0039, i2c_pullups: 4.7 kohm, pullup_provenance: "Typical GY-521 fitted pull-ups; verify owned board", ad0: grounded}
       provenance: {status: datasheet, source: "InvenSense PS-MPU-6000A-00: 3.9 mA gyro + accelerometer; board regulator/LED extra"}
     software:
       - {bus: i2c, address: 0x68, protocol: mpu6050, params: {}}

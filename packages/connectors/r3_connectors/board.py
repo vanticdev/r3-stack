@@ -1,11 +1,12 @@
 """Connector poses of a KiCad board in its catalog component frame.
 
-The component frame of a board is centred on the board outline with x right,
+The default component frame of a board is centred on the board outline with x right,
 y toward the top edge of the KiCad drawing (KiCad's y points down), z out of
 the component side and z = 0 on the bottom copper. A placed footprint's 3D
 frame (the KiCad model frame) is mapped through the footprint transform fitted
 to its pads (``kicad.footprint_to_board``); the connector frame follows from the
-catalog ``footprint_placement``.
+catalog ``footprint_placement``. A ``kicad_board`` model placement overrides
+the default origin, so extending one edge does not move its mounting datum.
 """
 
 from __future__ import annotations
@@ -55,6 +56,13 @@ def board_connectors(board: Path, component: ComponentType, catalog: Catalog,
     dump = board_footprints(board, list(references.values()))
     size = (float(dump["size"][0]), float(dump["size"][1]))
     thickness = float(dump["thickness"])
+    # KiCad STEP uses page x, -page y. Honour the same model placement used for
+    # the board solid instead of silently recentering an asymmetric outline.
+    board_in_component = Frame(np.eye(3), np.zeros(3))
+    if component.model is not None and component.model.source == "kicad_board":
+        page = dump["origin_page"]
+        centre = np.array([page[0] + size[0] / 2, -page[1] - size[1] / 2, 0.0]) * MM
+        board_in_component = Frame.from_placement(component.model.placement) @ Frame(np.eye(3), centre)
     placed = dump["footprints"]
     library = library_footprints([placed[ref]["lib_id"] for ref in references.values() if ref in placed])
     out: dict[str, BoardConnector] = {}
@@ -65,6 +73,7 @@ def board_connectors(board: Path, component: ComponentType, catalog: Catalog,
         geometry = catalog.connector(inst.type).geometry
         lib = library[placed[ref]["lib_id"]]
         fp_frame, rms, side = footprint_frame(placed[ref], lib, size, thickness)
+        fp_frame = board_in_component @ fp_frame
         fp_in_connector = Frame.from_placement(geometry.footprint_placement)
         # Placements are stored in metres by the catalog loader.
         connector = fp_frame @ fp_in_connector.inverse()
@@ -75,7 +84,7 @@ def board_connectors(board: Path, component: ComponentType, catalog: Catalog,
             if pad["number"].isdigit():
                 p = np.array([pad["position"][0] - size[0] / 2, size[1] / 2 - pad["position"][1],
                               0.0 if side == "bottom" else thickness]) * MM
-                pads[pad["number"]] = p
+                pads[pad["number"]] = board_in_component.point(p)
                 nets[pad["number"]] = pad["net"].lstrip("/")
         errors = [np.linalg.norm(connector.point(geometry.pins[n].pad) - pads[n])
                   for n in pads if n in geometry.pins and geometry.pins[n].pad is not None]

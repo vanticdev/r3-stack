@@ -18,7 +18,7 @@ from r3_kicad import ipc2152
 from r3_kicad.intent import BoardIntent, NetClass, Part, Placement, PowerTrack, Via, Zone
 from r3_kicad.regulators import pi_rail, servo_rail
 
-WIDTH, HEIGHT = 65.0, 56.5
+WIDTH, HEIGHT = 65.0, 70.0  # 13.5 mm south extension; original HAT mounting / GPIO datum retained
 HOLES = ((3.5, 3.5), (61.5, 3.5), (3.5, 52.5), (61.5, 52.5))   # HAT spec, M2.5, 58 x 49 mm pattern
 GPIO_PIN1 = (32.5 - 9.5 * 2.54, 3.5 + 1.27)                     # header centred at x 32.5, rows 3.5 -/+ 1.27 mm from the edge
 
@@ -43,13 +43,14 @@ P = Placement
 #   left edge     J6 GPS, J7 encoder (side entry, cables leave -x); C12 5 V hold-up beside them
 #   bottom-left   6.0 V servo buck-boost: power row Cout | Q5 Q4 | R21 | Q3 Q2 | Cin (y 48) above J3/J4, L2 above
 #                 the row, the LM5175 (U3, rotated so its gate drivers face the row) and its network above L2
-#   bottom-right  XT30 battery input, P-FET, Kelvin shunt, TVS, input bulk C3; INA226 above the shunt
-#   top-right     failsafe arbiter U4, IMU U5 + I2C pull-ups; J5 receiver on the right edge
+#   bottom-right  P-FET, Kelvin shunt, TVS, input bulk C3; INA226 above the shunt
+#   south extension  five side-entry harness connectors, clear of the Pi USB/Ethernet block
+#   top-right     failsafe arbiter U4; former onboard IMU removed for the owned GY-521
 #   right-middle  ESC PWM digital isolator U6 (ISO6720F) and its ESC-side LDO U7: the ESC-side ground is not HAT GND
 PLACEMENT: dict[str, Placement] = {
     # connectors
-    "J2": P(51.5, 44.5, 270), "J5": P(61.7, 25.0, 90), "J6": P(3.3, 22.5, 270), "J7": P(10.0, 30.5, 270),
-    "J3": P(13.0, 53.5, 90), "J4": P(25.0, 53.5, 90), "J8": P(36.0, 25.0, 90),
+    "J2": P(49.0, 57.0, 180), "J5": P(28.0, 66.3, 0), "J6": P(3.3, 22.5, 270), "J7": P(10.0, 30.5, 270),
+    "J3": P(10.54, 64.9, 270), "J4": P(20.54, 64.9, 270), "J8": P(36.0, 25.0, 90),
     # 5.1 V buck (U2 at 90 deg: SW pins 19/20 face L1, VIN pins 2-5 face down, FB/EN/SS/MODE face up)
     "U2": P(24.0, 13.0, 90), "L1": P(15.5, 13.0, 180), "C13": P(21.3, 16.2, 180), "C14": P(20.9, 11.2, 90),
     "R7": P(20.7, 7.9, 270), "R8": P(22.3, 7.9, 90), "R5": P(23.9, 7.9, 270), "C15": P(25.5, 7.9, 270),
@@ -75,8 +76,8 @@ PLACEMENT: dict[str, Placement] = {
     "C30": P(26.35, 37.9, 90), "D5": P(23.8, 38.6, 270), "C23": P(24.7, 40.9, 0),
     "D6": P(14.4, 34.4, 90), "C24": P(13.3, 38.5, 90),
     # battery input, protection, shunt, monitor
-    "Q1": P(45.0, 44.5, 0), "R2": P(37.5, 43.6, 180), "D2": P(43.0, 49.5, 0), "D1": P(45.8, 52.8, 0),
-    "R1": P(49.6, 52.8, 0), "C3": P(35.0, 36.5, 180),
+    "Q1": P(45.0, 44.5, 0), "R2": P(37.5, 43.6, 180), "D2": P(43.0, 49.5, 0), "D1": P(54.0, 12.0, 0),
+    "R1": P(54.0, 16.0, 0), "C3": P(35.0, 36.5, 180),
     "U1": P(45.5, 36.5, 180), "C2": P(45.5, 33.2, 0), "R3": P(43.6, 40.3, 90), "R4": P(45.2, 40.3, 90), "C1": P(46.8, 40.3, 90),
     # failsafe arbiter and its LED
     "U4": P(38.5, 13.0, 0), "C25": P(34.0, 12.3, 90), "R13": P(38.5, 17.8, 0),
@@ -84,9 +85,10 @@ PLACEMENT: dict[str, Placement] = {
     # ESC PWM isolation (U6 side 1 on the left = HAT, side 2 on the right = ESC) and the ESC-side LDO
     "U6": P(47.5, 26.0, 0), "C36": P(45.2, 22.2, 0), "C37": P(49.8, 22.2, 0), "U7": P(54.0, 24.5, 0),
     "C38": P(54.5, 28.0, 0), "C39": P(54.5, 20.9, 0), "R14": P(50.0, 30.3, 0), "R26": P(53.2, 30.3, 0),
-    # IMU, I2C pull-ups, servo PWM resistor
-    "U5": P(52.0, 13.0, 0), "C26": P(56.0, 12.4, 90), "C27": P(50.2, 17.9, 270), "C28": P(52.25, 18.4, 270),
-    "C29": P(53.0, 8.4, 90), "R18": P(46.6, 9.6, 90), "R19": P(48.2, 9.6, 90), "R17": P(58.6, 9.6, 90),
+    # Owned GY-521 edge header; ESD clamps at the harness entry. Pull-ups already on Pi / GY-521.
+    "J9": P(39.0, 66.3, 0), "D7": P(38.0, 61.0, 90), "D8": P(40.0, 61.0, 90),
+    "R17": P(58.6, 9.6, 90),
+
 }
 
 
@@ -124,14 +126,14 @@ def build() -> BoardIntent:
     add(Part("J2", "Connector_Generic:Conn_01x02", "XT30PW-M", "Connector_AMASS:AMASS_XT30PW-M_1x02_P2.50mm_Horizontal",
              {"1": "VBAT", "2": "GND"}, sch=(25.4, 190.5, 180), pcb=P(60.0, 46.0, 90), mpn="XT30PW-M", manufacturer="AMASS",
              description="XT30 right-angle male PCB connector, battery input", connector="J_BATT"))
-    add(Part("J3", "Connector_Generic:Conn_01x03", "ESC", "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+    add(Part("J3", "Connector_Generic:Conn_01x03", "ESC", "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal",
              {"1": "ESC_PWM", "2": "ESC_BEC", "3": "ESC_GND"}, sch=(386.08, 165.1, 0), pcb=P(9.0, 51.5, 90),
-             mpn="PH1-03-UA", manufacturer="Adam Tech",
-             description="ESC signal header, isolated: ESC_PWM and ESC_GND are the ESC's side of U6; pin 2 (ESC BEC) "
+             mpn="PH1-03-RA", manufacturer="Adam Tech",
+             description="Side-entry ESC signal header, isolated: ESC_PWM and ESC_GND are the ESC's side of U6; pin 2 (ESC BEC) "
                          "powers only U6's ESC side through U7", connector="J_ESC"))
-    add(Part("J4", "Connector_Generic:Conn_01x03", "SERVO", "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+    add(Part("J4", "Connector_Generic:Conn_01x03", "SERVO", "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal",
              {"1": "SERVO_PWM", "2": "SERVO_6V", "3": "GND"}, sch=(386.08, 190.5, 0), pcb=P(17.0, 51.5, 90),
-             mpn="PH1-03-UA", manufacturer="Adam Tech", description="Steering servo header, 6.0 V from U3", connector="J_SERVO"))
+             mpn="PH1-03-RA", manufacturer="Adam Tech", description="Side-entry steering servo header, 6.0 V from U3", connector="J_SERVO"))
     add(Part("J5", "Connector_Generic_MountingPin:Conn_01x04_MountingPin", "SM04B-GHS-TB",
              "Connector_JST:JST_GH_SM04B-GHS-TB_1x04-1MP_P1.25mm_Horizontal",
              {"1": "5V", "2": "CRSF_TX", "3": "CRSF_RX", "4": "GND", "MP": "GND"}, sch=(386.08, 76.2, 0), pcb=P(61.0, 18.25, 270),
@@ -309,17 +311,16 @@ def build() -> BoardIntent:
     # ------------------------------------------------------------------ servo PWM, IMU, I2C, encoder
     add(r("R17", "220", "PI_SERVO_PWM", "SERVO_PWM", (345.44, 165.1, 90), P(51.5, 9.0, 90), "RC0603FR-07220RL",
           "Servo PWM series resistor"))
-    add(Part("U5", "Sensor_Motion:MPU-6050", "MPU-6050", "Sensor_Motion:InvenSense_QFN-24_4x4mm_P0.5mm",
-             {"1": "GND", "8": "3V3", "9": "GND", "10": "REGOUT", "11": "GND", "13": "3V3", "18": "GND", "20": "CPOUT",
-              "23": "I2C_SCL", "24": "I2C_SDA"}, no_connect=("6", "7", "12"), sch=(116.84, 63.5, 0), pcb=P(48.0, 20.0, 0),
-             mpn="MPU-6050", manufacturer="TDK InvenSense", description="6-axis IMU, I2C 0x68 (AD0 = GND)"))
-    add(c("C26", "100n", "3V3", "GND", (91.44, 27.94, 0), P(52.0, 20.0, 90), "GRM188R71H104KA93D", "U5 VDD decoupling"))
-    add(c("C27", "10n", "3V3", "GND", (101.6, 27.94, 0), P(48.0, 16.0, 0), "GRM188R71H103KA01D", "U5 VLOGIC decoupling"))
-    add(c("C28", "100n", "REGOUT", "GND", (142.24, 93.98, 0), P(48.0, 24.0, 0), "GRM188R71H104KA93D", "U5 REGOUT filter"))
-    add(c("C29", "2.2n", "CPOUT", "GND", (154.94, 93.98, 0), P(51.5, 23.5, 0), "GRM188R71H222KA01D",
-          "U5 charge pump (50 V rated)"))
-    add(r("R18", "4.7k", "3V3", "I2C_SDA", (76.2, 27.94, 0), P(12.0, 7.5, 90), "RC0603FR-074K7L", "I2C SDA pull-up"))
-    add(r("R19", "4.7k", "3V3", "I2C_SCL", (66.04, 27.94, 0), P(13.5, 7.5, 90), "RC0603FR-074K7L", "I2C SCL pull-up"))
+    add(Part("J9", "Connector_Generic_MountingPin:Conn_01x04_MountingPin", "SM04B-GHS-TB",
+             "Connector_JST:JST_GH_SM04B-GHS-TB_1x04-1MP_P1.25mm_Horizontal",
+             {"1": "3V3", "2": "GND", "3": "I2C_SDA", "4": "I2C_SCL", "MP": "GND"},
+             mpn="SM04B-GHS-TB(LF)(SN)", manufacturer="JST", connector="J_IMU",
+             description="Keyed 3.3 V / GND / SDA / SCL header for the owned GY-521 (AD0 low, 0x68)"))
+    for ref, net in (("D7", "I2C_SDA"), ("D8", "I2C_SCL")):
+        add(Part(ref, "Device:D_TVS", "PESD3V3U1UL", "Diode_SMD:D_SOD-882",
+                 {"1": net, "2": "GND"}, mpn="PESD3V3U1UL", manufacturer="Nexperia",
+                 description="Low-capacitance 3.3 V bidirectional ESD clamp on external I2C lead"))
+    # No HAT pull-ups: Pi 1.8k in parallel with typical GY-521 4.7k gives 1.30k, ~2.23 mA at VOL=0.4 V.
     add(r("R20", "10k", "3V3", "ENC", (355.6, 129.54, 0), P(8.5, 33.0, 90), "RC0603FR-0710KL", "Encoder open-drain pull-up"))
 
     # ------------------------------------------------------------------ mechanical + ERC power flags
@@ -381,8 +382,16 @@ def build() -> BoardIntent:
                                        "SERVO_6V": 3.0, "SW1_6V": round(servo.values["i_l_rms_cont"], 2),
                                        "SW2_6V": round(servo.values["i_l_rms_cont"], 2),
                                        "CS_6V": round(servo.values["i_l_rms_cont"], 2), "GND": 5.0},
-                         frame_origin=(WIDTH / 2, HEIGHT / 2), origin=(100.0, 44.0), sheet="A2")
+                         frame_origin=(32.5, 28.25), origin=(100.0, 44.0), sheet="A2")
     intent.notes += [
+        "65 x 70 mm custom PCB: 13.5 mm south extension, original GPIO datum and all four HAT mounting holes unchanged.",
+        "Owned GY-521 at J_IMU (J9): 3.3 V, GND, SDA, SCL; AD0 low, address 0x68. No HAT pull-ups: Pi 1.8k || "
+        "typical GY-521 4.7k = 1.30k, sink current 2.23 mA at VOL=0.4 V, below the 3 mA I2C limit. "
+        "Verify the owned board pull-ups before assembly. PESD3V3U1UL clamps on both external I2C signals.",
+        "Camera connects directly to Pi CAM0 by 22-pin FPC, never through this HAT. CAM top z=90.8 mm; HAT "
+        "underside z=100.6 mm: 9.8 mm free height, or 6.8 mm allowing 3 mm trimmed THT tails. Route the 0.3 mm "
+        "FPC up 1 mm, bend toward -y at radius 3 mm, then under the extension at z=94.8 mm and beyond y=-43 mm. "
+        "Cable top z=94.95 leaves 2.65 mm below the lowest allowed solder tail. Plug and latch FPC before fitting HAT.",
         f"IPC-2152 external fit, 1 oz, {dt_power:g} C rise: 5 A -> {w5} mm, 3 A -> {w_servo} mm; signals 0.2 mm.",
         "INA226 measures only the HAT branch (Pi + servo + HAT logic). The ESC/motor branch splits off in the XT60 "
         "Y-harness before the HAT, so motor current is not visible to the Pi.",
@@ -412,7 +421,7 @@ def copper(w5: float, w_servo: float, i_in_5v: float, i_in_servo: float,
     T, V = PowerTrack, Via
     tracks = [
         # battery -> P-FET drain -> source -> shunt -> TVS (FET drain -> shunt: the VBAT_PROT pour below)
-        T("VBAT", w5, ("J2.1", (46.2, 44.5)), current=5.0),
+        T("VBAT", w5, ("J2.1", (49.0, 47.0), (46.2, 44.5)), current=5.0),
         T("VBAT_PROT", 1.2, ((40.6, 44.6), (41.0, 48.9)), current=1.0),
         # VIN_HAT spine: shunt -> bulk C3 -> north to the 5 V buck input bus, west to the servo buck input bar
         T("VIN_HAT", w5, ((35.0, 42.4), (38.3, 38.6), (38.3, 31.0), (29.6, 31.0), (29.6, 18.6)), current=5.0),
@@ -436,18 +445,12 @@ def copper(w5: float, w_servo: float, i_in_5v: float, i_in_servo: float,
         T("VIN_HAT", 0.3, ("R9.1", (30.0, 17.5))),
         T("VIN_HAT", 0.6, ((24.2, 16.4), "C7.1")),
         T("VIN_HAT", 0.3, ((39.5, 36.5), "U1.8")),
-        T("GND", 0.25, ("U5.11", (52.75, 15.6), (53.3, 16.1))),
-        T("GND", 0.25, ("U5.9", (51.75, 15.5), (51.45, 16.6))),
-        T("3V3", 0.25, ("U5.8", (51.25, 15.5), (50.2, 16.4), "C27.1")),
-        T("3V3", 0.25, ("C27.1", (49.6, 16.4), (48.2, 15.0), "R19.1")),
-        T("REGOUT", 0.25, ("U5.10", "C28.1")),
         T("5V", 0.5, ("C11.1", (7.0, 18.5), "J6.1")),
-        # CRSF UART to the receiver (J5, right edge): the Pi's TXD/RXD sit on the header's edge row, so the
+        # CRSF UART GPIO escapes to the receiver (J5, south edge): the Pi's TXD/RXD sit on the header's edge row, so the
         # pair is routed by hand along the two corridors that row leaves: TX on top between the board edge
-        # and the row, RX on the bottom between the two rows; both drop past H2's keep-out to J5.
-        T("CRSF_TX", 0.2, ("J1.8", (15.99, 0.85), (55.36, 0.85), (55.36, 6.3), (57.1, 6.3), (57.1, 25.625), "J5.2")),
+        # and the row, RX on the bottom between the two rows; both drop past H2's keep-out before autorouting to J5.
+        T("CRSF_TX", 0.2, ("J1.8", (15.99, 0.85), (55.36, 0.85), (55.36, 6.3), (57.1, 6.3), (57.1, 25.625))),
         T("CRSF_RX", 0.2, ("J1.10", (18.53, 3.5), (57.9, 3.5), (57.9, 24.375)), layer="B.Cu"),
-        T("CRSF_RX", 0.2, ((57.9, 24.375), "J5.3")),
         # U2 grounds into the exposed pad, then out to a stitching via
         T("GND", 0.2, ("U2.18", "U2.21")), T("GND", 0.2, ("U2.13", "U2.21")), T("GND", 0.2, ("U2.8", "U2.21")),
         T("GND", 0.2, ("U2.7", "U2.8")), T("GND", 0.3, ("U2.8", (26.6, 13.1))),
@@ -496,6 +499,9 @@ def copper(w5: float, w_servo: float, i_in_5v: float, i_in_servo: float,
         T("SW1_6V", 2.0, ((20.86, 42.2), (23.4, 42.2), (23.4, 45.6))),
         T("SW1_6V", 1.0, ((25.3, 41.6), (25.3, 46.3))),
         T("SW2_6V", 2.7, ((16.14, 42.2), (13.55, 42.2), (13.55, 45.25))),
+        # Protect the pour necks from signal routing: tie Q5 sources into Q4 drain and the sense stub to C20.
+        T("SW2_6V", 1.0, ((11.54, 48.0), (13.55, 48.0))),
+        T("SERVO_6V", 1.0, ((7.3, 39.4), (10.2, 39.4))),
         T("VBAT_PROT", 1.0, ("R2.1", "Q1.2")),
         T("CS_6V", 1.0, ((16.6, 48.0), (20.3, 48.0))),
         # Boost low-side gate: under L2 between its pads, below the SW2 pour, into Q4's gate pocket
@@ -508,9 +514,6 @@ def copper(w5: float, w_servo: float, i_in_5v: float, i_in_servo: float,
         # R13 (GPIO18 pull-down below U4) through a bottom-layer jumper from the GPIO18 line
         T("PI_ESC_PWM", 0.2, ((33.0, 12.3), (37.67, 16.7)), layer="B.Cu"),
         T("PI_ESC_PWM", 0.2, ((37.67, 16.7), "R13.1")),
-        # IMU SDA to its pull-up through a bottom-layer jumper (the IMU's top-left corner is fenced by its own supply)
-        T("I2C_SDA", 0.2, ("U5.24", (50.6, 10.0))), T("I2C_SDA", 0.2, ((50.6, 10.0), (48.9, 8.3), (47.0, 7.6), (46.6, 7.6)), layer="B.Cu"),
-        T("I2C_SDA", 0.2, ((46.6, 7.6), "R18.2")),
         # Cc2 off the COMP line through a bottom-layer jumper (the SLOPE line runs between them on top)
         T("COMP_6V", 0.15, ("R23.1", (19.55, 25.3))), T("COMP_6V", 0.2, ((19.55, 25.3), (19.55, 23.4), (22.65, 23.4)), layer="B.Cu"),
         T("COMP_6V", 0.15, ((22.65, 23.4), "C34.1")),
@@ -526,18 +529,18 @@ def copper(w5: float, w_servo: float, i_in_5v: float, i_in_servo: float,
         T("LD1_6V", 0.25, ((21.6, 50.5), (21.16, 49.6), "Q3.4")),
         # Output to J4 pin 2: the output pour at the left end of the power row, then along the bottom edge under J3,
         # 1.0 mm on both layers in parallel (2 x 2.9 A IPC-2152 rating, 1.5 A each at the 3 A design current).
-        T("SERVO_6V", 1.0, ((7.3, 48.8), (7.3, 55.55), (27.54, 55.55), "J4.2"), current=1.5),
-        T("SERVO_6V", 1.0, ((7.3, 50.3), (7.3, 55.55), (27.54, 55.55), "J4.2"), layer="B.Cu", current=1.5),
+        T("SERVO_6V", 1.0, ((7.3, 48.8), (7.3, 60.0), (18.0, 60.0), "J4.2"), current=1.5),
+        T("SERVO_6V", 1.0, ((7.3, 50.3), (7.3, 60.0), (18.0, 60.0), "J4.2"), layer="B.Cu", current=1.5),
     ]
-    vias = [V("SERVO_6V", 7.3, 50.3, 0.8, 0.4), V("SERVO_6V", 7.3, 51.3, 0.8, 0.4),
+    vias = [V("CRSF_RX", 57.9, 24.375), V("SERVO_6V", 7.3, 50.3, 0.8, 0.4), V("SERVO_6V", 7.3, 51.3, 0.8, 0.4),
             V("GND", 17.5, 32.4), V("GND", 21.0, 32.4), V("GND", 24.5, 32.4),  # U3 exposed pad to the bottom plane
             V("VIN_HAT", 24.25, 28.45), V("VIN_HAT", 28.9, 28.9), V("CS_6V", 17.1, 36.45), V("CS_6V", 18.6, 44.6),
             V("LD2_6V", 20.675, 36.5), V("LD2_6V", 15.35, 45.4),
             V("COMP_6V", 19.55, 25.3), V("COMP_6V", 22.65, 23.4), V("HD1_6V", 24.575, 36.45), V("HD1_6V", 24.9, 50.5),
-            V("LD1_6V", 23.275, 36.45), V("LD1_6V", 21.6, 50.5), V("I2C_SDA", 50.6, 10.0), V("I2C_SDA", 46.6, 7.6),
+            V("LD1_6V", 23.275, 36.45), V("LD1_6V", 21.6, 50.5),
             V("PI_ESC_PWM", 33.0, 12.3), V("PI_ESC_PWM", 37.67, 16.7),
             V("GND", 20.75, 26.44),  # via-in-pad: C31's ground pad sits between the COMP and SLOPE lines
-            V("5V", 6.86, 7.3, 0.8, 0.4), V("SW_5V", 26.0, 14.6), V("SW_5V", 20.0, 14.6), V("GND", 26.6, 13.1), V("GND", 53.3, 16.1), V("GND", 51.45, 16.6), V("CRSF_RX", 57.9, 24.375)]
+            V("5V", 6.86, 7.3, 0.8, 0.4), V("SW_5V", 26.0, 14.6), V("SW_5V", 20.0, 14.6), V("GND", 26.6, 13.1)]
     board = rect(0.3, 0.3, WIDTH - 0.3, HEIGHT - 0.3)
     # Bottom ground plane first (the autorouter drops GND pads to it with vias and still routes across it),
     # top ground pour after routing. Solid pad connections: reflow assembly, no starved thermal spokes.
@@ -588,11 +591,11 @@ def schematic_groups() -> list:
                "C23", "C24", "C30", "R10", "R11", "#FLG05")),
         Group("6.0 V servo rail: LM5175 timing, UVLO, soft start, slope and compensation", (15, 272, 300, 380),
               ("R12", "R24", "R22", "R25", "C31", "C32", "R23", "C33", "C34")),
-        Group("Raspberry Pi 40-pin header, I2C pull-ups", (15, 163, 135, 268), ("J1", "R18", "R19", "#FLG03", "#FLG01")),
+        Group("Raspberry Pi 40-pin header (onboard I2C pull-ups)", (15, 163, 135, 268), ("J1", "#FLG03", "#FLG01")),
         Group("Failsafe arbiter (ATtiny412): PWM passes only while GPIO27 toggles; ESC PWM isolator", (140, 205, 400, 290),
               ("U4", "C25", "R13", "R15", "R16", "D4", "U6", "C36", "U7", "C37", "C38", "C39", "R14", "R26",
                "#FLG06", "#FLG07")),
-        Group("IMU (MPU-6050, 0x68)", (405, 205, 580, 290), ("U5", "C26", "C27", "C28", "C29")),
+        Group("Owned GY-521 I2C harness (0x68), ESD; no additional pull-ups", (405, 205, 580, 290), ("J9", "D7", "D8")),
         Group("Vehicle connectors", (410, 15, 580, 100), ("J3", "J4", "J5", "J6", "J7", "R17", "R20", "J8")),
         Group("Mounting", (305, 300, 400, 330), ("H1", "H2", "H3", "H4")),
     ]

@@ -92,6 +92,11 @@ KICAD: dict[str, KicadSpec] = {
         "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x03_P2.54mm_Vertical.step",
         (0.0, -2.54, 2.54), (0, -1, 0), (0, 0, 1), True, 6.0, "square_post", 0.64,
         "mating face = top of the 2.54 mm insulator; posts reach 8.54 mm", "#151515"),
+    "header-1x3-2.54-ra": KicadSpec(
+        "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal",
+        "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x03_P2.54mm_Horizontal.step",
+        (4.04, -2.54, 1.27), (0, -1, 0), (1, 0, 0), True, 6.0, "square_post", 0.64,
+        "mating face = outer insulator face at x 4.04 mm; horizontal posts at z 1.27 mm", "#151515"),
     "jst-xh-3-header": KicadSpec(
         "Connector_JST:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical",
         "Connector_JST.3dshapes/JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical.step",
@@ -186,6 +191,20 @@ PROXIES: dict[str, ProxySpec] = {
         4.5, 0.0, (6.25, 4.25, 4.5), 0.0, "crimp", 0.6,
         "JST GH datasheet (eGH.pdf) GHR-04V-S: 1.25 mm pitch, 6.25 mm wide; SSHL-002T-P0.2 crimps (proxy)",
         "#f2efdc"),
+    "xt90h-male": ProxySpec(
+        [("1", -4.95, 0.0), ("2", 4.95, 0.0)], "housing",
+        {"width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5},
+        29.7, 0.0, (20.8, 11.7, 29.7), 0.0, "solder_cup", 4.5,
+        "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; "
+        "conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf",
+        "#d9a21b"),
+    "xt90h-female": ProxySpec(
+        [("1", -4.95, 0.0), ("2", 4.95, 0.0)], "housing",
+        {"width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5},
+        29.7, 0.0, (20.8, 11.7, 29.7), 0.0, "solder_cup", 4.5,
+        "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; "
+        "conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf",
+        "#d9a21b"),
     "servo-3-female": ProxySpec(
         [("1", -2.54, 0.0), ("2", 0.0, 0.0), ("3", 2.54, 0.0)], "housing",
         {"width": 7.6, "thickness": 2.6, "length": 14.0, "cavity": 1.0},
@@ -206,6 +225,9 @@ PROXIES: dict[str, ProxySpec] = {
         "listings; proxy)", "#d9a441", wire_entry=False),
 }
 
+
+# Same housing geometry with heavier crimp terminals; retain it when regenerating.
+PROXIES["servo-3-female-hd"] = PROXIES["servo-3-female"]
 
 def _round(v: float, nd: int = 4) -> float:
     r = round(float(v), nd)

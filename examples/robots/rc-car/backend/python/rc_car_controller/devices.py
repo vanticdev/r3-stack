@@ -128,8 +128,12 @@ class ImuSample:
 
 class Mpu6050:
     def __init__(self, bus: I2cBus, address: int = 0x68, gyro_range: int = MPU_GYRO_FS_500DPS,
-                 accel_range: int = MPU_ACCEL_FS_4G) -> None:
+                 accel_range: int = MPU_ACCEL_FS_4G, mounting_rpy_deg: tuple[float, float, float] = (0, 0, 0)) -> None:
         self.bus, self.address = bus, address
+        roll, pitch, yaw = (math.radians(v) for v in mounting_rpy_deg)
+        cr, sr, cp, sp, cy, sy = math.cos(roll), math.sin(roll), math.cos(pitch), math.sin(pitch), math.cos(yaw), math.sin(yaw)
+        self.rotation = ((cy*cp, cy*sp*sr-sy*cr, cy*sp*cr+sy*sr),
+                         (sy*cp, sy*sp*sr+cy*cr, sy*sp*cr-cy*sr), (-sp, cp*sr, cp*cr))
         self.gyro_range, self.accel_range = gyro_range, accel_range
         self._gyro_scale = math.radians(1.0) / GYRO_SENSITIVITY[gyro_range]
         self._accel_scale = STANDARD_GRAVITY / ACCEL_SENSITIVITY[accel_range]
@@ -153,6 +157,8 @@ class Mpu6050:
         words = [_s16(int.from_bytes(raw[i:i + 2], "big")) for i in range(0, 14, 2)]
         accel = tuple(w * self._accel_scale for w in words[0:3])
         gyro = tuple(w * self._gyro_scale for w in words[4:7])
+        accel = tuple(sum(r[i] * accel[i] for i in range(3)) for r in self.rotation)
+        gyro = tuple(sum(r[i] * gyro[i] for i in range(3)) for r in self.rotation)
         return ImuSample(accel, gyro, words[3] / 340.0 + 36.53)  # temperature formula, register map 4.18
 
 

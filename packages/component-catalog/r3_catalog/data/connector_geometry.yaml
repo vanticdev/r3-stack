@@ -205,6 +205,28 @@ geometry:
       "1": {position: [-2.54 mm, 0, 0], tip: 6.0 mm, pad: [-2.54 mm, 0, -2.54 mm]}
       "2": {position: [0, 0, 0], tip: 6.0 mm, pad: [0, 0, -2.54 mm]}
       "3": {position: [2.54 mm, 0, 0], tip: 6.0 mm, pad: [2.54 mm, 0, -2.54 mm]}
+  header-1x3-2.54-ra:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x03_P2.54mm_Horizontal.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-2.54 mm, 1.27 mm, -4.04 mm], x: [0.0, 0.0, 1.0], z: [0.0, -1.0, 0.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x03_P2.54mm_Horizontal.step", notes: "mating face = outer insulator face at x 4.04 mm; horizontal posts at z 1.27 mm"}
+    footprint: "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal"
+    footprint_placement: {origin: [-2.54 mm, 1.27 mm, -4.04 mm], x: [0.0, 0.0, 1.0], z: [0.0, -1.0, 0.0]}
+    pin_shape: square_post
+    pin_size: 0.64 mm
+    envelope: [7.62 mm, 5.54 mm, 10.36 mm]
+    depth: 4.36 mm
+    reach: 6.0 mm
+    color: "#151515"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "pads: KiCad footprint Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal via pcbnew; body and mating face: KiCad model Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x03_P2.54mm_Horizontal.step", notes: "mating face = outer insulator face at x 4.04 mm; horizontal posts at z 1.27 mm"}
+    pins:
+      "1": {position: [-2.54 mm, 0, 0], tip: 6.0 mm, pad: [-2.54 mm, 1.27 mm, -4.04 mm]}
+      "2": {position: [0, 0, 0], tip: 6.0 mm, pad: [0, 1.27 mm, -4.04 mm]}
+      "3": {position: [2.54 mm, 0, 0], tip: 6.0 mm, pad: [2.54 mm, 1.27 mm, -4.04 mm]}
   header-2x20-2.54:
     model:
       source: kicad
@@ -389,7 +411,7 @@ geometry:
       "1": {position: [-2.54 mm, 0, 0], tip: 0.0 mm, wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
       "2": {position: [0, 0, 0], tip: 0.0 mm, wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
       "3": {position: [2.54 mm, 0, 0], tip: 0.0 mm, wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
-  servo-3-female-hd:  # same housing as servo-3-female, 20 AWG crimp terminals
+  servo-3-female-hd:
     model:
       source: proxy
       units: mm
@@ -585,3 +607,39 @@ geometry:
     pins:
       "1": {position: [-3.6 mm, 0, 0], tip: -1.4 mm, pad: [-3.6 mm, 0, -16.0 mm], wire_entry: [-3.6 mm, 0, -20.5 mm], wire_axis: [0.0, 0.0, -1.0]}
       "2": {position: [3.6 mm, 0, 0], tip: -1.4 mm, pad: [3.6 mm, 0, -16.0 mm], wire_entry: [3.6 mm, 0, -20.5 mm], wire_axis: [0.0, 0.0, -1.0]}
+  xt90h-female:
+    model:
+      source: proxy
+      units: mm
+      placement: {origin: [0, 0, 0], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+      params: {"builder": "housing", "width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5}
+      provenance: {status: "estimated", source: "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf"}
+    pin_shape: solder_cup
+    pin_size: 4.5 mm
+    envelope: [20.8 mm, 11.7 mm, 29.7 mm]
+    depth: 29.7 mm
+    reach: 0.0 mm
+    color: "#d9a21b"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf"}
+    pins:
+      "1": {position: [-4.95 mm, 0, 0], tip: 0.0 mm, wire_entry: [-4.95 mm, 0, -29.7 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [4.95 mm, 0, 0], tip: 0.0 mm, wire_entry: [4.95 mm, 0, -29.7 mm], wire_axis: [0.0, 0.0, -1.0]}
+  xt90h-male:
+    model:
+      source: proxy
+      units: mm
+      placement: {origin: [0, 0, 0], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+      params: {"builder": "housing", "width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5}
+      provenance: {status: "estimated", source: "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf"}
+    pin_shape: solder_cup
+    pin_size: 4.5 mm
+    envelope: [20.8 mm, 11.7 mm, 29.7 mm]
+    depth: 29.7 mm
+    reach: 0.0 mm
+    color: "#d9a21b"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf"}
+    pins:
+      "1": {position: [-4.95 mm, 0, 0], tip: 0.0 mm, wire_entry: [-4.95 mm, 0, -29.7 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [4.95 mm, 0, 0], tip: 0.0 mm, wire_entry: [4.95 mm, 0, -29.7 mm], wire_axis: [0.0, 0.0, -1.0]}
