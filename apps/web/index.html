@@ -1,81 +1,22 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>R3 dashboard</title>
-  <script type="importmap">
-    {"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-                 "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
-  </script>
-  <style>
-    :root { --bg: #f6f7f9; --panel: #fff; --line: #e1e4e8; --muted: #57606a; --text: #1c2024; }
-    * { box-sizing: border-box; }
-    body { margin: 0; font: 13px/1.45 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--text); background: var(--bg);
-           display: grid; grid-template-rows: auto 1fr; height: 100vh; }
-    header { background: #14181d; color: #fff; padding: 10px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-    header h1 { font-size: 16px; margin: 0; }
-    header .meta { color: #aab3bd; }
-    header form { margin-left: auto; display: flex; gap: 6px; align-items: center; }
-    header input[type=text] { width: 320px; padding: 4px 6px; border-radius: 4px; border: 1px solid #3a4048; background: #1f252c; color: #fff; }
-    button, label.file { padding: 4px 10px; border-radius: 4px; border: 1px solid #3a4048; background: #2b323a; color: #fff; cursor: pointer; font: inherit; }
-    label.file input { display: none; }
-    main { display: grid; grid-template-columns: minmax(0, 1fr) 520px; min-height: 0; }
-    #view { position: relative; min-height: 0; }
-    #view canvas { display: block; }
-    #legend { position: absolute; left: 10px; bottom: 10px; background: rgba(255,255,255,.9); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
-    #picked { position: absolute; left: 10px; top: 10px; max-width: 420px; background: rgba(255,255,255,.95); border: 1px solid var(--line);
-              border-radius: 6px; padding: 8px 10px; display: none; }
-    aside { overflow: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 12px 14px; }
-    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 6px; }
-    table { width: 100%; border-collapse: collapse; }
-    td, th { text-align: left; padding: 4px 6px; border-bottom: 1px solid #eceef1; vertical-align: top; }
-    th { font-size: 11px; color: var(--muted); }
-    tr.diag { cursor: pointer; } tr.diag:hover { background: #f3f6fa; }
-    .pill { display: inline-block; padding: 0 7px; border-radius: 9px; font-size: 11px; font-weight: 600; }
-    .error, .failed { background: #ffe3e3; color: #a4161a; } .warning, .unavailable { background: #fff3cd; color: #7a5600; }
-    .info, .missing { background: #e7f0ff; color: #1f4e9a; } .ok, .passed { background: #dcf5e3; color: #1a6b34; }
-    code { font: 11px ui-monospace, Menlo, monospace; }
-    .filters { display: flex; gap: 6px; margin-bottom: 6px; } .filters select, .filters input { font: inherit; padding: 2px 4px; }
-    #status { color: #ffb4b4; }
-    .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; } .gallery img { width: 100%; border: 1px solid var(--line); }
-    .muted { color: var(--muted); }
-  </style>
-</head>
-<body>
-  <header>
-    <h1 id="title">R3 dashboard</h1>
-    <span class="meta" id="meta"></span>
-    <span id="status"></span>
-    <form id="source">
-      <input id="build-url" type="text" placeholder="build/ URL, e.g. /examples/robots/rc-car/build/" aria-label="build directory URL">
-      <button type="submit">Load</button>
-      <label class="file">Open files…<input id="files" type="file" multiple accept=".json"></label>
-    </form>
-  </header>
-  <main>
-    <div id="view">
-      <div id="picked"></div>
-      <div id="legend"><span class="pill error">error</span> <span class="pill warning">warning</span> component outline ·
-        <span id="wire-note" class="muted"></span></div>
-    </div>
-    <aside>
-      <div id="overall"></div>
-      <h2>Stages</h2>
-      <table id="stages"></table>
-      <h2>Diagnostics</h2>
-      <div class="filters">
-        <select id="f-severity"><option value="">all severities</option><option>error</option><option>warning</option><option>info</option></select>
-        <select id="f-stage"><option value="">all stages</option></select>
-        <input id="f-text" type="search" placeholder="filter code / subject">
-      </div>
-      <table id="diagnostics"></table>
-      <h2>Scenarios</h2>
-      <table id="scenarios"></table>
-      <h2>Images</h2>
-      <div class="gallery" id="images"></div>
-    </aside>
-  </main>
-  <script type="module" src="./app.js"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>R3</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23f97316'/%3E%3Ctext x='16' y='22' font-family='system-ui' font-weight='800' font-size='15' text-anchor='middle' fill='white'%3ER3%3C/text%3E%3C/svg%3E" />
+    <script>
+      // Apply the stored theme before first paint (no flash).
+      try {
+        const theme = localStorage.getItem("r3.theme");
+        document.documentElement.dataset.theme = theme === "light" || theme === "dark" ? theme
+          : matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      } catch { document.documentElement.dataset.theme = "dark"; }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
