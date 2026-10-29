@@ -96,8 +96,8 @@ components:
       # RTCM correction radio, case on edge along the right deck edge (antenna jack forward).
       rtk_radio_pad: {kind: adhesive_pad, origin: [46.5 mm, -49.15 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       lead_post: {kind: hole_pattern, origin: [-22 mm, -51.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
-      sensor_lead_post: {kind: hole_pattern, origin: [-40 mm, -36 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
-      cap_sensor_lead_post: {kind: adhesive_pad, origin: [-40 mm, -36 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      sensor_lead_post: {kind: hole_pattern, origin: [-60 mm, -45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_sensor_lead_post: {kind: adhesive_pad, origin: [-60 mm, -45 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       cap_lead_post: {kind: adhesive_pad, origin: [-22 mm, -51.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       mast: {kind: hole_pattern, origin: [55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
   - id: standoff-m3-47
