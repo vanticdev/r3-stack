@@ -83,7 +83,10 @@ def test_catalog_params_of_rc_car_parts():
 
 
 def _spec(mutate):
+    """The RC-car spec without its authored sourcing slots, then ``mutate``."""
     data = yaml.safe_load((RC_CAR / "robot.yaml").read_text())
+    for component in data["components"].values():
+        component.pop("source", None)
     mutate(data["components"])
     return data
 
@@ -92,7 +95,7 @@ def test_existing_specs_unchanged_and_source_is_additive():
     spec = RobotSpec.model_validate(_spec(lambda c: None))
     assert all(c.source is None for c in spec.components.values()) and spec.source_slots() == {}
     sourced = RobotSpec.model_validate(_spec(lambda c: c["pi"].update(source={"requires": {"kind": "computer", "ram": ">= 4 GB"}})))
-    assert sourced.components["pi"].type == "raspberry-pi-5-8gb" and sourced.source_slots() == {"pi": ["pi"]}
+    assert sourced.components["pi"].type == "raspberry-pi-5-4gb" and sourced.source_slots() == {"pi": ["pi"]}
     only = RobotSpec.model_validate(_spec(lambda c: c.update(pi={**{k: v for k, v in c["pi"].items() if k != "type"},
                                                                   "source": {"requires": {"kind": "computer"}}})))
     assert only.components["pi"].type == ""

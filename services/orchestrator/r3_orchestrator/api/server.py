@@ -20,14 +20,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, ConfigDict, Field
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import api, spec_ops
 from . import events as sse
+from . import freshness
 from . import projects as views
 from .agents import AgentManager
-from .errors import ApiError, raise_for
+from .errors import ApiError, project_load_error, raise_for
 from .runs import RunManager
 from .sourcing_jobs import SourcingJobs
 
@@ -113,7 +115,9 @@ class ProjectSummary(_Open):
     stages: dict[str, str] = Field(default_factory=dict, description="stage -> ok | failed | unavailable | missing")
     last_run: dict[str, Any] | None = None
     onshape_url: str | None = None
-    error: str | None = Field(None, description="Set when robot.yaml does not load.")
+    error: str | None = Field(None, description="Set when robot.yaml does not load: the concise project_invalid message.")
+    error_detail: ErrorBody | None = Field(None, description="The full project_invalid error: data.errors (path, message, type), "
+                                                             "data.total and data.details.")
 
 
 class ProjectList(_Open):
@@ -261,9 +265,11 @@ def default_web_dist() -> Path:
 
 def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | Path | None = None,
                runs: RunManager | None = None, agents: AgentManager | None = None,
-               doctor: Any = None, sourcing_jobs: SourcingJobs | None = None) -> FastAPI:
-    """Build the app. ``doctor`` (a zero-argument callable) replaces ``run_doctor`` in tests."""
+               doctor: Any = None, sourcing_jobs: SourcingJobs | None = None, code_guard: freshness.CodeGuard | None = None) -> FastAPI:
+    """Build the app. ``doctor`` (a zero-argument callable) replaces ``run_doctor`` in tests.
+    ``code_guard`` records the schema code this process loaded (default: now)."""
     registry = views.ProjectRegistry(projects_roots)
+    guard = code_guard or freshness.CodeGuard()
     runs = runs or RunManager()
     agents = agents or AgentManager()
     sourcing_jobs = sourcing_jobs or SourcingJobs()
@@ -282,6 +288,7 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
     from .models import router as models_router
     app.include_router(models_router)
     app.state.registry, app.state.runs, app.state.agents, app.state.sourcing = registry, runs, agents, sourcing_jobs
+    app.state.code_guard = guard
     app.add_middleware(GZipMiddleware, minimum_size=2048)
     app.add_middleware(CORSMiddleware, allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
                        allow_methods=["*"], allow_headers=["*"])
@@ -307,6 +314,7 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
         return JSONResponse({"code": "internal_error", "message": f"{type(error).__name__}: {error}", "data": {}}, status_code=500)
 
     def project(pid: str) -> views.ProjectRef:
+        guard.check()  # never answer with a schema older than the code on disk
         return registry.get(pid)
 
     async def call(function: Any, *args: Any, **kwargs: Any) -> Any:
@@ -317,6 +325,8 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
             raise ApiError("project_not_found", str(error)) from error
         except KeyError as error:
             raise ApiError("usage_error", str(error).strip("'\"")) from error
+        except (ValidationError, yaml.YAMLError) as error:  # a project load outside views.load (status, release, ...)
+            raise project_load_error(error, "robot.yaml") from error
 
     # ------------------------------------------------------------ system
     @app.get("/api/doctor", tags=["system"], summary="`r3 doctor`: tools, headless stage readiness, agent CLIs")
@@ -338,6 +348,7 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
     async def list_projects() -> dict[str, Any]:
         from r3_github.scaffold import available_templates
 
+        guard.check()
         refs = list(registry.scan().values())
         rows = await run_in_threadpool(lambda: [views.summary_entry(ref, runs) for ref in refs])
         return {"projects": rows, "roots": [str(r) for r in registry.roots], "templates": available_templates()}
@@ -629,10 +640,67 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
     return app
 
 
-def serve(host: str = "127.0.0.1", port: int = 8321, projects_roots: list[str] | None = None, web_dist: str | None = None) -> None:
+# ------------------------------------------------------------------ serving
+#: Folders of the platform source watched by ``r3 serve --reload`` (Python files only).
+RELOAD_FOLDERS = ("packages", "services", "integrations")
+#: Import string of the app factory the reloading worker process calls.
+APP_FACTORY = "r3_orchestrator.api.server:app_from_environment"
+
+
+def source_checkout() -> Path | None:
+    """The repository root when this package runs from a source checkout (``pyproject.toml``
+    plus ``.git`` or the platform folders next to it), else None (an installed package)."""
+    root = Path(__file__).resolve().parents[4]
+    if (root / "pyproject.toml").is_file() and ((root / ".git").exists() or (root / "packages").is_dir()):
+        return root
+    return None
+
+
+def dev_mode() -> bool:
+    """``r3 serve`` reloads by default in dev: ``R3_DEV=1``, or running from a source checkout (``R3_DEV=0`` turns it off)."""
+    flag = os.environ.get("R3_DEV", "").strip().lower()
+    if flag in ("1", "true", "yes", "on"):
+        return True
+    if flag in ("0", "false", "no", "off"):
+        return False
+    return source_checkout() is not None
+
+
+def default_reload_dirs() -> list[str]:
+    root = source_checkout()
+    if root is None:
+        return []
+    return [str(root / folder) for folder in RELOAD_FOLDERS if (root / folder).is_dir()]
+
+
+def _env_roots() -> list[str] | None:
+    return [p for p in os.environ.get("R3_PROJECTS_ROOTS", "").split(os.pathsep) if p] or None
+
+
+def app_from_environment() -> FastAPI:
+    """App factory for the reloading worker: ``R3_PROJECTS_ROOTS`` (os.pathsep separated) and ``R3_WEB_DIST``."""
+    return create_app(_env_roots(), os.environ.get("R3_WEB_DIST") or None)
+
+
+def serve(host: str = "127.0.0.1", port: int = 8321, projects_roots: list[str] | None = None, web_dist: str | None = None,
+          reload: bool = False, reload_dirs: list[str] | None = None) -> None:
+    """Run the API with uvicorn. ``reload`` (dev) restarts the worker whenever a Python file under
+    ``reload_dirs`` (default: the checkout's packages/, services/ and integrations/) changes; the
+    worker rebuilds the app with ``app_from_environment``, so the options travel as environment variables."""
     import uvicorn
 
-    roots = projects_roots or [p for p in os.environ.get("R3_PROJECTS_ROOTS", "").split(os.pathsep) if p] or None
-    app = create_app(roots, web_dist)
-    print(f"R3 API on http://{host}:{port}  (projects: {', '.join(map(str, app.state.registry.roots))})", flush=True)
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    roots = projects_roots or _env_roots()
+    if not reload:
+        app = create_app(roots, web_dist)
+        print(f"R3 API on http://{host}:{port}  (projects: {', '.join(map(str, app.state.registry.roots))})", flush=True)
+        uvicorn.run(app, host=host, port=port, log_level="info")
+        return
+    if roots:
+        os.environ["R3_PROJECTS_ROOTS"] = os.pathsep.join(str(Path(r).expanduser().resolve()) for r in roots)
+    if web_dist:
+        os.environ["R3_WEB_DIST"] = str(Path(web_dist).expanduser().resolve())
+    dirs = reload_dirs if reload_dirs is not None else default_reload_dirs()
+    print(f"R3 API on http://{host}:{port}  (dev: reloading on Python changes under {', '.join(dirs) or 'the working directory'}; "
+          "--no-reload turns it off)", flush=True)
+    uvicorn.run(APP_FACTORY, factory=True, host=host, port=port, log_level="info", reload=True, reload_dirs=dirs or None,
+                reload_includes=["*.py"])

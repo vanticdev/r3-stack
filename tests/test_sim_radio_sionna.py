@@ -147,3 +147,29 @@ def test_scene_from_rc_car_spec(tmp_path):
     assert np.allclose(cad_scene.antenna_offset, [0.2, 0.05, 0.21]) and cad_scene.antenna_offset_source == "cad"
     assert material_for("Aluminum 6061-T6") == "metal" and material_for("PETG") == "plastic"
     assert material_for("", "battery") == "metal" and material_for("itu_concrete") == "concrete"
+
+
+@needs_sionna
+def test_precomputed_cells_equal_inline_traces_and_persist(tmp_path):
+    """Cells traced ahead of the run in worker processes are identical to cells traced in the loop (deterministic
+    solver, same body pose per cell), and a new instance of the same scene loads them from disk."""
+    import trimesh
+
+    box = trimesh.creation.box(extents=[0.3, 0.3, 0.3])
+    box.apply_translation([-0.2, 0.0, 0.15])
+    scene = flat_scene(body=[BodyMesh("metal", np.asarray(box.vertices), np.asarray(box.faces), ["block"])],
+                       antenna_offset=np.array([0.0, 0.0, 0.12]))
+    inline = radio_sionna.SionnaPropagation(scene, tmp_path / "inline")
+    keys = [(int(x / 0.25), int(y / 0.25), 12, b) for x, y, b in [(20.0, 0.0, 0), (20.0, 1.0, 12), (45.0, -3.0, 6),
+                                                                  (80.0, 2.0, 0), (80.25, 2.0, 0), (120.0, 0.0, -6)]]
+    expected = {key: inline._trace_key(key) for key in keys}
+    ahead = radio_sionna.SionnaPropagation(scene, tmp_path / "ahead")
+    assert ahead.precompute(keys, workers=2) == len(keys) and ahead.precompute_workers == 2
+    assert (tmp_path / "ahead" / "worker_0" / "scene.xml").exists() and (tmp_path / "ahead" / "worker_1").exists()
+    for key, paths in expected.items():
+        got = ahead.cache[key]
+        assert np.array_equal(got.a, paths.a) and np.array_equal(got.length, paths.length) and got.los == paths.los
+    ahead.save_cache()
+    reloaded = radio_sionna.SionnaPropagation(scene, tmp_path / "ahead")
+    assert reloaded.cache_loaded == len(keys) and set(reloaded.cache) == set(keys)
+    assert reloaded.precompute(keys) == 0

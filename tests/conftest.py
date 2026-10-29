@@ -8,10 +8,18 @@
 * ``small_wiring`` / ``branch_wiring``: :func:`r3_wiring.stage.route_and_check` on the
   synthetic projects of :mod:`test_wiring_support` (one connector pair; every
   termination kind), for fast router/planner tests.
+
+Tests never see ``examples/robots/*/build`` (design-fix-queue item 19: stale
+``routes.json`` and CAD exports caused false failures). ``Project.load`` of an
+example project returns a source-only copy, one per test module, so every
+artifact a test reads it (or its module) generated, and nothing is written into
+the example. ``R3_TESTS_USE_EXAMPLE_BUILD=1`` restores the old behaviour for
+manual debugging.
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +28,49 @@ from typing import Any
 import pytest
 
 RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+EXAMPLES = RC_CAR.parent.resolve()
+_SOURCE_ONLY = shutil.ignore_patterns("build", "__pycache__", "_vendor")
+
+
+class _ExampleCopies:
+    """Source-only copies of example projects for the current test module."""
+
+    def __init__(self, base: Path) -> None:
+        self.base = base
+        self.module = "session"
+        self.copies: dict[tuple[str, Path], Path] = {}
+
+    def redirect(self, root: Path) -> Path:
+        path = Path(root).resolve()
+        if path.parent != EXAMPLES or os.environ.get("R3_TESTS_USE_EXAMPLE_BUILD") == "1":
+            return path
+        key = (self.module, path)
+        if key not in self.copies:
+            target = self.base / self.module.replace("/", "_").replace(".", "_") / path.name
+            shutil.copytree(path, target, ignore=_SOURCE_ONLY)
+            self.copies[key] = target
+        return self.copies[key]
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _examples_without_build(tmp_path_factory: pytest.TempPathFactory):
+    from r3_model.project import Project
+
+    copies = _ExampleCopies(tmp_path_factory.mktemp("example-sources"))
+    original = Project.__dict__["load"]
+
+    def load(cls, root):
+        return original.__func__(cls, copies.redirect(root))
+
+    Project.load = classmethod(load)
+    yield copies
+    Project.load = original
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _example_copy_per_module(request: pytest.FixtureRequest, _examples_without_build: _ExampleCopies):
+    _examples_without_build.module = request.module.__name__
+    yield
 
 
 @dataclass

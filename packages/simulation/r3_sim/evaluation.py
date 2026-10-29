@@ -70,35 +70,51 @@ def _project(xy: np.ndarray, segments: np.ndarray) -> tuple[np.ndarray, np.ndarr
     return offsets[k] + u[rows, k] * lengths[k], dist[rows, k]
 
 
-def lap_progress(xy: np.ndarray, t: np.ndarray, waypoints: list[list[float]], closed: bool) -> tuple[int, float | None, float | None]:
-    """(laps completed, mission start time, mission end time).
+@dataclass
+class CourseProgress:
+    """Lap counting result. ``entered`` is when the car first moves onto the course past waypoint 1."""
 
-    Progress is the unwrapped arc length of the car's projection onto the course,
+    laps: int
+    start: float | None  # first sample inside the capture radius of waypoint 1
+    end: float | None  # time the last counted lap completed
+    entered: float | None  # first sample with positive progress along the first path segment
+
+
+def course_progress(xy: np.ndarray, t: np.ndarray, waypoints: list[list[float]], closed: bool) -> CourseProgress:
+    """Progress is the unwrapped arc length of the car's projection onto the course,
     counted from the first approach to the first waypoint and only while the car is
     within ``LAP_CORRIDOR`` of the course (shortcuts do not count). A lap completes
     when progress reaches the course length minus ``CAPTURE_RADIUS``."""
     if len(waypoints) < 2:
-        return 0, None, None
+        return CourseProgress(0, None, None, None)
     segments = _segments(waypoints, closed)
     perimeter = float(np.linalg.norm(segments[:, 1] - segments[:, 0], axis=1).sum())
     s, dist = _project(xy, segments)
     near_start = np.nonzero(np.hypot(*(xy - np.asarray(waypoints[0], dtype=float)[:2]).T) <= CAPTURE_RADIUS)[0]
     if not len(near_start):
-        return 0, None, None
+        return CourseProgress(0, None, None, None)
     k0 = int(near_start[0])
-    progress, laps, end = 0.0, 0, None
+    progress, laps, end, entered = 0.0, 0, None, None
     for k in range(k0 + 1, len(t)):
         ds = s[k] - s[k - 1]
         if closed:
             ds = (ds + perimeter / 2) % perimeter - perimeter / 2
         if dist[k] <= LAP_CORRIDOR:
             progress += ds
+        if entered is None and progress > 0.0 and 0.0 < s[k] < perimeter / 2:
+            entered = float(t[k])
         if progress >= (laps + 1) * perimeter - CAPTURE_RADIUS:
             laps += 1
             end = float(t[k])
             if not closed:
                 break
-    return laps, float(t[k0]), end
+    return CourseProgress(laps, float(t[k0]), end, entered)
+
+
+def lap_progress(xy: np.ndarray, t: np.ndarray, waypoints: list[list[float]], closed: bool) -> tuple[int, float | None, float | None]:
+    """(laps completed, mission start time, mission end time); see :func:`course_progress`."""
+    result = course_progress(xy, t, waypoints, closed)
+    return result.laps, result.start, result.end
 
 
 def rc_gaps(frame_times: list[float], end_t: float, threshold: float) -> list[tuple[float, float]]:
@@ -122,7 +138,8 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
     mission = context.get("mission") or {}
     waypoints = mission.get("waypoints") or []
     closed = len(waypoints) > 2
-    laps, start, end = lap_progress(xy, t, waypoints, closed)
+    course = course_progress(xy, t, waypoints, closed)
+    laps, start, end = course.laps, course.start, course.end
     smooth = np.convolve(speed, np.ones(10) / 10.0, mode="same") if len(speed) >= 10 else speed
     checks: list[Check] = []
     for key, expected in expect.items():
@@ -130,16 +147,21 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
             checks.append(Check(key, expected, laps, laps >= int(expected), f"{laps} laps of the {len(waypoints)}-waypoint course "
                                 f"(progress along the course, start t={start}, end t={end})"))
         elif key == "max_cross_track_error_m":
-            if start is None:
-                checks.append(Check(key, expected, None, False, "car never reached the first waypoint"))
+            if start is None or course.entered is None:
+                checks.append(Check(key, expected, None, False, "car never reached the first path segment"))
                 continue
-            window = (t >= start) & (t <= (end if end is not None and laps >= int(mission.get("laps", 1)) else t[-1]))
+            # The window opens on the first path segment (progress past waypoint 1), not at the capture circle,
+            # where the distance to the course is up to CAPTURE_RADIUS by construction.
+            window = (t >= course.entered) & (t <= (end if end is not None and laps >= int(mission.get("laps", 1)) else t[-1]))
             err = distance_to_path(xy[window], _segments(waypoints, closed)) if window.any() else np.array([math.inf])
             k = int(np.argmax(err))
             worst = float(err[k])
             checks.append(Check(key, expected, round(worst, 3), worst <= float(expected),
-                                f"worst at t={t[window][k]:.2f}s ({xy[window][k][0]:.2f}, {xy[window][k][1]:.2f})",
-                                {"t": float(t[window][k]), "x": float(xy[window][k][0]), "y": float(xy[window][k][1])}))
+                                f"worst at t={t[window][k]:.2f}s ({xy[window][k][0]:.2f}, {xy[window][k][1]:.2f}); measured from "
+                                f"t={course.entered:.2f}s (first path segment)",
+                                {"t": float(t[window][k]), "x": float(xy[window][k][0]), "y": float(xy[window][k][1]),
+                                 "window_start_t": float(course.entered),
+                                 "rms": float(np.sqrt(np.mean(err ** 2)))}))
         elif key == "failsafe_events":
             gaps = context["failsafe_gaps"]
             checks.append(Check(key, expected, len(gaps), len(gaps) <= int(expected),
@@ -167,14 +189,16 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
                                     f"link never lost; max distance {reach:.1f} m", {"max_distance": reach}))
         elif key == "stop_within_m_of_link_loss":
             lost = context.get("link_lost")
-            if lost is None:
+            all_gaps = context.get("failsafe_gaps", [])
+            if lost is None and not any(abs(float(np.interp(g[0], t, speed))) > STOP_SPEED for g in all_gaps):
                 checks.append(Check(key, expected, None, False, "link was never lost; stop distance not exercised"))
                 continue
             # Measure from the last RC frame before the first frame gap longer than the software's failsafe
             # timeout that ends the run or precedes the declared loss: the software brakes on that gap, which can
-            # come well before the receiver declares the link lost (its own, longer timeout).
-            t_loss = lost["t"]
-            gaps = [g for g in context.get("failsafe_gaps", []) if g[0] <= t_loss + 1e-6]
+            # come well before the receiver declares the link lost (its own, longer timeout), or without it ever
+            # doing so (a gap shorter than the receiver timeout, after which a marginal link keeps resyncing).
+            t_loss = lost["t"] if lost is not None else math.inf
+            gaps = [g for g in all_gaps if g[0] <= t_loss + 1e-6]
             moving = [g for g in gaps if abs(float(np.interp(g[0], t, speed))) > STOP_SPEED]
             t0 = moving[0][0] if moving else t_loss
             k0 = int(np.searchsorted(t, t0))
@@ -184,7 +208,9 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
                 continue
             path = float(np.sum(np.hypot(np.diff(x[k0:k1 + 1]), np.diff(y[k0:k1 + 1])))) if k1 > k0 else 0.0
             checks.append(Check(key, expected, round(path, 3), path <= to_si(expected),
-                                f"last frame before the failsafe gap at t={t0:.2f}s (receiver declared loss at t={t_loss:.2f}s); "
+                                f"last frame before the failsafe gap at t={t0:.2f}s ("
+                                + (f"receiver declared loss at t={t_loss:.2f}s" if lost is not None else "receiver never declared loss")
+                                + "); "
                                 f"stopped at t={t[k1]:.2f}s, {t[k1] - t0:.2f}s later",
                                 {"speed_at_loss": float(speed[min(k0, len(speed) - 1)]), "stop_t": float(t[k1]),
                                  "gap_start_t": float(t0)}))

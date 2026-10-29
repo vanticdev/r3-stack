@@ -125,7 +125,25 @@ export interface ProjectSummary {
     run_status?: RunStatusValue;
   } | null;
   onshape_url?: string | null;
+  /** Set when robot.yaml does not load: the concise `project_invalid` message. */
   error?: string | null;
+  /** The full `project_invalid` error body; `data` follows `ProjectInvalidData`. */
+  error_detail?: ApiErrorBody | null;
+}
+/** One problem of a project that does not load; `path` is the dotted field path (`components.gps.type`). */
+export interface ProjectLoadIssue {
+  path: string;
+  message: string;
+  type: string;
+}
+/** `data` of a `project_invalid` error: the first few issues, their total and the full text. */
+export interface ProjectInvalidData {
+  project?: string;
+  file?: string;
+  exception?: string;
+  errors: ProjectLoadIssue[];
+  total: number;
+  details: string;
 }
 export interface ProjectList {
   projects: ProjectSummary[];

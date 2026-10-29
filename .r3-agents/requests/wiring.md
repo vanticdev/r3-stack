@@ -57,3 +57,20 @@
     gain an internal `breakouts` entry (not written to `routes.json`). `routes.json` per wire
     carries `ends`/`fanout` and `valid`/`violations`/`installed_ampacity`/`cut`; please document
     `ends`, `fanout` with the other optional fields in `docs/architecture/r3-pipeline.md`.
+
+## CAD mesh audit (branch r3/finish-c-meshaudit, lane C → lane A)
+
+11. **`geometry.cluster_decimate` opens the routing mesh (please fix in lane A).** Its duplicate
+    removal `np.unique(np.sort(tri, axis=1), ...)` ignores winding. When 1 mm clustering folds a
+    thin wall onto itself, two coincident triangles of OPPOSITE winding are produced. They should
+    cancel; instead one is kept, so the mesh is no longer a closed oriented 2-cycle and the
+    generalized winding number (the clearance sign) is not exact next to it. The audit
+    (`r3_wiring.geometry_audit.audit_routing_mesh`) reports this as `cad_mesh_invalid`
+    (`representation: routing_mesh`) on servo (6 unbalanced edges), axle_rl/rr (3), enc_magnet_3/4 (9),
+    pi_standoff_1..4 (12) and antenna_mast (6). The CAD exports of these parts are clean.
+    Fix: resolve coincident triangles as a 2-chain, i.e. replace the unique step with
+    `tri, _, _ = geometry_audit.remove_degenerate_and_duplicate_faces(tri)` (opposite windings
+    cancel, one copy of the net winding is kept). Measured on the RC car, this leaves 0 unbalanced
+    edges on all ten parts. Also, the docstring bound "the surface moves by at most cell*sqrt(3)/2"
+    is wrong: a vertex moves to its cell's vertex mean, which can be up to one cell diagonal
+    (cell*sqrt(3)) away. The audit uses cell*sqrt(3).

@@ -172,3 +172,12 @@ def test_lockstep_runs_are_deterministic(tmp_path: Path) -> None:
         return [(r.t, r.message, json.dumps(r.fields, sort_keys=True)) for r in hal.logs]
 
     assert run() == run()
+
+
+def test_autonomy_waits_for_an_rtk_fix(tmp_path: Path) -> None:
+    """require_rtk_fix_to_arm: a standalone (GGA quality 1) fix never arms autonomy, the arm switch notwithstanding."""
+    hal = fake.FakeCarHal(fake.pilot_arm_at(1.0), params=fake.CarParams(gps_fix_quality=1))
+    controller = make_controller(tmp_path, hal, RECTANGLE)
+    controller.run(5.0)
+    assert controller.gps_quality == 1 and not controller.ready
+    assert "armed" not in [s for _, s in state_changes(hal)]

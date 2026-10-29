@@ -8,10 +8,13 @@ is set from the minimum melting ratio (I_min = ratio x rating, default 1.25:
 between the 110 % hold and 135 % must-open points of SAE J2077 / ISO 8820-3
 blade fuses) — an estimate.
 
-The element is a voltage-controlled switch (``sw`` model, R_off = cold
-resistance, R_on = open) whose control is the melted latch. Melting is
-detected on every accepted ngspice time point; the latch then opens the
-switch from the next co-simulation step (at most one step of extra
+The element's conductance moves from the cold value to open with the melted
+latch: G = G_cold (1 - x) + G_open x, x = the latch low-passed with
+``clearing_time`` (default 50 us; estimate of the melting/arcing interval of a
+blade fuse at tens of amperes). A real element does not open in zero time, and an
+ideal switch carrying ~100 A into the harness inductance stalls ngspice's step
+control. Melting is detected on every accepted ngspice time point; the latch then
+opens the element from the next co-simulation step (at most one step of extra
 let-through, negligible against the melting I^2 t).
 """
 
@@ -24,6 +27,7 @@ from ..netlist import Netlist, Solution, fmt
 from .base import BehaviorModel, Event
 
 OPEN_RESISTANCE = 1e9  # ohm, blown fuse
+CLEARING_TIME = 50e-6  # s, melt-to-open transition (estimate)
 
 
 class FuseBlade(BehaviorModel):
@@ -37,6 +41,7 @@ class FuseBlade(BehaviorModel):
         self.i2t_melt = p.get("i2t_melt")
         self.min_melt_ratio = p.get("min_melt_ratio", 1.25)
         self.tau = self.i2t_melt / (self.min_melt_ratio * self.rating) ** 2
+        self.clearing_time = p.get("clearing_time", CLEARING_TIME)
         self.branch: Any = None
         self.h_node = self.local("h")
         self.states = {self.h_node: 0.0}
@@ -64,11 +69,13 @@ class FuseBlade(BehaviorModel):
             return
         name = f"fuse_blade_{self.inst[1:]}"
         a, b = self.ctx.node(self.branch.node_a), self.ctx.node(self.branch.node_b)
-        net.model("swfuse_" + self.inst[1:], f".model swfuse_{self.inst[1:]} sw vt=0.5 vh=0 ron={fmt(OPEN_RESISTANCE)} "
-                                             f"roff={fmt(self.cold_resistance)}")
+        g_cold, g_open = 1.0 / self.cold_resistance, 1.0 / OPEN_RESISTANCE
         lines = [
             "vsense a n1 dc 0",
-            f"sfuse n1 b blown 0 swfuse_{self.inst[1:]}",
+            # x: melted latch through a 1 ohm / clearing_time RC (0 = intact, 1 = open), x(0) = latch.
+            f"rx blown x 1",
+            f"cx x 0 {fmt(self.clearing_time)} ic={1 if self.s_blown else 0}",
+            f"bfuse n1 b i = v(n1,b)*({fmt(g_cold)}*(1-max(min(v(x),1),0))+{fmt(g_open)}*max(min(v(x),1),0))",
             # melting integral dH/dt = I^2 - H / tau
             "ch h 0 1",
             f"rh h 0 {fmt(self.tau)}",

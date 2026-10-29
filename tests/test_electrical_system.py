@@ -17,8 +17,9 @@ KT = 60 / (2 * math.pi * 2100)
 
 
 @pytest.fixture(scope="module")
-def project():
-    return Project.load(RC_CAR)
+def project(rc_car_wiring):
+    """The RC car with routes generated in this session (wire lengths and gauges as routed); never the example's build."""
+    return Project.load(rc_car_wiring.root)
 
 
 def test_contract_step_outputs(project):

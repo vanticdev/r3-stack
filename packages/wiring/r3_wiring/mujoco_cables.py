@@ -761,6 +761,8 @@ class CableMonitor:
         import mujoco
 
         self.model, self.data, self.plan = model, data, plan
+        self._scratch: Any = None  # MjData holding a captured step's geom poses
+        self._captured: tuple[np.ndarray, float] | None = None
         self.margin = plan.margin
         self.root_body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, root_body)
         self.bundle_ids = [b.id for b in plan.bundles]
@@ -837,14 +839,31 @@ class CableMonitor:
         return np.asarray(last), np.asarray(body2), np.asarray(anchor), np.asarray(length)
 
     # -------------------------------------------------------------- clearance
-    def update(self) -> np.ndarray:
-        """Per-bundle clearance to moving parts: the pairs this step's contact data lists, measured by GJK."""
+    def capture(self) -> None:
+        """Snapshot this step's contact pairs and geom poses so :meth:`update` can run later, e.g. while MuJoCo
+        computes the next step in its worker thread (``mj_geomDistance`` reads only the geom poses)."""
+        import mujoco
+
         data = self.data
+        if self._scratch is None:
+            self._scratch = mujoco.MjData(self.model)
+        self._scratch.geom_xpos[:] = data.geom_xpos
+        self._scratch.geom_xmat[:] = data.geom_xmat
+        self._captured = (data.contact.geom[:data.ncon].copy(), float(data.time))
+
+    def update(self) -> np.ndarray:
+        """Per-bundle clearance to moving parts: the pairs the step's contact data lists, measured by GJK.
+        Uses the pending :meth:`capture` when there is one, else the live data."""
+        if self._captured is not None:
+            geoms, time = self._captured
+            self._captured = None
+            source = self._scratch
+        else:
+            source = self.data
+            geoms, time = source.contact.geom[:source.ncon], float(source.time)
         self.current.fill(self.margin)
         self.current_part.fill(-1)
-        n = data.ncon
-        if n:
-            geoms = data.contact.geom[:n]
+        if len(geoms):
             g1, g2 = geoms[:, 0], geoms[:, 1]
             b1, b2 = self.geom_bundle[g1], self.geom_bundle[g2]
             cable_first = (b1 >= 0) & self.geom_moving[g2]
@@ -855,21 +874,61 @@ class CableMonitor:
 
                 cable_geom = np.where(cable_first, g1, g2)[relevant]
                 part_geom = np.where(cable_first, g2, g1)[relevant]
-                pairs = np.unique(np.stack([cable_geom, part_geom], axis=1), axis=0)
-                fromto = np.zeros(6)
-                exact = np.array([mujoco.mj_geomDistance(self.model, data, int(gc), int(gp), self.margin, fromto) for gc, gp in pairs])
-                bundle = self.geom_bundle[pairs[:, 0]]
-                part = self.geom_part[pairs[:, 1]]
-                d = np.minimum(exact, self.margin)
-                np.minimum.at(self.current, bundle, d)
-                closest = d <= self.current[bundle]
-                self.current_part[bundle[closest]] = part[closest]
+                key = np.unique(cable_geom.astype(np.int64) * self.model.ngeom + part_geom)  # 1-D unique: fast
+                self._bundle_minimum(np.stack([key // self.model.ngeom, key % self.model.ngeom], axis=1), source)
         better = self.current < self.minimum
         if better.any():
             self.minimum[better] = self.current[better]
             self.minimum_part[better] = self.current_part[better]
-            self.minimum_time[better] = data.time
+            self.minimum_time[better] = time
         return self.current
+
+    @property
+    def pending(self) -> bool:
+        return self._captured is not None
+
+    def _bundle_minimum(self, pairs: np.ndarray, data: Any = None) -> None:
+        """Exact per-bundle minimum of ``mj_geomDistance`` over (cable geom, part geom) ``pairs`` by branch and bound.
+
+        Bounding spheres give a lower bound on every pair's distance, d >= |c1 - c2| - r1 - r2
+        (``geom_rbound`` encloses the geom about ``geom_xpos``). Pairs are measured in order of
+        increasing bound, with the bundle's best distance so far as ``distmax`` (GJK early exit),
+        and a bundle stops once its next bound reaches its best distance: no pair left can be
+        closer. The minimum and its part are the same as measuring every pair."""
+        import mujoco
+
+        model = self.model
+        data = self.data if data is None else data
+        bundle = self.geom_bundle[pairs[:, 0]]
+        gap = (np.linalg.norm(data.geom_xpos[pairs[:, 0]] - data.geom_xpos[pairs[:, 1]], axis=1)
+               - model.geom_rbound[pairs[:, 0]] - model.geom_rbound[pairs[:, 1]])
+        fromto = np.zeros(6)
+        current, current_part, margin = self.current, self.current_part, self.margin
+        geom_part = self.geom_part
+        # Seed each bundle's bound with its smallest-gap pair, then drop (vectorised) every pair whose gap
+        # already reaches that exact distance; only the survivors go through the sequential loop.
+        order = np.lexsort((gap, bundle))
+        first = order[np.r_[True, bundle[order][1:] != bundle[order][:-1]]]
+        seed = np.full(len(current), margin)
+        for k in first:
+            d = min(mujoco.mj_geomDistance(model, data, int(pairs[k, 0]), int(pairs[k, 1]), margin, fromto), margin)
+            seed[bundle[k]] = d
+            if d < current[bundle[k]] or current_part[bundle[k]] < 0:
+                current[bundle[k]] = d
+                current_part[bundle[k]] = geom_part[pairs[k, 1]]
+        keep = gap < seed[bundle]
+        keep[first] = False
+        order = order[keep[order]]
+        for k in order:
+            b = bundle[k]
+            best = current[b]
+            if gap[k] >= best:
+                continue  # every later pair of this bundle has a larger bound
+            gc, gp = int(pairs[k, 0]), int(pairs[k, 1])
+            d = min(mujoco.mj_geomDistance(model, data, gc, gp, best, fromto), margin)
+            if d < best or (d <= best and current_part[b] < 0):
+                current[b] = d
+                current_part[b] = geom_part[gp]
 
     def end_tension(self) -> np.ndarray:
         """(bundles, 2) magnitude of the cable force at the start and end terminations (N):

@@ -92,10 +92,18 @@ def fake_research(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fixture: str 
 
 
 def sourced_rc_car(parent: Path, sources: dict[str, dict[str, Any]] | None = None, drop_type: tuple[str, ...] = ()) -> Path:
-    """A copy of examples/robots/rc-car with `source:` blocks added (in addition to `type`, unless dropped)."""
+    """A copy of examples/robots/rc-car with exactly these `source:` blocks (in addition to `type`, unless dropped).
+    The example's own slots, pins and sourced catalog files are removed first, so each test controls its slots."""
     root = parent / "rc-car"
-    shutil.copytree(RC_CAR, root, ignore=shutil.ignore_patterns("build", "__pycache__", ".venv", "*.pyc"))
+    shutil.copytree(RC_CAR, root, ignore=shutil.ignore_patterns("build", "__pycache__", ".venv", "*.pyc", "sourced_*.yaml"))
     spec = yaml.safe_load((root / "robot.yaml").read_text())
+    for component in spec["components"].values():
+        component.pop("source", None)
+    lock_path = root / "r3.lock.yaml"
+    if lock_path.exists():
+        lock = yaml.safe_load(lock_path.read_text()) or {}
+        lock.pop("sourcing", None)
+        lock_path.write_text(yaml.safe_dump(lock, sort_keys=True))
     sources = sources if sources is not None else {"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE, "wheel_fl": WHEEL_SOURCE,
                                                    "wheel_fr": WHEEL_SOURCE}
     for cid, source in sources.items():
