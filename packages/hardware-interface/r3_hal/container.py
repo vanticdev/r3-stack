@@ -38,6 +38,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -154,16 +156,79 @@ def build_image(context_dir: Path, tag: str, platform: str = PLATFORM, log_path:
     return tag
 
 
+def own_container_id() -> str | None:
+    """Id of the container this process runs in (None on a plain host)."""
+    if not Path("/.dockerenv").exists():
+        return None
+    try:
+        mountinfo = Path("/proc/self/mountinfo").read_text()
+    except OSError:
+        mountinfo = ""
+    # Docker bind-mounts /etc/hostname etc. from /var/lib/docker/containers/<id>/.
+    match = re.search(r"/containers/([0-9a-f]{64})/", mountinfo)
+    return match.group(1) if match else (os.uname().nodename or None)
+
+
+def sibling_network() -> str | None:
+    """``docker run --network`` value when R3 itself runs in a container that uses
+    the host's Docker daemon (mounted socket, e.g. the R3 worker image or a
+    GitHub Actions container job). The firmware container is then a sibling, so
+    ``host.docker.internal`` is the Docker host, not the twin; joining this
+    container's network namespace makes the twin reachable on 127.0.0.1.
+
+    ``R3_DOCKER_NETWORK``: ``auto`` (default), ``host-gateway`` (always use
+    host.docker.internal), or any ``--network`` value. A remote or DinD daemon
+    (``DOCKER_HOST=tcp://...``) cannot join this namespace; ``auto`` then keeps
+    host-gateway.
+    """
+    setting = os.environ.get("R3_DOCKER_NETWORK", "auto")
+    if setting == "host-gateway":
+        return None
+    if setting != "auto":
+        return setting
+    daemon = os.environ.get("DOCKER_HOST", "")
+    if daemon and not daemon.startswith("unix://"):
+        return None
+    container_id = own_container_id()
+    return f"container:{container_id}" if container_id else None
+
+
+def host_path(path: Path, container_id: str) -> Path:
+    """Translate a path in this container to the Docker host's path, through the
+    container's bind mounts and volumes (bind sources are host paths)."""
+    try:
+        raw = subprocess.run(["docker", "inspect", "--format", "{{json .Mounts}}", container_id],
+                             capture_output=True, text=True, timeout=20, check=True).stdout
+        mounts = json.loads(raw) or []
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return path
+    for mount in sorted(mounts, key=lambda m: len(m.get("Destination", "")), reverse=True):
+        destination = Path(mount.get("Destination", "/nonexistent"))
+        if path == destination or destination in path.parents:
+            return Path(mount["Source"]) / path.relative_to(destination)
+    return path
+
+
 def run_command(tag: str, port: int, host: str = "host.docker.internal", config: Path | None = None,
                 name: str | None = None, platform: str = PLATFORM, extra_args: list[str] | None = None,
                 environment: dict[str, str] | None = None) -> list[str]:
-    """argv for ``docker run`` connecting the firmware to a twin listening on the host."""
-    command = ["docker", "run", "--rm", "--platform", platform, "--add-host", "host.docker.internal:host-gateway",
-               "-e", "R3_HAL=virtual", "-e", f"R3_HAL_ENDPOINT=tcp://{host}:{int(port)}"]
+    """argv for ``docker run`` connecting the firmware to a twin listening on the host
+    (or, inside a container on the host daemon, in this container: see :func:`sibling_network`)."""
+    network = sibling_network()
+    if network:
+        if host == "host.docker.internal" and network.startswith("container:"):
+            host = "127.0.0.1"
+        command = ["docker", "run", "--rm", "--platform", platform, "--network", network]
+    else:
+        command = ["docker", "run", "--rm", "--platform", platform, "--add-host", "host.docker.internal:host-gateway"]
+    command += ["-e", "R3_HAL=virtual", "-e", f"R3_HAL_ENDPOINT=tcp://{host}:{int(port)}"]
     if name:
         command += ["--name", name]
     if config is not None:
-        command += ["-v", f"{Path(config).resolve()}:{CONFIG_MOUNT}:ro", "-e", f"R3_FIRMWARE_CONFIG={CONFIG_MOUNT}"]
+        source = Path(config).resolve()
+        if network and network.startswith("container:"):
+            source = host_path(source, network.split(":", 1)[1])
+        command += ["-v", f"{source}:{CONFIG_MOUNT}:ro", "-e", f"R3_FIRMWARE_CONFIG={CONFIG_MOUNT}"]
     for key, value in (environment or {}).items():
         command += ["-e", f"{key}={value}"]
     return command + [tag, *(extra_args or [])]

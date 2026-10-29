@@ -11,6 +11,10 @@ Entry points:
 
 from __future__ import annotations
 
+from .headless import configure as _configure_headless
+
+_configure_headless()  # before any submodule imports MuJoCo
+
 __all__ = ["__version__"]
 
 __version__ = "0.1.0"

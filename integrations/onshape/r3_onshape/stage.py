@@ -8,6 +8,9 @@ Behavior:
   ``r3.lock.yaml``. Failed attempts are deleted. ``R3_CAD_FORCE=1`` forces a rebuild.
 * Without a transport, downstream stages fall back to catalog geometry and a
   ``cad_geometry_estimated`` warning is emitted.
+* Screenshots come from Onshape's REST shaded-view endpoints
+  (``build/cad/views/{iso,front,top,right}.png``), never from a browser, so the
+  stage runs headless with API keys. ``R3_CAD_VIEWS=0`` skips them.
 """
 
 from __future__ import annotations
@@ -19,7 +22,7 @@ import time
 from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
 
-from .client import default_transport
+from .client import Transport, default_transport
 from .sync import sync, write_cad_model
 
 
@@ -54,6 +57,8 @@ def run(project: Project) -> StageResult:
     if existing and existing.get("source", {}).get("generator_digest") == digest and not force:
         result.add(Diagnostic.info("cad_model_reused", "cad_model.json matches the current generator digest",
                                    data={"document": existing["source"].get("url"), "digest": digest}))
+        if not (project.build_dir("cad") / "views" / "iso.png").exists():
+            _views(project, default_transport(), existing.get("source", {}), result)
         _summarize(project, existing, result)
         result.duration_s = time.time() - started
         return result
@@ -73,6 +78,8 @@ def run(project: Project) -> StageResult:
         project.write_lock("cad", {"provider": "onshape", "document_id": report.document.did, "workspace_id": report.document.wid,
                                    "element_id": report.document.part_studio, "url": report.document.url(),
                                    "generator_digest": digest, "attempt": attempt, "revision": digest})
+        _views(project, api, {"document_id": report.document.did, "workspace_id": report.document.wid,
+                              "element_id": report.document.part_studio}, result)
         _summarize(project, json.loads(path.read_text()), result)
         old = previous.get("document_id")
         if old and old != report.document.did:
@@ -90,6 +97,24 @@ def run(project: Project) -> StageResult:
     return result
 
 
+def _views(project: Project, api: Transport | None, source: dict, result: StageResult) -> None:
+    """Server-rendered PNGs of the CAD (no browser); failures only warn."""
+    if api is None or os.environ.get("R3_CAD_VIEWS") == "0":
+        return
+    ids = (source.get("document_id"), source.get("workspace_id"), source.get("element_id"))
+    if not all(ids):
+        return
+    from .views import render_document_views
+
+    try:
+        paths = render_document_views(api, *ids, project.build_dir("cad") / "views")
+    except Exception as error:  # noqa: BLE001 - images are evidence, not engineering data
+        result.add(Diagnostic.warning("cad_views_failed", f"Onshape shaded views failed: {error}", subjects=["cad"],
+                                      data={"status": getattr(error, "status", None)}))
+        return
+    result.metrics["cad_views"] = len(paths)
+
+
 def _summarize(project: Project, model: dict, result: StageResult) -> None:
     parts = model.get("parts", {})
     total = sum(p["mass"] for p in parts.values())
@@ -98,6 +123,8 @@ def _summarize(project: Project, model: dict, result: StageResult) -> None:
     if limit and total > limit:
         result.add(Diagnostic.error("mass_budget_exceeded", f"CAD mass {total:.3f} kg exceeds {limit:.3f} kg",
                                     subjects=["robot"], data={"mass": total, "limit": limit}))
+    for view in sorted((project.build_dir("cad") / "views").glob("*.png")):
+        result.artifact(f"cad/views/{view.name}", "plot_png", f"Onshape shaded view ({view.stem}, server-rendered)")
     shot = project.root / "build" / "cad" / "onshape_isometric.png"
     if shot.exists():
         result.artifact("cad/onshape_isometric.png", "plot_png", "Onshape viewport capture")

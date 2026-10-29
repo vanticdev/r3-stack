@@ -1,0 +1,18 @@
+# Build context for docker/r3-worker/Dockerfile (repository root).
+.git
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/*.egg-info
+**/.pytest_cache
+**/.ruff_cache
+**/node_modules
+**/build
+**/dist
+.r3-runs
+.claude
+.devcontainer
+.vscode
+system_data
+**/.DS_Store
