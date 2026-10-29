@@ -9,11 +9,11 @@ Everything ran headless (no KiCad window, as on a server); the flow is `python -
 - Schematic: official KiCad library symbols placed with `kicad-sch-api` (KiCad 10 has no headless schematic API; `kicad-cli sch` only checks and exports), a net label on every connected pin, no-connect flags on unused pins; normalized by `kicad-cli sch upgrade`, checked by `kicad-cli sch erc` and by comparing KiCad's own netlist export with the design intent.
 - Board: KiCad's `pcbnew` Python module (KiCad's bundled interpreter) applies Board Setup (net classes, rules, sizes), the HAT outline, Update PCB from Schematic (official library footprints linked to their symbols, pad nets from the netlist), placement, and the hand-routed power copper (locked tracks and vias).
 - Signals: Specctra DSN export from pcbnew, Freerouting CLI (headless JVM), SES import; then GND pours on both layers and Fill All Zones in pcbnew. DRC, schematic parity and all outputs by `kicad-cli`.
-- ERC: 0 errors, 0 warnings. DRC: 0 errors, 0 unconnected, 0 schematic-parity issues, 86 warnings.
+- ERC: 0 errors, 0 warnings. DRC: 0 errors, 0 unconnected, 0 schematic-parity issues, 133 warnings.
 
 ## Board
 
-- 65 x 56.5 mm, R3 corners, 1.6 mm FR-4, 2 layers, 1 oz copper. Rules for a standard 2-layer fab (JLCPCB/PCBWay): min track/clearance 0.15/0.15 mm, via 0.5/0.3 mm, copper-edge 0.3 mm.
+- 65 x 56.5 mm, R3 corners, 1.6 mm FR-4, 2 layers, 1 oz copper. Rules for a standard 2-layer fab (JLCPCB/PCBWay): min track/clearance 0.15/0.13 mm, via 0.5/0.3 mm, copper-edge 0.3 mm.
 - 2x20 socket on the bottom side at the HAT position; GND pours on both layers; power rails as wide hand-routed tracks (the 5 V path to the Pi pins doubled on the bottom layer) and pours at the regulator pins and the FET -> shunt gap.
 
 ## Copper sizing (IPC-2152)
@@ -29,22 +29,28 @@ External-conductor fit (Brooks, PCD&F 2015): dT = 215.3 I^2 W^-1.15 Th^-1 (mil, 
 
 | Net | Design current | Pour area (mm^2) | Vias (capacity) | Narrowest hand-routed track |
 | --- | --- | --- | --- | --- |
-| 5V | 5 A | - | 3 (5.56 A) | 0.50 mm (1.97 A) |
-| GND | 5 A | F.Cu 2385.93, B.Cu 2843.67 | 119 (188.65 A) | - |
-| SERVO_6V | 3 A | - | 1 (1.85 A) | 1.09 mm (3.08 A) |
+| 5V | 5 A | - | 4 (7.41 A) | 0.50 mm (1.97 A) |
+| CS_6V | 4.55 A | F.Cu 25.16 | 2 (3.17 A) | 0.30 mm (1.47 A) |
+| GND | 5 A | F.Cu 1896.39, B.Cu 2672.74 | 101 (160.12 A) | - |
+| SERVO_6V | 3 A | F.Cu 44.96 | 2 (3.71 A) | 0.30 mm (1.47 A) |
+| SW1_6V | 4.55 A | F.Cu 36.62 | 0 (0 A) | 0.30 mm (1.47 A) |
+| SW2_6V | 4.55 A | F.Cu 32.44 | 0 (0 A) | 2.70 mm (5.18 A) |
 | SW_5V | 5 A | F.Cu 14.42 | 2 (3.17 A) | 0.50 mm (1.97 A) |
-| SW_6V | 3 A | F.Cu 9.92 | 0 (0 A) | 1.60 mm (3.83 A) |
 | VBAT | 5 A | - | 0 (0 A) | 2.59 mm (5.06 A) |
-| VBAT_PROT | 5 A | F.Cu 14.82 | 0 (0 A) | 1.20 mm (3.25 A) |
-| VIN_HAT | 5 A | F.Cu 15.32 | 2 (3.71 A) | 0.30 mm (1.47 A) |
+| VBAT_PROT | 5 A | F.Cu 14.88 | 0 (0 A) | 1.00 mm (2.93 A) |
+| VIN_HAT | 5 A | F.Cu 44.77 | 2 (3.17 A) | 0.30 mm (1.47 A) |
 
 Power pours (KiCad-filled copper on F.Cu where the current enters fine-pitch pins or crosses between large pads); narrowest filled cross-section between the terminals, measured by `r3_kicad.pours`:
 
 | Pour | Terminals | Current | Narrowest cross-section | IPC-2152 rating |
 | --- | --- | --- | --- | --- |
 | SW_5V pour | L1.1 -> U2.19+U2.20 | 5 A | 2.74 mm | 5.22 A |
-| VIN_HAT pour | bus -> U2.2+U2.3+U2.4+U2.5 | 4.42 A | 3.74 mm | 6.25 A |
-| SW_6V pour | U3.6 -> L2.1 | 3 A | 1.82 mm | 4.13 A |
+| VIN_HAT pour | bus -> U2.2+U2.3+U2.4+U2.5 | 4.42 A | 2.86 mm | 5.36 A |
+| VIN_HAT pour | C17.2+C18.2 -> Q2.5 | 4.28 A | 3.74 mm | 6.25 A |
+| SW1_6V pour | L2.2 -> Q3.5 -> Q2.1+Q2.2+Q2.3 | 4.55 A | 3.94 mm | 6.44 A |
+| CS_6V pour | R21.2 -> Q3.1+Q3.2+Q3.3 -> Q4.1+Q4.2+Q4.3 | 4.55 A | 2.70 mm | 5.18 A |
+| SW2_6V pour | L2.1 -> Q4.5 -> Q5.1+Q5.2+Q5.3 | 4.55 A | 2.26 mm | 4.68 A |
+| SERVO_6V pour | C20.2+C21.2+C22.2+C35.2 -> Q5.5 | 3 A | 4.18 mm | 6.66 A |
 | VBAT_PROT pour | R2.1 -> Q1.1+Q1.2+Q1.3 | 5 A | 2.90 mm | 5.40 A |
 
 The Pi's 5 V pins (2, 4) sit on the header's edge row, behind pins 1/3: the 5 V path reaches them around pin 1 (between it and the H1 hole) as a parallel pair, 1.4 mm on top and 0.8 mm on the bottom (the current splits by width). Fine-pitch pins are reached by pours, not fixed-width necks.
@@ -87,60 +93,60 @@ Design checks:
 - [x] junction below 125 C at the design current, 25 C ambient: 60 C
 - [x] maximum input below the IC recommended maximum: 17 V <= 18 V
 
-## 6.0 V servo rail: U3 TPS56528
+## 6.0 V servo rail: U3 LM5175 4-switch buck-boost
 
-Part: TI TPS56528DDAR (https://www.ti.com/lit/ds/symlink/tps56528.pdf). Input 4.5-18 V (abs. max 20 V), 5 A, fsw 650 kHz, RDS(on) 68.0/37.0 mOhm.
+Part: TI LM5175PWPR (https://www.ti.com/lit/ds/symlink/lm5175.pdf (SNVSA37A)), 4-switch buck-boost controller, VIN 3.5-42 V. No dropout: the output stays at 6.00 V from the 17 V transient down to the 4.18 V UVLO.
 
 | Quantity | Equation / source | Value |
 | --- | --- | --- |
-| Feedback divider | Vout = Vref (1 + Rupper/Rlower) | Rupper = 453 kOhm, Rlower = 49.9 kOhm -> 6.047 V |
-| Vout tolerance | Vref 588-612 mV, 1 % resistors | 5.820-6.280 V |
-| Duty | D = Vout/Vin | 1.000 @ 6 V, 0.817 @ 7.4 V, 0.356 @ 17 V; Dmax 0.798 |
-| Dropout | Vin = (Vout + I (Dmax Rhs + (1-Dmax) Rls + DCR)) / Dmax | 7.83 V at 2.5 A |
-| Inductor | datasheet table | Coilcraft XAL7030-332MEB: 3.3 uH, DCR 19.5/21.45 mOhm, Isat 12.3 A, Irms 8 A |
-| Ripple current | dI = Vout (Vin - Vout) / (Vin L fsw) | 0.00 / 0.52 / 1.82 A at 6 / 7.4 / 17 V (21 % at nominal) |
-| Inductor RMS / peak | I_rms = sqrt(I^2 + dI^2/12); I_pk = I + dI/2 | 2.55 A / 5.91 A |
-| Current limit | valley I_ocl 5.5/6.2/7.8 A | output at limit 5.50-8.71 A; inductor peak at limit 9.62 A |
-| Output capacitance | ceramic X5R (DC-bias estimated) + bulk | 3 x 22 uF -> 29.7 uF |
-| LC double pole | fp = 1 / (2 pi sqrt(L C)) | 16.1 kHz (ceramic only 16.1 kHz) |
-| Output ripple | dV = dI / (8 fsw C) + dI ESR | 3.9 mV nominal, 13.6 mV at Vin max |
-| Input capacitance | Cin(min) = I Vout / (dVin Vin fsw) | min 15.7 uF; fitted 2 x 22 uF 25 V -> 28.6 uF, ripple 110 mV |
-| Cin RMS current | I = Iout sqrt(D (1-D)) | 1.25 A |
-| Losses at nominal input | I^2 R + 0.5 Vin I t_tr fsw + dead time + gate drive (estimated) | HS 341 mW, LS 47 mW, sw 60 mW, DCR 122 mW -> eta 95.9 % |
-| Junction temperature | Tj = 25 C + P_ic theta (theta 55 C/W on 2-layer, estimated; JEDEC 44.4 C/W) | 54 C |
-| Input current | Iin = Pout / (eta Vin) | 2.13 A @ 7.4 V, 2.63 A @ 6 V |
-| Current limit | valley I_ocl 5.5 / 6.2 / 7.8 A (min/typ/max, datasheet) | servo stall (2.5 A, catalog) is supplied; a shorted servo is limited to <= 8.7 A |
-| Dropout | Dmax = 1 - t_off(min) fsw = 1 - 310 ns x 650 kHz | 0.798: the servo sees ~5.66 V from a nominal 2S pack |
+| Feedback divider | Vout = 0.8 V (1 + Rfb2/Rfb1) (Eq. 12) | Rfb2 = 130 kOhm, Rfb1 = 20 kOhm -> 6.000 V (5.809-6.197 V) |
+| Switching frequency | RT = (1/fsw - 200 ns) / 37 pF (Eq. 5) | RT = 61.9 kOhm -> 402 kHz |
+| Inductor | Eq. 13/14: L for 40 % ripple | targets 2.68 uH (buck) / 1.34 uH (boost); fitted Coilcraft XAL7030-332MEB 3.3 uH, Isat 12.3 A, Irms 8 A |
+| Ripple | buck Vout (Vin-Vout)/(Vin L f); boost Vin (Vout-Vin)/(Vout L f) | 1.30 A at 8.4 V, 0.89 A at 4.4 V |
+| Inductor current | Eq. 15-17 | I_L,max 6.06 A, peak 6.51 A at 4 A out, Isat required 9.76 A |
+| Sense resistor | Eq. 22/23: 70 % of 76 mV buck valley / 170 mV boost peak | 12 mOhm (max 13.3 / 18.3 mOhm); dissipation at the boost limit 0.64 W (Eq. 24) |
+| Current limit | buck valley 53-98 mV, boost peak 119-221 mV | output 4.86-8.82 A; inductor peak limit 9.9-18.4 A; hiccup after 128 cycles (MODE 93.1 kOhm: CCM, hiccup) |
+| Slope | C_slope = gm_slope L / (Rsense A_cs) (Eq. 25) | dead-beat 110 pF; fitted 47 pF (more slope for the transition region) |
+| COMP range | Eq. 7 / Eq. 9 | 0.72 V at no load, 17 V in; 2.02 V at 4 A, 4.4 V in (window 0.3-3 V) |
+| UVLO | Vuv = 1.23 V (1 + Ruv2/Ruv1) - 1.5 uA Ruv2; hysteresis 3.5 uA Ruv2 (Eq. 1/2) | Ruv2 100 kOhm, Ruv1 35.7 kOhm: on 4.53 V, off 4.18 V |
+| Soft start | tss = Css 0.8 V / 5 uA (Eq. 3) | Css 68 nF -> 10.9 ms |
+| Compensation | Eq. 39, 43, 44 | RHP zero 38.9 kHz, crossover 8.0 kHz; Rc1 953 Ohm, Cc1 82 nF, Cc2 820 pF |
+| Output capacitance | ceramic X5R (DC bias estimated) | 4 x 22 uF -> 39.6 uF; boost ripple 54 mV, RMS 1.81 A (Eq. 18-20) |
+| FETs | Eq. 29-36 + gate drive + dead time (estimated) | 4 x CSD17577Q3AT, 30 V, 4.6 mOhm; hottest 36 C at 3 A, 4.4 V in |
+| Efficiency at 3 A | losses above (estimated) | 95.5 / 97.2 / 97.2 % at 4.4 / 7.4 / 8.4 V |
+| Input current at 3 A | Iin = Pout / (eta Vin) | 4.28 A at 4.4 V, 2.50 A at 7.4 V |
 
 Design checks:
 
-- [x] inductor ripple 15-50 % of Iout at nominal Vin: 21 %
-- [x] I_L peak at design current below Isat: 5.91 A < 12.3 A
-- [x] I_L peak at maximum current limit below Isat: 9.62 A < 12.3 A
-- [x] I_L RMS below Irms (20 C rise): 2.55 A < 8.0 A
-- [x] current limit (min) covers the required peak output: 5.50 A >= 5 A
-- [x] design current within IC rating: 2.5 A <= 5 A
-- [x] effective Cin above the input-ripple minimum: 28.6 uF >= 15.7 uF
-- [x] junction below 125 C at the design current, 25 C ambient: 54 C
-- [x] maximum input below the IC recommended maximum: 17 V <= 18 V
+- [x] inductor Isat above 1.2 I_L,peak / 0.8 (Eq. 17): 12.3 A >= 9.76 A
+- [x] inductor Irms above the continuous current at minimum input: 8 A >= 4.55 A
+- [x] sense resistor leaves the peak load below 70 % of both current limits (Eq. 22-23): 12.0 mOhm <= 13.3 mOhm
+- [x] minimum current limit covers the peak load in buck and boost mode: 4.86 A >= 4 A
+- [x] slope capacitor at or below the dead-beat value (Eq. 25): 47 pF <= 110 pF
+- [x] COMP above 0.3 V at no load and the 17 V transient input (Eq. 7): 0.72 V
+- [x] COMP below 3 V at peak load and minimum input (Eq. 9): 2.02 V
+- [x] UVLO falling threshold above the controller's 3.5 V minimum VIN: 4.18 V
+- [x] crossover below one third of the RHP zero and fsw/20: 8.0 kHz (RHP zero 38.9 kHz)
+- [x] FET VDS rating above the 17 V TVS clamp: 30 V >= 21.2 V
+- [x] hottest FET below 125 C at the continuous load, minimum input, 25 C: 36 C
 
 ## Protection and monitoring
 
 - Reverse polarity: DMP3013SFV P-MOSFET (-30 V, 9.5 mOhm at -10 V) in the + lead, gate pulled to GND by 100 k, BZT52B12 clamps VGS (VGS max +-25 V).
-- TVS: SMAJ10A (VRWM 10 V, VBR 11.1-12.3 V, VC 17 V at 23.5 A). A 2S pack is 8.4 V full, below the 10 V stand-off. Clamp 16.3 V at the expected 20 A surge (2 x the HAT branch's 10 A fuse; V_C(I) = V_BR,max + (V_C - V_BR,max) I / I_PP) and 17 V at I_PP, below the regulators' 20 V VIN absolute maximum (TPS56528 20 V, TPS568230 22 V). The previous SMAJ16A clamped at 26.0 V at its 15.4 A I_PP, above 20 V. A 3S pack (12.6 V) would need a different TVS.
+- TVS: SMAJ10A (VRWM 10 V, VBR 11.1-12.3 V, VC 17 V at 23.5 A). A 2S pack is 8.4 V full, below the 10 V stand-off. Clamp 16.3 V at the expected 20 A surge (>= 2 x the HAT branch's fuse; V_C(I) = V_BR,max + (V_C - V_BR,max) I / I_PP) and 17 V at I_PP, below the regulators' 22 V VIN absolute maximum (TPS568230 22 V; LM5175 60 V, CSD17577Q3A 30 V). The previous SMAJ16A clamped at 26.0 V at its 15.4 A I_PP, above 20 V. A 3S pack (12.6 V) would need a different TVS.
 - INA226 at 0x40 (A0 = A1 = GND) across a 2 mOhm Vishay WSK2512 Kelvin shunt, 10 Ohm + 100 nF filter (SBOS547 sec. 8.4.1), sense traces from the shunt's Kelvin pads. VBUS measures VIN_HAT. Full scale 81.92 mV / 2 mOhm = 41 A, LSB 1.25 mA. **Limitation:** the INA226 sees only the HAT branch (Pi, servo, logic). The ESC/motor current splits off in the XT60 Y-harness before the HAT and is not measured.
 - MPU-6050 at 0x68 (AD0 = GND), CLKIN/FSYNC low, REGOUT 100 nF, CPOUT 2.2 nF / 50 V, VDD/VLOGIC 100 nF / 10 nF.
 - I2C pull-ups 4.7 kOhm to 3V3 (parallel with the Pi's 1.8 kOhm: 1.3 kOhm, 2.6 mA sink).
-- 220 Ohm series resistors on the ESC (after the arbiter) and servo PWM lines; 10 kOhm encoder pull-up.
-- J_ESC pin 2 (the ESC's BEC) is not connected: the servo is powered only by U3.
+- 220 Ohm series resistors on the ESC (after the isolator, ESC side) and servo PWM lines; 10 kOhm encoder pull-up.
+- ESC signal isolation: U6 ISO6720F re-drives the arbiter output on the ESC's side, referenced to the ESC's own ground (J_ESC.3 = ESC_GND, a separate net from HAT GND) and powered from the ESC's BEC (J_ESC.2) through U7 AP7381-33 (40 V input LDO). The 22 AWG ESC signal lead's ground therefore carries only U6/U7's few mA instead of paralleling the power harness's motor return. Default-low outputs: with the Pi unpowered the ESC sees no pulses; R26 holds ESC_PWM low while U6's ESC side is unpowered. The servo is powered only by U3.
 
 ## Failsafe arbiter (U4 ATtiny412)
 
 - The Pi's ESC PWM (J_GPIO.12, GPIO18) reaches the ESC only through U4. The Pi toggles a heartbeat on J_GPIO.13 (GPIO27) every control cycle.
 - PASS: U4 mirrors every PWM edge (pin-change interrupt, ~1.5 us latency, estimated).
-- Timeout: no heartbeat edge for 100 ms -> FAILSAFE: 1500 us neutral pulses every 20 ms; red LED D4 on. Worst-case latency from the last edge to the first neutral frame is 120 ms.
+- Timeout: no heartbeat edge for 100 ms -> FAILSAFE, red LED D4 on: if the ESC is brake-armed (it was driving forward or braking) U4 sends 1000 us full-brake pulses for 3 s, then 1500 us neutral, every 20 ms. A hobby ESC coasts at neutral; the brake is QuicRun 1060 forward/brake/reverse logic (reverse stick after forward = brake), which U4 mirrors from the pulses it passes so it never sends a pulse the ESC could take as reverse. Worst-case latency from the last edge to the first failsafe frame is 120 ms.
 - Re-arm: 3 heartbeat edges within the timeout and a commanded pulse within +-50 us of neutral. U4 boots in FAILSAFE.
-- U4 runs from the Pi's 3V3; if the Pi is unpowered, R15 holds ESC_PWM low and the ESC's own signal-loss failsafe applies. UPDI header J8 programs U4. Behaviour model: `r3_kicad.arbiter.FailsafeArbiter`.
+- U4 runs from the Pi's 3V3; if the Pi is unpowered, U6's outputs default low (R15 also holds its input low) and the ESC's own signal-loss failsafe applies. UPDI header J8 programs U4. Behaviour model: `r3_kicad.arbiter.FailsafeArbiter`.
 
 ## Mounting
 
@@ -156,4 +162,6 @@ U2 drives the Pi's 5 V pins directly. Do not connect the Pi's USB-C supply at th
 
 - IPC-2152 external fit, 1 oz, 20 C rise: 5 A -> 2.59 mm, 3 A -> 1.09 mm; signals 0.2 mm.
 - INA226 measures only the HAT branch (Pi + servo + HAT logic). The ESC/motor branch splits off in the XT60 Y-harness before the HAT, so motor current is not visible to the Pi.
-- J_ESC pin 2 (ESC BEC) is not connected: the servo is powered by U3, never by the ESC BEC.
+- J_ESC is galvanically isolated (U6 ISO6720F): pin 3 is the ESC's own ground, not HAT GND, so no motor return current can flow in the ESC signal lead; pin 2 (the ESC's 6 V BEC) powers only U6's ESC side through U7. The servo is powered by U3, never by the ESC BEC.
+- Custom DRC rules (carrier-hat.kicad_dru): only pads inside each CSD17577Q3A (Q2-Q5, TI's VSON-8 land pattern, 0.14 mm gate-source gap) may sit 0.13 mm apart; every net class keeps >= 0.15 mm.
+- Autorouted branches of VIN_HAT, SERVO_6V and the servo switch/sense nets are 0.2 mm: they reach the LM5175's 0.5 mm-pitch QFN pins and carry mA; the rail currents flow in the hand-routed copper and pours sized by IPC-2152.

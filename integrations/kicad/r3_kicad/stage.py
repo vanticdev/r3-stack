@@ -307,6 +307,14 @@ def _pour_checks(intent: BoardIntent, board_file, result: StageResult, name: str
 
 def _regulator_json(design) -> dict[str, Any]:
     v = design.values
+    if getattr(design, "topology", "buck") == "buck_boost":
+        return {"part": design.ic.part, "topology": "buck_boost", "v_out": round(v["v_out_nominal"], 4),
+                "i_design": design.req.i_out, "i_peak": design.req.i_peak, "i_limit_min": round(v["i_out_limit_min"], 3),
+                "i_limit_max": round(v["i_out_limit_max"], 3), "inductor_peak_limit_min": round(v["i_l_peak_limit_min"], 3),
+                "f_sw": round(v["f_sw"], 1), "inductance": design.inductor.inductance, "c_out_effective": v["c_out_effective"],
+                "uvlo_rising": round(v["uvlo_rising"], 3), "uvlo_falling": round(v["uvlo_falling"], 3),
+                "r_sense": design.r_sense, "efficiency_nominal": round(v["efficiency"], 4),
+                "efficiency_min_input": round(v["efficiency_min"], 4)}
     return {"part": design.ic.part, "v_out": round(v["v_out_nominal"], 4), "i_design": design.req.i_out,
             "i_limit_min": round(v["i_out_limit_min"], 3), "i_limit_max": round(v["i_out_limit_max"], 3),
             "f_sw": design.ic.f_sw, "inductance": design.inductor.inductance, "c_out_effective": v["c_out_effective"],
@@ -324,7 +332,7 @@ def _kicad_outputs(project, cli: KicadCli, name: str, sch: Path, pcb: Path, out:
     if work.exists():
         shutil.rmtree(work)
     work.mkdir(parents=True)
-    for suffix in (".kicad_pro", ".kicad_sch", ".kicad_pcb", ".kicad_prl"):
+    for suffix in (".kicad_pro", ".kicad_sch", ".kicad_pcb", ".kicad_prl", ".kicad_dru"):
         src = pcb.with_suffix(suffix)
         if src.exists():
             shutil.copy2(src, work / src.name)
@@ -417,7 +425,7 @@ def _regulator_checks(pi, servo, result: StageResult, name: str) -> None:
                 result.add(Diagnostic.warning("buck_design_margin", f"{ref} {design.ic.part}: {check}: {detail}",
                                               subjects=[name, ref], hint=check))
     v = servo.values
-    if v["v_in_dropout"] > 7.4:
+    if "v_in_dropout" in v and v["v_in_dropout"] > 7.4:
         result.add(Diagnostic.info("servo_rail_dropout", f"servo rail is in dropout below {v['v_in_dropout']:.2f} V input at "
                                    f"{servo.req.i_out:g} A (TPS56528 Dmax {servo.ic.max_duty:.2f}); a nominal 2S pack gives "
                                    "~5.8-5.9 V at the servo", subjects=[name, "U3"],

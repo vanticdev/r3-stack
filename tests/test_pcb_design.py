@@ -8,7 +8,8 @@ import pytest
 
 from r3_kicad import ipc2152
 from r3_kicad.arbiter import ArbiterParams, ArbiterState, FailsafeArbiter
-from r3_kicad.regulators import TPS56528, TPS568230, hold_up_time, pi_rail, regulated_output, servo_rail
+from r3_kicad.regulators import (LM5175, TPS568230, buck_boost_efficiency, hold_up_time, pi_rail, regulated_output,
+                                 servo_rail)
 
 
 def test_ipc2152_round_trip_and_known_values():
@@ -38,18 +39,23 @@ def test_pi_rail_meets_brief():
     assert 66e-6 <= v["c_out_effective"] <= 500e-6
 
 
-def test_servo_rail_meets_brief():
+def test_servo_rail_is_a_buck_boost_without_dropout():
+    """Finish brief: a real buck-boost of >= 3 A continuous for the servo (the TPS56528 buck sagged to 4.80 V at
+    minimum charge). LM5175 design procedure (SNVSA37A sec. 9.2.2)."""
     design = servo_rail()
     v = design.values
-    assert design.ic is TPS56528
-    assert v["v_out_nominal"] == pytest.approx(6.05, abs=0.02)
-    assert v["i_out_limit_min"] >= 5.0                            # >= 5 A peak
-    assert v["i_out_limit_max"] < 10.0                            # and a real limit for a stalled/shorted servo
-    assert v["i_l_peak_at_ocl"] < design.inductor.i_sat
+    assert design.ic is LM5175 and design.topology == "buck_boost"
+    assert v["v_out_nominal"] == pytest.approx(6.0, abs=0.01)
+    assert design.req.i_out >= 3.0
+    assert v["i_out_limit_min"] >= design.req.i_peak >= 4.0      # servo stall with margin, in buck and boost mode
+    assert v["i_out_limit_max"] < 10.0                           # a real limit for a stalled or shorted servo
     assert not design.failed_checks, design.failed_checks
-    # Dropout: below ~7.8 V at 2.5 A the rail follows Dmax * Vin.
-    assert regulated_output(design, 6.0, 2.5) < 5.0
-    assert regulated_output(design, 8.4, 2.5) == pytest.approx(v["v_out_nominal"])
+    assert v["uvlo_falling"] < 4.4 < v["uvlo_rising"] < 4.6      # keeps running on an empty pack under a motor stall
+    assert v["f_sw"] == pytest.approx(400e3, rel=0.02)
+    assert v["v_comp_buck_vin_transient"] > 0.3 and v["v_comp_boost_vin_min"] < 3.0
+    assert buck_boost_efficiency(design, 4.4, 3.0) > 0.9 and buck_boost_efficiency(design, 8.4, 3.0) > 0.9
+    # Eq. 22-23: the sense resistor leaves the peak load below 70 % of both current-limit thresholds.
+    assert design.r_sense <= min(v["r_sense_buck_max"], v["r_sense_boost_max"])
 
 
 def test_hold_up_time_formula():

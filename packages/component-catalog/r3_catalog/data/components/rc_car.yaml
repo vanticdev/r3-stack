@@ -449,10 +449,13 @@ components:
     description: >
       65 x 56.5 mm HAT made headlessly in KiCad 10. XT30 battery input -> DMP3013SFV reverse-polarity FET ->
       2 mOhm Kelvin shunt (INA226, I2C 0x40, HAT branch only) -> TPS568230 5.1 V / 5 A buck back-powering the Pi
-      (VIN UVLO 4.4 V max, 220 uF hold-up) and TPS56528 6.0 V servo rail (5.5-7.8 A valley current limit);
-      SMAJ10A input TVS (17.0 V clamp, below the regulators' 20 V VIN absolute maximum); MPU-6050 IMU (I2C 0x68);
-      ATtiny412 failsafe arbiter between the Pi's ESC PWM and the ESC (neutral after 100 ms without a GPIO27
-      heartbeat); 220 Ohm series resistor on the servo PWM; encoder pull-up. The ESC BEC (J_ESC.2) is not connected.
+      (VIN UVLO 4.4 V max, 220 uF hold-up) and an LM5175 4-switch buck-boost 6.0 V / 3 A servo rail (no dropout
+      down to its 4.18 V UVLO; 4.9-8.8 A current limit, hiccup); 220 uF + ceramic input bulk; SMAJ10A input TVS
+      (17.0 V clamp, below the TPS568230's 22 V VIN absolute maximum); MPU-6050 IMU (I2C 0x68); ATtiny412 failsafe
+      arbiter between the Pi's ESC PWM and the ESC (active brake, then neutral, 100 ms after the last GPIO27 heartbeat
+      edge) followed by an ISO6720F digital isolator: J_ESC's PWM and ground are the ESC's side (ESC_GND is not HAT
+      GND, so no motor return flows in the signal lead), powered from the ESC BEC (J_ESC.2) by an AP7381 LDO;
+      220 Ohm series resistor on the servo PWM; encoder pull-up.
     mechanical:
       shape: custom
       size: [65 mm, 56.5 mm, 20.5 mm]
@@ -493,8 +496,11 @@ components:
       GND: {role: ground}
       5V: {role: power_out, voltage_nominal: 5.1, current_max: 5.0}
       3V3: {role: power_in, voltage_nominal: 3.3, current_max: 0.05}
-      SERVO_6V: {role: power_out, voltage_nominal: 6.0, current_max: 5.0}
-      ESC_BEC_NC: {role: nc}
+      SERVO_6V: {role: power_out, voltage_nominal: 6.0, current_max: 4.0}
+      # ESC side of the U6 isolator: the ESC's BEC feeds only U7 + U6 side 2 (a few mA); ESC_GND is the ESC's own
+      # ground, galvanically separate from GND on the board.
+      ESC_BEC: {role: power_in, voltage_nominal: 6.0, voltage_min: 3.6, voltage_max: 40.0, current_max: 0.15}
+      ESC_GND: {role: ground}
       HEARTBEAT: {role: gpio, logic_level: 3.3}
       I2C_SDA: {role: i2c_sda, logic_level: 3.3}
       I2C_SCL: {role: i2c_scl, logic_level: 3.3}
@@ -517,7 +523,7 @@ components:
                pins: {"1": VBAT, "2": GND}}
       J_ESC: {type: header-1x3-2.54, position: [-16.96 mm, -25.25 mm, 4.14 mm], direction: [0, 0, 1], x: [1, 0, 0], embedded: true,
               source: "kicad:J3 PinHeader_1x03_P2.54mm_Vertical (top)",
-              pins: {"1": ESC_PWM, "2": ESC_BEC_NC, "3": GND}}
+              pins: {"1": ESC_PWM, "2": ESC_BEC, "3": ESC_GND}}
       J_SERVO: {type: header-1x3-2.54, position: [-4.96 mm, -25.25 mm, 4.14 mm], direction: [0, 0, 1], x: [1, 0, 0], embedded: true,
                 source: "kicad:J4 PinHeader_1x03_P2.54mm_Vertical (top)",
                 pins: {"1": SERVO_PWM, "2": SERVO_6V, "3": GND}}
@@ -542,12 +548,21 @@ components:
                     inductance: 2.2 uH, r_high_side: 19.5 mohm, r_low_side: 9.5 mohm, inductor_dcr: 15.07 mohm,
                     efficiency: [[0.1, 0.80], [0.5, 0.95], [1.0, 0.96], [2.0, 0.97], [3.0, 0.97], [5.0, 0.96]],
                     quiescent_current: 0.003, hold_up_capacitance: 268 uF}
-        servo_regulator: {model: regulator.buck, part: TPS56528, output_pin: SERVO_6V, v_out: 6.05, i_max: 2.5, i_limit_min: 5.5,
-                          i_limit_max: 8.7, v_in_min: 4.35, v_in_max: 17.0, v_in_abs_max: 20.0, f_sw: 650 kHz, max_duty: 0.80,
-                          inductance: 3.3 uH, r_high_side: 68 mohm, r_low_side: 37 mohm, inductor_dcr: 21.45 mohm,
-                          efficiency: [[0.1, 0.83], [0.5, 0.95], [1.0, 0.96], [2.0, 0.96], [2.5, 0.95]],
-                          hold_up_capacitance: 29.7 uF}
-        input_capacitance: 220 uF   # C3 bulk on VIN_HAT (after the shunt), plus the regulators' input ceramics
+        # LM5175 4-switch buck-boost (r3_kicad.regulators.servo_rail, SNVSA37A): 12 mOhm sense -> buck valley limit
+        # 53.2 mV -> i_limit_min 4.86 A at the output, boost peak 119 mV -> 9.92 A in the inductor (output scales with
+        # V_in eta / V_out); EN/UVLO divider 100k/35.7k -> on 4.53 V, off 4.18 V. Efficiency: the loss model at the
+        # minimum 4.4 V input (worst case, estimated); quiescent: 1.65 mA + gate drive 2 x 8.5 nC x 7.35 V x 400 kHz.
+        servo_regulator: {model: regulator.buck_boost, part: LM5175, output_pin: SERVO_6V, v_out: 6.0, i_max: 3.0,
+                          i_limit_min: 4.86, i_limit_max: 8.82, inductor_peak_limit_min: 9.92, inductor_ripple_boost: 0.89,
+                          v_in_min: 4.18, uvlo_falling: 4.18, uvlo_rising: 4.53, v_in_max: 42.0, v_in_abs_max: 60.0,
+                          f_sw: 400 kHz, inductance: 3.3 uH, r_sense: 12 mohm,
+                          efficiency: [[0.1, 0.85], [0.5, 0.956], [1.0, 0.966], [2.0, 0.963], [3.0, 0.955], [4.0, 0.946]],
+                          quiescent_current: 0.008, hold_up_capacitance: 39.6 uF}
+        # VIN_HAT bulk after the shunt: C3 220 uF hybrid polymer (Panasonic EEH-ZA1E221P, ESR 27 mOhm) and the
+        # regulators' input ceramics (5 x 22 uF 25 V X5R at ~65 % DC-bias retention, estimated).
+        input_capacitance:
+          - {capacitance: 220 uF, esr: 27 mohm, part: EEH-ZA1E221P}
+          - {capacitance: 71.5 uF, esr: 1 mohm, part: GRM31CR61E226ME15L x 5}
         # Active brake first (QuicRun 1060 Fwd/Rev/Brk: reverse stick after forward = brake), then neutral:
         # r3_kicad.arbiter. brake_hold covers the longest stop (8 m/s top speed); deadband_us and
         # esc_reverse_delay mirror the ESC's own neutral deadband (3 %) and reverse delay.
@@ -557,6 +572,10 @@ components:
         reverse_protection: {part: DMP3013SFV, rds_on: 12 mohm}
         tvs: {part: SMAJ10A, v_standoff: 10.0, v_breakdown_min: 11.1, v_breakdown_max: 12.3, v_clamp: 17.0, i_pp: 23.5}
         ina226: {address: 0x40, shunt: 2 mohm, bus: I2C, measures: hat_branch_only}
+        # U6 ISO6720F: side 1 from the Pi's 3V3, side 2 + U7 AP7381 from the ESC BEC, returning to the ESC's ground.
+        isolator_hat_side: {part: ISO6720FBD, bus: digital_isolator, supply_pin: 3V3, current: 1.5 mA}
+        isolator_esc_side: {part: ISO6720FBD + AP7381-33, bus: digital_isolator, supply_pin: ESC_BEC, ground_pin: ESC_GND,
+                            current: 2.0 mA}
         mpu6050: {address: 0x68, bus: I2C}
         encoder_pullup: 10 kohm
         i2c_pullups: 4.7 kohm
@@ -564,7 +583,7 @@ components:
         mounting: {screw: ISO 4762 M2.5 socket head cap screw, holes: 4, pattern: [58 mm, 49 mm], drill: 2.7 mm,
                    head_diameter: 4.5 mm, head_height: 2.5 mm, print_clearance: 0.3 mm,
                    standoff: M2.5 x 11 mm hex 5.0 mm A/F}
-      provenance: {status: datasheet, source: "TI TPS568230 (SLVSEY5C), TPS56528 (SLVSBV3B), Littelfuse SMAJ series, DMP3013SFV; efficiencies estimated by r3_kicad.regulators.efficiency_curve"}
+      provenance: {status: datasheet, source: "TI TPS568230 (SLVSEY5C), LM5175 (SNVSA37A), CSD17577Q3A, ISO6720F, Diodes AP7381, Littelfuse SMAJ series, DMP3013SFV; efficiencies estimated by r3_kicad.regulators (efficiency_curve, buck_boost_efficiency_curve); isolator supply currents estimated"}
     software:
       - {bus: i2c, address: 0x40, protocol: ina226}
       - {bus: i2c, address: 0x68, protocol: mpu6050}

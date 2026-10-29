@@ -42,7 +42,8 @@ def test_board_json_contract(stage_run):
     assert board["erc"]["errors"] == 0
     assert board["drc"]["errors"] == 0 and board["drc"]["unconnected"] == 0
     assert set(board["connectors"]) == {"J_GPIO", "J_BATT", "J_ESC", "J_SERVO", "J_RX", "J_GPS", "J_ENC"}
-    assert board["connectors"]["J_SERVO"]["2"] == "SERVO_6V" and "2" not in board["connectors"]["J_ESC"]
+    assert board["connectors"]["J_SERVO"]["2"] == "SERVO_6V"
+    assert board["connectors"]["J_ESC"] == {"1": "ESC_PWM", "2": "ESC_BEC", "3": "ESC_GND"}   # isolator's ESC side
     assert board["connectors"]["J_GPIO"]["13"] == "HEARTBEAT"
     assert "J_BATT.1" in board["nets"]["VBAT"]
     traces = board["traces"]

@@ -57,3 +57,19 @@
     gain an internal `breakouts` entry (not written to `routes.json`). `routes.json` per wire
     carries `ends`/`fanout` and `valid`/`violations`/`installed_ampacity`/`cut`; please document
     `ends`, `fanout` with the other optional fields in `docs/architecture/r3-pipeline.md`.
+
+## From lane B (branch `r3/finish-b`): harness gauge changes that affect routing
+
+Electrical/PCB fixes changed four harnesses' conductors (robot.yaml `wires:` only, `route:` untouched):
+
+- `power_y`: `W_Y_P_HAT` and `W_Y_N_HAT` 18 -> 14 AWG (the 10 A fuse must not exceed the installed ampacity;
+  18 AWG was 5.4 A installed, 14 AWG ~10.3 A); `W_Y_P_FUSE` 18 -> 12 AWG (no thinner conductor upstream of the fuse).
+  The HAT pair's minimum bend radius rises to 14.8 mm (2-conductor 6.6 mm bundle).
+- `esc_signal`: a third conductor `W_ESC_BEC` (A.2 -> B.2, 22 AWG) is back: it powers the ESC side of the HAT's new
+  digital isolator; `W_ESC_GND` is now the isolator's ESC-side ground (net still GND through the ESC).
+- `servo_lead`: `W_SRV_VCC`/`W_SRV_GND` 22 -> 20 AWG; cable-side housing `servo-3-female-hd` (new connector type,
+  same geometry as `servo-3-female`, 20-24 AWG crimps; catalog + connector_geometry entries added).
+- `esc_motor` stays 14 AWG.
+
+Request: re-plan these routes for the larger bend radii; in my local wiring run several of the existing
+`route_infeasible`/`wire_bend_radius_violation` findings on `power_y` and `servo_lead` became tighter.
