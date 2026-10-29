@@ -48,12 +48,20 @@ class Pin(_Model):
 
 
 class ConnectorInstance(_Model):
-    """A connector mounted on a component, in the component frame."""
+    """A connector mounted on a component, in the component frame.
+
+    With catalog connector geometry, ``position`` is the origin of the connector
+    frame (centre of the contact array on the mating face), ``direction`` its z
+    axis (toward the mating half; the cable exit) and ``x`` its pin-row axis
+    (pin 1 toward the last pin). See :class:`ConnectorGeometry`."""
 
     type: str
     position: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
     direction: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0], description="Unit vector of cable exit.")
+    x: Vector | None = Field(default=None, description="Pin-row axis of the connector frame (perpendicular to direction).")
     pins: dict[str, str] = Field(description="connector pin number -> component pin name.")
+    embedded: bool = Field(default=False, description="The connector body is part of the component's own 3D model.")
+    source: str = Field(default="", description="Where the pose comes from, e.g. 'kicad:J5' or 'step:J8 pin 1'.")
 
 
 FeatureKind = Literal["bore", "d_bore", "shaft", "d_shaft", "tapped_hole", "clearance_hole", "spline", "face", "slot",
@@ -210,6 +218,46 @@ class Interface(_Model):
         return self
 
 
+class Placement(_Model):
+    """A frame expressed in a parent frame: ``origin`` and the ``x``/``z`` axes
+    (``y = z x x``). Lengths in metres."""
+
+    origin: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
+    x: Vector = Field(default_factory=lambda: [1.0, 0.0, 0.0])
+    z: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0])
+
+    @model_validator(mode="after")
+    def _check(self) -> "Placement":
+        x_norm = sum(v * v for v in self.x) ** 0.5
+        z_norm = sum(v * v for v in self.z) ** 0.5
+        if x_norm < 1e-12 or z_norm < 1e-12 or abs(sum(a * b for a, b in zip(self.x, self.z))) > 1e-6 * x_norm * z_norm:
+            raise ValueError("placement x and z must be non-zero and perpendicular")
+        return self
+
+
+class ModelRef(_Model):
+    """A 3D model of a part and where its frame sits in the owner's frame.
+
+    ``source``: ``kicad`` (official KiCad 3D library, ``path`` uses
+    ``${KICAD10_3DMODEL_DIR}``), ``vendor`` (manufacturer STEP fetched from
+    ``url``, verified against ``sha256``, ``path`` names the file inside the
+    archive), ``kicad_board`` (STEP exported by the KiCad stage, ``path``
+    relative to the project) or ``proxy`` (parametric body from datasheet
+    dimensions, built by ``r3_connectors.proxy`` from ``params``).
+    ``placement`` is the model frame expressed in the owner frame; ``units`` is
+    the model's length unit."""
+
+    source: Literal["kicad", "vendor", "kicad_board", "proxy"]
+    path: str = ""
+    url: str = ""
+    sha256: str = ""
+    license: str = ""
+    units: Literal["mm", "m"] = "mm"
+    placement: Placement = Field(default_factory=Placement)
+    params: dict[str, Any] = Field(default_factory=dict)
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="datasheet"))
+
+
 class ComponentType(_Model):
     id: str
     kind: Literal[
@@ -228,7 +276,55 @@ class ComponentType(_Model):
     behavior: BehaviorModel | None = None
     software: list[SoftwareInterface] = Field(default_factory=list)
     thermal: dict[str, Any] = Field(default_factory=dict, description="theta_ja_c_per_w, max_temp_c, ...")
+    model: ModelRef | None = Field(default=None, description="Detailed 3D model (vendor STEP or the KiCad board export).")
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
+
+
+class ConnectorPin(_Model):
+    """One contact in the connector frame (metres).
+
+    ``position`` is the contact axis on the mating face, ``axis`` the contact
+    direction (toward the mating half, normally +z). ``tip`` is how far the
+    contact reaches beyond the mating face along ``axis`` (negative when
+    recessed). ``pad`` is the PCB pad centre for board-side parts (checked
+    against the KiCad footprint). ``wire_entry``/``wire_axis`` give where the
+    conductor leaves a cable-side half (crimp barrel or solder cup exit) and the
+    direction it leaves in."""
+
+    position: Vector
+    axis: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0])
+    tip: Quantity = 0.0
+    pad: Vector | None = None
+    wire_entry: Vector | None = None
+    wire_axis: Vector | None = None
+
+
+class ConnectorGeometry(_Model):
+    """Exact geometry of a connector type.
+
+    Connector frame: origin at the centre of the contact array on the mating
+    face, z normal to the mating face pointing toward the mating half, x along
+    the pin row (pin 1 toward the last pin). Two mated halves have coincident
+    origins, opposite z and equal x (the partner frame is this one turned 180
+    degrees about x), so pin n meets pin n. ``footprint`` names the KiCad
+    footprint whose pads the pin map was verified against and
+    ``footprint_placement`` the footprint frame (KiCad 3D axes: x right, y up,
+    z out of the board's component side) in the connector frame. ``envelope``
+    is the body box [x, y, z] behind and around the mating face, ``depth`` the
+    body length behind the face (wire side) and ``reach`` its extent in front."""
+
+    model: ModelRef
+    footprint: str = ""
+    footprint_placement: Placement | None = None
+    pins: dict[str, ConnectorPin]
+    pin_shape: Literal["square_post", "socket", "blade", "crimp", "bullet", "solder_cup", "coax"] = "square_post"
+    pin_size: Quantity = 0.00064
+    envelope: Vector | None = None
+    depth: Quantity = 0.0
+    reach: Quantity = 0.0
+    color: str = "#202020"
+    contact_color: str = "#d4a640"
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="derived"))
 
 
 class ConnectorType(_Model):
@@ -245,6 +341,7 @@ class ConnectorType(_Model):
     mating_cycles: int | None = None
     locking: bool = False
     body_size: Vector = Field(default_factory=lambda: [0.01, 0.01, 0.01])
+    geometry: ConnectorGeometry | None = None
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 

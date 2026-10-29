@@ -162,7 +162,7 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
     _segment_checks(intent, result, name)
     pi, servo = pi_rail(), servo_rail()
     _regulator_checks(pi, servo, result, name)
-    geometry = connector_geometry(board_file, intent, ctype)
+    geometry = connector_geometry(board_file, intent, ctype, project.catalog)
     for cid, entry in geometry.items():
         if entry.get("deviation_xy", 0.0) > 0.002:
             result.add(Diagnostic.warning("pcb_connector_position_mismatch",

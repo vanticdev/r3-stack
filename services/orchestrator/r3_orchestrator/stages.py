@@ -39,6 +39,7 @@ STAGES: tuple[StageSpec, ...] = (
     StageSpec("cad", "r3_onshape.stage", "Onshape CAD sync, mass properties and meshes"),
     StageSpec("pcb", "r3_kicad.stage", "KiCad schematic/PCB generation, ERC/DRC"),
     StageSpec("wiring", "r3_wiring.stage", "3D cable routing, harness checks and slack"),
+    StageSpec("connectors", "r3_connectors.stage", "Connector and pin geometry: KiCad/vendor models, mated pairs, wire ends on pins"),
     StageSpec("electrical", "r3_sim.electrical.stage", "Static worst-case electrical operating points"),
     StageSpec("sim", "r3_sim.stage", "Multi-domain digital twin scenarios"),
 )

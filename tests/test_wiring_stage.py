@@ -33,7 +33,8 @@ def test_routes_json_contract(stage):
     spec_wires = {w.id for h in Project.load(root).spec.electrical.harnesses for w in h.wires}
     assert set(routes["wires"]) == spec_wires
     for wire in routes["wires"].values():
-        assert set(wire) == {"harness", "awg", "path", "routed_length", "cut_length"}
+        assert set(wire) == {"harness", "awg", "path", "routed_length", "cut_length", "ends", "fanout"}
+        assert len(wire["ends"]) == 2 and len(wire["fanout"]) == 2
         assert len(wire["path"]) >= 2 and all(len(p) == 3 for p in wire["path"])
         assert wire["cut_length"] >= wire["routed_length"] > 0
     for harness in routes["harnesses"].values():

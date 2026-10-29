@@ -100,8 +100,26 @@ def power_summary(board: BoardFile, intent: BoardIntent, trace_list: list[dict],
     return out
 
 
-def connector_geometry(board: BoardFile, intent: BoardIntent, catalog_component) -> dict[str, Any]:
-    """Cable exit point of each catalog connector in the component frame, from KiCad's pad positions."""
+def _catalog_pad_centroid(cat, catalog) -> tuple[float, float] | None:
+    """Pad centroid predicted by the catalog connector pose and its type's pin map
+    (``r3_catalog`` connector geometry), in the component frame."""
+    geometry = catalog.connectors[cat.type].geometry if catalog is not None and cat.type in catalog.connectors else None
+    if geometry is None:
+        return None
+    pads = [p.pad for p in geometry.pins.values() if p.pad is not None]
+    if not pads:
+        return None
+    from r3_connectors.pins import instance_frame
+
+    frame = instance_frame(cat)
+    points = [frame.point(pad) for pad in pads]
+    return (sum(q[0] for q in points) / len(points), sum(q[1] for q in points) / len(points))
+
+
+def connector_geometry(board: BoardFile, intent: BoardIntent, catalog_component, catalog=None) -> dict[str, Any]:
+    """Pad centroid of each catalog connector in the component frame, from KiCad's pad positions, against
+    the catalog: the pads predicted by the connector pose and pin map when the type has geometry
+    (``catalog_pad_centroid``), else the connector position."""
     out: dict[str, Any] = {}
     by_ref = {f.ref: f for f in board.footprints}
     for part in intent.parts:
@@ -117,7 +135,11 @@ def connector_geometry(board: BoardFile, intent: BoardIntent, catalog_component)
         if catalog_component is not None and part.connector in catalog_component.connectors:
             cat = catalog_component.connectors[part.connector]
             entry["catalog_position"] = list(cat.position)
-            entry["deviation_xy"] = round(math.dist((hx, hy), cat.position[:2]), 5)
+            predicted = _catalog_pad_centroid(cat, catalog)
+            reference = predicted if predicted is not None else cat.position[:2]
+            if predicted is not None:
+                entry["catalog_pad_centroid"] = [round(predicted[0], 6), round(predicted[1], 6)]
+            entry["deviation_xy"] = round(math.dist((hx, hy), reference), 5)
         out[part.connector] = entry
     return out
 

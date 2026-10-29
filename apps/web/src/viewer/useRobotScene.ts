@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 
+import { connectorAssetUrl, useConnectors, type ConnectorsJson } from "../api/connectors.ts";
 import { useCad, useDiagnostics, useModel, useSpec, useWiring } from "../api/hooks.ts";
 import type { AssemblyJson, CadPart, Diagnostic, GraphComponent, GraphEndpoint, RoutesJson, SpecJoint, Vec3 } from "../api/types.ts";
 import { buildScene, diagnosticsBySubject, type SceneComponent, type SceneWire } from "../lib/scene.ts";
@@ -28,6 +29,10 @@ export interface RobotData {
   bySubject: Record<string, Diagnostic[]>;
   assembly: AssemblyJson | null;
   massSource: Record<string, string>;
+  /** build/connectors/connectors.json (exact connector frames, pins, mated pairs), when the stage has run. */
+  connectors?: ConnectorsJson | null;
+  /** URL of a build/connectors/ asset (GLB models). */
+  connectorAsset?: (relative: string) => string;
 }
 
 /** Everything the 3D view needs, from /model, /cad, /wiring and /diagnostics. */
@@ -37,6 +42,7 @@ export function useRobotScene(pid: string) {
   const wiring = useWiring(pid);
   const diagnostics = useDiagnostics(pid);
   const spec = useSpec(pid);
+  const connectors = useConnectors(pid);
 
   const data = useMemo<RobotData | null>(() => {
     const graph = model.data?.graph;
@@ -62,8 +68,14 @@ export function useRobotScene(pid: string) {
     const joints = [...model.data.joints, ...(model.data.derived_joints ?? []).filter((d) => !model.data!.joints.some((j) => j.id === d.id))];
     const massSource: Record<string, string> = {};
     for (const [id, m] of Object.entries(graph.mass?.by_component ?? {})) massSource[id] = m.source;
+    // Pin-to-pin display paths: conductors of a bundle side by side, each ending on its pin.
+    const pinWires = connectors.data?.wires ?? {};
+    const wires = scene.wires.map((w) => {
+      const pin = pinWires[w.id];
+      return pin?.display_path?.length ? { ...w, path: pin.display_path, radius: pin.od ? pin.od / 2 : w.radius } : w;
+    });
     return {
-      components: scene.components, wires: scene.wires, graphComponents: graph.components,
+      components: scene.components, wires, graphComponents: graph.components,
       hardware: Object.entries(cadParts).flatMap(([id, part]) => {
         const url = cad.data?.meshes[id];
         const owner = part.owner && part.owner in graph.components ? part.owner : null;
@@ -74,8 +86,9 @@ export function useRobotScene(pid: string) {
       endpoints: graph.endpoints ?? {}, contacts: contactList.map((c) => [c[0], c[1]] as [string, string]),
       interference: scene.interference, routes, diagnostics: diags, bySubject: diagnosticsBySubject(diags),
       assembly: model.data.assembly, massSource,
+      connectors: connectors.data ?? null, connectorAsset: (relative: string) => connectorAssetUrl(pid, relative),
     };
-  }, [model.data, cad.data, wiring.data, diagnostics.data, spec.data]);
+  }, [model.data, cad.data, wiring.data, diagnostics.data, spec.data, connectors.data, pid]);
 
   return {
     data,
