@@ -714,8 +714,8 @@ class AssemblyCompiler:
         self.add(Diagnostic.error(
             "hole_pattern_mismatch",
             f"join {join.join_id}: hole patterns do not line up at clock {math.degrees(match.clock):.1f} deg: "
-            f"max center offset {match.max_offset * 1e3:.3f} mm (allowed {data['allowance'] * 1e3:.3f} mm), "
-            f"{len(match.pairs)}/{match.required} holes matched",
+            f"{len(match.pairs)}/{match.required} holes matched"
+            + (f", max center offset {match.max_offset * 1e3:.3f} mm (allowed {data['allowance'] * 1e3:.3f} mm)" if match.pairs else ""),
             subjects=[a.obj, b.obj, join.join_id], data=data,
             hint="Move the holes in the catalog interface (or choose a matching clock) so every fastener passes straight."))
 
@@ -766,6 +766,8 @@ class AssemblyCompiler:
         problems: list[dict[str, Any]] = []
         for i, j, _ in match.pairs:
             ha, hb = holes_a[i], holes_b[j]
+            if ha.kind == hb.kind and ha.kind != "clearance":
+                continue  # no fastener can join two threaded holes (hole_size_mismatch)
             holes = {h.kind: (h, iface) for h, iface in ((ha, a), (hb, b))}
             clearance = [h for h in (ha, hb) if h.kind == "clearance"]
             grip = sum(h.depth for h in clearance) + join.offset
@@ -1079,7 +1081,8 @@ class AssemblyCompiler:
             if join.kind not in ("revolute", "slider") or join.join_id not in self.valid:
                 continue
             if join.join_id not in tree_ids:
-                if join.joint:
+                a, b = self.valid[join.join_id]
+                if join.joint and a.obj in self.result.poses and b.obj in self.result.poses:
                     self.add(Diagnostic.warning(
                         "joint_in_loop", f"join {join.join_id} closes a loop; joint {join.joint} is not derived from it",
                         subjects=[join.join_id], data={"joint": join.joint}))

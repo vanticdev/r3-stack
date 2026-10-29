@@ -199,6 +199,7 @@ def test_island_not_reaching_root_is_object_not_joined(tmp_path):
     project = bench(tmp_path, spec=drop)
     found = {d.subjects[0]: d for d in project.assembly.diagnostics if d.code == "object_not_joined"}
     assert set(found) == {"axle", "wheel"} and found["wheel"].data["island"] == ["axle", "wheel"]
+    assert "joint_in_loop" not in {d.code for d in project.assembly.diagnostics}
 
 
 def test_shaft_larger_than_bore_is_fit_out_of_range(tmp_path):
@@ -263,8 +264,10 @@ def test_clearance_hole_too_small_is_hole_size_mismatch(tmp_path):
 def test_tapped_to_tapped_is_hole_size_mismatch(tmp_path):
     def tapped(types):
         types["bench-plate"]["interfaces"]["axle_hole"]["params"]["holes"] = [[0, 0, "3 mm", "tapped", "4 mm"]]
-    diag = only(bench(tmp_path, catalog=tapped), "hole_size_mismatch")
+    project = bench(tmp_path, catalog=tapped)
+    diag = only(project, "hole_size_mismatch")
     assert (diag.data["a_kind"], diag.data["b_kind"]) == ("tapped", "tapped")
+    assert "fastener_length_invalid" not in {d.code for d in project.assembly.diagnostics}
 
 
 @pytest.mark.parametrize("fastener, min_mm, max_mm", [("M3x8", 9.0, 10.0), ("M3x12", 9.0, 10.0)])
