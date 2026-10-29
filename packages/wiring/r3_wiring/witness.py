@@ -356,7 +356,10 @@ def verify_clearances(diagnostics: list[Diagnostic], obstacles: ObstacleSet, rou
         if obstacle is None:
             out.append(diagnostic)
             continue
-        measurement = _measure_diagnostic(diagnostic, obstacle, routing, catalog, use_mujoco)
+        connector = obstacles.by_component(diagnostic.subjects[1]) if len(diagnostic.subjects) > 1 and \
+            diagnostic.code == "connector_clearance_violation" else None
+        measurement = _measure_diagnostic(diagnostic, obstacle, routing, catalog, use_mujoco,
+                                          connector_body=connector.shape if connector else None)
         if measurement is None:
             out.append(diagnostic)
             continue
@@ -380,10 +383,12 @@ def verify_clearances(diagnostics: list[Diagnostic], obstacles: ObstacleSet, rou
 
 
 def _measure_diagnostic(diagnostic: Diagnostic, obstacle: Obstacle, routing: Any, catalog: Any,
-                        use_mujoco: bool) -> Measurement | None:
+                        use_mujoco: bool, connector_body: Shape | None = None) -> Measurement | None:
     data = diagnostic.data
     if diagnostic.code == "connector_clearance_violation":
-        body = _connector_body(diagnostic, routing, catalog)
+        # Use the same posed model as the checker, including each individual
+        # cable-side half; the old pair box cannot verify detailed housings.
+        body = connector_body if connector_body is not None else _connector_body(diagnostic, routing, catalog)
         if body is None:
             return None
         return measure(obstacle, body.surface_points(0.001), 0.0, swept=True, router_value=data.get("min_distance"),
