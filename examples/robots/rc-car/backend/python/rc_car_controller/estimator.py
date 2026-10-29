@@ -145,8 +145,11 @@ class VehicleEstimator:
         self.cov = [[p[i][j] + krk[i][j] for j in range(N)] for i in range(N)]
         return True
 
-    def update_gps_position(self, x: float, y: float, hdop: float | None = None) -> bool:
-        sigma = self.config.gps_position_sigma_m * max(1.0, hdop or 1.0)
+    def update_gps_position(self, x: float, y: float, hdop: float | None = None, sigma: float | None = None) -> bool:
+        """``sigma``: 1-sigma horizontal error per axis of this fix (m), e.g. from GST for an RTK solution;
+        default is the configured standalone sigma scaled by HDOP."""
+        if sigma is None:
+            sigma = self.config.gps_position_sigma_m * max(1.0, hdop or 1.0)
         if not self.position_initialised:
             self.state[X], self.state[Y] = x, y
             self.cov[X][X] = self.cov[Y][Y] = sigma ** 2

@@ -72,6 +72,8 @@ components:
       pi_4: {kind: hole_pattern, origin: [9 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       rx_pad: {kind: adhesive_pad, origin: [70 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       gps_pad: {kind: adhesive_pad, origin: [-65 mm, 30 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      # RTCM correction radio, case on edge along the right deck edge (antenna jack forward).
+      rtk_radio_pad: {kind: adhesive_pad, origin: [46.5 mm, -49.15 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       mast: {kind: hole_pattern, origin: [55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
   - id: standoff-m3-47
     kind: structure
@@ -264,6 +266,8 @@ components:
       output_r: {kind: bore, origin: [0, -33 mm, 27 mm], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6.02 mm, depth: 10 mm, flat_offset: 2.51 mm}}
       spur_shaft: {kind: shaft, origin: [29.93 mm, -45 mm, 34 mm], z: [0, -1, 0], x: [1, 0, 0], params: {d: 5 mm, length: 8 mm}, description: "Spur-gear shaft extension through the gear cover: turns at 2.4727 x the differential carrier"}
       encoder: {kind: hole_pattern, origin: [29.93 mm, -45 mm, 20 mm], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[3.5 mm, 0, 2 mm, tapped, 10 mm], [-3.5 mm, 0, 2 mm, tapped, 10 mm]]}}
+      # Flat case lid (55 x 60.5 mm), the highest clear surface at the rear: open sky for a GNSS antenna.
+      lid_pad: {kind: adhesive_pad, origin: [2.5 mm, -0.25 mm, 60 mm], z: [0, 0, 1], x: [1, 0, 0]}
     behavior:
       model: gearbox.differential
       params: {ratio: 9.066, efficiency: 0.88, backlash: 0.02, output_inertia: 4.0e-5, pinion_teeth: 18, spur_teeth: 66, module: 0.6 mm,
@@ -647,6 +651,111 @@ components:
       - {bus: uart, protocol: nmea-0183, params: {baud: 115200, sentences: [GGA, RMC, VTG]}}
     interfaces:
       bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+  - id: gnss-rtk-zed-f9p
+    kind: sensor
+    cad_name: GNSS RTK rover ZED-F9P
+    name: u-blox ZED-F9P multi-band RTK GNSS rover with integrated helical antenna
+    manufacturer: Holybro
+    part_number: H-RTK F9P Ultralight (u-blox ZED-F9P-04B)
+    description: >
+      Frame at the bottom-face centre; the helical antenna's phase centre is on the +z axis. UART1 (J1) carries NMEA to
+      the computer; UART2 (J2) takes RTCM3 corrections straight from the correction radio (CFG-UART2INPROT-RTCM3X).
+    mechanical:
+      shape: box
+      size: [36.5 mm, 47 mm, 16 mm]
+      mass: 0.0214
+      color: "#2b2b2b"
+      provenance: {status: estimated, source: "Holybro H-RTK F9P Ultralight: 21.4 g (Holybro product page); footprint 47 x 36.5 mm
+                                                (Unmanned Systems Technology listing; Holybro gives only a drawing)", notes: "height 16 mm estimated"}
+    pins:
+      5V: {role: power_in, voltage_nominal: 5.0, voltage_min: 4.75, voltage_max: 5.25, current_max: 0.15}
+      GND: {role: ground}
+      TX: {role: uart_tx, logic_level: 3.3}
+      RX: {role: uart_rx, logic_level: 3.3}
+      TX2: {role: uart_tx, logic_level: 3.3}
+      RX2: {role: uart_rx, logic_level: 3.3}
+    connectors:
+      # Holybro GH cable modelled as an integral pigtail (the receiver's own lead), as for the previous M10 module.
+      J1: {type: integral, position: [18.25 mm, 8 mm, 5 mm], direction: [1, 0, 0], pins: {"1": 5V, "2": RX, "3": TX, "4": GND}}
+      J2: {type: integral, position: [18.25 mm, -8 mm, 5 mm], direction: [1, 0, 0], pins: {"1": 5V, "2": RX2, "3": TX2, "4": GND}}
+    behavior:
+      model: gps.rtk
+      params:
+        update_rate: 10 Hz            # RTK navigation rate (datasheet: 7-20 Hz by constellation set; GPS+GAL+BDS assumed)
+        baud: 115200                  # UART1, Holybro default
+        uart2_baud: 57600             # UART2 configured to the correction radio's serial rate
+        horizontal_cep: 1.5           # standalone PVT, m CEP (datasheet)
+        rtk_cep: 0.01                 # RTK fixed, m CEP (datasheet: 0.01 m + 1 ppm)
+        rtk_ppm: 1.0e-6               # baseline-proportional RTK error (datasheet: + 1 ppm)
+        rtk_convergence_time: 10 s    # datasheet: RTK convergence < 10 s (multi-constellation)
+        float_cep: 0.3                # RTK float accuracy before ambiguity fix, m CEP (estimate)
+        dgnss_timeout: 60 s           # CFG-NAVSPG-CONSTR_DGNSSTO default: max age of corrections still used
+        rtk_fix_max_age: 10 s         # corrections older than this drop a fixed solution to float (estimate)
+        rtk_age_drift: 0.002          # RTK error growth with correction age, m/s per axis (estimate)
+        velocity_noise: 0.05          # datasheet velocity accuracy 0.05 m/s
+        cold_start: 25 s              # datasheet cold TTFF 24-25 s
+        current: 0.12                 # module 68 mA + LNA/compass/regulator at 5 V (estimate)
+        nmea_high_precision: true     # CFG-NMEA-HIGHPREC: 7 decimal minutes in GGA/RMC (~0.2 mm)
+        rtcm_inputs: [1005, 1006, 1074, 1077, 1084, 1087, 1094, 1097, 1124, 1127, 1230]
+        constellations: [GPS, Galileo, BeiDou]
+      provenance: {status: datasheet, source: "u-blox ZED-F9P-04B data sheet UBX-21044850 (RTK 0.01 m + 1 ppm CEP, PVT 1.5 m CEP,
+                                                 RTK convergence < 10 s, velocity 0.05 m/s, RTCM 3.3 inputs); u-blox F9 HPG interface
+                                                 description (CONSTR_DGNSSTO 60 s); Holybro H-RTK F9P Ultralight (UART 115200 default)",
+                   notes: "float accuracy, fix hold age, age drift and current are estimates"}
+    software:
+      - {bus: uart, protocol: nmea-0183, params: {baud: 115200, sentences: [GGA, RMC, VTG, GST]}}
+      - {bus: uart, protocol: rtcm3, params: {baud: 57600, port: UART2, direction: input}}
+    interfaces:
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+  - id: telemetry-sik-915-100mw
+    kind: radio
+    cad_name: SiK telemetry radio 915
+    name: SiK telemetry radio V3, 915 MHz, 100 mW (RTCM correction link)
+    manufacturer: Holybro
+    part_number: SiK Telemetry Radio V3 100mW 915MHz
+    description: >
+      Frame at the bottom-face centre of the case (53 mm along x); the RP-SMA antenna port is at +x, the JST-GH 6 serial
+      port at -x. The 2 dBi hinged dipole stands vertical. `side` is the 53 x 10.7 mm face for mounting the case on edge.
+    mechanical:
+      shape: box
+      size: [53 mm, 28 mm, 10.7 mm]
+      mass: 0.0235
+      color: "#1f3f5f"
+      provenance: {status: datasheet, source: "Holybro SiK Telemetry Radio V3 docs: 28 x 53 x 10.7 mm without antenna, 23.5 g with antenna"}
+    pins:
+      5V: {role: power_in, voltage_nominal: 5.0, voltage_min: 4.5, voltage_max: 5.5, current_max: 0.1}
+      GND: {role: ground}
+      TX: {role: uart_tx, logic_level: 3.3}
+      RX: {role: uart_rx, logic_level: 3.3}
+    connectors:
+      # GH-6: 1 5V, 2 RX (data in), 3 TX (data out), 4 CTS, 5 RTS, 6 GND (straight-through to a PX4 TELEM port; flow control unused).
+      J1: {type: integral, position: [-26.5 mm, 0, 5.35 mm], direction: [-1, 0, 0], pins: {"1": 5V, "2": RX, "3": TX, "6": GND}}
+    behavior:
+      model: telemetry.sik
+      params:
+        frequency: 915 MHz
+        band: [902 MHz, 928 MHz]      # datasheet; SiK firmware hops NUM_CHANNELS over MIN_FREQ..MAX_FREQ
+        hop_channels: 50              # SiK firmware default NUM_CHANNELS
+        tx_power_dbm: 20              # datasheet max (100 mW)
+        antenna_gain_dbi: 2.0         # datasheet (supplied dipole)
+        air_rate: 64000               # bit/s, SiK default AIR_SPEED 64
+        sensitivity_dbm: -105         # datasheet at 64 kbps (-121 dBm at 2 kbps)
+        sensitivity_ber: 0.001        # sensitivity reference bit-error rate (Si10xx radio datasheet convention; estimate)
+        noise_figure_db: 6            # estimate
+        serial_baud: 57600            # datasheet default
+        max_packet_bytes: 252         # SiK firmware MAX_PACKET_LENGTH
+        tdm_overhead_s: 0.004         # preamble, sync word, header and turnaround per transmit window (estimate)
+        antenna_port: [31.5 mm, 0, 5.35 mm]   # RP-SMA jack, component frame
+        antenna_feed_height: 0.06     # dipole centre above the jack, hinged vertical (estimate)
+        current_active: 0.1           # datasheet transmit current at 20 dBm (receive 25 mA); worst case
+      provenance: {status: datasheet, source: "Holybro SiK Telemetry Radio V3 docs (902-928 MHz, 20 dBm, 2 dBi, -105 dBm @ 64 kbps,
+                                                 57600 baud default, 100 mA TX / 25 mA RX at 5 V); SiK firmware defaults",
+                   notes: "BER reference, noise figure, TDM overhead and antenna height are estimates"}
+    software:
+      - {bus: uart, protocol: sik-transparent, params: {baud: 57600}}
+    interfaces:
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      side: {kind: adhesive_pad, origin: [0, -14 mm, 5.35 mm], z: [0, -1, 0], x: [1, 0, 0]}
   - id: hall-encoder-a1120
     kind: sensor
     cad_name: Hall encoder board

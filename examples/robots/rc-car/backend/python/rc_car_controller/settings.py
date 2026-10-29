@@ -49,6 +49,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "telemetry_rate_hz": 5,
     "imu_calibration_s": 0.5,
     "require_gps_fix_to_arm": True,
+    "require_rtk_fix_to_arm": True,      # autonomy arms only on an RTK fixed solution (GGA quality 4; the RC car has an RTK rover)
+    # 1-sigma horizontal position error per axis (m) by GGA fix quality when no matching GST is available:
+    # 1 GNSS (CEP 1.5 m / 1.1774), 2 DGNSS, 4 RTK fixed (CEP 0.01 m + 1 ppm), 5 RTK float.
+    "gps_sigma_by_quality_m": {"1": 1.3, "2": 0.6, "4": 0.02, "5": 0.4},
     "initial_heading_deg": 0.0,          # ENU, CCW from east; car faces +x at start
     "link_degraded_lq": 70,              # uplink LQ (%) below which autonomy slows down
     "link_degraded_speed_mps": 2.0,

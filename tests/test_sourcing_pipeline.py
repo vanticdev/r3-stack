@@ -149,7 +149,7 @@ def test_pins_are_reproducible_and_guarded(tmp_path, monkeypatch):
     path.unlink()
     assert "sourcing_catalog_missing" in {d.code for d in sourcing.check_pins(Project.load(root))}
     assert sourcing.unpin(root, "pi")["removed"]["name"] == "Raspberry Pi 5 (8 GB)"
-    assert Project.load(root).spec.components["pi"].type == "raspberry-pi-5-8gb"
+    assert Project.load(root).spec.components["pi"].type == "raspberry-pi-5-4gb"  # back to the authored type
 
 
 def test_source_only_slot_uses_a_template_by_connectors(tmp_path, monkeypatch):

@@ -178,6 +178,10 @@ def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | N
     out_dir.mkdir(parents=True, exist_ok=True)
     wall_start = time.monotonic()
     kernel = CoSimKernel(project, scenario, seed=seed)
+    radio_cache = kernel.prepare_radio()
+    if progress and radio_cache:
+        progress(f"{scenario_id}: radio path cache " + ", ".join(f"{k} {v['traced']}/{v['keys']} cells in {v['seconds']} s"
+                                                               for k, v in radio_cache.items()))
     setup = time.monotonic() - wall_start
     diagnostics = list(kernel.diagnostics)
     server = TwinHalServer(kernel)
@@ -244,6 +248,7 @@ def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | N
     software.kill("scenario_end")
     server.close()
     wall = time.monotonic() - wall_start
+    kernel.save_radio_cache()
 
     outcome = _finish(project, scenario, kernel, server, software, diagnostics, out_dir, render, wall, hung, setup)
     return outcome
@@ -361,6 +366,7 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
     }
     metrics.update(radio_metrics(radio, rec, project.spec.requirements.radio_range, h_rx))
     metrics.update(_loss_breakdown(project, kernel, rec))
+    metrics.update(_gnss_metrics(kernel, rec))
     diagnostics.extend(_sensor_capability(project, kernel, scenario))
     passed = all(c.passed for c in checks) and not any(d.severity.value == "error" and d.code in ("software_not_connected", "software_hung")
                                                        for d in diagnostics)
@@ -386,6 +392,11 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
 
     for path in plot_all(rec, context, out_dir):
         artifacts.append((rel(path), "plot_png", path.stem.replace("_", " ")))
+    if kernel.rtk_link is not None:
+        from .rtk_plots import plot_rtk
+
+        path = plot_rtk(rec, kernel.rtk_link, out_dir)
+        artifacts.append((rel(path), "plot_png", "RTK solution mode, correction age and 915 MHz link budget"))
     coverage = plot_coverage(radio, rec, context, out_dir, project.build_dir("sim") / "radio", h_rx)
     if coverage is not None:
         artifacts.append((rel(coverage), "plot_png", f"radio coverage map ({radio.model.label})"))
@@ -497,20 +508,44 @@ def _loss_breakdown(project: Project, kernel: CoSimKernel, rec: dict[str, np.nda
                                               "spin_joint_damping": round(damping, 2)}}
 
 
+def _gnss_metrics(kernel: CoSimKernel, rec: dict[str, np.ndarray]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    stats = getattr(kernel.gps, "stats", None)
+    if callable(stats):
+        out.update(stats())
+    if kernel.rtk_link is not None:
+        out.update(kernel.rtk_link.stats(since=0.0))
+    return out
+
+
 def _sensor_capability(project: Project, kernel: CoSimKernel, scenario: Any) -> list[Diagnostic]:
     """Static check: can the navigation sensor meet the scenario's cross-track tolerance?
     A 2-D Gaussian GPS error with CEP50 has per-axis sigma = CEP / 1.1774; 95 % of
-    lateral errors stay within 1.96 sigma."""
+    lateral errors stay within 1.96 sigma. An RTK rover with a connected correction
+    link is judged on its RTK-fixed CEP, and on how much of the run it actually held a fix."""
     limit = (scenario.expect or {}).get("max_cross_track_error_m")
     if limit is None or kernel.gps is None:
         return []
-    lateral95 = 1.96 * kernel.gps.cep / 1.1774
+    out: list[Diagnostic] = []
+    if kernel.rtk_link is not None:
+        stats = kernel.gps.stats()
+        if stats["rtk_fixed_fraction"] < 0.9:
+            out.append(Diagnostic.warning(
+                "rtk_fix_degraded", f"{kernel.gps_id}: RTK fixed for only {100 * stats['rtk_fixed_fraction']:.1f} % of the epochs "
+                f"(float {100 * stats['rtk_float_fraction']:.1f} %, single {100 * stats['rtk_single_fraction']:.1f} %)",
+                subjects=[kernel.gps_id, scenario.id], data={k: float(v) for k, v in stats.items() if isinstance(v, (int, float))}))
+        cep = kernel.gps.rtk_cep
+    else:
+        cep = kernel.gps.cep
+    lateral95 = 1.96 * cep / 1.1774
+    if lateral95 <= float(limit):
+        return out
     if lateral95 <= float(limit):
         return []
-    return [Diagnostic.warning(
+    return out + [Diagnostic.warning(
         "gps_accuracy_insufficient",
-        f"{kernel.gps_id}: CEP {kernel.gps.cep} m gives a 95 % lateral error of {lateral95:.2f} m, above the "
+        f"{kernel.gps_id}: CEP {cep} m gives a 95 % lateral error of {lateral95:.2f} m, above the "
         f"{limit} m cross-track tolerance of {scenario.id}; GPS-only navigation cannot meet it reliably",
-        subjects=[kernel.gps_id, scenario.id], data={"cep_m": kernel.gps.cep, "lateral_error_95_m": round(lateral95, 3),
+        subjects=[kernel.gps_id, scenario.id], data={"cep_m": cep, "lateral_error_95_m": round(lateral95, 3),
                                                      "limit_m": float(limit)},
         hint="Use an RTK/dual-band receiver, fuse odometry against a surveyed start pose, or relax the tolerance.")]

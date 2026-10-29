@@ -29,13 +29,14 @@ import trimesh
 from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
 
-from .display import display_paths
+from .display import display_paths, overlaps
 from .frames import Frame
 from .models import ModelUnavailable, component_scene, connector_scene, export_glb, glb_digest
 from .pins import component_connector_frame, instance_frame
 
 STAGE = "connectors"
 PIN_TOLERANCE = 1e-4  # wire endpoint to pin, m
+DISPLAY_MERGED_FRACTION = 0.25  # share of a conductor core drawn inside its neighbour before a warning
 MATE_LATERAL_LIMIT = 1e-4  # m
 MATE_ANGLE_LIMIT = math.radians(1.0)
 MATE_GAP_LIMIT = 5e-4  # axial gap between mating faces before it is reported, m
@@ -328,6 +329,22 @@ class ConnectorStage:
             if wire_id in self.data["wires"]:
                 self.data["wires"][wire_id]["display_path"] = _r(path, 6)
                 self.data["wires"][wire_id]["od"] = diameters.get(wire_id)
+        merged = overlaps(self.display, self.routes["wires"], diameters)
+        self.data["checks"]["display_overlaps"] = [{**o, "min_distance": _r(o["min_distance"]),
+                                                    "required": _r(o["required"]), "fraction": _r(o["fraction"], 3)}
+                                                   for o in merged]
+        self.result.metrics["display_overlap_pairs"] = len(merged)
+        self.result.metrics["display_overlap_max_fraction"] = max((o["fraction"] for o in merged), default=0.0)
+        for o in merged:
+            if o["fraction"] > DISPLAY_MERGED_FRACTION or o["min_distance"] < 0.5 * o["required"]:
+                self.result.add(Diagnostic.warning(
+                    "wire_display_merged",
+                    f"{o['a']} and {o['b']} are drawn merged over {o['fraction'] * 100:.0f}% of the core "
+                    f"(closest {o['min_distance'] * 1e3:.2f} mm, conductor pitch {o['required'] * 1e3:.2f} mm)",
+                    subjects=[o["a"], o["b"]], data={"fraction": o["fraction"], "min_distance": o["min_distance"],
+                                                     "required": o["required"], "units": "m"},
+                    hint="Display geometry only (checks use the bundle radius); a sharp bend or a crossover "
+                         "inside the core keeps the cross-section from spreading there."))
 
     def verify_pi_header(self) -> None:
         """The catalog J8 pin map against the posts in the official Raspberry Pi 5 STEP."""

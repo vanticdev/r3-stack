@@ -125,7 +125,25 @@ export interface ProjectSummary {
     run_status?: RunStatusValue;
   } | null;
   onshape_url?: string | null;
+  /** Set when robot.yaml does not load: the concise `project_invalid` message. */
   error?: string | null;
+  /** The full `project_invalid` error body; `data` follows `ProjectInvalidData`. */
+  error_detail?: ApiErrorBody | null;
+}
+/** One problem of a project that does not load; `path` is the dotted field path (`components.gps.type`). */
+export interface ProjectLoadIssue {
+  path: string;
+  message: string;
+  type: string;
+}
+/** `data` of a `project_invalid` error: the first few issues, their total and the full text. */
+export interface ProjectInvalidData {
+  project?: string;
+  file?: string;
+  exception?: string;
+  errors: ProjectLoadIssue[];
+  total: number;
+  details: string;
 }
 export interface ProjectList {
   projects: ProjectSummary[];
@@ -378,10 +396,14 @@ export interface ModelGraph {
   diagnostics?: Diagnostic[];
 }
 /** `build/model/assembly.json` (assembly stage; absent for specs without `assembly:`). */
+export type AssemblyInterface = { component?: string; kind?: string } & (
+  { frame: number[][] } | { origin: Vec3; z: Vec3; x?: Vec3 }
+);
 export interface AssemblyJson {
   root?: string;
+  joints?: SpecJoint[];
   joins?: { id: string; a: string; b: string; kind: string; joint?: string | null }[];
-  interfaces?: Record<string, { component?: string; kind?: string; origin: Vec3; z: Vec3; x?: Vec3 }>;
+  interfaces?: Record<string, AssemblyInterface>;
   [key: string]: unknown;
 }
 export interface ModelComponent {

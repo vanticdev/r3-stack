@@ -76,4 +76,33 @@ the body edges did not converge: it varied by ±8 dB at 300 m between 0.4 M and 
 would be an installed-antenna pattern from a full-wave solver (for example openEMS), loaded as a Sionna antenna pattern.
 Diffuse scattering (ground roughness) is off.
 
+**Path cache.** Before the loop, `CoSimKernel.prepare_radio` predicts the cells the car will occupy (along the
+mission polyline, ±1 cell across it, every heading bucket through each corner) and traces the missing ones in
+worker processes (`SionnaPropagation.precompute`: CPU count − 2, at most 12). A precomputed cell is bit-identical
+to one traced in the loop (deterministic solver, same body pose; tested). Cells are saved per scene digest and
+solver settings in `build/sim/radio/scene_<digest>/paths_<key>.pkl`, so a rerun traces nothing.
+`R3_RADIO_CACHE=0` disables the persistent cache.
+
+## RTK GNSS and the correction link
+
+`simulation.environment.gnss_base` places an RTK base (a `gps.rtk` receiver in fixed-base mode plus a
+`telemetry.sik` radio) in the world. It streams RTCM 3.3 (`r3_sim.rtcm`): CRC-24Q framing, 1005 ARP and MSM7 with
+exact lengths and synthetic observables. The stream goes over a SiK 915 MHz TDM link (`r3_sim.correction_link`):
+FSK BER/PER from the datasheet sensitivity, Sionna RT at the hop frequency (ITU-R P.2040 fits extrapolated below
+1 GHz, labelled) or the analytic fallback, with its own shadowing. It reaches the rover's UART2, and only if the
+harness connects a radio TX to it (`rtk_corrections_not_connected` otherwise).
+
+The rover (`devices/gnss_rtk.py`) moves between single, RTK float and RTK fixed from the frames that arrive intact
+(base position, age of corrections, baseline; datasheet CEP 0.01 m + 1 ppm, convergence < 10 s). It reports GGA
+quality 4/5/1, age of differential, GST sigmas and high-precision NMEA. Base and rover run a 30 s warm-start pre-roll
+before t = 0. Evidence: `build/sim/<scenario>/rtk_gnss.png` and the `rtk_*` metrics.
+
+## Performance controls
+
+* `R3_SIM_OVERLAP=0`: MuJoCo step halves in the calling thread (default: a GIL-free worker thread overlaps them
+  with the circuit solve, the sensors and the cable-clearance measurement). Results are bit-identical.
+* `R3_MUJOCO_THREADS`: MuJoCo's per-step thread pool (default 4, 0 = serial). Bit-identical.
+* The cable clearance monitor measures the contact-listed cable/moving-part pairs exactly, by a bounding-sphere
+  branch and bound (same minimum as measuring every pair; tested).
+
 Simulation success does not imply hardware success; every summary lists its assumptions.

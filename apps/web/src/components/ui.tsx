@@ -5,7 +5,9 @@ import { ApiError } from "../api/client.ts";
 import type { EvidenceStatus, Severity } from "../api/types.ts";
 import { ratio } from "../lib/domain.ts";
 import { fmt, pct, timeAgo } from "../lib/units.ts";
+import { Markdown } from "./Markdown.tsx";
 import { Icon, type IconName } from "./icons.tsx";
+import { ProjectLoadError } from "./ProjectLoadError.tsx";
 
 export function Card({ title, subtitle, actions, children, flush, className = "" }: {
   title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; flush?: boolean; className?: string;
@@ -77,7 +79,9 @@ export function ErrorBox({ error }: { error: unknown }) {
   const api = error instanceof ApiError ? error : null;
   return (
     <div className="error-box" role="alert">
-      <strong>{api ? api.message : String((error as Error)?.message ?? error)}</strong>
+      {api?.code === "project_invalid"
+        ? <ProjectLoadError error={{ code: api.code, message: api.message, data: api.data }} />
+        : <Markdown>{api ? api.message : String((error as Error)?.message ?? error)}</Markdown>}
       {api && <div className="small"><code>{api.code}</code>{api.status ? ` · HTTP ${api.status}` : ""}</div>}
     </div>
   );

@@ -11,6 +11,7 @@ import {
   invalidateSourcing, sourcingApi, useSlots, useStoredSearch, type Candidate, type ParamMatch, type RankedCandidate, type Slot,
   type SourcingEvent, type Tier, type ValueStatus,
 } from "../api/sourcing.ts";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { Card, Chip, ConfirmDialog, Empty, ErrorBox, QueryView, Segmented, type Tone } from "../components/ui.tsx";
 import { timeAgo } from "../lib/units.ts";
@@ -323,7 +324,7 @@ function CandidateDetail({ entry, candidate }: { entry: RankedCandidate; candida
             {entry.twin.checks.map((check, i) => (
               <div key={i} className="diag">
                 <div className="row"><Chip tone={check.severity === "error" ? "critical" : check.severity === "warning" ? "warning" : "info"}>{check.check}</Chip><code className="small">{check.code}</code></div>
-                <span className="small">{check.message}</span>
+                <Markdown className="small">{check.message}</Markdown>
               </div>
             ))}
           </div>
@@ -346,7 +347,7 @@ function CandidateDetail({ entry, candidate }: { entry: RankedCandidate; candida
           {candidate.models.map((m) => <Link key={m.url} href={m.url}>{m.format === "pdf_drawing" ? "drawing" : m.format.replace("_", " ")}</Link>)}
           {!candidate.models.some((m) => m.format.startsWith("step")) && <Chip tone="muted">no vendor model: CAD proxy</Chip>}
         </div>
-        {candidate.notes.length > 0 && <div className="small muted">{candidate.notes.join(" ")}</div>}
+        {candidate.notes.length > 0 && <Markdown className="small muted">{candidate.notes.join("\n\n")}</Markdown>}
       </div>
     </div>
   );

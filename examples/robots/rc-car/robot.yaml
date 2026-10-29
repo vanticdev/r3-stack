@@ -57,8 +57,9 @@ components:
   knuckle_fr:  {type: steering-knuckle, params: {mirror: [1, -1, 1]}}
   stub_fl:     {type: stub-axle-6mm}
   stub_fr:     {type: stub-axle-6mm, params: {mirror: [1, -1, 1]}}
-  wheel_fl:    {type: wheel-110x45}
-  wheel_fr:    {type: wheel-110x45}
+  # Sourcing slots (`r3 source`): the type is the current part; a pinned choice in r3.lock.yaml replaces it.
+  wheel_fl:    {type: wheel-110x45, source: {group: front_wheels, requires: {kind: wheel, diameter: [100 mm, 115 mm], width: [40 mm, 50 mm], hub: 6 mm bore}}}
+  wheel_fr:    {type: wheel-110x45, source: {group: front_wheels, requires: {kind: wheel, diameter: [100 mm, 115 mm], width: [40 mm, 50 mm], hub: 6 mm bore}}}
   nut_fl:      {type: wheel-nut-m6-nyloc}
   nut_fr:      {type: wheel-nut-m6-nyloc}
   bs_kl:       {type: ball-stud-m3-5.8x8}
@@ -88,8 +89,9 @@ components:
   axle_rr:     {type: rear-axle-6mm-r, params: {mirror: [1, -1, 1]}}
   spacer_rl:   {type: wheel-spacer-6x9}
   spacer_rr:   {type: wheel-spacer-6x9}
-  wheel_rl:    {type: wheel-110x45-d}
-  wheel_rr:    {type: wheel-110x45-d}
+  # Rear wheels drive through D-flats on the axle (6 mm D-bore hub).
+  wheel_rl:    {type: wheel-110x45-d, source: {group: rear_wheels, requires: {kind: wheel, diameter: [100 mm, 115 mm], width: [40 mm, 50 mm], hub: 6 mm d-bore}}}
+  wheel_rr:    {type: wheel-110x45-d, source: {group: rear_wheels, requires: {kind: wheel, diameter: [100 mm, 115 mm], width: [40 mm, 50 mm], hub: 6 mm d-bore}}}
   nut_rl:      {type: wheel-nut-m6-nyloc}
   nut_rr:      {type: wheel-nut-m6-nyloc}
   # Drivetrain encoder: four magnets on a carrier pressed onto the spur-shaft extension; the Hall board below it
@@ -112,7 +114,7 @@ components:
   pi_spacer_2: {type: spacer-m2.5-ff-10}
   pi_spacer_3: {type: spacer-m2.5-ff-10}
   pi_spacer_4: {type: spacer-m2.5-ff-10}
-  pi:          {type: raspberry-pi-5-8gb}
+  pi:          {type: raspberry-pi-5-4gb}  # owned by the user (Pi 5 4 GB): nothing to source
   pi_standoff_1: {type: hat-standoff-mf-m2.5-11}
   pi_standoff_2: {type: hat-standoff-mf-m2.5-11}
   pi_standoff_3: {type: hat-standoff-mf-m2.5-11}
@@ -123,11 +125,15 @@ components:
   cap_hat_3:   {type: screw-cap-m2.5-petg}
   cap_hat_4:   {type: screw-cap-m2.5-petg}
   tape_rx:     {type: foam-tape-3m-4026, params: {size: [11 mm, 9 mm, 1.6 mm]}}
-  receiver:    {type: elrs-receiver-2g4}
+  receiver:    {type: elrs-receiver-2g4, source: {requires: {kind: radio, protocol: crsf, band: 2.4 GHz, supply: [4.5 V, 5.5 V]}}}
   antenna_mast: {type: antenna-mast-petg}
   rx_antenna:  {type: elrs-t-antenna}
-  tape_gps:    {type: foam-tape-3m-4026, params: {size: [18 mm, 18 mm, 1.6 mm]}}
-  gps:         {type: gps-ublox-m10}
+  # RTK GNSS rover: standalone GNSS (1.5 m CEP) cannot hold the 1.5 m cross-track tolerance; RTK corrections from the
+  # base station (simulation.environment.gnss_base) arrive over the 915 MHz SiK link into the rover's UART2.
+  tape_gps:    {type: foam-tape-3m-4026, params: {size: [34 mm, 44 mm, 1.6 mm]}}
+  gps:         {type: gnss-rtk-zed-f9p}
+  tape_rtk_radio: {type: foam-tape-3m-4026, params: {size: [50 mm, 10 mm, 1.6 mm]}}
+  rtk_radio:   {type: telemetry-sik-915-100mw}
 
 # Join ids name the derived fasteners (<id> or <id>_<n>) and fit interfaces; `verify` holds the exact-geometry limits
 # the CAD fit checks apply (radial clearances/interferences, engagement lengths, retainers).
@@ -254,8 +260,10 @@ assembly:
     - {id: cap_hat_4, a: hat.cap_4, b: cap_hat_4.seat}
     - {id: rx_tape_bottom, a: deck.rx_pad, b: tape_rx.bottom}
     - {id: rx_tape_top, a: tape_rx.top, b: receiver.bottom}
-    - {id: gps_tape_bottom, a: deck.gps_pad, b: tape_gps.bottom}
+    - {id: gps_tape_bottom, a: gearbox.lid_pad, b: tape_gps.bottom}
     - {id: gps_tape_top, a: tape_gps.top, b: gps.bottom}
+    - {id: rtk_radio_tape_bottom, a: deck.rtk_radio_pad, b: tape_rtk_radio.bottom}
+    - {id: rtk_radio_tape_top, a: tape_rtk_radio.top, b: rtk_radio.side}
     # Antenna mast through-bolted to the PETG deck with nylocs underneath; antenna bonded to the mast top.
     - {id: mast_mount, a: deck.mast, b: antenna_mast.flange, clock: 0 deg, fasteners: {type: M3x12, nut: nut-m3-nyloc, head: b}}
     - {id: antenna_bond, a: antenna_mast.antenna_seat, b: rx_antenna.seat}
@@ -381,6 +389,17 @@ electrical:
         - {id: W_GPS_PI_RX, from: A.3, to: B.3, awg: 28, color: green, signal: GPS_RX}
         - {id: W_GPS_GND, from: A.4, to: B.4, awg: 28, color: black, signal: GND}
       route: {slack: 20 mm}
+    # RTCM3 corrections: correction radio TX -> rover UART2 RX; the radio is powered from the rover's 5 V input.
+    - id: rtk_radio_lead
+      connectors:
+        A: {type: integral, mates: gps.J2}
+        B: {type: integral, mates: rtk_radio.J1}
+      wires:
+        - {id: W_RTK_5V, from: A.1, to: B.1, awg: 28, color: red, signal: 5V}
+        - {id: W_RTK_RTCM, from: B.3, to: A.2, awg: 28, color: white, signal: RTCM}
+        - {id: W_RTK_TX2, from: A.3, to: B.2, awg: 28, color: green, signal: GPS_TX2}
+        - {id: W_RTK_GND, from: A.4, to: B.6, awg: 28, color: black, signal: GND}
+      route: {slack: 30 mm}
     - id: encoder_lead
       connectors:
         A: {type: integral, mates: encoder.J1}
@@ -403,7 +422,8 @@ cad:
   # Subassemblies of the Onshape document (the chassis plate sits in the top-level assembly).
   subassemblies:
     Rear drivetrain: [gearbox, motor, hub_rl, hub_rr, bearing_rl, bearing_rr, axle_rl, axle_rr, spacer_rl, spacer_rr,
-                      wheel_rl, wheel_rr, nut_rl, nut_rr, encoder, enc_ring, enc_magnet_1, enc_magnet_2, enc_magnet_3, enc_magnet_4]
+                      wheel_rl, wheel_rr, nut_rl, nut_rr, encoder, enc_ring, enc_magnet_1, enc_magnet_2, enc_magnet_3, enc_magnet_4,
+                      tape_gps, gps]
     Front steering L: [arm_fl, kp_fl, knuckle_fl, stub_fl, wheel_fl, nut_fl, bs_kl]
     Front steering R: [arm_fr, kp_fr, knuckle_fr, stub_fr, wheel_fr, nut_fr, bs_kr]
     Steering linkage: [servo_post_a, servo_post_b, servo, servo_output, servo_horn, bs_hl, bs_hr, tie_rod, tie_rod_r,
@@ -411,7 +431,7 @@ cad:
     Deck and electronics stack: [standoff_rl, standoff_rr, standoff_fl, standoff_fr, deck, cap_so_rl, cap_so_rr, cap_so_fl, cap_so_fr,
                                  pi_spacer_1, pi_spacer_2, pi_spacer_3, pi_spacer_4, pi, pi_standoff_1, pi_standoff_2, pi_standoff_3,
                                  pi_standoff_4, hat, cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, tape_rx, receiver, antenna_mast,
-                                 rx_antenna, tape_gps, gps]
+                                 rx_antenna, tape_rtk_radio, rtk_radio]
     Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc]
 
 software:
@@ -443,6 +463,7 @@ software:
     encoder_pulses_per_rev: 9.891     # 4 magnets on the spur shaft x 2.4727 spur rev per carrier (mean rear-wheel) rev
     traction: {enabled: true, yaw_assist_enabled: true, target_slip: 0.10, motor_current_limit_a: 50.0, launch_slew_per_s: 3.0,
                yaw_gain: 0.6, gear_ratio: 9.066}   # gear_ratio: 18T/66T x 2.4727 (rear transmission catalog)
+    require_rtk_fix_to_arm: true    # autonomy arms only on an RTK fixed solution (GGA quality 4)
     arm_channel: 5              # CRSF AUX channel that arms autonomy (>1700 us)
     crsf_channels: {steering: 1, throttle: 2, arm: 5}
 
@@ -456,6 +477,14 @@ simulation:
     terrain: flat-grass
     radio_transmitter: {position: [-2 m, 0, 1.2 m], power_dbm: 20, antenna_gain_dbi: 2.0}
     radio_environment: {model: sionna_rt, shadowing_sigma_db: 4.0, ground_permittivity: 15, interference_dbm: -100, gps_origin: [37.4275, -122.1697, 30.0]}
+    # RTK base station on a tripod beside the start: ZED-F9P in fixed-base mode at surveyed coordinates, RTCM3 MSM7
+    # at 1 Hz over a SiK 915 MHz radio. The course waypoints were recorded with this base, so its coordinate error is
+    # common to the course and the rover solution (survey_error 0 in that frame).
+    gnss_base:
+      receiver: gnss-rtk-zed-f9p
+      radio: telemetry-sik-915-100mw
+      position: [-4 m, -3 m, 1.6 m]
+      rtcm: {messages: {1005: 0.2 Hz, 1077: 1 Hz, 1097: 1 Hz, 1127: 1 Hz}}
     obstacles:
       - {id: cone_a, center: [12 m, 6 m, 0.15 m], size: [0.3 m, 0.3 m, 0.3 m], material: plastic}
   scenarios:

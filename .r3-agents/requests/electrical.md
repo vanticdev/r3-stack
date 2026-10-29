@@ -44,3 +44,30 @@ All are read today with defaults (recorded as `estimated_parameters` in
 - **Sim requests 1-2 are implemented** (`initial={"battery_soc": ...}` accepted by the
    constructor; `pulse_us <= 0` is signal loss for the ESC and the servo). Item 3: servo outputs
    now also carry `voltage`.
+
+## From lane C (finish): RTK rover + correction radio on the 5 V rail
+- `gps` is now `gnss-rtk-zed-f9p` (behavior `gps.rtk`, 0.12 A at 5 V, estimate; module 68 mA plus LNA/compass/regulator),
+  replacing the M10 (0.03 A). The SiK 915 MHz correction radio `rtk_radio` (behavior `telemetry.sik`, `current_active`
+  0.1 A, the datasheet TX worst case; 25 mA receive) is powered from the rover's 5 V pin through `rtk_radio_lead`.
+  Total added load on the HAT 5 V rail: about +0.19 A. Both are registered as constant loads in
+  `r3_sim/electrical/models/__init__.py` (two lines). Please re-verify the 5 V budget and the gps_lead
+  (28 AWG) drop.
+- **Fuse opening (lane C made a minimal blocking change in `electrical/models/fuse.py`):** the ideal `sw` switch
+  jumped from 7 mOhm to 1 GOhm in one step while ~100 A flowed into the harness inductance. ngspice then stalled
+  ("Timestep too small ... trouble with node v.xpi.vr0#branch" at the fuse-melt instant) once the RTK loads shifted
+  the timing slightly, in `test_fuse_blows_on_short_and_pi_browns_out` on a fresh copy. The element is now a
+  conductance blend G_cold (1 - x) + G_open x, with x the melted latch through an RC of `clearing_time` (default 50 us,
+  an estimate of a blade fuse's melt/arc interval; overridable as a fuse behavior param). Please review; an arc-voltage
+  model would be the next refinement (and item 24, the HAT bulk capacitance, still stands).
+- **Test-order leak (pre-existing; it reproduces on 70bef0e):** running `tests/test_electrical_system.py` before
+  `tests/test_electrical_stage.py` in one process makes the stage's `motor_stall@full` battery current come out
+  ~1 A (should be > 10 x cruise). Some state persists across ElectricalSystem instances (ngspice library state, or a
+  mutated cached catalog object). Alphabetical order hides it.
+- **top_speed_failsafe now fails, a real finding (lane C: the pilot maps full stick to the CRSF limit 2012 us, item
+  14):** at true full stick the car reaches 8.458 m/s (it was capped at 8.045 m/s by the 2000 us = 97.6 % mapping), and the
+  radio-failsafe stop then takes 9.608 m from 8.45 m/s against `failsafe_stop_distance_at_top_speed: 9 m` (that
+  requirement was derived from 6.0-7.1 m at 8.0 m/s). The requirement was not changed. Options: stronger braking (ESC
+  brake strength / drag brake), a shorter software failsafe, or a manual-mode throttle ceiling. `full_throttle`
+  passes at 8.458 m/s (item 15's margin concern is gone).
+- **pi_hang** still fails: 5.482 m against 3 m (item 21, the arbiter outputs neutral, not brake). **steering_sweep**:
+  W_Y_P_IN to motor clearance -2.2 mm (a lane A route). Both are as found; nothing in lane C changed them.

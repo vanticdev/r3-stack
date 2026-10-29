@@ -5,7 +5,9 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client.ts";
 import { keys, useProjects } from "../api/hooks.ts";
 import type { ProjectSummary } from "../api/types.ts";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
+import { ProjectLoadError } from "../components/ProjectLoadError.tsx";
 import { Card, Dialog, Empty, ErrorBox, QueryView } from "../components/ui.tsx";
 import { stageLabel } from "../lib/labels.ts";
 import { countsText, listLabels } from "../lib/status.ts";
@@ -20,6 +22,7 @@ function ProjectStatusLine({ p }: { p: ProjectSummary }) {
   const run = p.last_run;
   const failed = Object.entries(p.stages).filter(([, s]) => s === "failed").map(([stage]) => stageLabel(stage));
   const to = `/p/${encodeURIComponent(p.id)}`;
+  if (p.error_detail) return <div className="status"><ProjectLoadError error={p.error_detail} compact /></div>;
   if (p.error) return <div className="status"><span style={{ color: "var(--critical)" }}>{p.error}</span></div>;
   if (!run) return <div className="status"><span className="muted">Not run yet</span></div>;
   return (
@@ -54,7 +57,7 @@ export function ProjectsPage() {
                         <span className="muted small">{p.id}{p.version ? ` · v${p.version}` : ""}</span>
                       </div>
                       <div className="actions"><Link className="button" to={`/p/${encodeURIComponent(p.id)}/overview`}>Open</Link></div>
-                      {p.description && <span className="desc" title={p.description}>{p.description.split("\n")[0]}</span>}
+                      {p.description && <span className="desc" title={p.description}><Markdown inline>{p.description.split("\n")[0] ?? ""}</Markdown></span>}
                       <ProjectStatusLine p={p} />
                     </div>
                   ))}

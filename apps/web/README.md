@@ -17,7 +17,7 @@ npm run dev:mock       # dev server that always uses the mock API
 npm run build          # type-check + production build -> apps/web/dist (served by `r3 serve`)
 npm run preview        # serve dist/ with the same /api routing as the dev server
 npm run typecheck      # tsc -b over the app, the mock layer and the e2e tests
-npm test               # vitest unit tests (src/**/*.test.ts)
+npm test               # vitest unit tests (src/**/*.test.{ts,tsx})
 npm run test:e2e       # Playwright smoke test, headless Chromium (builds first)
 npm run check          # typecheck + unit + e2e
 ```
@@ -135,6 +135,16 @@ All project pages live under `#/p/<pid>/...`:
 Live updates: run and agent SSE streams invalidate the project's queries when stages, runs and
 sessions finish.
 
+Narrative text uses `src/components/Markdown.tsx` (`react-markdown`, `remark-gfm`,
+`rehype-sanitize`): agent messages and tool results, diagnostics, evidence notes, descriptions and
+setup/deploy guidance. Raw HTML is skipped, unsafe URLs are removed, links open with opener
+protection, and images appear as alt-text labels to avoid remote loads and layout shifts. Code
+fences have copy controls; wide tables scroll inside their container. Compact labels use the
+component's `inline` mode, which keeps emphasis/code and unwraps links and block elements so it
+can safely sit inside a button. Keep identifiers, logs, diffs and tool-call JSON as plain text.
+The renderer and transcript entries are memoized; unfinished Markdown renders synchronously
+without replacing completed message DOM as new events arrive.
+
 ## Layout
 
 ```
@@ -154,6 +164,9 @@ e2e/            Playwright smoke test;  tests/  Node loader test used by tests/t
   and rest poses, Ackermann steering, the exploded view, SSE parsing, the run-event reducer, binding
   pin maps, PCB pin maps, release-gate precedence and formatting, wiring rows, route-hint patches,
   and the diff and CSV helpers.
+  The jsdom Markdown tests also cover GFM, copy controls, safe links, HTML/URL sanitization and
+  partial streaming input. `e2e/markdown.spec.ts` intercepts the Agent API with a deterministic
+  transcript and saves `test-results/screenshots/agent-markdown-{1600,390}-{light,dark}.png`.
 - **E2E:** `npm run test:e2e`. It builds the app and serves it with `vite preview` on the mock API.
   It loads every page at 1600 px and 390 px in the dark and light themes and checks for console
   errors. It also drives the status summary and the mobile drawer, the create dialog, the 3D parts

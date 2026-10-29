@@ -229,6 +229,15 @@ tbody tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .empty { display: grid; place-items: center; gap: 8px; padding: 36px 16px; color: var(--text-muted); text-align: center; }
 .error-box { padding: 10px 12px; border-radius: 6px; border: 1px solid var(--critical); background: var(--critical-bg); color: var(--text-primary); }
 .error-box code { color: var(--text-secondary); }
+.load-error { display: grid; gap: 6px; min-width: 0; }
+.load-error-message { color: var(--critical); }
+.error-box .load-error-message { color: var(--text-primary); }
+.load-error-issues { margin: 0; padding-left: 18px; display: grid; gap: 2px; font-size: 12.5px; }
+.load-error-issues li { overflow-wrap: anywhere; }
+.load-error-issues code { margin-right: 6px; color: var(--text-primary); }
+.load-error pre.code { max-height: 280px; white-space: pre-wrap; }
+.load-error.compact .load-error-issues { font-size: 12px; }
+.project-row .status .load-error { flex: 1 1 100%; }
 .skeleton { background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 6px; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 
@@ -695,6 +704,39 @@ tr.mismatch td { background: var(--critical-bg); }
   .composer.docked { bottom: -24px; }
 }
 .agent-page.no-history { grid-template-columns: minmax(0, 1fr); }
+
+/* Shared Markdown prose: theme colours come from the surrounding design tokens. */
+.markdown { min-width: 0; max-width: 100%; line-height: 1.6; white-space: normal; overflow-wrap: anywhere; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p, .markdown ul, .markdown ol, .markdown blockquote, .markdown .markdown-table, .markdown .markdown-code { margin: 0.65em 0; }
+.markdown :is(h1, h2, h3, h4, h5, h6) { margin: 1em 0 0.4em; color: inherit; font-weight: 650; line-height: 1.35; text-transform: none; letter-spacing: -0.01em; }
+.markdown h1 { font-size: 1.3em; }
+.markdown h2 { font-size: 1.2em; }
+.markdown h3 { font-size: 1.1em; }
+.markdown :is(h4, h5, h6) { font-size: 1em; }
+.markdown :is(ul, ol) { padding-left: 1.6em; }
+.markdown li + li { margin-top: 0.2em; }
+.markdown li > p { margin: 0.3em 0; }
+.markdown .contains-task-list { list-style: none; padding-left: 0.3em; }
+.markdown .task-list-item > input { margin-right: 0.5em; }
+.markdown blockquote { border-left: 3px solid var(--line-strong); padding: 0.2em 1em; color: var(--text-secondary); }
+.markdown a { text-decoration: underline; text-underline-offset: 2px; }
+.markdown code { font: 0.92em/1.5 var(--mono); background: var(--surface-3); border-radius: 4px; padding: 0.1em 0.3em; white-space: pre-wrap; overflow-wrap: anywhere; }
+.markdown-code { border: 1px solid var(--line); border-radius: 6px; background: var(--surface-1); overflow: hidden; }
+.markdown-code-head { display: flex; justify-content: space-between; align-items: center; padding: 3px 8px; border-bottom: 1px solid var(--line); color: var(--text-muted); font-size: 11px; min-height: 28px; }
+.markdown-code-head button { min-width: 80px; justify-content: center; }
+.markdown .markdown-code pre { margin: 0; padding: 10px 12px; max-height: none; border: 0; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2; }
+.markdown pre code { padding: 0; border: 0; border-radius: 0; background: none; }
+.markdown-table { max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; border: 1px solid var(--line); border-radius: 6px; }
+.markdown table { width: 100%; border-collapse: collapse; font-size: inherit; }
+.markdown :is(th, td) { padding: 6px 10px; border: 1px solid var(--line); white-space: normal; min-width: 100px; max-width: 32em; overflow-wrap: anywhere; }
+.markdown th { background: var(--surface-3); color: var(--text-primary); font-weight: 650; }
+.markdown tbody tr:nth-child(even) { background: var(--surface-1); }
+.markdown hr { border: 0; border-top: 1px solid var(--line); margin: 1em 0; }
+.markdown-inline { display: inline; }
+.transcript, .transcript > .stack { min-width: 0; }
+.tool-result { padding: 10px 12px; border-top: 1px solid var(--line); }
 .choices.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .choice .text strong { font-weight: 600; }
 .choice .text span { font-weight: 400; }
