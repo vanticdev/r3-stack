@@ -18,6 +18,7 @@ import {
 } from "../lib/transforms.ts";
 import { humanize } from "../lib/units.ts";
 import { cssVar, useThemeVersion } from "../state/prefs.ts";
+import { ConnectorLayer, detailedComponents } from "./ConnectorLayer.tsx";
 import { RouteEditor, type RouteEditState } from "./RouteEditor.tsx";
 import type { RobotData } from "./useRobotScene.ts";
 
@@ -39,6 +40,8 @@ export interface ViewOptions {
   joints: boolean;
   xray: boolean;
   issues: boolean;
+  /** Detailed component models, connector bodies and individual pins (build/connectors). */
+  connectors: boolean;
   explode: number;
 }
 
@@ -48,7 +51,7 @@ export interface PlaybackState {
   follow: boolean;
 }
 
-const DEFAULT_OPTIONS: ViewOptions = { wires: true, hardware: true, interference: false, interfaces: false, joins: false, joints: false, xray: false, issues: false, explode: 0 };
+const DEFAULT_OPTIONS: ViewOptions = { wires: true, hardware: true, interference: false, interfaces: false, joins: false, joints: false, xray: false, issues: false, connectors: true, explode: 0 };
 const IDENTITY = new Matrix4();
 const HIGHLIGHT = new Color("#f97316");
 const SELECTED = new Color("#3987e5");
@@ -464,6 +467,9 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
   const dark = themeVersion !== "light";
   const hovered = hover ? data.components.find((c) => c.id === hover) ?? data.wires.find((w) => w.id === hover) : null;
   const meshCount = data.components.filter((c) => data.meshes[c.id]).length;
+  const showConnectors = !!data.connectors && options.connectors && !playback;
+  const detailed = useMemo(() => (showConnectors ? detailedComponents(data.connectors ?? null) : new Set<string>()), [showConnectors, data.connectors]);
+  const selectedHarness = selected?.kind === "wire" ? data.connectors?.wires[selected.id]?.harness ?? null : null;
 
   return (
     <div className="viewer" data-testid="robot-viewer">
@@ -476,6 +482,10 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
           {!playback && <button className={options.joints ? "on" : ""} onClick={() => toggle("joints")} title="Joint axes and sliders">Joints</button>}
           <button className={options.xray ? "on" : ""} onClick={() => toggle("xray")} title="See-through parts">X-ray</button>
           <button className={options.issues ? "on" : ""} onClick={() => toggle("issues")} title="Tint parts with error diagnostics">Issues</button>
+          {data.connectors && !playback && (
+            <button className={options.connectors ? "on" : ""} onClick={() => toggle("connectors")}
+                    title="Vendor/KiCad models, connector bodies and individual pins (hover a pin for its signal)">Pins</button>
+          )}
           {data.interference.length > 0 && !playback && (
             <button className={options.interference ? "on" : ""} onClick={() => toggle("interference")} title="Envelope overlaps found by the model stage">
               Interference <span className="badge critical">{data.interference.length}</span>
@@ -531,7 +541,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         <Grid rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -0.0005]} cellSize={0.01} sectionSize={0.1} infiniteGrid fadeDistance={4}
               fadeStrength={1.4} cellColor={dark ? "#2e2e2a" : "#d6d5cf"} sectionColor={dark ? "#45453f" : "#b5b4ad"} cellThickness={0.6} sectionThickness={1} />
 
-        {data.components.map((c) => (
+        {data.components.filter((c) => !detailed.has(c.id)).map((c) => (
           <Part key={c.id} c={c} url={data.meshes[c.id]} matrix={playback ? IDENTITY : matrices[c.id] ?? IDENTITY} state={stateOf(c.id)}
                 xray={options.xray} error={options.issues && !anyFocus && errorParts.has(c.id)} edge={dark ? "#77766f" : "#3a3a36"} register={register} onSelect={onSelect} onHover={setHover} />
         ))}
@@ -550,6 +560,10 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
             <meshBasicMaterial color="#d03b3b" transparent opacity={0.45} depthWrite={false} />
           </mesh>
         ))}
+        {showConnectors && data.connectors && data.connectorAsset && (
+          <ConnectorLayer data={data.connectors} assetUrl={data.connectorAsset} matrices={matrices} harness={selectedHarness}
+                          showBodies showPins={options.explode < 0.02} ghost={(id) => stateOf(id) === "ghost" || (options.xray && stateOf(id) === "normal")} />
+        )}
         {options.interfaces && <InterfacesOverlay data={data} matrices={playback ? {} : matrices} />}
         {options.joins && <JoinsOverlay data={data} matrices={playback ? {} : matrices} />}
         {!playback && options.joints && <JointsOverlay data={data} positions={positions} />}
