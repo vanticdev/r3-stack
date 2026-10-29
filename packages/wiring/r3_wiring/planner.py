@@ -1,0 +1,1202 @@
+"""Curvature-constrained harness planning: a constrained elastic band solved by SciPy.
+
+The voxel router (:mod:`r3_wiring.router`) finds the topology and a collision-free
+corridor, but its paths are polylines whose corners are filleted afterwards, so
+bend radius is only *checked*, never guaranteed. :func:`plan_bundle` turns a
+routed bundle graph into a buildable one: every bundle segment becomes a chain
+of points that SciPy's SLSQP moves to minimise length (plus a term that keeps
+the bundle within tie reach of structure) subject to
+
+* **curvature**: the circle through every three consecutive points has radius
+  ``>= R_min`` (the bundle's catalog factor x OD). With edges ``a = |u|``,
+  ``b = |v|`` and chord ``c = |u + v|`` the circumradius is
+  ``R = a b c / (2 |u x v|)``, so the constraint is ``a b c - 2 R_min |u x v| >= 0``
+  (plus ``u . v >= 0``, which rules out reversals where ``|u x v| -> 0``);
+* **tangency at junctions**: every junction (connector exit, splice sleeve,
+  breakout, pass-through, floating mated pair, cable support) has one axis;
+  segments leave it along ``+axis`` or ``-axis`` (wires that pass through a
+  junction keep a continuous tangent, so a breakout leaves its trunk
+  tangentially). A circular arc of radius ``R_min`` tangent to the axis reaches
+  the first point at a chord angle of ``asin(l / 2 R_min)``, which bounds the
+  first edge's angle to the axis;
+* **clearance**: the router's static distance field (trilinear, 3 mm voxels)
+  ``>= r + margin`` and the moving-parts swept field ``>= r +
+  requirements.min_wire_clearance_moving``. Points inside a connector's
+  termination zone may not get closer than the routed path already was;
+* **edge length**: edges at most 1.6x the nominal spacing (no sparse chords
+  across obstacles).
+
+Decision variables are optimised *jointly*: the interior points, free junction
+positions (breakouts; splices within :data:`SPLICE_MOVE` of their authored
+position; floating mated pairs within :data:`FLOATING_MOVE`), free junction axes
+(splice sleeves, breakouts, vias, mated pairs) and the exit axis of integral
+pigtails within :data:`PIGTAIL_CONE` of the authored direction. Harnesses joined
+by floating mated pairs are planned as one problem.
+
+If SLSQP cannot satisfy every constraint, the plan keeps the least-violating
+geometry and returns *infeasibility constraints*: each violated constraint with
+its location, the required and achieved value, the parts that bound it and an
+action. Nothing is reported valid that is not.
+
+Integration: :func:`plan_routing` applies the plans to a
+:class:`r3_wiring.router.RoutingResult` (the stage calls it after routing). The
+router can call :func:`plan_bundle` directly from ``_route_harness`` after its
+relaxation pass, a one-line hook once its endpoint / fan-out logic settles.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
+from scipy import sparse
+from scipy.optimize import minimize
+
+from r3_model.diagnostics import Diagnostic
+
+from .geometry import polyline_length, resample_polyline
+from .grid import FIELD_CUTOFF, VoxelGrid
+
+SPLICE_MOVE = 0.025  # m: a splice may move this far from robot.yaml (reported as a recommended edit)
+FLOATING_MOVE = 0.02  # m: a floating mated pair may move this far from the router's placement
+BRANCH_MOVE = 0.03  # m: a breakout may move this far
+PIGTAIL_CONE = math.radians(30.0)  # integral pigtails may leave their grommet this far off the authored direction
+SUPPORT_TILT = math.radians(15.0)  # bundle axis tilt allowed where it leaves a support strap
+STATIC_MARGIN = 0.0012  # m, extra static clearance: trilinear 3 mm field error near thin plates and edges
+MOVING_MARGIN = 0.0005  # m, same for the moving-parts field
+TERMINATION_SLACK = 0.0  # m: inside a termination zone a point may not lose any of its routed clearance
+BEND_MARGIN = 1.03  # planned radius / catalog minimum
+EDGE_STRETCH = 1.6
+SURFACE_BAND = 0.006  # m: bundle surface farther than this from structure cannot sit on a tie mount
+SURFACE_WEIGHT = 4.0  # per metre of bundle at one band of excess distance (vs. 1 per metre of length)
+PENALTY_WEIGHTS = (1.0, 10.0, 100.0, 1000.0)
+ELASTIC_WEIGHT = 50.0  # objective units (~m) per unit of the largest scaled violation
+FEASIBILITY_TOL = {"curvature": 0.005, "clearance": 0.0002, "tangent": 0.001, "edge": 0.02, "move": 0.0, "cone": 0.002}
+
+
+# ------------------------------------------------------------------ fields
+@dataclass
+class ClearanceField:
+    """Trilinear distance fields on the router's voxel grid (values and gradients)."""
+
+    grid: VoxelGrid
+    static: np.ndarray  # flat, min signed distance to static parts (drillable plates except at holes)
+    moving: np.ndarray  # flat, min signed distance to moving swept envelopes
+    structure: np.ndarray  # flat, distance to static structure (tie anchors)
+
+    def sample(self, name: str, points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        return trilinear(self.grid, getattr(self, name), points)
+
+
+def trilinear(grid: VoxelGrid, values: np.ndarray, points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Trilinear interpolation of a flat voxel field and its exact gradient."""
+    f = values.reshape(grid.shape)
+    rel = (np.atleast_2d(points) - grid.origin) / grid.voxel
+    upper = np.asarray(grid.shape) - 1.000001
+    clipped = np.clip(rel, 0.0, upper)
+    inside = (rel >= 0.0) & (rel <= upper)
+    i0 = np.floor(clipped).astype(int)
+    t = clipped - i0
+    out = np.zeros(len(rel))
+    grad = np.zeros((len(rel), 3))
+    for dx in (0, 1):
+        wx, gx = (t[:, 0], 1.0) if dx else (1 - t[:, 0], -1.0)
+        for dy in (0, 1):
+            wy, gy = (t[:, 1], 1.0) if dy else (1 - t[:, 1], -1.0)
+            for dz in (0, 1):
+                wz, gz = (t[:, 2], 1.0) if dz else (1 - t[:, 2], -1.0)
+                v = f[i0[:, 0] + dx, i0[:, 1] + dy, i0[:, 2] + dz]
+                out += wx * wy * wz * v
+                grad[:, 0] += gx * wy * wz * v
+                grad[:, 1] += wx * gy * wz * v
+                grad[:, 2] += wx * wy * gz * v
+    grad = grad * inside / grid.voxel  # clamped outside the grid: no gradient
+    return out, grad
+
+
+# ------------------------------------------------------------------ problem
+@dataclass
+class Junction:
+    """A point where segments meet, with one axis shared by every incident segment end."""
+
+    key: str
+    kind: str  # connector | floating | splice | free | hole | via | branch | support | unplaced
+    position: np.ndarray
+    axis: np.ndarray | None = None  # authored / initial axis
+    axis_free: bool = False
+    cone: float = math.pi  # max deviation of the axis from ``axis`` (free axes only)
+    move: float = 0.0  # max distance the position may move
+    plane_normal: np.ndarray | None = None  # supports: axis must stay parallel to this face
+    exempt: set[str] = field(default_factory=set)
+    termination_length: float = 0.0
+    lead: float = 0.0  # straight strain-relief length out of a connector exit
+    half_length: float = 0.0  # floating pair: exits at position +- axis * half_length
+    body_radius: float = 0.0  # floating pair: connector body half width (clearance of the pair body)
+    harnesses: set[str] = field(default_factory=set)
+
+
+@dataclass
+class Segment:
+    """One bundle segment between two junctions (``points`` run start -> end)."""
+
+    harness: str
+    index: int  # position in the harness's ``segments`` list
+    start: str
+    end: str
+    points: np.ndarray
+    wires: list[str]
+    od: float
+    r_min: float
+    start_sign: float = 1.0  # side of the start junction's axis this segment leaves along
+    end_sign: float = 1.0
+
+
+@dataclass
+class Violation:
+    """An unsatisfied planning constraint, in engineering terms."""
+
+    kind: str  # curvature | static_clearance | moving_clearance | tangent | edge | move | cone
+    harness: str
+    position: list[float]
+    required: float
+    achieved: float
+    wires: list[str]
+    components: list[str] = field(default_factory=list)
+    junction: str = ""
+    action: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"kind": self.kind, "harness": self.harness, "position": self.position, "required": self.required,
+                "achieved": self.achieved, "wires": self.wires, "components": self.components,
+                "junction": self.junction, "action": self.action, "units": "m"}
+
+
+@dataclass
+class BundlePlan:
+    harnesses: list[str]
+    segments: list[Segment]  # planned points
+    junctions: dict[str, Junction]  # planned positions / axes
+    feasible: bool
+    violations: list[Violation]
+    stats: dict[str, Any]
+    initial_points: list[np.ndarray] = field(default_factory=list)
+
+
+class _Problem:
+    """Maps the decision vector ``x`` to the point/axis state ``y`` and evaluates
+    objective and constraints with analytic Jacobians (``J_x = J_y @ dy/dx``)."""
+
+    def __init__(self, segments: list[Segment], junctions: dict[str, Junction], fields: ClearanceField,
+                 requirement: float, spacing: dict[int, float]) -> None:
+        self.segments, self.junctions, self.fields, self.c_req = segments, junctions, fields, requirement
+        self.x0: list[float] = []
+        self.jpos: dict[str, int | None] = {}  # junction -> offset of its position in x (None: fixed)
+        self.jaxis: dict[str, int | None] = {}  # junction -> offset of its unnormalised axis in x
+        for key, j in junctions.items():
+            self.jpos[key] = self._alloc(j.position) if j.move > 0 else None
+            self.jaxis[key] = self._alloc(j.axis) if (j.axis_free and j.axis is not None) else None
+        # Point slots: (kind, a, b, c): ("fixed", xyz), ("var", offset), ("junction", key), ("lead", key, sign, length)
+        self.slots: list[list[tuple]] = []
+        self.h: list[float] = []
+        self.exempt_bounds: list[dict[str, np.ndarray]] = []
+        for k, seg in enumerate(segments):
+            slots, h = self._slots(seg, spacing[k])
+            self.slots.append(slots)
+            self.h.append(h)
+        self.n = len(self.x0)
+        self.point_offset = np.cumsum([0] + [len(s) for s in self.slots])
+        self.n_points = int(self.point_offset[-1])
+        self.axis_keys = [k for k, j in junctions.items() if j.axis is not None]
+        self.axis_index = {k: i for i, k in enumerate(self.axis_keys)}
+        self.ny = 3 * self.n_points + 3 * len(self.axis_keys) + 3 * len(junctions)
+        self.junction_keys = list(junctions)
+        self.junction_index = {k: i for i, k in enumerate(self.junction_keys)}
+        self.x0_array = np.asarray(self.x0, dtype=float)
+        self._pair_samples = self._pair_body_slots()
+        self._initial_bounds()
+
+    # ------------------------------------------------------------ layout
+    def _alloc(self, values: np.ndarray) -> int:
+        offset = len(self.x0)
+        self.x0.extend(float(v) for v in values)
+        return offset
+
+    def _slots(self, seg: Segment, spacing: float) -> tuple[list[tuple], float]:
+        js, je = self.junctions[seg.start], self.junctions[seg.end]
+        points = seg.points
+        total = polyline_length(points)
+        head = self._anchor(js, seg.start_sign)
+        tail = self._anchor(je, seg.end_sign)
+        s0 = head[1] if head[0] == "lead" else 0.0
+        s1 = tail[1] if tail[0] == "lead" else 0.0
+        inner = max(total - s0 - s1, 1e-4)
+        n = max(2, int(math.ceil(inner / spacing)))
+        h = inner / n
+        dense, arc = resample_polyline(points, min(h / 4, 0.0005))
+        slots: list[tuple] = [("junction", seg.start)]
+        if head[0] == "lead":
+            slots.append(("lead", seg.start, seg.start_sign, head[1]))
+        for i in range(1, n):
+            s = s0 + i * h
+            p = np.array([np.interp(s, arc, dense[:, a]) for a in range(3)])
+            slots.append(("var", self._alloc(p)))
+        if tail[0] == "lead":
+            slots.append(("lead", seg.end, seg.end_sign, tail[1]))
+        slots.append(("junction", seg.end))
+        return slots, h
+
+    @staticmethod
+    def _anchor(j: Junction, sign: float) -> tuple[str, float]:
+        if j.kind == "floating" and j.half_length > 0:
+            return "lead", j.half_length
+        if j.lead > 0:
+            return "lead", j.lead
+        return "point", 0.0
+
+    def _pair_body_slots(self) -> list[tuple[str, float, float]]:
+        """Clearance samples along every floating pair body: (junction, offset, radius)."""
+        out = []
+        for key, j in self.junctions.items():
+            if j.kind == "floating" and j.half_length > 0:
+                for t in np.linspace(-j.half_length, j.half_length, 7):
+                    out.append((key, float(t), j.body_radius))
+        return out
+
+    # ------------------------------------------------------------ state
+    def axes(self, x: np.ndarray) -> dict[str, tuple[np.ndarray, np.ndarray | None]]:
+        """Unit axis of every junction and d(axis)/d(x block) (None when fixed)."""
+        out = {}
+        for key in self.axis_keys:
+            offset = self.jaxis[key]
+            if offset is None:
+                a = np.asarray(self.junctions[key].axis, dtype=float)
+                out[key] = (a / np.linalg.norm(a), None)
+            else:
+                a = x[offset:offset + 3]
+                norm = max(float(np.linalg.norm(a)), 1e-9)
+                d = a / norm
+                out[key] = (d, (np.eye(3) - np.outer(d, d)) / norm)
+        return out
+
+    def junction_position(self, key: str, x: np.ndarray) -> np.ndarray:
+        offset = self.jpos[key]
+        return x[offset:offset + 3].copy() if offset is not None else np.asarray(self.junctions[key].position, float)
+
+    def point(self, slot: tuple, x: np.ndarray, axes: dict) -> np.ndarray:
+        kind = slot[0]
+        if kind == "var":
+            return x[slot[1]:slot[1] + 3].copy()
+        if kind == "junction":
+            return self.junction_position(slot[1], x)
+        if kind == "lead":
+            return self.junction_position(slot[1], x) + slot[2] * slot[3] * axes[slot[1]][0]
+        return np.asarray(slot[1], dtype=float)
+
+    def points(self, x: np.ndarray) -> list[np.ndarray]:
+        axes = self.axes(x)
+        return [np.array([self.point(s, x, axes) for s in slots]) for slots in self.slots]
+
+    def point_jacobian(self, slot: tuple, axes: dict) -> list[tuple[int, np.ndarray]]:
+        """d point / d x as (x offset, 3x3 block) pairs."""
+        kind = slot[0]
+        if kind == "var":
+            return [(slot[1], np.eye(3))]
+        out = []
+        key = slot[1]
+        if kind in ("junction", "lead") and self.jpos[key] is not None:
+            out.append((self.jpos[key], np.eye(3)))
+        if kind == "lead" and self.jaxis[key] is not None:
+            out.append((self.jaxis[key], slot[2] * slot[3] * axes[key][1]))
+        return out
+
+    # ------------------------------------------------------------ bounds
+    def _initial_bounds(self) -> None:
+        """Clearance bound per point: the requirement, relaxed inside termination zones
+        to the routed path's own clearance (the part a wire terminates on is exempt)."""
+        x = self.x0_array
+        pts = self.points(x)
+        self.bounds: list[tuple[np.ndarray, np.ndarray]] = []
+        self.terminal: list[np.ndarray] = []
+        for k, (seg, p) in enumerate(zip(self.segments, pts)):
+            r = seg.od / 2
+            fs, _ = self.fields.sample("static", p)
+            fm, _ = self.fields.sample("moving", p)
+            arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(p, axis=0), axis=1))])
+            static_req = np.full(len(p), r + STATIC_MARGIN)
+            moving_req = np.full(len(p), r + self.c_req + MOVING_MARGIN)
+            terminal = np.zeros(len(p), dtype=bool)
+            for key, from_end in ((seg.start, arc), (seg.end, arc[-1] - arc)):
+                j = self.junctions[key]
+                zone = j.termination_length if j.exempt else (j.half_length + 2 * seg.od if j.kind == "floating" else 0.0)
+                if j.kind in ("hole",):
+                    zone = 0.004
+                inside = from_end <= zone + 1e-9
+                static_req[inside] = np.minimum(static_req[inside], fs[inside] - TERMINATION_SLACK)
+                moving_req[inside] = np.minimum(moving_req[inside], fm[inside] - TERMINATION_SLACK)
+                terminal[inside] = True
+            self.bounds.append((static_req, moving_req))
+            self.terminal.append(terminal)
+
+    # ------------------------------------------------------------ objective
+    def objective(self, x: np.ndarray) -> tuple[float, np.ndarray]:
+        axes = self.axes(x)
+        pts = self.points(x)
+        grad_y: dict[tuple[int, int], np.ndarray] = {}
+        value = 0.0
+        for k, (p, slots) in enumerate(zip(pts, self.slots)):
+            h = self.h[k]
+            e = np.diff(p, axis=0)
+            value += float(np.sum(e * e)) / h
+            gp = np.zeros_like(p)
+            gp[:-1] -= 2 * e / h
+            gp[1:] += 2 * e / h
+            # Stay within tie reach of structure: sum h * s^2, s = excess distance / band.
+            r = self.segments[k].od / 2
+            fs, gs = self.fields.sample("structure", p)
+            excess = np.maximum(0.0, fs - r - SURFACE_BAND) / SURFACE_BAND
+            value += SURFACE_WEIGHT * h * float(np.sum(excess ** 2))
+            gp += (SURFACE_WEIGHT * h * 2 * excess / SURFACE_BAND)[:, None] * gs
+            for i, slot in enumerate(slots):
+                grad_y[(k, i)] = gp[i]
+        grad = np.zeros(self.n)
+        for (k, i), g in grad_y.items():
+            for offset, block in self.point_jacobian(self.slots[k][i], axes):
+                grad[offset:offset + 3] += block.T @ g
+        for key in self.axis_keys:  # keep unnormalised axes near unit length
+            offset = self.jaxis[key]
+            if offset is not None:
+                a = x[offset:offset + 3]
+                m = float(a @ a) - 1.0
+                value += 0.01 * m * m
+                grad[offset:offset + 3] += 0.04 * m * a
+        return value, grad
+
+    # ------------------------------------------------------------ constraints
+    def constraints(self, x: np.ndarray) -> tuple[np.ndarray, sparse.csr_matrix, list[dict[str, Any]]]:
+        """All inequality constraints g(x) >= 0 (scaled to O(1)), their Jacobian and labels."""
+        axes = self.axes(x)
+        pts = self.points(x)
+        rows: list[float] = []
+        labels: list[dict[str, Any]] = []
+        jac_rows, jac_cols, jac_vals = [], [], []
+
+        def add(value: float, label: dict[str, Any], grads: list[tuple[tuple, np.ndarray]],
+                axis_grads: list[tuple[str, np.ndarray]] = (), pos_grads: list[tuple[str, np.ndarray]] = ()) -> None:
+            row = len(rows)
+            rows.append(value)
+            labels.append(label)
+            for slot, g in grads:
+                for offset, block in self.point_jacobian(slot, axes):
+                    jac_rows.extend([row] * 3)
+                    jac_cols.extend(range(offset, offset + 3))
+                    jac_vals.extend(block.T @ g)
+            for key, g in axis_grads:
+                offset, dd = self.jaxis[key], axes[key][1]
+                if offset is not None:
+                    jac_rows.extend([row] * 3)
+                    jac_cols.extend(range(offset, offset + 3))
+                    jac_vals.extend(dd.T @ g)
+            for key, g in pos_grads:
+                offset = self.jpos[key]
+                if offset is not None:
+                    jac_rows.extend([row] * 3)
+                    jac_cols.extend(range(offset, offset + 3))
+                    jac_vals.extend(g)
+
+        for k, (seg, p, slots) in enumerate(zip(self.segments, pts, self.slots)):
+            h, radius = self.h[k], BEND_MARGIN * seg.r_min
+            # Curvature at interior points: circumradius c / (2 sin theta) >= R, i.e.
+            # (c - 2 R |u x v| / (a b)) / h >= 0, and u.v / (a b) >= 0 (no reversals).
+            for i in range(1, len(p) - 1):
+                u, v = p[i] - p[i - 1], p[i + 1] - p[i]
+                w = u + v
+                a, b, c = (max(float(np.linalg.norm(z)), 1e-12) for z in (u, v, w))
+                cross = np.cross(u, v)
+                cn = float(np.linalg.norm(cross))
+                ch = cross / cn if cn > 1e-15 else np.zeros(3)
+                sin = cn / (a * b)
+                g = (c - 2 * radius * sin) / h
+                dsu = np.cross(v, ch) / (a * b) - sin * u / (a * a)
+                dsv = np.cross(ch, u) / (a * b) - sin * v / (b * b)
+                du = (w / c - 2 * radius * dsu) / h
+                dv = (w / c - 2 * radius * dsv) / h
+                lab = {"kind": "curvature", "segment": k, "point": i, "radius": radius}
+                add(g, lab, [(slots[i - 1], -du), (slots[i], du - dv), (slots[i + 1], dv)])
+                dot = float(u @ v)
+                cu = v / (a * b) - dot * u / (a ** 3 * b)
+                cv = u / (a * b) - dot * v / (a * b ** 3)
+                add(dot / (a * b), {"kind": "curvature", "segment": k, "point": i, "radius": radius, "reversal": True},
+                    [(slots[i - 1], -cu), (slots[i], cu - cv), (slots[i + 1], cv)])
+            # Edge length between 0.5x and EDGE_STRETCH x the nominal spacing.
+            cap, floor = (EDGE_STRETCH * h) ** 2, (0.5 * h) ** 2
+            for i in range(len(p) - 1):
+                e = p[i + 1] - p[i]
+                if slots[i][0] in ("junction", "lead") and slots[i + 1][0] in ("junction", "lead"):
+                    continue
+                ee = float(e @ e)
+                grads = [(slots[i], 2 * e / h ** 2), (slots[i + 1], -2 * e / h ** 2)]
+                add((cap - ee) / h ** 2, {"kind": "edge", "segment": k, "point": i}, grads)
+                add((ee - floor) / h ** 2, {"kind": "edge", "segment": k, "point": i},
+                    [(slots[i], -2 * e / h ** 2), (slots[i + 1], 2 * e / h ** 2)])
+            # Tangency at both ends: the first edge leaving the anchor within asin(l / 2R) of +-axis.
+            for end, sign, key in ((0, seg.start_sign, seg.start), (1, seg.end_sign, seg.end)):
+                if key not in axes:
+                    continue
+                d, _ = axes[key]
+                anchor = 1 if slots[0 if end == 0 else -1][0] == "junction" and \
+                    slots[1 if end == 0 else -2][0] == "lead" else 0
+                ia = anchor if end == 0 else len(p) - 1 - anchor
+                ib = ia + 1 if end == 0 else ia - 1
+                e = p[ib] - p[ia]
+                l = max(float(np.linalg.norm(e)), 1e-12)
+                ratio = min(l / (2 * radius), 1.0)
+                limit = math.sqrt(max(0.0, 1.0 - ratio * ratio))
+                cos = sign * float(d @ e) / l
+                de = sign * (d / l - float(d @ e) * e / l ** 3)
+                dlim = (ratio / max(limit, 1e-6)) * (e / l) / (2 * radius) if limit > 1e-6 else np.zeros(3)
+                ge = de + dlim
+                add(cos - limit, {"kind": "tangent", "segment": k, "junction": key, "end": end},
+                    [(slots[ia], -ge), (slots[ib], ge)], axis_grads=[(key, sign * e / l)])
+            # Clearance (scaled per mm).
+            static_req, moving_req = self.bounds[k]
+            fs, gs = self.fields.sample("static", p)
+            fm, gm = self.fields.sample("moving", p)
+            for i, slot in enumerate(slots):
+                if slot[0] == "fixed":
+                    continue
+                if static_req[i] < FIELD_CUTOFF:
+                    add((fs[i] - static_req[i]) * 1e3, {"kind": "static_clearance", "segment": k, "point": i,
+                                                       "required": float(static_req[i]),
+                                                       "terminal": bool(self.terminal[k][i])}, [(slot, gs[i] * 1e3)])
+                if moving_req[i] < FIELD_CUTOFF:
+                    add((fm[i] - moving_req[i]) * 1e3, {"kind": "moving_clearance", "segment": k, "point": i,
+                                                       "required": float(moving_req[i]),
+                                                       "terminal": bool(self.terminal[k][i])}, [(slot, gm[i] * 1e3)])
+        # Floating pair bodies clear everything.
+        for key, t, radius in self._pair_samples:
+            slot = ("lead", key, 1.0, t)
+            p = self.point(slot, x, axes)[None]
+            fs, gs = self.fields.sample("static", p)
+            fm, gm = self.fields.sample("moving", p)
+            add((fs[0] - radius - STATIC_MARGIN) * 1e3, {"kind": "static_clearance", "junction": key,
+                                                         "required": radius + STATIC_MARGIN}, [(slot, gs[0] * 1e3)])
+            add((fm[0] - radius - self.c_req) * 1e3, {"kind": "moving_clearance", "junction": key,
+                                                      "required": radius + self.c_req}, [(slot, gm[0] * 1e3)])
+        # Junction moves, axis cones, support planes.
+        for key, j in self.junctions.items():
+            if self.jpos[key] is not None and j.move > 0:
+                delta = self.junction_position(key, x) - j.position
+                add((j.move ** 2 - float(delta @ delta)) / j.move ** 2, {"kind": "move", "junction": key,
+                                                                         "required": j.move},
+                    [], pos_grads=[(key, -2 * delta / j.move ** 2)])
+            if self.jaxis[key] is not None:
+                d, _ = axes[key]
+                d0 = np.asarray(j.axis, dtype=float) / np.linalg.norm(j.axis)
+                if j.cone < math.pi - 1e-9:
+                    add(float(d @ d0) - math.cos(j.cone), {"kind": "cone", "junction": key, "required": j.cone},
+                        [], axis_grads=[(key, d0)])
+                if j.plane_normal is not None:
+                    nrm = j.plane_normal
+                    s = float(d @ nrm)
+                    add(math.sin(SUPPORT_TILT) ** 2 - s * s, {"kind": "cone", "junction": key, "required": SUPPORT_TILT},
+                        [], axis_grads=[(key, -2 * s * nrm)])
+        jac = sparse.csr_matrix((jac_vals, (jac_rows, jac_cols)), shape=(len(rows), self.n))
+        return np.asarray(rows), jac, labels
+
+
+# ------------------------------------------------------------------ solve
+def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields: ClearanceField,
+                requirement: float, *, max_iterations: int = 300, obstacles: Any = None) -> BundlePlan:
+    """Plan one bundle group (harnesses joined by floating mates) as a single
+    constrained optimisation. Returns the planned segments and junctions,
+    feasibility and the violated constraints (with the parts that cause them)."""
+    spacing = {k: float(np.clip(seg.r_min / 3.0, 0.0015, 0.004)) for k, seg in enumerate(segments)}
+    problem = _Problem(segments, junctions, fields, requirement, spacing)
+    x0 = problem.x0_array.copy()
+    stats: dict[str, Any] = {"variables": problem.n, "points": problem.n_points}
+    if problem.n == 0:
+        return _result(problem, x0, segments, junctions, stats, obstacles)
+
+    def violation(x: np.ndarray) -> float:
+        g, _, labels = problem.constraints(x)
+        return _max_violation(g, labels)
+
+    # Phase 1: smooth quadratic-penalty descent (L-BFGS-B) from the routed path, with an
+    # escalating penalty weight so the residual violation goes to ~0 where a route exists.
+    def penalty(x: np.ndarray, weight: float) -> tuple[float, np.ndarray]:
+        f, gf = problem.objective(x)
+        g, jac, _ = problem.constraints(x)
+        neg = np.minimum(g, 0.0)
+        return 1e-3 * f + weight * float(neg @ neg), 1e-3 * gf + 2.0 * weight * (jac.T @ neg)
+
+    v0 = violation(x0)
+    x1, iterations1 = x0, 0
+    for weight in PENALTY_WEIGHTS:
+        step = minimize(penalty, x1, args=(weight,), jac=True, method="L-BFGS-B", options={"maxiter": 400})
+        iterations1 += int(step.nit)
+        if violation(step.x) <= violation(x1) + 1e-12 or weight == PENALTY_WEIGHTS[0]:
+            x1 = step.x
+        if violation(x1) == 0.0:
+            break
+    if violation(x1) > v0:
+        x1 = x0
+    stats.update(initial_violation=v0, penalty_iterations=iterations1, penalty_violation=violation(x1))
+
+    # Phase 2: elastic SLSQP. One slack t >= 0 relaxes every constraint (g + t >= 0) and
+    # costs ELASTIC_WEIGHT per unit, so SLSQP always has a feasible point and converges to
+    # the least-violating geometry when the layout leaves no feasible route.
+    def fun(z: np.ndarray) -> float:
+        return problem.objective(z[:-1])[0] + ELASTIC_WEIGHT * z[-1]
+
+    def jac(z: np.ndarray) -> np.ndarray:
+        return np.concatenate([problem.objective(z[:-1])[1], [ELASTIC_WEIGHT]])
+
+    def cons(z: np.ndarray) -> np.ndarray:
+        return np.concatenate([problem.constraints(z[:-1])[0] + z[-1], [z[-1]]])
+
+    def cons_jac(z: np.ndarray) -> np.ndarray:
+        jx = problem.constraints(z[:-1])[1].toarray()
+        top = np.hstack([jx, np.ones((len(jx), 1))])
+        bottom = np.zeros((1, problem.n + 1))
+        bottom[0, -1] = 1.0
+        return np.vstack([top, bottom])
+
+    g1, _, _ = problem.constraints(x1)
+    z1 = np.concatenate([x1, [max(0.0, -float(g1.min())) + 1e-3]])
+    try:
+        result = minimize(fun, z1, jac=jac, method="SLSQP",
+                          constraints=[{"type": "ineq", "fun": cons, "jac": cons_jac}],
+                          options={"maxiter": max_iterations, "ftol": 1e-10})
+        x2, message, iterations = result.x[:-1], str(result.message), int(result.nit)
+        stats["elastic_slack"] = float(result.x[-1])
+    except (ValueError, np.linalg.LinAlgError) as exc:  # pragma: no cover - SLSQP numerical failure
+        x2, message, iterations = x1, f"SLSQP failed: {exc}", 0
+    # Phase 3: hard-constraint SLSQP polish from the elastic solution (removes the residual slack).
+    x3 = x2
+    try:
+        polish = minimize(lambda x: problem.objective(x)[0], x2, jac=lambda x: problem.objective(x)[1],
+                          method="SLSQP", options={"maxiter": 2 * max_iterations, "ftol": 1e-10},
+                          constraints=[{"type": "ineq", "fun": lambda x: problem.constraints(x)[0],
+                                        "jac": lambda x: problem.constraints(x)[1].toarray()}])
+        x3 = polish.x
+        stats["polish_message"] = str(polish.message)
+    except (ValueError, np.linalg.LinAlgError):  # pragma: no cover
+        pass
+    best = min((x0, x1, x2, x3), key=lambda x: (violation(x), problem.objective(x)[0]))
+    stats.update(slsqp_message=message, slsqp_iterations=iterations, final_violation=violation(best),
+                 initial_length=float(sum(polyline_length(p) for p in problem.points(x0))),
+                 planned_length=float(sum(polyline_length(p) for p in problem.points(best))))
+    return _result(problem, best, segments, junctions, stats, obstacles)
+
+
+def _max_violation(g: np.ndarray, labels: list[dict[str, Any]]) -> float:
+    worst = 0.0
+    for value, label in zip(g, labels):
+        tol = FEASIBILITY_TOL.get(label["kind"].replace("static_", "").replace("moving_", ""), 0.0)
+        if label["kind"].endswith("clearance"):
+            tol = FEASIBILITY_TOL["clearance"] * 1e3
+        worst = max(worst, -float(value) - tol)
+    return max(worst, 0.0)
+
+
+def _result(problem: _Problem, x: np.ndarray, segments: list[Segment], junctions: dict[str, Junction],
+            stats: dict[str, Any], obstacles: Any) -> BundlePlan:
+    axes = problem.axes(x)
+    planned = []
+    for seg, pts in zip(segments, problem.points(x)):
+        planned.append(Segment(seg.harness, seg.index, seg.start, seg.end, pts, seg.wires, seg.od, seg.r_min,
+                               seg.start_sign, seg.end_sign))
+    new_junctions = {}
+    for key, j in junctions.items():
+        moved = Junction(**{**j.__dict__})
+        moved.position = problem.junction_position(key, x)
+        if key in axes:
+            moved.axis = axes[key][0]
+        new_junctions[key] = moved
+    g, _, labels = problem.constraints(x)
+    violations = _violations(g, labels, planned, new_junctions, problem, obstacles)
+    feasible = not violations and _max_violation(g, labels) <= 0.0
+    stats["violations"] = len(violations)
+    return BundlePlan(sorted({s.harness for s in segments}), planned, new_junctions, feasible, violations, stats,
+                      [s.points for s in segments])
+
+
+def _violations(g: np.ndarray, labels: list[dict[str, Any]], planned: list[Segment], junctions: dict[str, Junction],
+                problem: _Problem, obstacles: Any) -> list[Violation]:
+    """Group violated constraints into engineering findings (worst per kind and place)."""
+    found: list[Violation] = []
+    for value, label in zip(g, labels):
+        kind = label["kind"]
+        tol = FEASIBILITY_TOL["clearance"] * 1e3 if kind.endswith("clearance") else FEASIBILITY_TOL.get(kind, 0.0)
+        if value >= -tol or label.get("terminal"):
+            continue  # termination zones are judged by the checker with the exact exemptions
+        seg = planned[label["segment"]] if "segment" in label else None
+        if seg is not None and "point" in label:
+            p = seg.points[min(label["point"], len(seg.points) - 1)]
+        else:
+            p = junctions[label["junction"]].position
+        harness = seg.harness if seg is not None else ",".join(sorted(junctions[label["junction"]].harnesses))
+        wires = list(seg.wires) if seg is not None else []
+        if kind == "curvature":
+            pts = seg.points
+            i = label["point"]
+            achieved = _circumradius(pts[i - 1], pts[i], pts[i + 1])
+            required = label["radius"] / BEND_MARGIN
+            if achieved >= required * 0.98:
+                continue  # inside the catalog minimum (the planner's margin is a preference)
+            room = float(problem.fields.sample("static", p[None])[0][0])
+            v = Violation("curvature", harness, p.tolist(), required, achieved, wires, _near(obstacles, p),
+                          action=f"bundle of {len(wires)} conductor(s), OD {seg.od * 1e3:.1f} mm, needs a "
+                                 f"{required * 1e3:.1f} mm bend radius here but the corridor leaves "
+                                 f"{max(room - seg.od / 2, 0) * 1e3:.1f} mm of free space: move or rotate the "
+                                 f"connector exit, give the bundle a wider path, or split it")
+        elif kind.endswith("clearance"):
+            achieved = float(problem.fields.sample("static" if kind.startswith("static") else "moving", p[None])[0][0])
+            required = label["required"]
+            r = seg.od / 2 if seg is not None else 0.0
+            near = _near(obstacles, p, moving=kind.startswith("moving"))
+            what = "moving part swept envelope" if kind.startswith("moving") else "part"
+            v = Violation(kind, harness, p.tolist(), required - r, achieved - r, wires, near,
+                          junction=label.get("junction", ""),
+                          action=f"the corridor between {', '.join(near) or 'parts'} leaves "
+                                 f"{(achieved - r) * 1e3:.1f} mm to the {what}; {(required - r) * 1e3:.1f} mm is "
+                                 f"required: move the connector/component or add a routing channel")
+        elif kind == "tangent":
+            j = junctions[label["junction"]]
+            if _tangent_radius(seg, label["end"], j) >= 0.98 * seg.r_min:
+                continue
+            v = Violation("tangent", harness, j.position.tolist(), seg.r_min, _tangent_radius(seg, label["end"], j),
+                          wires, _near(obstacles, j.position), label["junction"],
+                          action=f"the bundle cannot leave {j.kind} {label['junction']} along its axis with a "
+                                 f"{seg.r_min * 1e3:.1f} mm bend radius: rotate the {j.kind} or give it more room")
+        elif kind == "edge":
+            # A chord longer than the spacing cap: the optimiser stretched the chain to cheat the
+            # curvature constraint, i.e. no curve with this radius and clearance exists here.
+            v = Violation("curvature", harness, p.tolist(), seg.r_min, 0.0, wires, _near(obstacles, p),
+                          action=f"no curve with a {seg.r_min * 1e3:.1f} mm bend radius fits the available space "
+                                 f"along this segment (the planned chain had to stretch): give the bundle more room, "
+                                 f"move the connectors, or split the bundle")
+        else:
+            v = Violation(kind, harness, p.tolist(), float(label.get("required", 0.0)), float(value), wires, [],
+                          label.get("junction", ""), action="junction placement limit reached")
+        if any(o.kind == v.kind and o.harness == v.harness and np.linalg.norm(np.subtract(o.position, v.position)) < 0.01
+               for o in found):
+            prior = next(o for o in found if o.kind == v.kind and o.harness == v.harness and
+                         np.linalg.norm(np.subtract(o.position, v.position)) < 0.01)
+            if v.achieved < prior.achieved:
+                found[found.index(prior)] = v
+            continue
+        found.append(v)
+    return found
+
+
+def _tangent_radius(seg: Segment, end: int, j: Junction) -> float:
+    """Radius of the arc tangent to the junction axis through the segment's first point."""
+    pts = seg.points if end == 0 else seg.points[::-1]
+    sign = seg.start_sign if end == 0 else seg.end_sign
+    for q in pts[1:]:
+        e = q - pts[0]
+        l = float(np.linalg.norm(e))
+        if l > 1e-9:
+            sin = float(np.linalg.norm(np.cross(sign * j.axis, e / l)))
+            cos = float(sign * j.axis @ e / l)
+            if cos <= 0:
+                return 0.0
+            return l / (2 * sin) if sin > 1e-12 else math.inf
+    return math.inf
+
+
+def _near(obstacles: Any, p: np.ndarray, moving: bool | None = None, limit: float = 0.012) -> list[str]:
+    if obstacles is None:
+        return []
+    near = []
+    for o in obstacles.obstacles:
+        if moving is not None and o.moving != moving:
+            continue
+        shape = o.swept if o.moving else o.shape
+        d = float(shape.sdf_bounded(np.asarray(p)[None], 0.05)[0])
+        if d < limit:
+            near.append((d, o.component))
+    return [c for _, c in sorted(near)[:3]]
+
+
+def _circumradius(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> float:
+    u, v = b - a, c - b
+    cross = float(np.linalg.norm(np.cross(u, v)))
+    if cross < 1e-15:
+        return math.inf
+    return float(np.linalg.norm(u) * np.linalg.norm(v) * np.linalg.norm(u + v) / (2 * cross))
+
+
+def vertex_radii(points: np.ndarray) -> np.ndarray:
+    """Circumradius at every vertex of a polyline (inf at the ends and on straight runs)."""
+    out = np.full(len(points), math.inf)
+    for i in range(1, len(points) - 1):
+        out[i] = _circumradius(points[i - 1], points[i], points[i + 1])
+    return out
+
+
+# ------------------------------------------------------------------ routing integration
+@dataclass
+class PlanningReport:
+    plans: list[BundlePlan]
+    diagnostics: list[Diagnostic]
+    moved: dict[str, dict[str, Any]]  # junction -> {"from", "to", "kind"} (recommended robot.yaml edits)
+    stats: dict[str, Any]
+    before: dict[str, np.ndarray]  # wire -> routed path before planning
+
+    def plan_of(self, harness: str) -> BundlePlan | None:
+        return next((p for p in self.plans if harness in p.harnesses), None)
+
+
+def clearance_field(router: Any, harness_holes: set[int]) -> ClearanceField:
+    """The router's raw-geometry fields: static (drillable plates count except at the
+    group's own holes), moving swept envelopes, and static structure."""
+    f = router.fields
+    static = f.static_raw.copy()
+    hole_ok = router._hole_ok(harness_holes)
+    for plate in f.plates_raw:
+        np.minimum(static, np.where(hole_ok, FIELD_CUTOFF, plate), out=static)
+    return ClearanceField(router.grid, static, f.moving_raw.copy(), f.struct_dist.copy())
+
+
+CROSSING_GAP = 0.0005  # m between the surfaces of two harnesses that cross or run side by side
+
+
+def occupancy_field(grid: VoxelGrid, occupied: list[tuple[np.ndarray, float, set[str]]],
+                    categories: set[str]) -> np.ndarray:
+    """Distance field of bundles already planned (other harnesses), less their radius,
+    the EMC segregation distance between the categories involved and a crossing gap:
+    the next harness group must keep this field >= its own radius."""
+    from scipy.spatial import cKDTree
+
+    from .bundles import SEPARATION
+
+    centers = grid.centers()
+    out = np.full(grid.size, FIELD_CUTOFF)
+    for points, radius, cats in occupied:
+        separation = max([SEPARATION.get(frozenset({a, b}), 0.0) for a in categories for b in cats if a != b] + [0.0])
+        d, _ = cKDTree(points).query(centers, distance_upper_bound=FIELD_CUTOFF)
+        np.minimum(out, np.minimum(d, FIELD_CUTOFF) - radius - separation - CROSSING_GAP, out=out)
+    return out
+
+
+def _group_categories(project: Any, harnesses: list[str]) -> set[str]:
+    from .bundles import category
+
+    return {category(w.signal, w.awg) for h in project.spec.electrical.harnesses if h.id in harnesses for w in h.wires}
+
+
+def _groups(project: Any, routing: Any) -> list[list[str]]:
+    """Harnesses joined by floating mated pairs form one planning group."""
+    parent = {h: h for h in routing.harnesses}
+
+    def find(h: str) -> str:
+        while parent[h] != h:
+            parent[h] = parent[parent[h]]
+            h = parent[h]
+        return h
+
+    for pair in routing.floating:
+        a, b = pair.a.split(".")[0], pair.b.split(".")[0]
+        if a in parent and b in parent:
+            parent[find(a)] = find(b)
+    groups: dict[str, list[str]] = {}
+    for h in routing.harnesses:
+        groups.setdefault(find(h), []).append(h)
+    order = [h.id for h in project.spec.electrical.harnesses]
+    copper = {h.id: sum(float(project.catalog.wire(w.awg).conductor_diameter) ** 2 for w in h.wires)
+              for h in project.spec.electrical.harnesses}
+    # Heaviest (least flexible) groups claim their corridor first.
+    return sorted((sorted(g, key=order.index) for g in groups.values()),
+                  key=lambda g: (-sum(copper.get(h, 0.0) for h in g), order.index(g[0])))
+
+
+def _tangent(points: np.ndarray, from_start: bool, reach: float = 0.004) -> np.ndarray:
+    pts = points if from_start else points[::-1]
+    arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(pts, axis=0), axis=1))])
+    k = int(np.searchsorted(arc, min(reach, arc[-1])))
+    k = min(max(k, 1), len(pts) - 1)
+    d = pts[k] - pts[0]
+    n = float(np.linalg.norm(d))
+    return d / n if n > 1e-12 else np.array([1.0, 0.0, 0.0])
+
+
+def build_problem(project: Any, router: Any, routing: Any, harnesses: list[str],
+                  supports: dict[str, list[dict[str, Any]]] | None = None) -> tuple[list[Segment], dict[str, Junction]]:
+    """Junctions and segments of a harness group from the routed bundle graph.
+    ``supports`` (harness -> [{"position", "normal", "arc_wire", ...}]) split segments
+    at cable supports, which become fixed junctions whose axis stays on the face."""
+    catalog = project.catalog
+    junctions: dict[str, Junction] = {}
+    segments: list[Segment] = []
+    pair_of: dict[str, tuple[str, float]] = {}
+    jacket = {h.id: h.jacket for h in project.spec.electrical.harnesses}
+    for pair in routing.floating:
+        key = f"F:{pair.a}|{pair.b}"
+        from .terminations import body_width
+
+        width = max(body_width(catalog, pair.type_a), body_width(catalog, pair.type_b))
+        junctions[key] = Junction(key, "floating", np.asarray(pair.center, float), np.asarray(pair.axis, float),
+                                  axis_free=True, move=FLOATING_MOVE, half_length=pair.length / 2,
+                                  body_radius=width / 2,
+                                  harnesses={pair.a.split(".")[0], pair.b.split(".")[0]})
+        pair_of[pair.a], pair_of[pair.b] = (key, -1.0), (key, 1.0)
+    for harness in harnesses:
+        route = routing.harnesses[harness]
+        nodes = routing.nodes[harness]
+        failed = {w for w, r in routing.wires.items() if r.harness == harness and r.failed}
+        hole_centers = {f"H:{i}": routing.holes[i] for i in route.holes}
+        vias = [np.asarray(v, float) for h in project.spec.electrical.harnesses if h.id == harness for v in h.route.via]
+
+        def identify(point: np.ndarray) -> tuple[str, float | None]:
+            for node in nodes.values():
+                if node.exit is not None and np.linalg.norm(node.exit - point) < 1e-7:
+                    if node.ref in pair_of:
+                        return pair_of[node.ref]
+                    key = f"{harness}/N:{node.name}"
+                    if key not in junctions:
+                        junctions[key] = _node_junction(key, node, catalog)
+                    return key, (1.0 if node.kind == "connector" else None)
+            for key, hole in hole_centers.items():
+                if np.linalg.norm(hole.center - point) < 1e-7:
+                    jkey = f"{key}"
+                    if jkey not in junctions:
+                        normal = np.zeros(3)
+                        normal[hole.axis] = 1.0
+                        junctions[jkey] = Junction(jkey, "hole", hole.center.copy(), normal, harnesses={harness},
+                                                   termination_length=0.004)
+                    junctions[jkey].harnesses.add(harness)
+                    return jkey, None
+            kind = "via" if any(np.linalg.norm(v - point) <= router.opt.voxel * 1.8 for v in vias) else "branch"
+            key = f"{harness}/{kind[0].upper()}:{len([k for k in junctions if k.startswith(harness + '/')])}"
+            for existing, j in junctions.items():
+                if existing.startswith(harness + "/") and j.kind in ("via", "branch") and \
+                        np.linalg.norm(j.position - point) < 1e-7:
+                    return existing, None
+            junctions[key] = Junction(key, kind, point.copy(), None, axis_free=True,
+                                      move=BRANCH_MOVE if kind == "branch" else 0.0, harnesses={harness})
+            return key, None
+
+        cuts = (supports or {}).get(harness, [])
+        for index, seg in enumerate(route.segments):
+            if set(seg["wires"]) <= failed:
+                continue
+            pts = np.asarray(seg["points"], float)
+            if len(pts) < 2 or polyline_length(pts) < 1e-6:
+                continue
+            start, s_sign = identify(pts[0])
+            end, e_sign = identify(pts[-1])
+            pieces = _split_at_supports(pts, cuts, set(seg["wires"]), harness, junctions)
+            for k, (piece, a_key, b_key) in enumerate(pieces):
+                a_key = a_key or start
+                b_key = b_key or end
+                a_sign = s_sign if a_key == start else None
+                b_sign = e_sign if b_key == end else None
+                if a_key in pair_of.values() or a_key.startswith("F:"):
+                    piece = np.vstack([junctions[a_key].position, piece])
+                if b_key.startswith("F:"):
+                    piece = np.vstack([piece, junctions[b_key].position])
+                awgs = [routing.wires[w].awg for w in seg["wires"] if w in routing.wires]
+                radius = bundle_bend_radius(catalog, awgs, float(seg["od"]), jacket.get(harness, "none") != "none")
+                segments.append(Segment(harness, index, a_key, b_key, piece, list(seg["wires"]), float(seg["od"]),
+                                        radius,
+                                        a_sign if a_sign is not None else 0.0, b_sign if b_sign is not None else 0.0))
+    _assign_sides(segments, junctions)
+    return segments, junctions
+
+
+def bundle_bend_radius(catalog: Any, awgs: list[int], bundle_od: float, jacketed: bool) -> float:
+    """Minimum bend radius of the bundle centreline.
+
+    A jacketed (taped, sleeved, overmoulded) bundle bends as one cable: ``factor x OD``.
+    In a loose bundle every conductor bends on its own; SAE AS50881 (formerly MIL-W-5088)
+    references the bend radius of wire groups to the OD of the largest *wire*, so the
+    innermost conductor (``(OD - od) / 2`` inside the centreline) must keep
+    ``factor x od``: ``R = factor x od_max + (OD - od_max) / 2``."""
+    gauges = [catalog.wire(a) for a in awgs]
+    factor = max(float(g.min_bend_radius_factor) for g in gauges)
+    od = max(float(g.outer_diameter) for g in gauges)
+    if jacketed or len(gauges) == 1:
+        return factor * (bundle_od if jacketed else od)
+    return factor * od + max(bundle_od - od, 0.0) / 2
+
+
+def _node_junction(key: str, node: Any, catalog: Any) -> Junction:
+    if node.kind == "connector":
+        free = node.connector_type == "integral"
+        lead = min(node.lead_length, max(2 * node.od, 0.003)) if node.lead_length > 0 else 0.0
+        return Junction(key, "connector", node.exit.copy(), np.asarray(node.direction, float), axis_free=free,
+                        cone=PIGTAIL_CONE if free else 0.0, exempt=set(node.exempt),
+                        termination_length=node.termination_length, lead=lead, harnesses={node.harness})
+    if node.kind == "splice":
+        return Junction(key, "splice", node.exit.copy(), None, axis_free=True, move=SPLICE_MOVE,
+                        termination_length=0.006, harnesses={node.harness})
+    return Junction(key, node.kind, node.exit.copy() if node.exit is not None else np.zeros(3), None,
+                    axis_free=True, harnesses={node.harness})
+
+
+def _split_at_supports(points: np.ndarray, cuts: list[dict[str, Any]], wires: set[str], harness: str,
+                       junctions: dict[str, Junction]) -> list[tuple[np.ndarray, str | None, str | None]]:
+    """Split a segment polyline at the supports that hold it (closest point within 3 mm)."""
+    from .geometry import project_to_polyline
+
+    total = polyline_length(points)
+    hits = []
+    for support in cuts:
+        if not set(support.get("wires", [])) & wires:
+            continue
+        d, s = project_to_polyline(points, np.asarray(support.get("path_position", support["position"]), float)[None])
+        if d <= 0.003 and 0.004 < s < total - 0.004:
+            hits.append((s, support))
+    if not hits:
+        return [(points, None, None)]
+    hits.sort(key=lambda h: h[0])
+    arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))])
+    out: list[tuple[np.ndarray, str | None, str | None]] = []
+    prev_s, prev_key = 0.0, None
+    for s, support in hits:
+        key = f"{harness}/S:{support['id']}"
+        if key not in junctions:
+            junctions[key] = Junction(key, "support", np.asarray(support["position"], float),
+                                      np.asarray(support["axis"], float), axis_free=True,
+                                      plane_normal=np.asarray(support["normal"], float), harnesses={harness})
+        mask = (arc > prev_s) & (arc < s)
+        start = _at(points, arc, prev_s) if prev_key else points[0]
+        piece = np.vstack([start, points[mask], junctions[key].position])
+        out.append((piece, prev_key, key))
+        prev_s, prev_key = s, key
+    mask = arc > prev_s
+    out.append((np.vstack([junctions[prev_key].position, points[mask]]), prev_key, None))
+    return out
+
+
+def _at(points: np.ndarray, arc: np.ndarray, s: float) -> np.ndarray:
+    return np.array([np.interp(s, arc, points[:, a]) for a in range(3)])
+
+
+def _assign_sides(segments: list[Segment], junctions: dict[str, Junction]) -> None:
+    """Side (+-axis) of every segment end at every junction, and the initial axis of
+    free junctions. Segments that share a wire through a junction sit on opposite
+    sides (continuous tangent); other ends follow the routed tangents. Connector and
+    floating ends already carry their side (they leave along the exit direction)."""
+    ends: dict[str, list[tuple[int, int, np.ndarray]]] = {}
+    for k, seg in enumerate(segments):
+        ends.setdefault(seg.start, []).append((k, 0, _tangent(seg.points, True)))
+        ends.setdefault(seg.end, []).append((k, 1, _tangent(seg.points, False)))
+    for key, items in ends.items():
+        j = junctions[key]
+        if j.kind in ("connector", "floating"):
+            for k, e, _ in items:
+                if e == 0 and not segments[k].start_sign:
+                    segments[k].start_sign = 1.0
+                elif e == 1 and not segments[k].end_sign:
+                    segments[k].end_sign = 1.0
+            continue
+        tangents = np.array([t for _, _, t in items])
+        signs = _two_color(items, segments) if j.kind in ("branch", "via", "hole", "support") else None
+        if signs is None:
+            reference = j.axis if j.axis is not None else _principal(tangents)
+            signs = [1.0 if t @ reference >= 0 else -1.0 for t in tangents]
+        combined = sum(sg * t for sg, t in zip(signs, tangents))
+        if j.kind == "hole":
+            j.axis = j.axis * (1.0 if combined @ j.axis >= 0 else -1.0)
+            signs = [1.0 if t @ j.axis >= 0 else -1.0 for t in tangents]
+        elif j.kind == "support":
+            n = j.plane_normal
+            along = combined - (combined @ n) * n
+            j.axis = along / max(float(np.linalg.norm(along)), 1e-9)
+            signs = [1.0 if t @ j.axis >= 0 else -1.0 for t in tangents]
+        else:
+            norm = float(np.linalg.norm(combined))
+            j.axis = combined / norm if norm > 1e-9 else tangents[0]
+        for (k, e, _), sg in zip(items, signs):
+            if e == 0:
+                segments[k].start_sign = sg
+            else:
+                segments[k].end_sign = sg
+
+
+def _principal(tangents: np.ndarray) -> np.ndarray:
+    _, _, vt = np.linalg.svd(tangents - 0.0)
+    return vt[0]
+
+
+def _two_color(items: list[tuple[int, int, np.ndarray]], segments: list[Segment]) -> list[float] | None:
+    n = len(items)
+    color: list[float | None] = [None] * n
+    for start in range(n):
+        if color[start] is not None:
+            continue
+        color[start] = 1.0 if items[start][2] @ items[0][2] >= 0 or start == 0 else -1.0
+        stack = [start]
+        while stack:
+            i = stack.pop()
+            for j in range(n):
+                if j == i or not set(segments[items[i][0]].wires) & set(segments[items[j][0]].wires):
+                    continue
+                want = -color[i]
+                if color[j] is None:
+                    color[j] = want
+                    stack.append(j)
+                elif color[j] != want:
+                    return None
+    # Unconstrained ends (no shared wire) follow the geometry of the first.
+    return [float(c) for c in color]
+
+
+def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str, list[dict[str, Any]]] | None = None,
+                 obstacles: Any = None, max_iterations: int = 300) -> PlanningReport:
+    """Plan every harness group and write the planned geometry back into ``routing``
+    (segment points, wire paths, bundle radii, bends, splice / floating / pigtail
+    placement). Returns plans, ``route_infeasible`` diagnostics and moved junctions."""
+    requirement = float(project.spec.requirements.min_wire_clearance_moving)
+    before = {w: r.path.copy() for w, r in routing.wires.items()}
+    plans, diagnostics, moved = [], [], {}
+    stats: dict[str, Any] = {}
+    occupied: list[tuple[np.ndarray, float, set[str]]] = []
+    for group in _groups(project, routing):
+        holes = {i for h in group for i in routing.harnesses[h].holes}
+        fields = clearance_field(router, holes)
+        categories = _group_categories(project, group)
+        if occupied:
+            np.minimum(fields.static, occupancy_field(router.grid, occupied, categories), out=fields.static)
+        segments, junctions = build_problem(project, router, routing, group, supports)
+        if not segments:
+            continue
+        plan = plan_bundle(segments, junctions, fields, requirement, max_iterations=max_iterations,
+                           obstacles=obstacles)
+        plans.append(plan)
+        stats["+".join(group)] = plan.stats
+        _apply(project, routing, plan, moved)
+        for harness in group:
+            for seg in routing.harnesses[harness].segments:
+                pts, _ = resample_polyline(np.asarray(seg["points"], float), 0.001)
+                occupied.append((pts, float(seg["od"]) / 2, categories))
+        for v in plan.violations:
+            diagnostics.append(Diagnostic.error(
+                "route_infeasible",
+                f"{v.harness}: {v.kind.replace('_', ' ')} cannot be met at "
+                f"({', '.join(f'{c * 1e3:.0f}' for c in v.position)}) mm: required {v.required * 1e3:.1f} mm, "
+                f"best {v.achieved * 1e3:.1f} mm",
+                subjects=[*v.harness.split(","), *v.wires, *v.components],
+                data=v.as_dict(), hint=v.action))
+    return PlanningReport(plans, diagnostics, moved, stats, before)
+
+
+def _apply(project: Any, routing: Any, plan: BundlePlan, moved: dict[str, dict[str, Any]]) -> None:
+    from .router import Bend
+
+    junctions = plan.junctions
+    for key, j in junctions.items():
+        if j.kind in ("splice", "floating"):
+            original = None
+            for harness in j.harnesses:
+                for node in routing.nodes.get(harness, {}).values():
+                    if j.kind == "splice" and key == f"{harness}/N:{node.name}":
+                        original = node.exit.copy()
+                        node.exit = j.position.copy()
+                        node.lead_end = j.position.copy()
+            if j.kind == "floating":
+                pair = next(f for f in routing.floating if key == f"F:{f.a}|{f.b}")
+                original = np.asarray(pair.center, float).copy()
+                pair.center, pair.axis = j.position.copy(), j.axis.copy()
+                for ref, sign in ((pair.a, -1.0), (pair.b, 1.0)):
+                    h, name = ref.split(".", 1)
+                    node = routing.nodes[h][name]
+                    node.face = j.position.copy()
+                    node.direction = sign * j.axis
+                    node.exit = j.position + sign * j.axis * j.half_length
+                    node.lead_end = node.exit.copy()
+            if original is not None and np.linalg.norm(original - j.position) > 1e-4:
+                moved[key] = {"kind": j.kind, "from": original.tolist(), "to": j.position.tolist(),
+                              "distance": float(np.linalg.norm(original - j.position)), "axis": j.axis.tolist()}
+        if j.kind == "connector" and j.axis_free:
+            harness, name = key.split("/N:")
+            node = routing.nodes[harness][name]
+            if float(np.degrees(np.arccos(np.clip(node.direction @ j.axis, -1, 1)))) > 0.5:
+                moved[key] = {"kind": "pigtail_exit", "from": node.direction.tolist(), "to": j.axis.tolist(),
+                              "angle_deg": float(np.degrees(np.arccos(np.clip(node.direction @ j.axis, -1, 1))))}
+            node.direction = j.axis.copy()
+            node.lead_end = node.exit + node.direction * max(j.lead, node.lead_length)
+    # Segment points (floating pair centres stripped: wires start at the connector exit).
+    by_harness: dict[str, list[Segment]] = {}
+    for seg in plan.segments:
+        pts = seg.points
+        if seg.start.startswith("F:"):
+            pts = pts[1:]
+        if seg.end.startswith("F:"):
+            pts = pts[:-1]
+        by_harness.setdefault(seg.harness, []).append(Segment(seg.harness, seg.index, seg.start, seg.end, pts,
+                                                              seg.wires, seg.od, seg.r_min))
+    for harness, segs in by_harness.items():
+        route = routing.harnesses[harness]
+        merged: dict[int, list[np.ndarray]] = {}
+        for seg in segs:
+            merged.setdefault(seg.index, []).append(seg.points)
+        for index, parts in merged.items():
+            pts = parts[0]
+            for extra in parts[1:]:
+                pts = np.vstack([pts, extra[1:]])
+            route.segments[index]["points"] = pts
+        for wire_id in route.wires:
+            wire = routing.wires.get(wire_id)
+            if wire is None or wire.failed:
+                continue
+            chain = _wire_chain(wire, segs, routing.nodes[harness], junctions, harness)
+            if chain is None:
+                continue
+            path, radius, count, rmin = chain
+            wire.path, wire.bundle_radius, wire.conductors = path, radius, count
+            radii = vertex_radii(path)
+            wire.bends = [Bend(path[i].copy(), float(radii[i]), float(rmin[i]), int(count[i]), float(2 * radius[i]))
+                          for i in range(1, len(path) - 1) if radii[i] < 3 * rmin[i]]
+        trunk = max((routing.wires[w] for w in route.wires if w in routing.wires),
+                    key=lambda w: float(np.sum(w.conductors)), default=None)
+        if trunk is not None:
+            route.bundle_path = trunk.path
+
+
+def _wire_chain(wire: Any, segs: list[Segment], nodes: dict[str, Any], junctions: dict[str, Junction],
+                harness: str) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+    """The wire's path through the planned segments that carry it (from its start node)."""
+    mine = [s for s in segs if wire.wire_id in s.wires]
+    if not mine:
+        return None
+    start = nodes[wire.from_node].exit
+    end = nodes[wire.to_node].exit
+    remaining = list(mine)
+    current = start
+    pts, rad, cnt, rmin = [current], [mine[0].od / 2], [len(mine[0].wires)], [mine[0].r_min]
+    guard = 0
+    while remaining and guard < 64:
+        guard += 1
+        nxt = None
+        for seg in remaining:
+            if np.linalg.norm(seg.points[0] - current) < 1e-6:
+                nxt, body = seg, seg.points
+            elif np.linalg.norm(seg.points[-1] - current) < 1e-6:
+                nxt, body = seg, seg.points[::-1]
+            if nxt is not None:
+                break
+        if nxt is None:
+            return None
+        remaining.remove(nxt)
+        rad[-1], cnt[-1], rmin[-1] = max(rad[-1], nxt.od / 2), max(cnt[-1], len(nxt.wires)), max(rmin[-1], nxt.r_min)
+        for p in body[1:]:
+            pts.append(p)
+            rad.append(nxt.od / 2)
+            cnt.append(len(nxt.wires))
+            rmin.append(nxt.r_min)
+        current = body[-1]
+        if np.linalg.norm(current - end) < 1e-6:
+            break
+    if np.linalg.norm(current - end) > 1e-6:
+        return None
+    return np.asarray(pts), np.asarray(rad), np.asarray(cnt), np.asarray(rmin)
+
+
+__all__ = ["bundle_bend_radius", "BundlePlan", "ClearanceField", "Junction", "PlanningReport", "Segment", "Violation", "build_problem",
+           "clearance_field", "plan_bundle", "plan_routing", "trilinear", "vertex_radii"]

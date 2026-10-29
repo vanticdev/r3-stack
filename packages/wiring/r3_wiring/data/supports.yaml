@@ -1,0 +1,104 @@
+# Cable support hardware (wiring stage). Lengths in m, forces in N.
+#
+# kind:              adhesive_tie_mount | screw_tie_mount | p_clip
+# footprint:         base size on the mounting face [along bundle, across bundle]
+# height:            face to the underside of the bundle (bundle centre = height + r)
+# bundle_od:         [min, max] bundle diameter the part holds
+# retention:         axial load the support carries before the bundle slips or the mount lets go
+#                    (adhesive mounts: limited by the adhesive; tie mounts: by the tie's grip;
+#                    P-clips: by the clamp's cushion)
+# permitted_motion:  how the bundle is constrained in the MuJoCo cable model
+#                    pinned  = position held, bundle may pivot (a single narrow strap)
+#                    clamped = position and direction held (a wide clamp band)
+# fastener:          none, or the screw/nut the mount needs (the host must be drillable or tapped)
+# access:            installation access envelope above the face: [diameter, height] for a finger
+#                    press (adhesive) or a driver line [diameter, length] (screw)
+# provenance:        MPNs and dimensions follow the vendor catalogues as listed; values marked
+#                    estimated are engineering estimates, not datasheet numbers.
+ties:
+  - id: plt1m
+    mpn: PLT1M-C
+    manufacturer: Panduit
+    description: Pan-Ty miniature cable tie, nylon 6.6, 99 mm
+    width: 2.5 mm
+    thickness: 1.0 mm
+    max_bundle: 22 mm
+    loop_tensile: 80 N  # 18 lb minimum loop tensile strength
+    tool: Panduit GS2B (miniature tie tension tool)
+    provenance: {status: datasheet, source: "Panduit PLT1M-C: 3.9 in long, 0.10 in wide, 18 lb loop tensile"}
+supports:
+  - id: adhesive-tie-mount-13
+    kind: adhesive_tie_mount
+    mpn: ABMM-A-C
+    manufacturer: Panduit
+    description: Adhesive-backed tie mount, miniature, 12.7 mm square, acrylic adhesive
+    footprint: [12.7 mm, 12.7 mm]
+    height: 4.3 mm
+    bundle_od: [1.0 mm, 10 mm]
+    tie: plt1m
+    fastener: none
+    retention: 20 N
+    max_temperature_c: 85
+    permitted_motion: pinned
+    access: [16 mm, 20 mm]
+    provenance: {status: estimated, source: "Panduit ABMM-A-C footprint 0.50 x 0.50 in; retention and height estimated (acrylic adhesive on clean aluminium/PETG)"}
+  - id: adhesive-tie-mount-19
+    kind: adhesive_tie_mount
+    mpn: ABM100-A-C
+    manufacturer: Panduit
+    description: Adhesive-backed tie mount, 19.1 mm square, acrylic adhesive
+    footprint: [19.1 mm, 19.1 mm]
+    height: 5.3 mm
+    bundle_od: [1.0 mm, 14 mm]
+    tie: plt1m
+    fastener: none
+    retention: 35 N
+    max_temperature_c: 85
+    permitted_motion: pinned
+    access: [22 mm, 20 mm]
+    provenance: {status: estimated, source: "Panduit ABM100-A-C footprint 0.75 x 0.75 in; retention and height estimated"}
+  - id: screw-tie-mount-m3
+    kind: screw_tie_mount
+    mpn: TM1S4-C
+    manufacturer: Panduit
+    description: Screw-applied tie mount for #4 / M3 screw, miniature and intermediate ties
+    footprint: [9.7 mm, 7.6 mm]
+    height: 4.6 mm
+    bundle_od: [1.0 mm, 14 mm]
+    tie: plt1m
+    fastener: {screw: "ISO 7380 M3 x 8 button head", nut: "ISO 10511 M3 nylon-insert lock nut", hole: 3.4 mm, driver: "2.0 mm hex key"}
+    retention: 60 N
+    max_temperature_c: 85
+    permitted_motion: pinned
+    access: [7 mm, 60 mm]
+    provenance: {status: estimated, source: "Panduit TM1S4-C screw-applied tie mount; footprint and height from the catalogue drawing, verify MPN against the datasheet before release; retention limited by the PLT1M tie (estimate)"}
+  - id: p-clip-cushioned-m3
+    kind: p_clip
+    mpn: null
+    manufacturer: generic
+    description: Nylon cushioned P-clip, M3 mounting hole, sized to the bundle (order by bundle OD)
+    footprint: [10 mm, 12 mm]
+    height: 1.2 mm
+    bundle_od: [3 mm, 12 mm]
+    tie: null
+    fastener: {screw: "ISO 7380 M3 x 8 button head", nut: "ISO 10511 M3 nylon-insert lock nut", hole: 3.4 mm, driver: "2.0 mm hex key"}
+    retention: 80 N
+    max_temperature_c: 105
+    permitted_motion: clamped
+    access: [7 mm, 60 mm]
+    provenance: {status: estimated, source: "Generic nylon P-clip; no MPN assigned (select by bundle OD); retention estimated"}
+  - id: tie-to-post
+    kind: post_tie
+    mpn: PLT1M-C
+    manufacturer: Panduit
+    description: Cable tie looped around a standoff or post and the bundle (no mount)
+    footprint: [2.5 mm, 2.5 mm]
+    height: 0 mm
+    bundle_od: [1.0 mm, 10 mm]
+    tie: plt1m
+    fastener: none
+    retention: 15 N
+    max_temperature_c: 85
+    permitted_motion: pinned
+    access: [12 mm, 15 mm]
+    provenance: {status: estimated, source: "PLT1M-C around a 5-6 mm standoff; axial retention is tie friction on the post (estimate)"}

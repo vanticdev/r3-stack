@@ -10,10 +10,11 @@ from r3_model.project import Project
 
 from .router import RoutingResult
 
-FIELDS = ["section", "harness", "item", "description", "awg", "color", "signal", "quantity", "cut_length_mm", "notes"]
+FIELDS = ["release", "section", "harness", "item", "description", "awg", "color", "signal", "quantity", "cut_length_mm", "notes"]
 
 
-def write_bom(path: Path, project: Project, routing: RoutingResult) -> list[dict[str, str]]:
+def write_bom(path: Path, project: Project, routing: RoutingResult, status: str = "unreleased") -> list[dict[str, str]]:
+    """Cut list and harness BOM. Every row carries the release status of the geometry checks."""
     catalog = project.catalog
     rows: list[dict[str, str]] = []
     totals: dict[tuple[int, str], float] = defaultdict(float)
@@ -65,5 +66,5 @@ def write_bom(path: Path, project: Project, routing: RoutingResult) -> list[dict
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows({"release": status.upper(), **row} for row in rows)
     return rows

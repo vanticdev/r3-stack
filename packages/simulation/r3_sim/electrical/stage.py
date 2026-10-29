@@ -900,7 +900,7 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
     runtime = estimate_runtime(system, ops, duty, result)
 
     estimated = {cid: m.params.estimated for cid, m in system.models.items() if m.params.estimated}
-    _assumptions(result, vehicle, ops, estimated, routes is not None)
+    _assumptions(result, vehicle, ops, estimated, routes is not None, routes)
     result.metrics.update({
         "vehicle_mass": vehicle["mass"], "cruise_motor_torque": ops.motor_torque_cruise, "cruise_motor_omega": ops.motor_omega_cruise,
         "traction_motor_torque": ops.motor_torque_traction, "runtime": runtime.get("runtime"),
@@ -954,7 +954,8 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
     return result
 
 
-def _assumptions(result: StageResult, vehicle: dict[str, Any], ops: OperatingPoints, estimated: dict[str, Any], routed: bool) -> None:
+def _assumptions(result: StageResult, vehicle: dict[str, Any], ops: OperatingPoints, estimated: dict[str, Any], routed: bool,
+                 routes: dict[str, Any] | None = None) -> None:
     a = result.assume
     a("electrical", "Circuit solved by ngspice (shared library): operating points with `op`, the transient in lockstep with the "
                     "1 ms co-simulation clock; every component is a SPICE subcircuit generated from robot.yaml and the catalog.")
@@ -966,7 +967,13 @@ def _assumptions(result: StageResult, vehicle: dict[str, Any], ops: OperatingPoi
     a("electrical", "Wire resistance from the AWG table with copper tempco 0.00393/K; contact resistance per mated pin from the catalog; PCB trace resistance not modeled.")
     if not routed:
         a("wiring", "No build/wiring/routes.json: wire lengths are 1.3 x straight-line connector distance (wire_length_estimated).")
-    a("thermal", "Wire and contact thermal resistance calibrated to a 30 K rise at the catalog ampacity / per-pin rating; free air, no bundling derating.")
+    installed = bool(routes) and any(w.get("installed_ampacity") for w in (routes or {}).get("wires", {}).values())
+    if installed:
+        a("thermal", "Wire ratings are the wiring stage's installed ampacity (bundle derating NEC 310.15(C)(1), enclosure "
+                     "temperature); wire thermal resistance calibrated to a 30 K rise at bundle factor x catalog ampacity; "
+                     "contacts at their per-pin rating.")
+    else:
+        a("thermal", "Wire and contact thermal resistance calibrated to a 30 K rise at the catalog ampacity / per-pin rating; free air, no bundling derating.")
     a("thermal", f"Burst durations: {BURST_DURATION} s; continuous points use steady conductor temperatures.")
     a("connectors", "Burst rating = 2 x continuous unless the catalog provides current_rating_burst (XT60/XT30 datasheet ratio).")
     a("vehicle", f"Mass {vehicle['mass']:.2f} kg ({vehicle['mass_source']}), C_rr {vehicle['rolling_resistance']}, C_d {DRAG_COEFFICIENT}, "

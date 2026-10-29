@@ -123,6 +123,11 @@ class CableSpan:
     end_body: str
     damping: float
     exclude: list[tuple[int, str]] = field(default_factory=list)  # (segment, kinematic body)
+    # How the pins hold the bundle (from the support hardware, r3_wiring.supports):
+    # "clamped" = position and direction (rigid root / weld), "pinned" = position only
+    # (ball-jointed first segment / connect). Connector ends are clamped by their housing.
+    start_motion: str = "clamped"
+    end_motion: str = "clamped"
 
     @property
     def segments(self) -> int:
@@ -265,7 +270,7 @@ def _bulged(path: np.ndarray, length: float, direction: np.ndarray, segments: in
     offset = (np.sin(math.pi * u) ** 2)[:, None] * normal
 
     def vertices(amplitude: float) -> np.ndarray:
-        return _resample(path + amplitude * offset, segments)
+        return _equal_chords(path + amplitude * offset, segments)
 
     def chord_length(amplitude: float) -> float:
         return float(np.linalg.norm(np.diff(vertices(amplitude), axis=0), axis=1).sum())
@@ -279,6 +284,44 @@ def _bulged(path: np.ndarray, length: float, direction: np.ndarray, segments: in
         mid = 0.5 * (lo + hi)
         lo, hi = (mid, hi) if chord_length(mid) < length else (lo, mid)
     return vertices(hi)
+
+
+def _equal_chords(path: np.ndarray, segments: int) -> np.ndarray:
+    """``segments + 1`` vertices on ``path`` with equal chord lengths (equal arc spacing would
+    let chords across a tight curl fall below the bending-stability segment length)."""
+    dense = _resample(path, max(4 * segments, 200))
+    end = dense[-1]
+
+    def walk(chord: float) -> tuple[np.ndarray, float]:
+        out, current, k = [dense[0]], dense[0], 0
+        for _ in range(segments):
+            while k < len(dense) - 1 and np.linalg.norm(dense[k + 1] - current) < chord:
+                k += 1
+            if k >= len(dense) - 1:
+                out.append(end)
+                current = end
+                continue
+            # Point on dense[k] -> dense[k+1] at distance ``chord`` from ``current``.
+            a, b = dense[k], dense[k + 1]
+            d = b - a
+            f = a - current
+            qa, qb, qc = d @ d, 2 * f @ d, f @ f - chord * chord
+            disc = max(qb * qb - 4 * qa * qc, 0.0)
+            t = (-qb + math.sqrt(disc)) / (2 * qa) if qa > 0 else 1.0
+            current = a + d * min(max(t, 0.0), 1.0)
+            out.append(current)
+        return np.asarray(out), float(np.linalg.norm(out[-1] - end))
+
+    total = float(np.linalg.norm(np.diff(dense, axis=0), axis=1).sum())
+    lo, hi = 0.0, total / segments * 1.0000001
+    for _ in range(50):  # bisection: the last vertex lands on the end of the path
+        mid = 0.5 * (lo + hi)
+        vertices, miss = walk(mid)
+        reached = np.allclose(vertices[-1], end) and miss < 1e-12
+        lo, hi = (lo, mid) if reached else (mid, hi)
+    vertices, _ = walk(lo)  # the largest chord that does not run past the end; snap the last vertex
+    vertices[-1] = end
+    return vertices
 
 
 def _resample(path: np.ndarray, segments: int) -> np.ndarray:
@@ -382,13 +425,18 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
             zero_slack.append(members[0])
 
         # Pins: both ends plus every tie of the harness that the path passes through.
-        pins: list[tuple[float, str]] = [(0.0, ends[0][0]), (routed, ends[1][0])]
+        pins: list[tuple[float, str, str]] = [(0.0, ends[0][0], "clamped"), (routed, ends[1][0], "clamped")]
+        harness_routes = routes.get("harnesses", {}).get(harness.id, {})
+        supports = [(np.asarray(sp["position"], dtype=float), sp.get("permitted_motion", "clamped"))
+                    for sp in harness_routes.get("supports", [])]
         tie_count = 0
         for tie in routes.get("harnesses", {}).get(harness.id, {}).get("tie_points", []):
             distance, arc = project_to_polyline(path, np.asarray(tie, dtype=float)[None])
             if distance <= 0.8 * od + 0.0015 and segment_length < arc < routed - segment_length:
-                if all(abs(arc - s) > segment_length for s, _ in pins):
-                    pins.append((arc, ROOT))
+                if all(abs(arc - s) > segment_length for s, _, _ in pins):
+                    tie_point = np.asarray(tie, dtype=float)
+                    motion = next((m for q, m in supports if np.linalg.norm(q - tie_point) < 1e-6), "clamped")
+                    pins.append((arc, ROOT, motion))
                     tie_count += 1
         pins.sort(key=lambda item: item[0])
 
@@ -397,14 +445,14 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
         spans: list[CableSpan] = []
         free_arc = 0.0
         free_total = routed * stretch
-        for k, ((s0, body0), (s1, body1)) in enumerate(zip(pins[:-1], pins[1:])):
+        for k, ((s0, body0, motion0), (s1, body1, motion1)) in enumerate(zip(pins[:-1], pins[1:])):
             span_path = _dense(path, s0, s1)
             span_free = (s1 - s0) * stretch
             n = max(MIN_SEGMENTS, int(math.floor(span_free / target + 1e-9)))
             vertices = _best_bulge(span_path, span_free, n, obstacles, od / 2)
             length = float(np.mean(np.linalg.norm(np.diff(vertices, axis=0), axis=1)))
             span = CableSpan(f"{bundle_id}s{k}_", vertices, body0, body1,
-                             _damping(ei, mass_per_m, od / 2, length, dt))
+                             _damping(ei, mass_per_m, od / 2, length, dt), start_motion=motion0, end_motion=motion1)
             # Termination zones: segments within the zone of a connector end do not
             # contact the body they terminate on (the conductors leave the housing there).
             for seg_index in range(n):
@@ -643,7 +691,7 @@ def emit_mjcf(mj: ET.Element, plan: CablePlan, body_element: Callable[[str], ET.
             parent = body_element(span.start_body)
             local = span.vertices - body_origin(span.start_body)
             composite = ET.SubElement(parent, "composite", type="cable", prefix=span.prefix, vertex=_fmt(local),
-                                      initial="none")
+                                      initial="ball" if span.start_motion == "pinned" else "none")
             plugin = ET.SubElement(composite, "plugin", plugin=CABLE_PLUGIN)
             for key, value in (("twist", f"{bundle.shear_modulus:.9g}"), ("bend", f"{bundle.young_modulus:.9g}"),
                                ("flat", "true"), ("vmax", "0")):
@@ -655,9 +703,17 @@ def emit_mjcf(mj: ET.Element, plan: CablePlan, body_element: Callable[[str], ET.
                           group="1")
             # The weld acts at the pin itself (anchor relative to body2); MuJoCo's default anchor is
             # body2's origin, whose lever arm makes a tiny segment's rotation a large, stiff residual.
-            ET.SubElement(equality, "weld", name=f"{span.prefix}pin", body1=f"{span.prefix}B_last",
-                          body2=body_name(span.end_body), anchor=_fmt(span.vertices[-1] - body_origin(span.end_body)),
-                          solref=ANCHOR_SOLREF, solimp=ANCHOR_SOLIMP)
+            if span.end_motion == "pinned":
+                # Position only: the anchor is the cable tip in the last segment's frame (+x spans it).
+                tip = float(np.linalg.norm(span.vertices[-1] - span.vertices[-2]))
+                ET.SubElement(equality, "connect", name=f"{span.prefix}pin", body1=f"{span.prefix}B_last",
+                              body2=body_name(span.end_body), anchor=_fmt([tip, 0.0, 0.0]),
+                              solref=ANCHOR_SOLREF, solimp=ANCHOR_SOLIMP)
+            else:
+                ET.SubElement(equality, "weld", name=f"{span.prefix}pin", body1=f"{span.prefix}B_last",
+                              body2=body_name(span.end_body),
+                              anchor=_fmt(span.vertices[-1] - body_origin(span.end_body)),
+                              solref=ANCHOR_SOLREF, solimp=ANCHOR_SOLIMP)
             names = span.body_names()
             for seg_index, body in sorted(set(span.exclude)):
                 if seg_index == 0 and body == span.start_body:
@@ -735,6 +791,10 @@ class CableMonitor:
         self.minimum_part = np.full(len(plan.bundles), -1, dtype=np.int64)
         self.minimum_time = np.zeros(len(plan.bundles))
         self._pins = self._pin_arrays(plan)
+        # Bodies next to each bundle's end pins: the second segment of the first span (its
+        # interaction force is what the start termination holds) and the last segment.
+        self.end_bodies = np.array([[spans[0][1] if len(spans[0]) > 1 else spans[0][0], spans[-1][-1]]
+                                    for spans in self.span_bodies], dtype=np.int64).reshape(-1, 2)
 
     def _pin_arrays(self, plan: CablePlan) -> tuple[np.ndarray, ...] | None:
         """(last segment body, pin body, pin anchor in the pin body, last segment length) per span."""
@@ -743,11 +803,14 @@ class CableMonitor:
         last, body2, anchor, length = [], [], [], []
         for eq in range(self.model.neq):
             name = mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_EQUALITY, eq) or ""
-            if self.model.eq_type[eq] != mujoco.mjtEq.mjEQ_WELD or not name.endswith("_pin"):
+            kind = int(self.model.eq_type[eq])  # numpy int vs pybind enum: compare as ints
+            if kind not in (int(mujoco.mjtEq.mjEQ_WELD), int(mujoco.mjtEq.mjEQ_CONNECT)) or not name.endswith("_pin"):
                 continue
             last.append(int(self.model.eq_obj1id[eq]))
             body2.append(int(self.model.eq_obj2id[eq]))
-            anchor.append(np.array(self.model.eq_data[eq, :3]))
+            # Weld: data[0:3] is the anchor in body2. Connect: data[3:6] is the anchor in body2.
+            anchor.append(np.array(self.model.eq_data[eq, 3:6] if kind == int(mujoco.mjtEq.mjEQ_CONNECT)
+                                   else self.model.eq_data[eq, :3]))
         spans = {s.prefix: s for b in plan.bundles for s in b.spans}
         for body in last:
             prefix = (mujoco.mj_id2name(self.model, mujoco.mjtObj.mjOBJ_BODY, body) or "").split("B_")[0]
@@ -785,6 +848,18 @@ class CableMonitor:
             self.minimum_part[better] = self.current_part[better]
             self.minimum_time[better] = data.time
         return self.current
+
+    def end_tension(self) -> np.ndarray:
+        """(bundles, 2) magnitude of the cable force at the start and end terminations (N):
+        the interaction force between the end segment and its neighbour (``cfrc_int`` from
+        ``mj_rnePostConstraint``; the force part of a spatial force is frame-independent)."""
+        import mujoco
+
+        if not len(self.end_bodies):
+            return np.zeros((0, 2))
+        mujoco.mj_rnePostConstraint(self.model, self.data)
+        force = self.data.cfrc_int[self.end_bodies.ravel(), 3:6]
+        return np.linalg.norm(force, axis=1).reshape(-1, 2)
 
     def _part(self, index: int) -> str:
         return self.parts[index] if index >= 0 else ""

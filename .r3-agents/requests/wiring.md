@@ -21,3 +21,25 @@
    (MuJoCo order); `lin_acc`, `ang_vel`, `ang_acc` are world-frame;
    `moving[<component>]` is the world pose of the component frame used by
    `RobotGraph.component_pose`. Please confirm this in `r3-pipeline.md`.
+
+## Wiring overhaul (branch r3/wiring-overhaul)
+
+6. **routes.json additive fields (now written).** `routes.json` keeps the contract
+   keys and adds: top-level `release` (`status` released|unreleased, `blocking_codes`);
+   per wire `valid`, `violations`, `color`, `od`, `cut` (nominal, tolerance, breakdown),
+   `installed_ampacity` + `derating` (read by `r3_sim.electrical.network`), and
+   `terminal_load`; per harness `valid`, `violations` and `supports`
+   (`id`, `type`, `mpn`, `host`, `position`, `permitted_motion`). Please add them to
+   `docs/architecture/r3-pipeline.md` as optional fields.
+7. **Termination data (catalog request).** `r3_wiring/data/terminations.yaml` holds per
+   cable-side connector type: housing/contact MPNs, strip length and tolerance, insertion
+   depth, rework allowance, contact retention and crimp tool. These belong in
+   `connectors.yaml` as optional `termination:` blocks (the `r3/connectors` branch adds
+   geometry, not termination data). Values are estimates unless marked datasheet.
+8. **Support hardware catalog.** `r3_wiring/data/supports.yaml` (tie mounts, screw mounts,
+   P-clips, post ties, PLT1M tie). Could move into `r3_catalog` as a `supports.yaml`.
+9. **Router hook (after the r3/connectors merge).** `r3_wiring.planner.plan_bundle` /
+   `plan_routing` run after routing in `stage.route_and_check`; `router.py` is untouched.
+   Once the connector fan-out lands, the router may call `plan_routing(project, self,
+   result)` at the end of `route()` (one line); per-conductor contact frames can then
+   become fixed junction axes in `planner._node_junction`.

@@ -182,7 +182,8 @@ def test_rc_car_steering_sweep(rc_car):
     # MuJoCo's own distance query agrees with the contact-derived clearance.
     exact = sim.exact_clearance()
     for wire, (distance, _) in sim.monitor.wire_clearance().items():
-        assert distance == pytest.approx(exact[wire][0], abs=1e-6), wire
+        # Penetrating pairs: the contact narrow phase and mj_geomDistance estimate depth differently.
+        assert distance == pytest.approx(exact[wire][0], abs=1e-6 if exact[wire][0] >= 0 else 5e-5), wire
 
 
 def test_mesh_sdf_sign_is_exact_near_corners():
