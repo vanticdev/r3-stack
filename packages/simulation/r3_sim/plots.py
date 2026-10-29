@@ -90,7 +90,7 @@ def plot_all(rec: dict[str, np.ndarray], context: dict[str, Any], out: Path) -> 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 5.5), dpi=130, sharex=True)
     ax1.plot(t, rec["battery_v"], color=SERIES[0], linewidth=1.2, label="battery terminal")
     ax1.plot(t, rec["rail_5v"], color=SERIES[2], linewidth=1.0, label="5 V rail")
-    ax1.plot(t, rec["bec_v"], color=SERIES[4], linewidth=1.0, label="BEC rail")
+    ax1.plot(t, rec["bec_v"], color=SERIES[4], linewidth=1.0, label="servo rail")
     _events(ax1, context.get("events", []), ("brownout",))
     _style(ax1, f"{title}: battery and rails", "", "V")
     ax1.legend(frameon=False, fontsize=8, ncol=3)
@@ -143,7 +143,38 @@ def plot_all(rec: dict[str, np.ndarray], context: dict[str, Any], out: Path) -> 
     paths.append(out / "currents.png")
     fig.savefig(paths[-1])
     plt.close(fig)
+
+    fault = context.get("fault")
+    if fault is not None and "esc_pulse_pi" in rec:
+        paths.append(_failsafe_plot(rec, context, fault, out / "failsafe.png"))
     return paths
+
+
+def _failsafe_plot(rec: dict[str, np.ndarray], context: dict[str, Any], fault: dict[str, Any], path: Path) -> Path:
+    """Speed, the Pi's ESC pulse vs the pulse the ESC sees, and the arbiter state around an injected fault."""
+    t = rec["t"]
+    window = (t >= fault["t"] - 2.0) & (t <= fault["t"] + 8.0)
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 5.5), dpi=130, sharex=True)
+    ax1.plot(t[window], rec["speed"][window], color=SERIES[0], linewidth=1.3, label="forward speed")
+    ax1.axvline(fault["t"], color=SERIES[1], linestyle="--", linewidth=1.0, label=f"{fault['type']} (t={fault['t']:.2f} s)")
+    for event in context.get("events", []):
+        if event.get("event") == "arbiter_failsafe" and event["t"] >= fault["t"] - 1e-9:
+            ax1.axvline(event["t"], color=SERIES[3], linestyle=":", linewidth=1.0, label=f"arbiter neutral (t={event['t']:.3f} s)")
+            break
+    _style(ax1, f"{context['scenario']}: failsafe", "", "m/s")
+    ax1.legend(frameon=False, fontsize=8)
+    ax2.plot(t[window], rec["esc_pulse_pi"][window], color=SERIES[4], linewidth=1.0, label="Pi PWM (GPIO18)")
+    ax2.plot(t[window], rec["esc_pulse"][window], color=SERIES[2], linewidth=1.3, linestyle="--", label="pulse at the ESC")
+    ax3 = ax2.twinx()
+    ax3.fill_between(t[window], 0, rec["arbiter_failsafe"][window], color=SERIES[1], alpha=0.12, step="post")
+    ax3.set_ylim(0, 4)
+    ax3.set_yticks([])
+    _style(ax2, "", "time (s)", "pulse width (us)")
+    ax2.legend(frameon=False, fontsize=8, loc="lower left")
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+    return path
 
 
 def plot_overview(outcomes: list[Any], path: Path) -> Path:

@@ -98,7 +98,9 @@ class TwinHalServer:
 
     def serve_one(self) -> str:
         """Read and answer one request. Returns ``ok``, ``closed``, ``timeout``,
-        ``brownout`` (a brownout reply was sent), or ``end`` (scenario over)."""
+        ``brownout`` (a brownout reply was sent), ``freeze`` (a software-freeze fault is
+        due: the request is left unanswered and the runner stops the process), or
+        ``end`` (scenario over)."""
         assert self._rfile is not None
         try:
             line = self._rfile.readline()
@@ -113,11 +115,16 @@ class TwinHalServer:
         except (json.JSONDecodeError, UnicodeDecodeError):
             self.errors["bad_request"] = self.errors.get("bad_request", 0) + 1
             self.bad_lines.append(line[:200])
-            self._send({"id": None, "ok": False, "t": self.kernel.t, "error": "bad_request", "message": "invalid JSON"})
+            try:
+                self._send({"id": None, "ok": False, "t": self.kernel.t, "error": "bad_request", "message": "invalid JSON"})
+            except OSError:
+                return "closed"  # the peer went away mid-line
             return "ok"
         self.requests += 1
         rid = request.get("id")
         op = str(request.get("op", ""))
+        if self.kernel.freeze_due:
+            return "freeze"
         if not self.kernel.pi_powered:
             self._error(rid, "brownout", "computer supply below brownout threshold")
             return "brownout"
@@ -129,6 +136,8 @@ class TwinHalServer:
         if status == "end":
             self.ended = True
             return "end"
+        if status == "freeze":
+            return "freeze"
         self._send({"id": rid, "ok": True, "t": round(self.kernel.t, 9), **result})
         if op == "bye":
             self.bye = self.ended = True
@@ -149,6 +158,11 @@ class TwinHalServer:
             raise HalRequestError("brownout", "computer supply browned out while blocked")
         return reason
 
+    @staticmethod
+    def _blocked(reason: str) -> str | None:
+        """Request status when a blocking wait ended early (scenario end or software freeze)."""
+        return reason if reason in ("end", "freeze") else None
+
     def _dispatch(self, op: str, req: dict[str, Any]) -> tuple[dict[str, Any], str]:
         k = self.kernel
         if op == "hello":
@@ -163,7 +177,7 @@ class TwinHalServer:
         if op == "clock.sleep_until":
             target = float(req.get("t", k.t))
             reason = self._advance(lambda: k.t + 1e-9 >= target, deadline=target)
-            return {}, "end" if reason == "end" else "ok"
+            return {}, self._blocked(reason) or "ok"
         if op.startswith("gpio."):
             return self._gpio(op, req)
         if op == "pwm.configure":
@@ -196,6 +210,8 @@ class TwinHalServer:
         if op == "gpio.configure":
             k.gpio_lines[key] = GpioLineState(key[0], key[1], str(req.get("direction", "in")), str(req.get("bias", "none")),
                                               str(req.get("edge", "none")))
+            if k.gpio_lines[key].direction == "out":
+                k.gpio_written(key, 0)  # a line configured as output starts low
             return {}, "ok"
         line = k.gpio_lines.get(key)
         if line is None:
@@ -209,6 +225,7 @@ class TwinHalServer:
             if line.direction != "out":
                 raise HalRequestError("bad_direction", "line is configured as input")
             line.value_out = int(req.get("value", 0))
+            k.gpio_written(key, line.value_out)
             return {}, "ok"
         if op == "gpio.count_edges":
             return {"count": line.rising_count, "last_t": line.last_rising_t}, "ok"
@@ -217,8 +234,8 @@ class TwinHalServer:
             if not line.pending_edges and timeout > 0:
                 deadline = k.t + timeout
                 reason = self._advance(lambda: bool(line.pending_edges) or k.t + 1e-9 >= deadline)
-                if reason == "end":
-                    return {}, "end"
+                if self._blocked(reason):
+                    return {}, reason
             edges = [{"t": round(t, 9), "rising": rising} for t, rising in line.pending_edges if t <= k.t + 1e-12]
             line.pending_edges = [(t, r) for t, r in line.pending_edges if t > k.t + 1e-12]
             return {"edges": edges}, "ok"
@@ -265,8 +282,8 @@ class TwinHalServer:
             if k.bytes_available(device) == 0 and timeout > 0:
                 deadline = k.t + timeout
                 reason = self._advance(lambda: k.bytes_available(device) > 0 or k.t + 1e-9 >= deadline)
-                if reason == "end":
-                    return {}, "end"
+                if self._blocked(reason):
+                    return {}, reason
             k.bytes_available(device)
             data = bytes(uart.ready[:maximum])
             del uart.ready[:maximum]

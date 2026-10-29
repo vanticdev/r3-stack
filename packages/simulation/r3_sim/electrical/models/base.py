@@ -15,7 +15,7 @@ from typing import Any
 
 from r3_model.units import to_si
 
-from ..netlist import GROUND, Netlist, Solution, fmt
+from ..netlist import GROUND, Netlist, Solution, fmt, smooth_min
 
 _SAFE = re.compile(r"[^a-z0-9_]")
 
@@ -231,9 +231,18 @@ class BehaviorModel:
         self.__dict__.update(state)
 
 
+#: Relative width of the constant-current load's knee (smooth min, see :func:`constant_current`).
+KNEE_WIDTH = 0.02
+
+
 def constant_current(current: float, v_knee: float, v: str) -> str:
-    """I = I0 above ``v_knee``; I0 V / v_knee below (supply collapse keeps Newton well posed)."""
-    return f"({v} >= {fmt(v_knee)} ? {fmt(current)} : {fmt(current)}*max({v},{fmt(-v_knee)})/{fmt(v_knee)})"
+    """I = I0 above ``v_knee``; I0 V / v_knee below (supply collapse keeps Newton well posed).
+
+    The corner is a smooth min, I = I0 min_s(1, V / V_knee) (2 % wide: 1.4 % low exactly at the knee,
+    < 0.01 % from 6 % above it): a hard corner stalls ngspice's step control when a rail decays slowly
+    through the knee (e.g. on hold-up capacitance)."""
+    ratio = f"max({v},{fmt(-v_knee)})/{fmt(v_knee)}"
+    return f"{fmt(current)}*{smooth_min('1', ratio, KNEE_WIDTH)}"
 
 
 def gated_power(power: str, v_on: float, width: float, v: str) -> str:

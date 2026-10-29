@@ -111,7 +111,9 @@ def test_top_speed_consistent_with_motor_limit(project):
     key = ("pwmchip0", 2)
     for step in range(9000):
         t = step * 0.001
-        pulse = 1500.0 + 500.0 * min(1.0, t / 2.5)  # ramp to full throttle without spinning the rear tires
+        if step % 10 == 0:  # HAT failsafe arbiter heartbeat (GPIO27) at the 100 Hz control rate
+            kernel.gpio_written(("gpiochip0", 27), (step // 10) % 2)
+        pulse = 1500.0 + 500.0 * max(0.0, min(1.0, (t - 0.05) / 2.5))  # neutral while the arbiter re-arms, then ramp
         kernel.pwm_state[key] = {"period_ns": 20_000_000, "duty_ns": int(pulse * 1000), "enabled": True}
         kernel.step()
     speed = kernel.vehicle.forward_speed()

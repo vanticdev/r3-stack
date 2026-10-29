@@ -8,10 +8,11 @@ from . import ipc2152
 from .arbiter import ArbiterParams
 from .intent import BoardIntent
 from .regulators import BuckDesign, design_notes_markdown, hold_up_time
+from .spice import TVS_PARTS, tvs_clamp
 
 
 def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign, power: dict[str, Any],
-                 erc: dict[str, Any], drc: dict[str, Any]) -> str:
+                 erc: dict[str, Any], drc: dict[str, Any], pour_report: list[dict[str, Any]] | None = None) -> str:
     dt = float(intent.rules.get("delta_t_power", 20.0))
     arb = ArbiterParams()
     hold = hold_up_time(pi.values["c_out_effective"], pi.values["v_out_nominal"], 4.63, 6.5)
@@ -43,7 +44,8 @@ def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign, power: 
         f"{intent.rules['min_track_width']}/{intent.rules['min_clearance']} mm, via {intent.rules['min_via_diameter']}/"
         f"{intent.rules['min_via_drill']} mm, copper-edge {intent.rules['copper_edge_clearance']} mm.",
         "- 2x20 socket on the bottom side at the HAT position; GND pours on both layers; power rails as wide "
-        "hand-routed tracks (the 5 V path to the Pi pins doubled on the bottom layer).",
+        "hand-routed tracks (the 5 V path to the Pi pins doubled on the bottom layer) and pours at the regulator pins "
+        "and the FET -> shunt gap.",
         "",
         "## Copper sizing (IPC-2152)",
         "",
@@ -63,10 +65,19 @@ def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign, power: 
         track = (f"{e['narrowest_deliberate_width'] * 1000:.2f} mm ({e['narrowest_deliberate_rating']:.2f} A)"
                  if "narrowest_deliberate_width" in e else "-")
         lines.append(f"| {net} | {e['design_current']:g} A | {pours} | {e['vias']} ({e['via_capacity']:g} A) | {track} |")
+    if pour_report:
+        lines += ["", "Power pours (KiCad-filled copper on F.Cu where the current enters fine-pitch pins or crosses between "
+                  "large pads); narrowest filled cross-section between the terminals, measured by `r3_kicad.pours`:", "",
+                  "| Pour | Terminals | Current | Narrowest cross-section | IPC-2152 rating |", "| --- | --- | --- | --- | --- |"]
+        for entry in pour_report:
+            terminals = " -> ".join("+".join(t if isinstance(t, str) else "bus" for t in group) for group in entry["terminals"])
+            lines.append(f"| {entry['zone']} | {terminals} | {entry['current']:g} A | {entry['bottleneck_width'] * 1000:.2f} mm | "
+                         f"{entry['rating']:.2f} A |")
     lines += [
         "",
         "The Pi's 5 V pins (2, 4) sit on the header's edge row, behind pins 1/3: the 5 V path reaches them around pin 1 "
-        "(between it and the H1 hole) on both layers. Fine-pitch pins are entered with short necks (< 1.5 mm).",
+        "(between it and the H1 hole) as a parallel pair, 1.4 mm on top and 0.8 mm on the bottom (the current splits by "
+        "width). Fine-pitch pins are reached by pours, not fixed-width necks.",
         "",
         design_notes_markdown(pi, "5.1 V / 5 A Pi rail: U2 TPS568230", [
             ("UVLO", "VIN UVLO 4.2 typ / 4.4 V max rising, 3.8 V falling (datasheet)",
@@ -86,8 +97,7 @@ def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign, power: 
         "",
         "- Reverse polarity: DMP3013SFV P-MOSFET (-30 V, 9.5 mOhm at -10 V) in the + lead, gate pulled to GND by 100 k, "
         "BZT52B12 clamps VGS (VGS max +-25 V).",
-        "- TVS: SMAJ16A (VRWM 16 V, VBR 17.8 V min, VC 26 V at 15.4 A). Its clamp exceeds the regulators' VIN abs. max "
-        "(20/22 V) at full surge current (reported as a warning); a 2S-only build should fit an SMAJ10A.",
+        _tvs_note(intent, pi, servo),
         "- INA226 at 0x40 (A0 = A1 = GND) across a 2 mOhm Vishay WSK2512 Kelvin shunt, 10 Ohm + 100 nF filter "
         "(SBOS547 sec. 8.4.1), sense traces from the shunt's Kelvin pads. VBUS measures VIN_HAT. Full scale 81.92 mV / "
         "2 mOhm = 41 A, LSB 1.25 mA. **Limitation:** the INA226 sees only the HAT branch (Pi, servo, logic). The ESC/motor "
@@ -133,3 +143,19 @@ def design_notes(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign, power: 
     if intent.notes:
         lines += ["## Notes", ""] + [f"- {n}" for n in intent.notes] + [""]
     return "\n".join(lines)
+
+
+def _tvs_note(intent: BoardIntent, pi: BuckDesign, servo: BuckDesign) -> str:
+    part = next((p.value for p in intent.parts if p.lib_id.startswith("Diode:SMAJ")), None)
+    if part not in TVS_PARTS:
+        return "- TVS: none."
+    d = TVS_PARTS[part]
+    abs_max = min(pi.ic.v_in_abs_max, servo.ic.v_in_abs_max)
+    surge = 20.0  # A: 2 x the 10 A blade fuse feeding the HAT (200 % for >= 0.15 s), the expected surge bound
+    return (f"- TVS: {part} (VRWM {d['v_rwm']:g} V, VBR {d['v_br_min']:g}-{d['v_br_max']:g} V, VC {d['v_c']:g} V at "
+            f"{d['i_pp']:g} A). A 2S pack is 8.4 V full, below the {d['v_rwm']:g} V stand-off. Clamp "
+            f"{tvs_clamp(part, surge):.1f} V at the expected {surge:g} A surge (2 x the HAT branch's 10 A fuse; "
+            f"V_C(I) = V_BR,max + (V_C - V_BR,max) I / I_PP) and {d['v_c']:g} V at I_PP, below the regulators' "
+            f"{abs_max:g} V VIN absolute maximum (TPS56528 20 V, TPS568230 22 V). The previous SMAJ16A clamped at "
+            f"{tvs_clamp('SMAJ16A', min(surge, TVS_PARTS['SMAJ16A']['i_pp'])):.1f} V at its {TVS_PARTS['SMAJ16A']['i_pp']:g} A "
+            "I_PP, above 20 V. A 3S pack (12.6 V) would need a different TVS.")

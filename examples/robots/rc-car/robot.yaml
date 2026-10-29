@@ -11,7 +11,12 @@ requirements:
   top_speed: 8 m/s
   min_runtime: 15 min
   radio_range: 300 m
+  # Failsafe stop distance from the fault (link loss, hung software) to standstill, at the autonomous
+  # maximum cruise speed (software.config.max_cruise_speed_mps); proven by range_failsafe and pi_hang.
   failsafe_stop_distance: 3 m
+  # At the 8 m/s top speed (manual driving) 3 m is physically impossible; the radio failsafe stop distance
+  # proven by top_speed_failsafe (7.1 m from 8.0 m/s, 0.25 s software failsafe then ESC brake) plus ~25 % margin.
+  failsafe_stop_distance_at_top_speed: 9 m
   max_wire_voltage_drop_fraction: 0.03
   min_wire_clearance_moving: 8 mm
   max_component_temperature_c: 85
@@ -355,8 +360,9 @@ electrical:
         A: {type: integral, mates: esc.J_SIG}
         B: {type: servo-3-female, mates: hat.J_ESC}
       wires:
+        # The ESC's BEC (A.2) is not used: the HAT's J_ESC.2 is unconnected and the servo runs from the
+        # HAT's 6.0 V regulator, so the 3-pin lead carries signal and ground only (BEC pin unpopulated).
         - {id: W_ESC_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: ESC_PWM}
-        - {id: W_ESC_BEC, from: A.2, to: B.2, awg: 22, color: red, signal: BEC_6V}
         - {id: W_ESC_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
       route: {slack: 30 mm}
     - id: servo_lead
@@ -365,7 +371,7 @@ electrical:
         B: {type: servo-3-female, mates: hat.J_SERVO}
       wires:
         - {id: W_SRV_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: SERVO_PWM}
-        - {id: W_SRV_VCC, from: A.2, to: B.2, awg: 22, color: red, signal: BEC_6V}
+        - {id: W_SRV_VCC, from: A.2, to: B.2, awg: 22, color: red, signal: SERVO_6V}
         - {id: W_SRV_GND, from: A.3, to: B.3, awg: 22, color: black, signal: GND}
       route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr]}
     - id: rx_lead
@@ -417,6 +423,9 @@ software:
     gps:       {interface: uart, computer: pi, pins: [pi.J8.7, pi.J8.29], device: /dev/ttyAMA2, baud: 115200, expects: [gps.J1.2, gps.J1.3]}
     i2c:       {interface: i2c, computer: pi, pins: [pi.J8.3, pi.J8.5], device: /dev/i2c-1, expects: [hat.I2C_SDA, hat.I2C_SCL]}
     encoder:   {interface: gpio, computer: pi, pins: [pi.J8.11], device: gpiochip0, channel: 17, expects: [encoder.J1.2]}
+    # Failsafe heartbeat to the HAT's ATtiny412 arbiter: toggled every control cycle (100 Hz); after 100 ms
+    # without an edge the arbiter replaces the Pi's ESC PWM with 1500 us neutral.
+    heartbeat: {interface: gpio, computer: pi, pins: [pi.J8.13], device: gpiochip0, channel: 27, expects: [hat.HEARTBEAT]}
   config:
     control_rate_hz: 100
     mode: autonomous            # autonomous | manual
@@ -461,12 +470,34 @@ simulation:
       pilot: {arm_at: 0.5 s, throttle: [[0, 0.0], [1.0, 1.0], [7.0, 0.0]], steering: [[0, 0.0]]}
       expect: {min_top_speed_mps: 8.0, brownouts: 0}
     - id: range_failsafe
-      description: Autonomous straight run away from the transmitter until the radio link is lost; car must brake.
+      description: Autonomous straight run at the maximum cruise speed away from the transmitter until the radio link is lost; car must brake.
       duration: 300 s
       initial: {battery_soc: 0.95}
       pilot: {arm_at: 1.0 s}
-      mission: {type: waypoints, laps: 1, speed: 5.0, waypoints: [[5, 0], [1500, 0]]}
+      mission: {type: waypoints, laps: 1, speed: 4.0, waypoints: [[5, 0], [1500, 0]]}
       expect: {link_lost_beyond_m: 300, stop_within_m_of_link_loss: 3.0}
+    - id: pi_hang
+      description: >
+        Autonomous straight run at the maximum cruise speed; the robot software freezes (SIGSTOP) at 15 s while the
+        Pi's PWM peripheral keeps the last throttle. The HAT arbiter must force neutral within 100 ms of the last
+        heartbeat edge and the car must stop.
+      duration: 40 s
+      initial: {battery_soc: 0.95}
+      pilot: {arm_at: 1.0 s}
+      mission: {type: waypoints, laps: 1, speed: 4.0, waypoints: [[5, 0], [400, 0]]}
+      faults:
+        - {type: software_freeze, at: 15 s, method: sigstop}
+      expect: {arbiter_neutral_within_s: 0.12, stop_within_m_of_fault: 3.0, brownouts: 0}
+    - id: top_speed_failsafe
+      description: >
+        Manual full throttle to top speed, then the transmitter is switched off; the receiver sends no frames
+        ("no pulses" failsafe) and the software must brake to a stop.
+      duration: 16 s
+      initial: {battery_soc: 1.0, mode: manual}
+      pilot: {arm_at: 0.5 s, throttle: [[0, 0.0], [1.0, 1.0]], steering: [[0, 0.0]]}
+      faults:
+        - {type: transmitter_off, at: 7.0 s}
+      expect: {min_top_speed_mps: 8.0, stop_within_m_of_link_loss: 9.0, brownouts: 0}
     - id: low_battery
       description: Start nearly empty; firmware must cut throttle before cells drop below 3.0 V and the Pi must not brown out.
       duration: 120 s

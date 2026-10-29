@@ -332,9 +332,12 @@ components:
     kind: pcb
     name: R3 RC carrier HAT (custom KiCad board)
     description: >
-      65 x 56.5 mm HAT. XT30 battery input -> 5.1 V / 5 A synchronous buck back-powering the Pi;
-      INA226 battery monitor (I2C 0x40, 2 mOhm shunt); MPU-6050 IMU (I2C 0x68); 220 Ohm series
-      resistors on ESC/servo PWM; ESC BEC 6 V rail passed through to the servo header; encoder pull-up.
+      65 x 56.5 mm HAT made headlessly in KiCad 10. XT30 battery input -> DMP3013SFV reverse-polarity FET ->
+      2 mOhm Kelvin shunt (INA226, I2C 0x40, HAT branch only) -> TPS568230 5.1 V / 5 A buck back-powering the Pi
+      (VIN UVLO 4.4 V max, 220 uF hold-up) and TPS56528 6.0 V servo rail (5.5-7.8 A valley current limit);
+      SMAJ10A input TVS (17.0 V clamp, below the regulators' 20 V VIN absolute maximum); MPU-6050 IMU (I2C 0x68);
+      ATtiny412 failsafe arbiter between the Pi's ESC PWM and the ESC (neutral after 100 ms without a GPIO27
+      heartbeat); 220 Ohm series resistor on the servo PWM; encoder pull-up. The ESC BEC (J_ESC.2) is not connected.
     mechanical:
       shape: custom
       size: [65 mm, 56.5 mm, 20.5 mm]
@@ -352,11 +355,14 @@ components:
         - {id: hole_4, kind: clearance_hole, position: [29 mm, 24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
       provenance: {status: derived, source: "Raspberry Pi HAT+ mechanical spec: 65 x 56.5 board, holes on the Pi's 58 x 49 pattern, header centered"}
     pins:
-      VBAT: {role: power_in, voltage_nominal: 7.4, voltage_min: 6.0, voltage_max: 17.0, current_max: 3.0}
+      # VBAT maximum: the SMAJ10A's 10 V standoff (a 2S pack is 8.4 V full); above it the TVS conducts.
+      VBAT: {role: power_in, voltage_nominal: 7.4, voltage_min: 4.4, voltage_max: 10.0, current_max: 5.0}
       GND: {role: ground}
       5V: {role: power_out, voltage_nominal: 5.1, current_max: 5.0}
       3V3: {role: power_in, voltage_nominal: 3.3, current_max: 0.05}
-      BEC_6V: {role: passive, voltage_nominal: 6.0, current_max: 3.0}
+      SERVO_6V: {role: power_out, voltage_nominal: 6.0, current_max: 5.0}
+      ESC_BEC_NC: {role: nc}
+      HEARTBEAT: {role: gpio, logic_level: 3.3}
       I2C_SDA: {role: i2c_sda, logic_level: 3.3}
       I2C_SCL: {role: i2c_scl, logic_level: 3.3}
       PI_ESC_PWM: {role: pwm_in, logic_level: 3.3}
@@ -369,36 +375,57 @@ components:
       GPS_RX: {role: uart_rx, logic_level: 3.3}
       ENC: {role: gpio, logic_level: 3.3}
     connectors:
+      # Positions measured from the KiCad board (board.json connector_geometry): pad centroid plus the
+      # connector type's mating-face height; component frame = board centre, +y toward the GPIO edge.
       J_GPIO:
         type: socket-2x20-2.54
-        position: [0, 24.5 mm, 0]
+        position: [0, 24.75 mm, 0]
         direction: [0, 0, -1]
         pins: {"1": 3V3, "2": 5V, "3": I2C_SDA, "4": 5V, "5": I2C_SCL, "6": GND, "7": GPS_TX, "8": CRSF_TX, "9": GND, "10": CRSF_RX,
-               "11": ENC, "12": PI_ESC_PWM, "14": GND, "17": 3V3, "20": GND, "25": GND, "29": GPS_RX, "30": GND, "34": GND,
-               "35": PI_SERVO_PWM, "39": GND}
-      J_BATT: {type: xt30-male, position: [27 mm, -20 mm, 12 mm], direction: [1, 0, 0], pins: {"1": VBAT, "2": GND}}
-      J_ESC: {type: header-1x3-2.54, position: [-26 mm, -22 mm, 12 mm], direction: [0, 0, 1], pins: {"1": ESC_PWM, "2": BEC_6V, "3": GND}}
-      J_SERVO: {type: header-1x3-2.54, position: [-18 mm, -22 mm, 12 mm], direction: [0, 0, 1], pins: {"1": SERVO_PWM, "2": BEC_6V, "3": GND}}
-      J_RX: {type: jst-gh-4-header, position: [24 mm, 10 mm, 12 mm], direction: [1, 0, 0], pins: {"1": 5V, "2": CRSF_TX, "3": CRSF_RX, "4": GND}}
-      J_GPS: {type: jst-gh-4-header, position: [-28 mm, 5 mm, 12 mm], direction: [-1, 0, 0], pins: {"1": 5V, "2": GPS_TX, "3": GPS_RX, "4": GND}}
-      J_ENC: {type: jst-xh-3-header, position: [-27 mm, -8 mm, 12 mm], direction: [-1, 0, 0], pins: {"1": 3V3, "2": ENC, "3": GND}}
+               "11": ENC, "12": PI_ESC_PWM, "13": HEARTBEAT, "14": GND, "17": 3V3, "20": GND, "25": GND, "29": GPS_RX,
+               "30": GND, "34": GND, "35": PI_SERVO_PWM, "39": GND}
+      J_BATT: {type: xt30-male, position: [19.0 mm, -13.75 mm, 4.6 mm], direction: [1, 0, 0], pins: {"1": VBAT, "2": GND}}
+      J_ESC: {type: header-1x3-2.54, position: [-16.96 mm, -25.25 mm, 10.1 mm], direction: [0, 0, 1], pins: {"1": ESC_PWM, "2": ESC_BEC_NC, "3": GND}}
+      J_SERVO: {type: header-1x3-2.54, position: [-4.96 mm, -25.25 mm, 10.1 mm], direction: [0, 0, 1], pins: {"1": SERVO_PWM, "2": SERVO_6V, "3": GND}}
+      J_RX: {type: jst-gh-4-header, position: [27.35 mm, 3.25 mm, 3.7 mm], direction: [1, 0, 0], pins: {"1": 5V, "2": CRSF_TX, "3": CRSF_RX, "4": GND}}
+      J_GPS: {type: jst-gh-4-header, position: [-27.35 mm, 5.75 mm, 3.7 mm], direction: [-1, 0, 0], pins: {"1": 5V, "2": GPS_TX, "3": GPS_RX, "4": GND}}
+      J_ENC: {type: jst-xh-3-header, position: [-22.5 mm, -4.75 mm, 4.9 mm], direction: [-1, 0, 0], pins: {"1": 3V3, "2": ENC, "3": GND}}
     internal_links:
-      - {a: PI_ESC_PWM, b: ESC_PWM, kind: series_resistor, value: 220}
+      - {a: PI_ESC_PWM, b: ESC_PWM, kind: failsafe_arbiter, value: 0.1}    # value = heartbeat timeout (s)
       - {a: PI_SERVO_PWM, b: SERVO_PWM, kind: series_resistor, value: 220}
     behavior:
       model: board.pcb
       params:
         source: pcb/carrier-hat
-        regulator: {model: regulator.buck, v_out: 5.1, i_max: 5.0, v_in_min: 6.0, v_in_max: 17.0, f_sw: 500 kHz,
-                    efficiency: [[0.1, 0.80], [0.5, 0.91], [1.0, 0.93], [2.0, 0.93], [3.0, 0.92], [5.0, 0.89]], quiescent_current: 0.002}
-        ina226: {address: 0x40, shunt: 2 mohm, bus: I2C}
+        regulator: {model: regulator.buck, part: TPS568230, output_pin: 5V, v_out: 5.105, i_max: 5.0, i_limit_min: 8.1,
+                    v_in_min: 4.4, v_in_uvlo_falling: 3.8, v_in_max: 17.0, v_in_abs_max: 22.0, f_sw: 600 kHz, max_duty: 0.90,
+                    inductance: 2.2 uH, r_high_side: 19.5 mohm, r_low_side: 9.5 mohm, inductor_dcr: 15.07 mohm,
+                    efficiency: [[0.1, 0.80], [0.5, 0.95], [1.0, 0.96], [2.0, 0.97], [3.0, 0.97], [5.0, 0.96]],
+                    quiescent_current: 0.003, hold_up_capacitance: 268 uF}
+        servo_regulator: {model: regulator.buck, part: TPS56528, output_pin: SERVO_6V, v_out: 6.05, i_max: 2.5, i_limit_min: 5.5,
+                          i_limit_max: 8.7, v_in_min: 4.35, v_in_max: 17.0, v_in_abs_max: 20.0, f_sw: 650 kHz, max_duty: 0.80,
+                          inductance: 3.3 uH, r_high_side: 68 mohm, r_low_side: 37 mohm, inductor_dcr: 21.45 mohm,
+                          efficiency: [[0.1, 0.83], [0.5, 0.95], [1.0, 0.96], [2.0, 0.96], [2.5, 0.95]],
+                          hold_up_capacitance: 29.7 uF}
+        input_capacitance: 220 uF   # C3 bulk on VIN_HAT (after the shunt), plus the regulators' input ceramics
+        failsafe: {part: ATtiny412, heartbeat: HEARTBEAT, timeout: 0.1, neutral_us: 1500, frame: 0.02, rearm_edges: 3,
+                   rearm_band_us: 50, supply: 3V3}
+        reverse_protection: {part: DMP3013SFV, rds_on: 12 mohm}
+        tvs: {part: SMAJ10A, v_standoff: 10.0, v_breakdown_min: 11.1, v_breakdown_max: 12.3, v_clamp: 17.0, i_pp: 23.5}
+        ina226: {address: 0x40, shunt: 2 mohm, bus: I2C, measures: hat_branch_only}
         mpu6050: {address: 0x68, bus: I2C}
         encoder_pullup: 10 kohm
         i2c_pullups: 4.7 kohm
+        spice_model: build/pcb/carrier-hat/carrier-hat_power.cir   # subckt R3_CARRIER_HAT_POWER VBAT GND V5 V6
+        mounting: {screw: ISO 4762 M2.5 socket head cap screw, holes: 4, pattern: [58 mm, 49 mm], drill: 2.7 mm,
+                   head_diameter: 4.5 mm, head_height: 2.5 mm, print_clearance: 0.3 mm,
+                   standoff: M2.5 x 11 mm hex 5.0 mm A/F}
+      provenance: {status: datasheet, source: "TI TPS568230 (SLVSEY5C), TPS56528 (SLVSBV3B), Littelfuse SMAJ series, DMP3013SFV; efficiencies estimated by r3_kicad.regulators.efficiency_curve"}
     software:
       - {bus: i2c, address: 0x40, protocol: ina226}
       - {bus: i2c, address: 0x68, protocol: mpu6050}
-    thermal: {theta_ja_c_per_w: 35.0, max_temp_c: 105, notes: "buck regulator package to ambient"}
+      - {bus: gpio, protocol: heartbeat, params: {pin: HEARTBEAT, min_rate_hz: 20, timeout: 0.1}}
+    thermal: {theta_ja_c_per_w: 55.0, max_temp_c: 125, notes: "TPS568230 on a 2-layer board (estimated); JEDEC 44.9 C/W"}
   - id: elrs-receiver-2g4
     kind: radio
     name: ExpressLRS 2.4 GHz receiver (CRSF)
@@ -414,7 +441,8 @@ components:
     behavior:
       model: receiver.crsf
       params: {frequency: 2.44 GHz, packet_rate: 150 Hz, sensitivity_dbm: -108, noise_figure_db: 6, antenna_gain_dbi: 2.0,
-               antenna_height_above_mount: 0.0829, uart_baud: 420000, failsafe_timeout: 1.0, current_active: 0.06, telemetry_power_dbm: 17}
+               antenna_height_above_mount: 0.0829, uart_baud: 420000, failsafe_timeout: 1.0, current_active: 0.06, telemetry_power_dbm: 17,
+               failsafe_mode: no_pulses}   # ELRS failsafe: stop CRSF RC frames on link loss (not hold/set position)
       provenance: {status: datasheet, source: "ExpressLRS docs: 150 Hz LoRa sensitivity -108 dBm; RP1 power ~60 mA (estimated)"}
     software:
       - {bus: uart, protocol: crsf, params: {baud: 420000}}

@@ -165,12 +165,17 @@ class SoftwareInterface(_Model):
 class InternalLink(_Model):
     """Signal or power continuity between two pins inside a component, through
     a non-ideal element (series resistor, fuse, switch, shunt). Pins that share
-    a name are the same node and need no link."""
+    a name are the same node and need no link.
+
+    ``failsafe_arbiter``: an active signal element. ``b`` follows ``a`` only while
+    the board's heartbeat pin toggles; otherwise ``b`` carries neutral pulses
+    (``value`` = heartbeat timeout in s; model ``r3_kicad.arbiter.FailsafeArbiter``).
+    It carries the logic signal like a series resistor but conducts no DC."""
 
     a: str
     b: str
-    kind: Literal["series_resistor", "fuse", "switch", "shunt", "wire", "level_shifter"]
-    value: Quantity = Field(default=0.0, description="Resistance (ohm) or fuse rating (A).")
+    kind: Literal["series_resistor", "fuse", "switch", "shunt", "wire", "level_shifter", "failsafe_arbiter"]
+    value: Quantity = Field(default=0.0, description="Resistance (ohm), fuse rating (A) or arbiter heartbeat timeout (s).")
 
 
 InterfaceKind = Literal[

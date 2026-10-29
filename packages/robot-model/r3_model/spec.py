@@ -45,7 +45,10 @@ class Requirements(_Model):
     top_speed: Quantity | None = None
     min_runtime: Quantity | None = Field(default=None, description="Mission runtime at the scenario duty cycle.")
     radio_range: Quantity | None = Field(default=None, description="Distance with positive link margin.")
-    failsafe_stop_distance: Quantity | None = None
+    failsafe_stop_distance: Quantity | None = Field(
+        default=None, description="Stop distance after a failsafe (link loss, hung software) at the autonomous maximum cruise speed.")
+    failsafe_stop_distance_at_top_speed: Quantity | None = Field(
+        default=None, description="Radio-failsafe stop distance from top speed (manual driving).")
     max_wire_voltage_drop_fraction: float = 0.03
     min_wire_clearance_moving: Quantity = 0.008
     max_component_temperature_c: float = 85.0

@@ -8,6 +8,12 @@ time has elapsed. A crashed program is restarted by the target-side watchdog
 after ``WATCHDOG_RESTART_DELAY`` (BLITZ watchdog behavior), up to
 ``MAX_RESTARTS`` times. PWM outputs keep their last configuration when the
 process exits (Linux sysfs PWM semantics) and only stop on power loss.
+
+Fault ``software_freeze`` (``scenario.faults``): at its time the program is
+stopped with SIGSTOP while it waits for a HAL reply (that reply never comes),
+exactly as a hung main loop on the Pi: the PWM peripheral keeps its last
+duty, GPIO lines keep their level (the heartbeat stops), and the twin runs on
+freely. A frozen process is not restarted (the hang is not a crash).
 """
 
 from __future__ import annotations
@@ -15,6 +21,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -45,6 +52,8 @@ CHECK_CODES = {
     "min_top_speed_mps": "top_speed_below_requirement",
     "link_lost_beyond_m": "radio_range_insufficient",
     "stop_within_m_of_link_loss": "failsafe_stop_distance_exceeded",
+    "stop_within_m_of_fault": "failsafe_stop_distance_exceeded",
+    "arbiter_neutral_within_s": "arbiter_failsafe_too_slow",
     "min_cell_voltage_v": "battery_undervoltage",
     "low_voltage_cutoff_engaged": "low_voltage_cutoff_not_engaged",
     "min_wire_clearance_m": "wire_clearance_violation",
@@ -97,6 +106,7 @@ class _Software:
         self.restarts = 0
         self.gave_up = cmd is None
         self.restart_at: float | None = None
+        self.frozen = False
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_path.write_text("")
 
@@ -127,10 +137,21 @@ class _Software:
         self.kill()
         return False
 
+    def freeze(self) -> None:
+        """Stop the program (SIGSTOP): its main loop hangs in the HAL call it is blocked in."""
+        if self.proc is not None and self.proc.poll() is None:
+            os.kill(self.proc.pid, signal.SIGSTOP)
+        self.frozen = True
+        self.gave_up = True  # a hung process is not restarted by the watchdog's exit handling
+        if self.launches:
+            self.launches[-1]["frozen_t"] = round(self.kernel.t, 6)
+
     def kill(self, reason: str = "") -> None:
         if self.proc is not None:
             if self.proc.poll() is None:
                 self.proc.terminate()
+                if self.frozen:
+                    os.kill(self.proc.pid, signal.SIGCONT)  # deliver the pending SIGTERM
                 try:
                     self.proc.wait(2.0)
                 except subprocess.TimeoutExpired:
@@ -175,12 +196,18 @@ def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | N
         if progress and kernel.t - last_report >= 10.0:
             last_report = kernel.t
             progress(f"{scenario_id}: t={kernel.t:.1f}s / {duration:.0f}s")
-        if server.connected:
+        if server.connected and not software.frozen:
             status = server.serve_one()
             if status == "ok":
                 continue
             if status == "end":
                 break
+            if status == "freeze":
+                software.freeze()
+                kernel.software_frozen, kernel.frozen_at = True, kernel.t
+                kernel.recorder.events.append({"t": kernel.t, "event": "software_freeze", "method": "SIGSTOP",
+                                               "pid": software.proc.pid if software.proc else None})
+                continue
             if status == "brownout":
                 software.kill("brownout")
                 continue
@@ -201,7 +228,7 @@ def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | N
             else:
                 software.gave_up = True
             continue
-        # No software connected: decide whether to (re)launch, otherwise free-run one step.
+        # No software connected (or frozen): decide whether to (re)launch, otherwise free-run one step.
         due = (kernel.pi_powered and not software.gave_up and kernel.boot_ready_t is not None and kernel.t + 1e-9 >= kernel.boot_ready_t
                and (software.restart_at is None or kernel.t + 1e-9 >= software.restart_at))
         if due:
@@ -222,6 +249,16 @@ def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | N
     return outcome
 
 
+def _fault(kernel: CoSimKernel) -> dict[str, Any] | None:
+    """The first injected fault that took effect: {"type", "t"}."""
+    faults = []
+    if kernel.frozen_at is not None:
+        faults.append({"type": "software_freeze", "t": float(kernel.frozen_at)})
+    if kernel.transmitter_off is not None and kernel.transmitter_off[0] <= kernel.t:
+        faults.append({"type": "transmitter_off", "t": float(kernel.transmitter_off[0])})
+    return min(faults, key=lambda f: f["t"]) if faults else None
+
+
 def _interp_position(rec: dict[str, np.ndarray], t: float) -> tuple[float, float]:
     return float(np.interp(t, rec["t"], rec["x"])), float(np.interp(t, rec["t"], rec["y"]))
 
@@ -229,6 +266,9 @@ def _interp_position(rec: dict[str, np.ndarray], t: float) -> tuple[float, float
 def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHalServer, software: _Software,
             diagnostics: list[Diagnostic], out_dir: Path, render: bool, wall: float, hung: bool,
             setup: float = 0.0) -> ScenarioOutcome:
+    for arbiter in set(kernel.arbiters.values()):
+        kernel.recorder.events.extend(arbiter.events)
+    kernel.recorder.events.sort(key=lambda e: e.get("t", 0.0))
     rec = kernel.recorder.arrays()
     config = project.spec.software.config
     failsafe_timeout = float(config.get("radio_failsafe_timeout_s", 0.25))
@@ -256,6 +296,7 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         "esc_neutral_us": to_si(esc_params.get("neutral_pulse", 1500e-6)) * 1e6,
         "obstacles": [{"id": o.get("id"), "center": [to_si(v) for v in o.get("center", [0, 0, 0])]}
                       for o in project.spec.simulation.environment.obstacles],
+        "fault": _fault(kernel),
         "tx_position": tx.tolist(), "rssi_curve": curve, "radio_backend": radio.backend, "radio_label": radio.model.label,
         "sensitivity_dbm": radio.sensitivity_dbm, "noise_dbm": radio.noise_dbm,
         "snr_required_db": radio.snr_required_db,
@@ -302,6 +343,10 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         "max_tx_distance_m": round(float(np.max(rec["tx_distance"])), 1),
         "min_rssi_dbm": round(float(np.nanmin(rec["rssi"])), 1) if np.isfinite(rec["rssi"]).any() else None,
         "link_lost": link_lost, "rc_frames": kernel.receiver.frames_rc,
+        "fault": context["fault"],
+        "arbiter": {f"{a.board}": {"heartbeat_edges": a.edges, "failsafe": a.failsafe, "timeout": a.params.timeout,
+                                   "transitions": [[round(tt, 4), s.value] for tt, s in a.model.transitions]}
+                    for a in set(kernel.arbiters.values())},
         "packets_ok": kernel.receiver.packets_ok, "packets_lost": kernel.receiver.packets_lost,
         "min_wire_clearance_m": (round(kernel.min_wire_clearance[0], 5) if math.isfinite(kernel.min_wire_clearance[0]) else None),
         "min_wire_clearance_wire": kernel.min_wire_clearance[1], "min_wire_clearance_component": kernel.min_wire_clearance[2],

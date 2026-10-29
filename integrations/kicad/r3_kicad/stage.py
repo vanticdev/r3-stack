@@ -26,7 +26,7 @@ from typing import Any
 
 from r3_model.diagnostics import Diagnostic, StageResult
 
-from . import ipc2152
+from . import ipc2152, pours
 from .arbiter import ArbiterParams
 from .board_json import catalog_check, connector_geometry, connectors_map, nets_map, power_summary, traces
 from .board_read import read_board
@@ -160,8 +160,10 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
     power = power_summary(board_file, intent, trace_list, dt_power)
     _power_checks(intent, board_file, power, result, name)
     _segment_checks(intent, result, name)
+    pour_report = _pour_checks(intent, board_file, result, name)
     pi, servo = pi_rail(), servo_rail()
     _regulator_checks(pi, servo, result, name)
+    _tvs_check(intent, ctype, pi, servo, result, name)
     geometry = connector_geometry(board_file, intent, ctype)
     for cid, entry in geometry.items():
         if entry.get("deviation_xy", 0.0) > 0.002:
@@ -172,9 +174,10 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
                                                 "deviation": entry["deviation_xy"], "limit": 0.002},
                                           hint="update the catalog connector position from board.json connector_geometry"))
     spice = out / f"{name}_power.cir"
-    spice.write_text(power_subcircuit(pi, servo))
+    tvs_part = next((p.value for p in intent.parts if p.lib_id.startswith("Diode:SMAJ")), "SMAJ10A")
+    spice.write_text(power_subcircuit(pi, servo, tvs=tvs_part))
     files["spice"] = _rel(project, spice)
-    notes = design_notes(intent, pi, servo, power, erc, drc)
+    notes = design_notes(intent, pi, servo, power, erc, drc, pour_report)
     (out / "design-notes.md").write_text(notes)
     (source / "design-notes.md").write_text(notes)
     files["design_notes"] = _rel(project, source / "design-notes.md")
@@ -195,6 +198,7 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
                   "max_current": round(ipc2152.via_max_current(v.drill), 3)} for v in board_file.vias],
         "zones": [{"net": z.net, "layer": z.layer, "name": z.name, "area": round(z.area * 1e-6, 9)} for z in board_file.zones],
         "power": power,
+        "pours": pour_report,
         "regulators": {
             "pi_5v": _regulator_json(pi), "servo_6v": _regulator_json(servo),
             "hold_up_5v_s": round(hold_up_time(pi.values["c_out_effective"], pi.values["v_out_nominal"], 4.63, 6.5), 6),
@@ -259,6 +263,46 @@ def _segment_checks(intent: BoardIntent, result: StageResult, name: str) -> None
                 data={"width": track.width / 1000, "current": track.current, "rating": round(rating, 3),
                       "delta_t_rated": dt, "delta_t_estimated": round(rise, 1), "length": round(length / 1000, 6)},
                 hint="short necks between pours run cooler than the long-trace fit; widen if space allows"))
+
+
+def _pour_checks(intent: BoardIntent, board_file, result: StageResult, name: str) -> list[dict[str, Any]]:
+    """Power pours (zones with a design current) against IPC-2152 at their narrowest cross-section,
+    measured on KiCad's filled copper between the zone's terminals (:mod:`r3_kicad.pours`)."""
+    dt = float(intent.rules.get("delta_t_power", 20.0))
+    out: list[dict[str, Any]] = []
+    for zone in intent.zones:
+        if zone.current <= 0 or len(zone.terminals) < 2:
+            continue
+        zone_name = zone.name or f"{zone.net} {zone.layer}"
+        fills = [z for z in board_file.zones if z.net == zone.net and z.layer == zone.layer and z.name == zone_name]
+        polygons = [poly for z in fills for poly in z.polygons]
+        groups: list[list[Any]] = []
+        for group in zone.terminals:
+            boxes: list[Any] = []
+            for terminal in group:
+                if isinstance(terminal, str):
+                    ref, number = terminal.split(".", 1)
+                    boxes += [pad.bbox for pad in board_file.pads if pad.ref == ref and pad.number == number
+                              and zone.layer in pad.layers and pad.bbox is not None]
+                else:
+                    boxes.append(tuple(terminal))
+            groups.append(boxes)
+        width = pours.bottleneck_width(polygons, groups) if polygons and all(groups) else 0.0
+        rating = ipc2152.max_current(width, intent.copper_oz, dt) if width > 0 else 0.0
+        entry = {"zone": zone_name, "net": zone.net, "layer": zone.layer, "current": zone.current,
+                 "terminals": [[t if isinstance(t, str) else list(t) for t in g] for g in zone.terminals],
+                 "bottleneck_width": round(width / 1000, 6), "rating": round(rating, 3), "delta_t_rated": dt,
+                 "area": round(sum(z.area for z in fills) * 1e-6, 9)}
+        out.append(entry)
+        if width <= 0:
+            result.add(Diagnostic.error("pcb_pour_disconnected", f"{name}: pour {zone_name} does not connect its terminals",
+                                        subjects=[name, zone.net], data={"terminal_groups": len(groups)}))
+        elif rating + 1e-9 < zone.current:
+            result.add(Diagnostic.warning(
+                "pcb_pour_over_ipc2152", f"{name}: {zone_name} narrows to {width:.2f} mm between its terminals; "
+                f"carries {zone.current:g} A, IPC-2152 rating {rating:.2f} A at {dt:g} C rise", subjects=[name, zone.net],
+                data={"width": width / 1000, "current": zone.current, "rating": round(rating, 3), "delta_t_rated": dt}))
+    return out
 
 
 def _regulator_json(design) -> dict[str, Any]:
@@ -379,9 +423,31 @@ def _regulator_checks(pi, servo, result: StageResult, name: str) -> None:
                                    "~5.8-5.9 V at the servo", subjects=[name, "U3"],
                                    data={"v_in_dropout": round(v["v_in_dropout"], 3), "v_nominal_in": 7.4,
                                          "max_duty": round(servo.ic.max_duty, 4)}))
-    clamp, abs_max = 26.0, min(pi.ic.v_in_abs_max, servo.ic.v_in_abs_max)
-    result.add(Diagnostic.warning("pcb_tvs_clamp_exceeds_abs_max", f"SMAJ16A clamps at {clamp} V at its 15.4 A peak pulse "
-                                  f"current, above the regulators' {abs_max} V VIN absolute maximum",
-                                  subjects=[name, "D2", "U2", "U3"], data={"clamp_voltage": clamp, "abs_max": abs_max,
-                                                                         "surge_current": 15.4},
-                                  hint="for a 2S-only build an SMAJ10A (VRWM 10 V, VC 17 V) protects fully"))
+
+
+def _tvs_check(intent: BoardIntent, catalog_component, pi, servo, result: StageResult, name: str) -> None:
+    """The input TVS on the board against the catalog's TVS data and the regulators' VIN absolute maximum.
+    V_C(I_PP) is the datasheet clamp at the part's rated peak pulse current, the worst case it is specified for
+    (the electrical twin also checks it at the expected surge current)."""
+    tvs_parts = [p for p in intent.parts if p.lib_id.startswith("Diode:SMAJ")]
+    params = (catalog_component.behavior.params if catalog_component and catalog_component.behavior else {}) or {}
+    tvs = params.get("tvs") if isinstance(params.get("tvs"), dict) else None
+    if not tvs_parts or tvs is None:
+        return
+    part = tvs_parts[0]
+    if str(tvs.get("part")) != part.value:
+        result.add(Diagnostic.error("board_catalog_mismatch", f"{part.ref} is {part.value}, catalog tvs.part is {tvs.get('part')}",
+                                    subjects=[name, part.ref], data={"kind": "tvs_part"}))
+        return
+    clamp, i_pp = float(tvs["v_clamp"]), float(tvs["i_pp"])
+    abs_max = min(pi.ic.v_in_abs_max, servo.ic.v_in_abs_max)
+    data = {"clamp_voltage": clamp, "abs_max": abs_max, "surge_current": i_pp}
+    if clamp > abs_max:
+        result.add(Diagnostic.warning("pcb_tvs_clamp_exceeds_abs_max", f"{part.value} clamps at {clamp:g} V at its {i_pp:g} A "
+                                      f"peak pulse current, above the regulators' {abs_max:g} V VIN absolute maximum",
+                                      subjects=[name, part.ref, "U2", "U3"], data=data,
+                                      hint="choose a TVS whose clamp at I_PP is below the absolute maximum"))
+    else:
+        result.add(Diagnostic.info("pcb_tvs_clamp_ok", f"{part.value} clamps at {clamp:g} V at its {i_pp:g} A peak pulse current, "
+                                   f"{abs_max - clamp:.1f} V below the regulators' {abs_max:g} V VIN absolute maximum",
+                                   subjects=[name, part.ref], data=data))

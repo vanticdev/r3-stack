@@ -120,6 +120,9 @@ def main() -> None:
     gps_uart = hal.uart(b["gps"]["device"], b["gps"]["baud"])
     i2c = hal.i2c(b["i2c"]["device"])
     enc = hal.gpio(b["encoder"]["device"], b["encoder"]["channel"], "in", "pull_up", "rising")
+    # HAT failsafe arbiter heartbeat: the ESC follows our PWM only while this line toggles.
+    beat = hal.gpio(b["heartbeat"]["device"], b["heartbeat"]["channel"], "out") if "heartbeat" in b else None
+    level = 0
     esc.set_pulse_us(esc_cfg["neutral"])
     servo.set_pulse_us(steer_cfg["center"])
     i2c.write_reg(0x68, 0x6B, b"\x00")  # MPU-6050 wake, internal oscillator
@@ -236,6 +239,9 @@ def main() -> None:
         span = (steer_cfg["left"] - steer_cfg["center"]) if steer > 0 else (steer_cfg["center"] - steer_cfg["right"])
         esc.set_pulse_us(pulse)
         servo.set_pulse_us(steer_cfg["center"] + steer / max_steer * span)
+        if beat is not None:
+            level ^= 1
+            beat.write(level)
         tick += 1
         t_next += period
         hal.clock.sleep_until(t_next)

@@ -91,7 +91,12 @@ def test_board_geometry(checked, intent):
     # Hand-routed power copper survived the autorouter round trip as locked copper.
     locked = [s for s in board.segments if s.locked]
     assert len(locked) >= len([t for t in intent.power_tracks]) and any(s.net == "VIN_HAT" for s in locked)
-    assert {z.net for z in board.zones} == {"GND"} and all(z.area > 500 for z in board.zones)
+    ground = [z for z in board.zones if z.net == "GND"]
+    assert len(ground) == 2 and all(z.area > 500 for z in ground)
+    # Power pours at the regulator pins and the FET -> shunt gap, filled by KiCad on the top layer.
+    power = {z.net: z for z in board.zones if z.net != "GND"}
+    assert set(power) == {"SW_5V", "SW_6V", "VIN_HAT", "VBAT_PROT"}
+    assert all(z.layer == "F.Cu" and z.area > 5 and z.polygons for z in power.values())
 
 
 def test_flow_log_records_a_headless_run():

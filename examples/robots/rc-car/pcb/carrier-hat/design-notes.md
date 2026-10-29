@@ -14,7 +14,7 @@ Everything ran headless (no KiCad window, as on a server); the flow is `python -
 ## Board
 
 - 65 x 56.5 mm, R3 corners, 1.6 mm FR-4, 2 layers, 1 oz copper. Rules for a standard 2-layer fab (JLCPCB/PCBWay): min track/clearance 0.15/0.15 mm, via 0.5/0.3 mm, copper-edge 0.3 mm.
-- 2x20 socket on the bottom side at the HAT position; GND pours on both layers; power rails as wide hand-routed tracks (the 5 V path to the Pi pins doubled on the bottom layer).
+- 2x20 socket on the bottom side at the HAT position; GND pours on both layers; power rails as wide hand-routed tracks (the 5 V path to the Pi pins doubled on the bottom layer) and pours at the regulator pins and the FET -> shunt gap.
 
 ## Copper sizing (IPC-2152)
 
@@ -30,15 +30,24 @@ External-conductor fit (Brooks, PCD&F 2015): dT = 215.3 I^2 W^-1.15 Th^-1 (mil, 
 | Net | Design current | Pour area (mm^2) | Vias (capacity) | Narrowest hand-routed track |
 | --- | --- | --- | --- | --- |
 | 5V | 5 A | - | 3 (5.56 A) | 0.50 mm (1.97 A) |
-| GND | 5 A | F.Cu 2307.01, B.Cu 2884.79 | 113 (179.14 A) | - |
+| GND | 5 A | F.Cu 2385.93, B.Cu 2843.67 | 119 (188.65 A) | - |
 | SERVO_6V | 3 A | - | 1 (1.85 A) | 1.09 mm (3.08 A) |
-| SW_5V | 5 A | - | 2 (3.17 A) | 0.50 mm (1.97 A) |
-| SW_6V | 3 A | - | 0 (0 A) | 1.60 mm (3.83 A) |
+| SW_5V | 5 A | F.Cu 14.42 | 2 (3.17 A) | 0.50 mm (1.97 A) |
+| SW_6V | 3 A | F.Cu 9.92 | 0 (0 A) | 1.60 mm (3.83 A) |
 | VBAT | 5 A | - | 0 (0 A) | 2.59 mm (5.06 A) |
-| VBAT_PROT | 5 A | - | 0 (0 A) | 1.20 mm (3.25 A) |
-| VIN_HAT | 5 A | - | 0 (0 A) | 0.30 mm (1.47 A) |
+| VBAT_PROT | 5 A | F.Cu 14.82 | 0 (0 A) | 1.20 mm (3.25 A) |
+| VIN_HAT | 5 A | F.Cu 15.32 | 2 (3.71 A) | 0.30 mm (1.47 A) |
 
-The Pi's 5 V pins (2, 4) sit on the header's edge row, behind pins 1/3: the 5 V path reaches them around pin 1 (between it and the H1 hole) on both layers. Fine-pitch pins are entered with short necks (< 1.5 mm).
+Power pours (KiCad-filled copper on F.Cu where the current enters fine-pitch pins or crosses between large pads); narrowest filled cross-section between the terminals, measured by `r3_kicad.pours`:
+
+| Pour | Terminals | Current | Narrowest cross-section | IPC-2152 rating |
+| --- | --- | --- | --- | --- |
+| SW_5V pour | L1.1 -> U2.19+U2.20 | 5 A | 2.74 mm | 5.22 A |
+| VIN_HAT pour | bus -> U2.2+U2.3+U2.4+U2.5 | 4.42 A | 3.74 mm | 6.25 A |
+| SW_6V pour | U3.6 -> L2.1 | 3 A | 1.82 mm | 4.13 A |
+| VBAT_PROT pour | R2.1 -> Q1.1+Q1.2+Q1.3 | 5 A | 2.90 mm | 5.40 A |
+
+The Pi's 5 V pins (2, 4) sit on the header's edge row, behind pins 1/3: the 5 V path reaches them around pin 1 (between it and the H1 hole) as a parallel pair, 1.4 mm on top and 0.8 mm on the bottom (the current splits by width). Fine-pitch pins are reached by pours, not fixed-width necks.
 
 ## 5.1 V / 5 A Pi rail: U2 TPS568230
 
@@ -118,7 +127,7 @@ Design checks:
 ## Protection and monitoring
 
 - Reverse polarity: DMP3013SFV P-MOSFET (-30 V, 9.5 mOhm at -10 V) in the + lead, gate pulled to GND by 100 k, BZT52B12 clamps VGS (VGS max +-25 V).
-- TVS: SMAJ16A (VRWM 16 V, VBR 17.8 V min, VC 26 V at 15.4 A). Its clamp exceeds the regulators' VIN abs. max (20/22 V) at full surge current (reported as a warning); a 2S-only build should fit an SMAJ10A.
+- TVS: SMAJ10A (VRWM 10 V, VBR 11.1-12.3 V, VC 17 V at 23.5 A). A 2S pack is 8.4 V full, below the 10 V stand-off. Clamp 16.3 V at the expected 20 A surge (2 x the HAT branch's 10 A fuse; V_C(I) = V_BR,max + (V_C - V_BR,max) I / I_PP) and 17 V at I_PP, below the regulators' 20 V VIN absolute maximum (TPS56528 20 V, TPS568230 22 V). The previous SMAJ16A clamped at 26.0 V at its 15.4 A I_PP, above 20 V. A 3S pack (12.6 V) would need a different TVS.
 - INA226 at 0x40 (A0 = A1 = GND) across a 2 mOhm Vishay WSK2512 Kelvin shunt, 10 Ohm + 100 nF filter (SBOS547 sec. 8.4.1), sense traces from the shunt's Kelvin pads. VBUS measures VIN_HAT. Full scale 81.92 mV / 2 mOhm = 41 A, LSB 1.25 mA. **Limitation:** the INA226 sees only the HAT branch (Pi, servo, logic). The ESC/motor current splits off in the XT60 Y-harness before the HAT and is not measured.
 - MPU-6050 at 0x68 (AD0 = GND), CLKIN/FSYNC low, REGOUT 100 nF, CPOUT 2.2 nF / 50 V, VDD/VLOGIC 100 nF / 10 nF.
 - I2C pull-ups 4.7 kOhm to 3V3 (parallel with the Pi's 1.8 kOhm: 1.3 kOhm, 2.6 mA sink).

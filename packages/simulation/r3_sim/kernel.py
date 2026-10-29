@@ -34,7 +34,7 @@ from r3_model.project import Project
 from r3_model.spec import Scenario
 from r3_model.units import to_si
 
-from .devices import GpsReceiver, HallEncoder, Ina226, Mpu6050
+from .devices import ArbiterDevice, GpsReceiver, HallEncoder, Ina226, Mpu6050, arbiter_params
 from .fallbacks import FallbackCableSimulator, FallbackElectricalSystem
 from .pilot import Pilot
 from .radio import ElrsReceiver, RadioLink
@@ -47,6 +47,8 @@ CABLE_PERIOD = 0.005
 RECORD_PERIOD = 0.01
 SNAPSHOT_PERIOD = 1.0 / 30.0
 UART_BUFFER_BYTES = 4096  # Linux n_tty receive buffer
+#: Scenario fault types the kernel and runner inject (``scenario.faults``).
+FAULT_TYPES = {"software_freeze", "transmitter_off"}
 DEFAULT_GPS_ORIGIN = (37.4275, -122.1697, 30.0)  # fixed geodetic origin of the local tangent plane (estimate)
 
 
@@ -287,6 +289,30 @@ class CoSimKernel:
                     self.assumptions.append(("sensors", f"Hall encoder magnets ride on {self.encoder_joint} (drive joint nearest "
                                                         f"to {cid})."))
 
+        # --- hardware failsafe arbiters between a PWM binding and its consumer (board ``failsafe_arbiter`` links)
+        self.arbiters: dict[tuple[str, int], ArbiterDevice] = {}        # PWM (chip, channel) -> arbiter
+        self.heartbeat_lines: dict[tuple[str, int], ArbiterDevice] = {}  # GPIO (chip, line) -> arbiter
+        self.pi_pulses: dict[tuple[str, int], float] = {}                # what the computer outputs, per PWM channel
+        self._setup_arbiters()
+
+        # --- injected faults
+        self.faults = [dict(f) for f in scenario.faults]
+        self.freeze_at: float | None = None
+        self.transmitter_off: tuple[float, float] | None = None
+        for fault in self.faults:
+            kind = fault.get("type")
+            at = to_si(fault.get("at", 0.0))
+            if kind == "software_freeze":
+                self.freeze_at = at if self.freeze_at is None else min(self.freeze_at, at)
+            elif kind == "transmitter_off":
+                self.transmitter_off = (at, to_si(fault["until"]) if fault.get("until") is not None else math.inf)
+            else:
+                self.diagnostics.append(Diagnostic.warning(
+                    "fault_unsupported", f"scenario fault type {kind!r} is not supported (known: {', '.join(sorted(FAULT_TYPES))})",
+                    subjects=[scenario.id], data={"faults": len(self.faults)}))
+        self.software_frozen = False
+        self.frozen_at: float | None = None
+
         mode = initial.get("mode", spec.software.config.get("mode", "autonomous"))
         self.pilot = Pilot(scenario.pilot or {}, spec.software.config)
         self.mode = mode
@@ -365,6 +391,57 @@ class CoSimKernel:
                     return edge.ref
         return None
 
+    def _setup_arbiters(self) -> None:
+        """Arbiter devices from boards with a ``failsafe_arbiter`` internal link: the PWM bindings whose pins
+        share a net with the link's input pin pass through it; the GPIO bindings on the board's heartbeat pin
+        feed it."""
+        project, spec, graph = self.project, self.project.spec, self.project.graph
+
+        def on_net(pins: list[str], node: str) -> bool:
+            for pin in pins:
+                try:
+                    if graph.connected(pin, node):
+                        return True
+                except KeyError:
+                    continue
+            return False
+
+        for cid, inst in spec.components.items():
+            ctype = project.catalog.components.get(inst.type)
+            links = [link for link in (ctype.internal_links if ctype else []) if link.kind == "failsafe_arbiter"]
+            if not links:
+                continue
+            failsafe = _behavior_params(project, cid).get("failsafe") or {}
+            heartbeat = failsafe.get("heartbeat") or next(
+                (s.params.get("pin") for s in ctype.software if s.bus == "gpio" and s.protocol == "heartbeat"), None)
+            mine = [b for b in spec.software.bindings.values() if b.computer == self.computer]
+            for link in links:
+                device = ArbiterDevice(cid, arbiter_params(failsafe, float(link.value) or None))
+                pwm = [(b.device, int(b.channel or 0)) for b in mine if b.interface == "pwm" and on_net(b.pins, f"C:{cid}.{link.a}")]
+                beats = [(b.device, int(b.channel or 0)) for b in mine
+                         if b.interface == "gpio" and heartbeat and on_net(b.pins, f"C:{cid}.{heartbeat}")]
+                for key in pwm:
+                    self.arbiters[key] = device
+                for key in beats:
+                    self.heartbeat_lines[key] = device
+                if pwm and not beats:
+                    self.diagnostics.append(Diagnostic.error(
+                        "arbiter_heartbeat_unbound", f"{cid}: failsafe arbiter {link.a}->{link.b} has no software heartbeat binding "
+                        f"on {heartbeat}; its output stays at neutral", subjects=[cid, str(heartbeat)], data={"pwm_bindings": len(pwm)},
+                        hint="bind a gpio output to the board's heartbeat pin and toggle it every control cycle"))
+                if pwm:
+                    p = device.params
+                    self.assumptions.append(("electrical", f"{cid} failsafe arbiter ({p.part}, r3_kicad.arbiter): {link.a} reaches "
+                                                           f"{link.b} only while the heartbeat toggles; {p.timeout * 1e3:.0f} ms without "
+                                                           f"an edge -> {p.neutral_us:.0f} us neutral from the next {p.frame * 1e3:.0f} ms "
+                                                           f"frame; re-arm after {p.rearm_edges} edges at neutral; boots in failsafe."))
+
+    def gpio_written(self, key: tuple[str, int], value: int) -> None:
+        """Software wrote a GPIO output level (heartbeat lines feed their arbiter)."""
+        arbiter = self.heartbeat_lines.get(key)
+        if arbiter is not None:
+            arbiter.heartbeat_write(self.t, value)
+
     def _nearest_drive_joint(self, component: str) -> str | None:
         if not self.vm.drives:
             return None
@@ -404,11 +481,17 @@ class CoSimKernel:
 
     # ------------------------------------------------------------------ step
     def _pulse_for(self, component: str) -> float:
+        """Pulse width (us) ``component`` sees: the computer's PWM output, through a failsafe arbiter when the
+        binding passes one (0: no pulses)."""
         for key, devices in self.pwm_devices.items():
             if component in devices:
                 state = self.pwm_state.get(key)
+                pulse = 0.0
                 if state and state["enabled"] and state["period_ns"] > 0 and self.pi_powered:
-                    return state["duty_ns"] / 1000.0
+                    pulse = state["duty_ns"] / 1000.0
+                self.pi_pulses[key] = pulse
+                arbiter = self.arbiters.get(key)
+                return arbiter.output(self.t, pulse) if arbiter is not None else pulse
         return 0.0
 
     def _inputs(self) -> tuple[dict[str, Any], float, float, float]:
@@ -527,6 +610,11 @@ class CoSimKernel:
                     self.min_wire_clearance = (float(distance), wire, part)
         # 6. radio.
         rx_powered = self.pi_powered and float(_first(out, [("_nets", "5V")], 5.0)) >= 4.5
+        if self.transmitter_off is not None:
+            on = not (self.transmitter_off[0] <= t1 < self.transmitter_off[1])
+            if on != self.receiver.transmitter_on:
+                self.recorder.events.append({"t": t1, "event": "transmitter_on" if on else "transmitter_off"})
+            self.receiver.transmitter_on = on
         rx_pos = position + rotation @ self.rx_antenna_offset
         channels = self.pilot.channels_us(t1)
         frame_bytes = self.receiver.advance(t1, rx_pos, channels, rx_powered, rotation)
@@ -576,6 +664,9 @@ class CoSimKernel:
                 self.min_wire_clearance = (distance, wire, part)
 
     def _update_power(self, powered: bool, t: float) -> None:
+        if powered != self.pi_powered:
+            for arbiter in set(self.arbiters.values()):  # arbiters run from the computer's 3V3
+                arbiter.set_powered(t, powered)
         if self.pi_powered and not powered:
             self.pi_powered = False
             self.brownout_times.append(t)
@@ -611,7 +702,10 @@ class CoSimKernel:
             soc=float(_first(out, [(self.battery_id, "soc")], 0.0)),
             cell_v=float(_first(out, [(self.battery_id, "cell_voltage")], battery_v / max(self.cells, 1))),
             rail_5v=float(_first(out, [("_nets", "5V"), (self.computer, "v_in")], 0.0)),
-            bec_v=float(_first(out, [("_nets", "BEC_6V"), (self.esc_id, "bec_voltage")], 0.0)),
+            bec_v=float(_first(out, [("_nets", "SERVO_6V"), ("_nets", "BEC_6V"), (self.esc_id, "bec_voltage")], 0.0)),
+            esc_pulse_pi=next((v for k, v in self.pi_pulses.items() if k in self.arbiters), self.esc_pulse),
+            arbiter_failsafe=1.0 if any(a.failsafe for a in self.arbiters.values()) else 0.0,
+            software_frozen=1.0 if self.software_frozen else 0.0,
             hat_current=float(_first(out, [("_branches", self.hat_supply_wire or "", "current"), (self.board_id or "", "current_in")], 0.0)),
             servo_current=float(_first(out, [(self.servo_id, "current")], 0.0)),
             pi_powered=1.0 if self.pi_powered else 0.0, software=1.0 if self.software_running else 0.0,
@@ -624,20 +718,29 @@ class CoSimKernel:
             armed=1.0 if self.pilot.armed(self.t) else 0.0,
         )
 
+    @property
+    def freeze_due(self) -> bool:
+        """A ``software_freeze`` fault is due now (the runner stops the program)."""
+        return self.freeze_at is not None and not self.software_frozen and self.t + 1e-9 >= self.freeze_at
+
     def advance_until(self, done: Callable[[], bool], limit: float | None = None, deadline: float | None = None) -> str:
-        """Step until ``done()``; returns 'done' | 'brownout' | 'end' (scenario duration).
+        """Step until ``done()``; returns 'done' | 'brownout' | 'freeze' | 'end' (scenario duration).
         ``deadline``: ``done()`` is exactly ``t >= deadline``, so the steps up to it can run
-        with MuJoCo overlapped across steps (:meth:`_run_overlapped`)."""
+        with MuJoCo overlapped across steps (:meth:`_run_overlapped`). 'freeze': a software-freeze
+        fault is due; the request in progress is never answered."""
         end = self.duration if limit is None else min(self.duration, limit)
         while True:
             if done():
                 return "done"
             if not self.pi_powered:
                 return "brownout"
+            if self.freeze_due:
+                return "freeze"
             if self.t >= end - 1e-9:
                 return "end" if self.t >= self.duration - 1e-9 else "done"
             if deadline is not None and self.vehicle.overlapped:
-                steps = self._steps_until(deadline, end)
+                frozen_by = self.freeze_at if self.freeze_at is not None and not self.software_frozen else math.inf
+                steps = self._steps_until(min(deadline, frozen_by), end)
                 if steps > 1:
                     self._run_overlapped(steps)
                     continue

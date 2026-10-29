@@ -203,8 +203,28 @@ def _radio_range(ctx: _Context, limit: float) -> list[Evidence]:
     return ctx.scenario_checks("link_lost_beyond_m")
 
 
+STOP_DISTANCE_CHECKS = ("stop_within_m_of_link_loss", "stop_within_m_of_fault")
+
+
+def _stop_checks(ctx: _Context, limit: float) -> list[Evidence]:
+    """Stop-distance checks of the scenarios that test this requirement: those whose expected stop distance
+    equals it (a scenario at top speed tests ``failsafe_stop_distance_at_top_speed``, one at the autonomous
+    cruise speed ``failsafe_stop_distance``)."""
+    out = []
+    for key in STOP_DISTANCE_CHECKS:
+        for evidence in ctx.scenario_checks(key):
+            limit_value = _finite(evidence.limit)
+            if limit_value is not None and abs(limit_value - limit) <= 1e-6:
+                out.append(evidence)
+    return out
+
+
 def _failsafe_stop(ctx: _Context, limit: float) -> list[Evidence]:
-    return ctx.scenario_checks("stop_within_m_of_link_loss")
+    return _stop_checks(ctx, limit)
+
+
+def _failsafe_stop_top_speed(ctx: _Context, limit: float) -> list[Evidence]:
+    return _stop_checks(ctx, limit)
 
 
 def _voltage_drop(ctx: _Context, limit: float) -> list[Evidence]:
@@ -260,6 +280,7 @@ REQUIREMENT_CHECKS: dict[str, Callable[[_Context, float], list[Evidence]]] = {
     "min_runtime": _min_runtime,
     "radio_range": _radio_range,
     "failsafe_stop_distance": _failsafe_stop,
+    "failsafe_stop_distance_at_top_speed": _failsafe_stop_top_speed,
     "max_wire_voltage_drop_fraction": _voltage_drop,
     "min_wire_clearance_moving": _wire_clearance,
     "max_component_temperature_c": _temperature,

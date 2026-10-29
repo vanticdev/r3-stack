@@ -60,7 +60,10 @@ def map_bindings(project: Project) -> dict[str, BindingMap]:
                 elif binding.interface == "i2c":
                     wanted = pin.role in ("i2c_sda", "i2c_scl") and any(s.bus == "i2c" for s in ctype.software)
                 elif binding.interface == "gpio":
-                    wanted = pin.role == "gpio" and ctype.kind != "pcb"
+                    # Board GPIO pins are pass-through traces, except a pin the board itself consumes
+                    # (a gpio software interface naming it, e.g. a failsafe arbiter's heartbeat input).
+                    board_input = any(s.bus == "gpio" and s.params.get("pin") == pin_name for s in ctype.software)
+                    wanted = pin.role == "gpio" and (ctype.kind != "pcb" or board_input)
                 elif binding.interface == "spi":
                     wanted = pin.role.startswith("spi_")
                 if not wanted:

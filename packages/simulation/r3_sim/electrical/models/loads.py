@@ -13,6 +13,8 @@ from .base import BehaviorModel, Event, Params, constant_current, gated_power
 from .battery import ctype_thermal
 from .regulator import ENABLE_CARD, ENABLE_MODEL, efficiency_at, regulator_lines
 
+# Current (A) a converter with output capacitance may sink back (estimate; see regulator_lines).
+REVERSE_LIMIT = 0.2
 # Typical supply currents when the catalog gives none (A).
 DEVICE_CURRENTS = {
     "ina226": (330e-6, "TI INA226 datasheet: IQ 330 uA typical"),
@@ -25,75 +27,133 @@ DEVICE_CURRENTS = {
 class BuckCore:
     """Synchronous buck converter between ports of its owner's subcircuit.
 
-    V_out = min(V_set - R_o I, V_in - V_drop - R_drop I) with current-limit
+    V_out = min(V_set - R_o I, D_max V_in - I R_drop) with current-limit
     foldback; I_in = V_out I / (eta(I) V_in) + I_q (power balance).
+    With ``max_duty`` (minimum off-time) the dropout is D_max V_in less the
+    conduction drop I (D_max R_hs + (1 - D_max) R_ls + DCR) from ``r_high_side``,
+    ``r_low_side`` and ``inductor_dcr`` (datasheet RDS(on), inductor DCR);
+    otherwise ``dropout_voltage`` + ``dropout_resistance`` I. The foldback starts
+    at ``i_limit_min`` (the datasheet's minimum current limit) or ``i_max``.
     UVLO is a SPICE ``sw`` comparator with hysteresis on V_in in series with
-    the output: off below ``uvlo_falling`` (default: the rated ``v_in_min``),
-    back on above ``uvlo_rising``. A second switch with the same control and
-    model drives a 0/1 readout node (``reg_en``). Junction: thermal RC heated
-    by P_in - P_out."""
+    the output: off below ``uvlo_falling`` (aliases ``v_in_uvlo_falling``;
+    default: the rated ``v_in_min``), back on above ``uvlo_rising`` (default
+    ``v_in_min`` when a falling threshold is given, the datasheet's maximum
+    rising threshold, else falling + 0.3 V). ``hold_up_capacitance`` is the
+    effective output capacitance (transient only, in series with ``hold_up_esr``):
+    when the converter stops it keeps the rail up for C (V0^2 - V1^2) / (2 P).
+    Its voltage is a state (carried over a transient restart). A second switch with the same
+    control and model drives a 0/1 readout node. Junction: thermal RC heated by
+    P_in - P_out.
 
-    def __init__(self, owner: BehaviorModel, params: Params, thermal: dict[str, Any]) -> None:
+    ``prefix`` names the internal nodes so that one subcircuit can hold several
+    converters (``reg`` is the board's primary regulator)."""
+
+    def __init__(self, owner: BehaviorModel, params: Params, thermal: dict[str, Any], prefix: str = "reg") -> None:
         self.owner = owner
+        self.prefix = prefix
         p = params
+        self.part = str(p.raw("part", ""))
         self.v_out = p.get("v_out")
         self.i_max = p.get("i_max")
         self.v_in_min = p.get("v_in_min", 0.0)
         self.v_in_max = p.get("v_in_max", math.inf)
-        self.uvlo_falling = p.get("uvlo_falling", self.v_in_min)
-        self.uvlo_rising = p.get("uvlo_rising", self.uvlo_falling + 0.3)
+        self.v_in_abs_max = p.get("v_in_abs_max") if p.has("v_in_abs_max") else math.inf
+        if p.has("uvlo_falling") or p.has("v_in_uvlo_falling"):
+            self.uvlo_falling = p.get("uvlo_falling") if p.has("uvlo_falling") else p.get("v_in_uvlo_falling")
+            self.uvlo_rising = p.get("uvlo_rising", max(self.v_in_min, self.uvlo_falling + 0.1))
+        else:
+            self.uvlo_falling = p.get("uvlo_falling", self.v_in_min)
+            self.uvlo_rising = p.get("uvlo_rising", self.uvlo_falling + 0.3)
         self.quiescent = p.get("quiescent_current", 0.0)
         self.r_out = p.get("output_resistance", 0.005)
-        self.dropout = p.get("dropout_voltage", 0.1)
-        self.r_dropout = p.get("dropout_resistance", 0.05)
+        self.max_duty = p.get("max_duty") if p.has("max_duty") else 1.0
+        if p.has("max_duty"):
+            d = self.max_duty
+            self.dropout = p.get("dropout_voltage", 0.0)
+            self.r_dropout = (d * p.get("r_high_side", 0.02) + (1.0 - d) * p.get("r_low_side", 0.01)
+                              + p.get("inductor_dcr", 0.015))
+        else:
+            self.dropout = p.get("dropout_voltage", 0.1)
+            self.r_dropout = p.get("dropout_resistance", 0.05)
+        self.current_limit = p.get("i_limit_min") if p.has("i_limit_min") else self.i_max
+        self.hold_up = p.get("hold_up_capacitance") if p.has("hold_up_capacitance") else 0.0
+        self.hold_up_esr = p.get("hold_up_esr", 0.01) if self.hold_up > 0 else 0.0  # polymer + ceramics (estimate)
         table = p.raw("efficiency")
         self.efficiency = np.asarray(table, dtype=float) if table else np.array([[0.0, 0.9], [1.0, 0.9]])
         self.theta = float(thermal.get("theta_ja_c_per_w", 40.0))
         self.max_temp_c = float(thermal.get("max_temp_c", 125.0))
         self.heat_capacity = p.get("heat_capacity_j_per_k", 2.0)
-        self.t_node = owner.local("t")
+        primary = prefix == "reg"
+        self.t_port = "t" if primary else f"t_{prefix}"
+        self.t_node = owner.local(self.t_port)
+        self.control_name = "uvlo_enable" if primary else f"{prefix}_uvlo_enable"
+        self.ctl_port = "reg_ctl" if primary else f"{prefix}_ctl"
         owner.states[self.t_node] = owner.ambient_c
+        self.hold_port = f"{prefix}_hc"
+        self.hold_node = owner.local(f"hc_{prefix}")
+        if self.hold_up > 0:
+            owner.states[self.hold_node] = None  # set by the first transient solution (DC start)
         self.s_enabled = True
         self.s_overtemperature = False
         self._toggled = False
+
+    def dropout_input(self, current: float) -> float:
+        """Input voltage below which the output falls out of regulation at ``current`` (A)."""
+        return (self.v_out + self.r_out * current + self.dropout + self.r_dropout * current) / self.max_duty
 
     @property
     def s_temperature(self) -> float:
         return self.owner.states[self.t_node]
 
     def lines(self, net: Netlist, vin: str, vout: str, gnd: str) -> tuple[list[str], str | None]:
-        """Subcircuit lines; returns (lines, node for the owner's ``reg_ctl``
-        port in operating points, else None)."""
+        """Subcircuit lines; returns (lines, node for the owner's control port
+        (``ctl_port``) in operating points, else None)."""
+        x = self.prefix
         initial = "on" if self.s_enabled else "off"
         control: str | None = None
         if net.transient:  # comparator with hysteresis on V_in
-            model = f"swuvlo_{self.owner.inst[1:]}"
+            model = f"swuvlo_{self.owner.inst[1:]}" + ("" if x == "reg" else f"_{x}")
             center, half = 0.5 * (self.uvlo_rising + self.uvlo_falling), 0.5 * (self.uvlo_rising - self.uvlo_falling)
             net.model(model, f".model {model} sw vt={fmt(center)} vh={fmt(half)} ron=1e-5 roff=1e9")
             sense = (vin, gnd)
         else:  # operating points: enable from the active set in ``resolve`` (hysteresis is path dependent in DC)
             model = ENABLE_MODEL
             net.model(ENABLE_MODEL, ENABLE_CARD)
-            sense = ("reg_ctl", "0")
-            control = self.owner.control(net, "uvlo_enable", 1.0 if self.s_enabled else 0.0)
-        lines = regulator_lines(net, "reg", vout, gnd, vin, self.v_out, self.r_out, self.dropout, self.r_dropout, self.i_max,
-                                "switching", self.efficiency, enable=(*sense, model, initial))
+            sense = (self.ctl_port, "0")
+            control = self.owner.control(net, self.control_name, 1.0 if self.s_enabled else 0.0)
+        lines = regulator_lines(net, x, vout, gnd, vin, self.v_out, self.r_out, self.dropout, self.r_dropout, self.current_limit,
+                                "switching", self.efficiency, enable=(*sense, model, initial), max_duty=self.max_duty,
+                                reverse_limit=REVERSE_LIMIT if self.hold_up > 0 else None)
         lines += [
-            f"vregq {vin} reg_q dc 0",
-            f"bregq reg_q {gnd} i = {constant_current(self.quiescent, 1.0, f'v({vin},{gnd})')}",
+            f"v{x}q {vin} {x}_q dc 0",
+            f"b{x}q {x}_q {gnd} i = {constant_current(self.quiescent, 1.0, f'v({vin},{gnd})')}",
             # UVLO state readout: the same comparator switching a 1 V source
-            "vreg_one reg_one 0 dc 1",
-            f"sreg_read reg_one reg_en {sense[0]} {sense[1]} {model} {initial}",
-            "rreg_read reg_en 0 1k",
-            f"bregloss reg_ploss 0 v = v({vin},{gnd})*(i(vregin)+i(vregq))-v({vout},{gnd})*i(vreg)",
+            f"v{x}_one {x}_one 0 dc 1",
+            f"s{x}_read {x}_one {x}_en {sense[0]} {sense[1]} {model} {initial}",
+            f"r{x}_read {x}_en 0 1k",
+            f"b{x}loss {x}_ploss 0 v = v({vin},{gnd})*(i(v{x}in)+i(v{x}q))-v({vout},{gnd})*i(v{x})",
         ]
-        self.owner.thermal(net, "t", self.heat_capacity, self.theta, "v(reg_ploss)", lines)
+        if self.hold_up > 0 and net.transient:
+            lines += [f"r{x}hold {vout} {self.hold_port} {fmt(self.hold_up_esr)}",
+                      f"c{x}hold {self.hold_port} {gnd} {fmt(self.hold_up)}"]
+            if self.owner.states.get(self.hold_node) is not None:
+                net.state(self.hold_node, self.owner.states[self.hold_node])
+        thermal: list[str] = []
+        self.owner.thermal(net, self.t_port, self.heat_capacity, self.theta, f"v({x}_ploss)", thermal)
+        if x != "reg":  # the owner's thermal helper names its elements; keep them unique per converter
+            thermal = [line.replace("bheat ", f"bheat_{x} ", 1).replace("cth ", f"cth_{x} ", 1).replace("rth ", f"rth_{x} ", 1)
+                       for line in thermal]
+        lines += thermal
         net.state(self.t_node, self.owner.states[self.t_node])
         return lines, control
 
+    def extra_ports(self, net: Netlist) -> list[tuple[str, str]]:
+        """(subcircuit port, top-level node) pairs the owner must add (the hold-up capacitor state)."""
+        return [(self.hold_port, self.hold_node)] if self.hold_up > 0 and net.transient else []
+
     def prepare(self) -> None:
         """Operating point: the UVLO enable starts from the current state."""
-        self.owner.controls["uvlo_enable"] = 1.0 if self.s_enabled else 0.0
+        self.owner.controls[self.control_name] = 1.0 if self.s_enabled else 0.0
         self._toggled = False
 
     def resolve(self, sol: Solution, vin: str, gnd: str) -> bool:
@@ -109,30 +169,32 @@ class BuckCore:
         else:
             return False
         self._toggled = True
-        self.owner.controls["uvlo_enable"] = 1.0 if self.s_enabled else 0.0
+        self.owner.controls[self.control_name] = 1.0 if self.s_enabled else 0.0
         return True
 
     def enabled(self, sol: Solution) -> bool:
-        return sol.get(self.owner.internal("reg_en")) > 0.5
+        return sol.get(self.owner.internal(f"{self.prefix}_en")) > 0.5
 
     def state(self, sol: Solution, vin: str, vout: str, gnd: str) -> dict[str, Any]:
-        owner = self.owner
+        owner, x = self.owner, self.prefix
         v_in = sol.v(vin, gnd)
         v_out = sol.v(vout, gnd)
-        i = sol.i(owner.sense("vreg"))
-        i_in = sol.i(owner.sense("vregin")) + sol.i(owner.sense("vregq"))
+        i = sol.i(owner.sense(f"v{x}"))
+        i_in = sol.i(owner.sense(f"v{x}in")) + sol.i(owner.sense(f"v{x}q"))
         p_in, p_out = v_in * i_in, v_out * i
         return {"v_in": v_in, "v_out": v_out, "i_out": i, "i_in": i_in, "efficiency": efficiency_at(self.efficiency, i),
-                "power_in": p_in, "power_out": p_out, "power_loss": sol.get(owner.internal("reg_ploss")),
-                "enabled": self.enabled(sol), "temperature_c": sol.v(self.t_node), "uvlo_falling": self.uvlo_falling}
+                "power_in": p_in, "power_out": p_out, "power_loss": sol.get(owner.internal(f"{x}_ploss")),
+                "enabled": self.enabled(sol), "temperature_c": sol.v(self.t_node), "uvlo_falling": self.uvlo_falling,
+                "in_dropout": v_in < self.dropout_input(max(i, 0.0)), "current_limit": self.current_limit}
 
     def end_step(self, dt: float | None, sol: Solution, time: float, vin: str, gnd: str) -> list[Event]:
         events: list[Event] = []
         enabled = self.enabled(sol)
         v_in = sol.v(vin, gnd)
+        label = "buck" if self.prefix == "reg" else f"{self.prefix} buck"
         if (dt is None and self._toggled) or (dt is not None and enabled != self.s_enabled):
             code = "regulator_uvlo" if not enabled else "regulator_restart"
-            events.append(Event(time, code, self.owner.id, f"buck input {v_in:.2f} V (UVLO {self.uvlo_falling} V)",
+            events.append(Event(time, code, self.owner.id, f"{label} input {v_in:.2f} V (UVLO {self.uvlo_falling} V)",
                                 {"v_in": v_in, "uvlo_falling": self.uvlo_falling, "uvlo_rising": self.uvlo_rising}))
         if dt is None:
             return events
@@ -140,7 +202,7 @@ class BuckCore:
         temperature = sol.v(self.t_node)
         hot = temperature > self.max_temp_c
         if hot and not self.s_overtemperature:
-            events.append(Event(time, "regulator_overtemperature", self.owner.id, f"buck {temperature:.0f} C",
+            events.append(Event(time, "regulator_overtemperature", self.owner.id, f"{label} {temperature:.0f} C",
                                 {"temperature_c": temperature, "limit": self.max_temp_c}))
         self.s_overtemperature = hot
         return events
@@ -166,8 +228,10 @@ class BuckRegulator(BehaviorModel):
         name = f"regulator_buck_{self.inst[1:]}"
         net.model(ENABLE_MODEL, ENABLE_CARD)
         lines, control = self.core.lines(net, "vin", "vout", "vss")
-        ports = ["vin", "vout", "vss", "t", "tamb"] + (["reg_ctl"] if control else [])
-        nodes = [self.vin.node, self.vout.node, self.gnd.node, self.core.t_node, "tamb"] + ([control] if control else [])
+        extra = self.core.extra_ports(net)
+        ports = ["vin", "vout", "vss", "t", "tamb"] + (["reg_ctl"] if control else []) + [port for port, _ in extra]
+        nodes = ([self.vin.node, self.vout.node, self.gnd.node, self.core.t_node, "tamb"] + ([control] if control else [])
+                 + [node for _, node in extra])
         net.subckt(name, ports, lines, doc=f"{self.id}: buck regulator {self.core.v_out} V")
         net.add(f"{self.inst} {' '.join(nodes)} {name}")
 
@@ -242,7 +306,7 @@ class ComputerLoad(BehaviorModel):
             v_set = pin.voltage_nominal or 3.3
             port = f"rail{k}"
             lines += regulator_lines(net, f"r{k}", port, "vss", "vin", v_set, self.rail_resistance, 0.1, 0.0, self.rail_max,
-                                     "none", enable=("en", "0", ENABLE_MODEL, "on"))
+                                     "none", enable_gain="en")
             rail_terms.append(f"{fmt(v_set)}*max(i(vr{k}),0)/{fmt(self.rail_efficiency)}")
             ports.append(port)
             nodes.append(pin.node)

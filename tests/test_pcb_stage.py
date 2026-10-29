@@ -67,21 +67,21 @@ def test_mounting_envelopes_handed_to_cad(stage_run):
     assert mounting["keepouts"]["top_components_radius"] > mounting["head"]["diameter"] / 2
 
 
-def test_stage_reports_catalog_mismatch_until_the_request_is_applied(stage_run):
-    _, result, _ = stage_run
-    mismatch = [d for d in result.diagnostics if d.code == "board_catalog_mismatch"]
-    # The catalog still feeds the servo from the ESC BEC and has no heartbeat pin: the board differs on purpose.
-    assert {s for d in mismatch for s in d.subjects} >= {"J_ESC", "J_SERVO", "J_GPIO"}
+def test_catalog_matches_the_board(stage_run):
+    """The requested catalog patch is applied: the KiCad netlist matches r3-carrier-hat exactly, the
+    connector positions are the measured ones and the TVS on the board is the catalog's."""
+    _, result, board = stage_run
+    assert not [d for d in result.diagnostics if d.code == "board_catalog_mismatch"], \
+        [d.message for d in result.diagnostics if d.code == "board_catalog_mismatch"]
+    assert not [d for d in result.diagnostics if d.code == "pcb_connector_position_mismatch"]
+    assert all(entry["deviation_xy"] <= 0.002 for entry in board["connector_geometry"].values())
+    assert not [d for d in result.diagnostics if d.code == "pcb_tvs_clamp_exceeds_abs_max"]
 
 
 def _requested_component() -> ComponentType:
     text = REQUEST.read_text()
     block = re.search(r"```yaml\n(  - id: r3-carrier-hat.*?)```", text, re.S).group(1)
-    entry = yaml.safe_load(block)[0]
-    for link in entry["internal_links"]:
-        if link["kind"] == "failsafe_arbiter":      # requested schema literal; validate with the interim kind
-            link["kind"] = "switch"
-    return ComponentType.model_validate(entry)
+    return ComponentType.model_validate(yaml.safe_load(block)[0])
 
 
 def test_board_matches_catalog_with_requested_patch(stage_run):

@@ -58,6 +58,10 @@ class RcCarController:
         self.gps_uart = hal.uart(str(b["gps"]["device"]), int(quantity(b["gps"].get("baud", 115200))))
         self.i2c = hal.i2c(str(b["i2c"]["device"]))
         self.encoder = hal.gpio(str(b["encoder"]["device"]), int(b["encoder"]["channel"]), direction="in", edge="rising")
+        # HAT failsafe arbiter heartbeat: the ESC only follows our PWM while this line toggles.
+        heartbeat = b.get("heartbeat")
+        self.heartbeat = hal.gpio(str(heartbeat["device"]), int(heartbeat["channel"]), direction="out") if heartbeat else None
+        self.heartbeat_level = 0
 
         self.crsf_parser = crsf.CrsfParser()
         self.nmea_reader = nmea.NmeaReader()
@@ -131,6 +135,13 @@ class RcCarController:
             return False
         self.hal.log("info", "device_ready", device=name)
         return True
+
+    def _toggle_heartbeat(self) -> None:
+        """One heartbeat edge per control cycle, from the main loop only: if the loop hangs, the edges
+        stop and the HAT arbiter replaces the ESC command with neutral within 100 ms (+ one 20 ms frame)."""
+        if self.heartbeat is not None:
+            self.heartbeat_level ^= 1
+            self.heartbeat.write(self.heartbeat_level)
 
     def _write_outputs(self, command: Command) -> None:
         self.esc.set_pulse_us(self.pulses.esc_pulse(command.throttle), self.esc_hz)
@@ -364,6 +375,7 @@ class RcCarController:
                      mission=bool(self.pursuit), config_sources=",".join(self.settings.sources))
         while duration_s is None or next_t - start < duration_s - 1e-9:
             self.step(clock.now())
+            self._toggle_heartbeat()
             next_t += self.dt
             after = clock.now()
             if after > next_t:  # compute overran the period (real hardware only; lockstep compute is instantaneous)

@@ -98,6 +98,10 @@ class Zone:
     solid: bool = False                           # solid pad connection instead of thermal reliefs
     # Poured before autorouting (Freerouting sees it as a plane and drops vias into it) or after.
     before_routing: bool = False
+    # A power pour that carries ``current`` (A) between ``terminals`` ("REF.PAD" or board points): the
+    # stage measures the narrowest cross-section of KiCad's filled copper between them (IPC-2152 check).
+    current: float = 0.0
+    terminals: tuple[tuple[str | tuple[float, float], ...], ...] = ()
 
 
 @dataclass(frozen=True)
