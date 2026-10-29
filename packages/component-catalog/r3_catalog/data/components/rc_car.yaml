@@ -1,0 +1,275 @@
+# Components used by the reference RC car. Component frame: origin at the
+# center of the bottom (mounting) face, +z away from the mount, box sizes are
+# full extents centered at (0, 0, size_z / 2). Connector positions are in the
+# component frame. Cylinders are centered on their axis at mid-length.
+components:
+  - id: chassis-plate-al6061
+    kind: structure
+    name: Main chassis plate, 6061-T6 aluminum, 3 mm
+    description: Waterjet plate; rear section 130 mm wide, front tapers to 70 mm for steering sweep.
+    mechanical: {shape: custom, size: [340 mm, 130 mm, 3 mm], mass: 0.33, material: Aluminum 6061-T6, density: 2700, color: "#b8bcc2",
+                 provenance: {status: estimated, notes: "mass replaced by CAD mass properties after cad sync"}}
+  - id: upper-deck-petg
+    kind: structure
+    name: Electronics deck, PETG 3D printed, 3 mm
+    mechanical: {shape: box, size: [170 mm, 110 mm, 3 mm], mass: 0.065, material: PETG, density: 1270, color: "#2c6e9e"}
+  - id: standoff-m3-47
+    kind: structure
+    name: M3 x 47 mm aluminum standoff
+    mechanical: {shape: cylinder, axis: z, size: [5.5 mm, 47 mm], mass: 0.0028, material: Aluminum 6061-T6, density: 2700}
+  - id: wheel-110x45
+    kind: wheel
+    name: 1/10 scale wheel and foam-insert rubber tire, 110 x 45 mm
+    mechanical: {shape: cylinder, axis: y, size: [110 mm, 45 mm], mass: 0.085, material: Rubber over nylon rim, color: "#222222", moving: true, keepout_margin: 4 mm}
+    behavior:
+      model: tire.linear
+      params: {radius: 0.055, width: 0.045, friction: 0.9, rolling_resistance: 0.015, torsional_friction: 0.005}
+  - id: steering-knuckle
+    kind: structure
+    name: Steering knuckle / hub carrier
+    mechanical: {shape: box, size: [30 mm, 20 mm, 40 mm], mass: 0.018, material: Nylon PA12, density: 1010}
+  - id: motor-540-brushed
+    kind: motor
+    name: 540-size brushed DC motor, 20T
+    mechanical: {shape: cylinder, axis: y, size: [36 mm, 50 mm], mass: 0.165, material: Steel can, color: "#555b61", moving: true}
+    pins:
+      M_POS: {role: motor, voltage_max: 8.4, current_max: 70}
+      M_NEG: {role: motor, voltage_max: 8.4, current_max: 70}
+    connectors:
+      J_POS: {type: bullet-3.5-male, position: [8 mm, -26 mm, 18 mm], direction: [0, -1, 0], pins: {"1": M_POS}}
+      J_NEG: {type: bullet-3.5-male, position: [-8 mm, -26 mm, 18 mm], direction: [0, -1, 0], pins: {"1": M_NEG}}
+    behavior:
+      model: motor.dc_brushed
+      params: {kv_rpm_per_v: 2100, resistance: 0.11, inductance: 60 uH, no_load_current: 1.6, rotor_inertia: 1.2e-5, brush_drop: 0.2, max_rpm: 21000}
+      provenance: {status: estimated, notes: "Typical 540 20T values; replace with dynamometer data"}
+    thermal: {theta_ja_c_per_w: 2.5, max_temp_c: 100}
+  - id: gearbox-spur-diff-9.6
+    kind: gearbox
+    name: Spur/pinion + open gear differential, 9.6:1 final drive
+    mechanical: {shape: box, size: [50 mm, 60 mm, 60 mm], mass: 0.12, material: Nylon/steel, moving: true}
+    behavior:
+      model: gearbox.differential
+      params: {ratio: 9.6, efficiency: 0.88, backlash: 0.02, output_inertia: 4.0e-5}
+  - id: esc-brushed-60a
+    kind: esc
+    name: Brushed ESC 60 A, 2-3S, 6 V / 2 A BEC
+    manufacturer: Hobbywing
+    part_number: QuicRun 1060
+    mechanical: {shape: box, size: [46.5 mm, 34 mm, 35.5 mm], mass: 0.049, color: "#1d1d1d",
+                 provenance: {status: datasheet, source: "Hobbywing QuicRun 1060 product page"}}
+    pins:
+      VIN: {role: power_in, voltage_nominal: 7.4, voltage_min: 5.0, voltage_max: 12.6, current_max: 60}
+      GND: {role: ground}
+      M_A: {role: motor, current_max: 60}
+      M_B: {role: motor, current_max: 60}
+      SIG: {role: pwm_in, voltage_max: 6.0, logic_level: 2.0}
+      BEC: {role: power_out, voltage_nominal: 6.0, current_max: 2.0}
+    connectors:
+      J_PWR: {type: integral, position: [-23 mm, 8 mm, 10 mm], direction: [-1, 0, 0], pins: {"1": VIN, "2": GND}}
+      J_MOT: {type: integral, position: [23 mm, 0, 10 mm], direction: [1, 0, 0], pins: {"1": M_A, "2": M_B}}
+      J_SIG: {type: integral, position: [-23 mm, -10 mm, 20 mm], direction: [-1, 0, 0], pins: {"1": SIG, "2": BEC, "3": GND}}
+    behavior:
+      model: esc.brushed
+      params: {current_continuous: 60, current_burst: 360, r_on: 2 mohm, pwm_frequency: 1 kHz, bec_voltage: 6.0, bec_current: 2.0,
+               bec_type: linear, input_min_pulse: 1000 us, input_max_pulse: 2000 us, neutral_pulse: 1500 us, deadband: 0.03,
+               signal_timeout: 0.5, low_voltage_cutoff_per_cell: 3.0, reverse_delay: 0.1, quiescent_current: 0.04}
+      provenance: {status: datasheet, source: "Hobbywing QuicRun 1060 manual: 60 A/360 A, BEC 6 V/2 A linear, 2-3S"}
+    thermal: {theta_ja_c_per_w: 8.0, max_temp_c: 110}
+  - id: servo-digital-20kg
+    kind: servo
+    name: 20 kg-cm digital steering servo
+    part_number: DS3218
+    mechanical: {shape: box, size: [20 mm, 40 mm, 40.5 mm], mass: 0.060, color: "#202020",
+                 provenance: {status: datasheet, source: "DS3218 datasheet"}}
+    pins:
+      SIG: {role: pwm_in, logic_level: 2.0, voltage_max: 7.2}
+      VCC: {role: power_in, voltage_nominal: 6.0, voltage_min: 4.8, voltage_max: 6.8, current_max: 3.0}
+      GND: {role: ground}
+    connectors:
+      J1: {type: integral, position: [0, -20 mm, 10 mm], direction: [0, -1, 0], pins: {"1": SIG, "2": VCC, "3": GND}}
+    behavior:
+      model: servo.pwm
+      params: {stall_torque_at_6v: 1.96, speed_60deg_at_6v: 0.15 s, stall_current_at_6v: 2.5, idle_current: 0.008,
+               min_pulse: 500 us, max_pulse: 2500 us, travel: 270 deg, deadband: 3 us, frame_rate: 50 Hz}
+      provenance: {status: datasheet, source: "DS3218: 19.5 kg-cm @5V, 21.5 @6.8V, 0.16 s/60deg @5V; stall current estimated"}
+  - id: lipo-2s-5000-25c
+    kind: battery
+    name: 2S 7.4 V 5000 mAh 25C LiPo, hard case
+    mechanical: {shape: box, size: [138 mm, 46 mm, 25 mm], mass: 0.265, color: "#3a3a3a",
+                 provenance: {status: datasheet, source: "Typical 2S 5000 mAh hard-case pack listing"}}
+    pins:
+      POS: {role: power_out, voltage_nominal: 7.4, voltage_min: 6.0, voltage_max: 8.4, current_max: 125}
+      NEG: {role: ground}
+    connectors:
+      J1: {type: integral, position: [69 mm, 10 mm, 12 mm], direction: [1, 0, 0], pins: {"1": POS, "2": NEG}}
+    behavior:
+      model: battery.lipo
+      params:
+        cells_series: 2
+        capacity: 5000 mAh
+        c_rating: 25
+        r_internal_per_cell: 4 mohm
+        rc_pair: {r: 2.5 mohm, c: 2000}
+        ocv_curve: [[0.0, 3.27], [0.05, 3.61], [0.10, 3.69], [0.20, 3.73], [0.30, 3.77], [0.40, 3.79], [0.50, 3.82],
+                    [0.60, 3.87], [0.70, 3.92], [0.80, 3.97], [0.90, 4.08], [1.0, 4.20]]
+        min_cell_voltage: 3.0
+      provenance: {status: estimated, notes: "Generic LiPo OCV curve; IR from typical new 25C pack"}
+    thermal: {theta_ja_c_per_w: 3.0, max_temp_c: 60, heat_capacity_j_per_k: 250}
+  - id: raspberry-pi-5-8gb
+    kind: computer
+    name: Raspberry Pi 5 (8 GB)
+    manufacturer: Raspberry Pi Ltd
+    mechanical: {shape: box, size: [85 mm, 56 mm, 17 mm], mass: 0.046, color: "#1a7f37",
+                 mount_holes: [[-39 mm, -24.5 mm, 0], [19 mm, -24.5 mm, 0], [-39 mm, 24.5 mm, 0], [19 mm, 24.5 mm, 0]],
+                 provenance: {status: datasheet, source: "Raspberry Pi 5 mechanical drawing"}}
+    pins:
+      5V: {role: power_in, voltage_nominal: 5.1, voltage_min: 4.75, voltage_max: 5.5, current_max: 5.0}
+      3V3: {role: power_out, voltage_nominal: 3.3, current_max: 0.5}
+      GND: {role: ground}
+      GPIO2: {role: i2c_sda, logic_level: 3.3, functions: [i2c1_sda], current_max: 0.016}
+      GPIO3: {role: i2c_scl, logic_level: 3.3, functions: [i2c1_scl], current_max: 0.016}
+      GPIO4: {role: uart_tx, logic_level: 3.3, functions: [uart2_tx], current_max: 0.016}
+      GPIO5: {role: uart_rx, logic_level: 3.3, functions: [uart2_rx], current_max: 0.016}
+      GPIO14: {role: uart_tx, logic_level: 3.3, functions: [uart0_tx], current_max: 0.016}
+      GPIO15: {role: uart_rx, logic_level: 3.3, functions: [uart0_rx], current_max: 0.016}
+      GPIO17: {role: gpio, logic_level: 3.3, functions: [gpio], current_max: 0.016}
+      GPIO18: {role: pwm_out, logic_level: 3.3, functions: [pwm0_ch2], current_max: 0.016}
+      GPIO19: {role: pwm_out, logic_level: 3.3, functions: [pwm0_ch3], current_max: 0.016}
+      GPIO27: {role: gpio, logic_level: 3.3, functions: [gpio], current_max: 0.016}
+    connectors:
+      J8:
+        type: header-2x20-2.54
+        position: [-10 mm, 24.5 mm, 1.6 mm]
+        direction: [0, 0, 1]
+        pins: {"1": 3V3, "2": 5V, "3": GPIO2, "4": 5V, "5": GPIO3, "6": GND, "7": GPIO4, "8": GPIO14, "9": GND, "10": GPIO15,
+               "11": GPIO17, "12": GPIO18, "13": GPIO27, "14": GND, "17": 3V3, "20": GND, "25": GND, "29": GPIO5, "30": GND,
+               "34": GND, "35": GPIO19, "39": GND}
+    behavior:
+      model: load.computer
+      params: {power_idle: 2.7, power_active: 6.5, brownout_voltage: 4.63, boot_time: 18 s, rail_3v3_max: 0.5}
+      provenance: {status: measured, source: "Published Raspberry Pi 5 power measurements (idle ~2.7 W, stress ~6-7 W)"}
+    software:
+      - {bus: none, protocol: linux-aarch64, params: {os: raspberry-pi-os-bookworm, arch: arm64, pwm_chip: pwmchip0, gpio_chip: gpiochip0,
+                                                      i2c: {"/dev/i2c-1": [GPIO2, GPIO3]}, uart: {"/dev/ttyAMA0": [GPIO14, GPIO15], "/dev/ttyAMA2": [GPIO4, GPIO5]}}}
+    thermal: {theta_ja_c_per_w: 9.0, max_temp_c: 85}
+  - id: r3-carrier-hat
+    kind: pcb
+    name: R3 RC carrier HAT (custom KiCad board)
+    description: >
+      65 x 56.5 mm HAT. XT30 battery input -> 5.1 V / 5 A synchronous buck back-powering the Pi;
+      INA226 battery monitor (I2C 0x40, 2 mOhm shunt); MPU-6050 IMU (I2C 0x68); 220 Ohm series
+      resistors on ESC/servo PWM; ESC BEC 6 V rail passed through to the servo header; encoder pull-up.
+    mechanical: {shape: box, size: [65 mm, 56.5 mm, 12 mm], mass: 0.028, color: "#0b4f2b"}
+    pins:
+      VBAT: {role: power_in, voltage_nominal: 7.4, voltage_min: 6.0, voltage_max: 17.0, current_max: 3.0}
+      GND: {role: ground}
+      5V: {role: power_out, voltage_nominal: 5.1, current_max: 5.0}
+      3V3: {role: power_in, voltage_nominal: 3.3, current_max: 0.05}
+      BEC_6V: {role: passive, voltage_nominal: 6.0, current_max: 3.0}
+      I2C_SDA: {role: i2c_sda, logic_level: 3.3}
+      I2C_SCL: {role: i2c_scl, logic_level: 3.3}
+      PI_ESC_PWM: {role: pwm_in, logic_level: 3.3}
+      PI_SERVO_PWM: {role: pwm_in, logic_level: 3.3}
+      ESC_PWM: {role: pwm_out, logic_level: 3.3}
+      SERVO_PWM: {role: pwm_out, logic_level: 3.3}
+      CRSF_TX: {role: uart_tx, logic_level: 3.3}
+      CRSF_RX: {role: uart_rx, logic_level: 3.3}
+      GPS_TX: {role: uart_tx, logic_level: 3.3}
+      GPS_RX: {role: uart_rx, logic_level: 3.3}
+      ENC: {role: gpio, logic_level: 3.3}
+    connectors:
+      J_GPIO:
+        type: socket-2x20-2.54
+        position: [-2.5 mm, 24.5 mm, 0]
+        direction: [0, 0, -1]
+        pins: {"1": 3V3, "2": 5V, "3": I2C_SDA, "4": 5V, "5": I2C_SCL, "6": GND, "7": GPS_TX, "8": CRSF_TX, "9": GND, "10": CRSF_RX,
+               "11": ENC, "12": PI_ESC_PWM, "14": GND, "17": 3V3, "20": GND, "25": GND, "29": GPS_RX, "30": GND, "34": GND,
+               "35": PI_SERVO_PWM, "39": GND}
+      J_BATT: {type: xt30-male, position: [27 mm, -20 mm, 12 mm], direction: [1, 0, 0], pins: {"1": VBAT, "2": GND}}
+      J_ESC: {type: header-1x3-2.54, position: [-26 mm, -22 mm, 12 mm], direction: [0, 0, 1], pins: {"1": ESC_PWM, "2": BEC_6V, "3": GND}}
+      J_SERVO: {type: header-1x3-2.54, position: [-18 mm, -22 mm, 12 mm], direction: [0, 0, 1], pins: {"1": SERVO_PWM, "2": BEC_6V, "3": GND}}
+      J_RX: {type: jst-gh-4-header, position: [24 mm, 10 mm, 12 mm], direction: [1, 0, 0], pins: {"1": 5V, "2": CRSF_TX, "3": CRSF_RX, "4": GND}}
+      J_GPS: {type: jst-gh-4-header, position: [-30 mm, 5 mm, 12 mm], direction: [-1, 0, 0], pins: {"1": 5V, "2": GPS_TX, "3": GPS_RX, "4": GND}}
+      J_ENC: {type: jst-xh-3-header, position: [-30 mm, -8 mm, 12 mm], direction: [-1, 0, 0], pins: {"1": 3V3, "2": ENC, "3": GND}}
+    internal_links:
+      - {a: PI_ESC_PWM, b: ESC_PWM, kind: series_resistor, value: 220}
+      - {a: PI_SERVO_PWM, b: SERVO_PWM, kind: series_resistor, value: 220}
+    behavior:
+      model: board.pcb
+      params:
+        source: pcb/carrier-hat
+        regulator: {model: regulator.buck, v_out: 5.1, i_max: 5.0, v_in_min: 6.0, v_in_max: 17.0, f_sw: 500 kHz,
+                    efficiency: [[0.1, 0.80], [0.5, 0.91], [1.0, 0.93], [2.0, 0.93], [3.0, 0.92], [5.0, 0.89]], quiescent_current: 0.002}
+        ina226: {address: 0x40, shunt: 2 mohm, bus: I2C}
+        mpu6050: {address: 0x68, bus: I2C}
+        encoder_pullup: 10 kohm
+        i2c_pullups: 4.7 kohm
+    software:
+      - {bus: i2c, address: 0x40, protocol: ina226}
+      - {bus: i2c, address: 0x68, protocol: mpu6050}
+    thermal: {theta_ja_c_per_w: 35.0, max_temp_c: 105, notes: "buck regulator package to ambient"}
+  - id: elrs-receiver-2g4
+    kind: radio
+    name: ExpressLRS 2.4 GHz receiver (CRSF)
+    part_number: RadioMaster RP1
+    mechanical: {shape: box, size: [13 mm, 11 mm, 3 mm], mass: 0.0015, color: "#7a2ba8"}
+    pins:
+      5V: {role: power_in, voltage_nominal: 5.0, voltage_min: 4.5, voltage_max: 5.5, current_max: 0.12}
+      GND: {role: ground}
+      TX: {role: uart_tx, logic_level: 3.3}
+      RX: {role: uart_rx, logic_level: 3.3, tolerant_5v: false}
+    connectors:
+      J1: {type: integral, position: [-6 mm, 0, 1.5 mm], direction: [-1, 0, 0], pins: {"1": 5V, "2": TX, "3": RX, "4": GND}}
+    behavior:
+      model: receiver.crsf
+      params: {frequency: 2.44 GHz, packet_rate: 150 Hz, sensitivity_dbm: -108, noise_figure_db: 6, antenna_gain_dbi: 2.0,
+               antenna_height_above_mount: 0.10, uart_baud: 420000, failsafe_timeout: 1.0, current_active: 0.06, telemetry_power_dbm: 17}
+      provenance: {status: datasheet, source: "ExpressLRS docs: 150 Hz LoRa sensitivity -108 dBm; RP1 power ~60 mA (estimated)"}
+    software:
+      - {bus: uart, protocol: crsf, params: {baud: 420000}}
+  - id: gps-ublox-m10
+    kind: sensor
+    name: u-blox M10 GNSS module
+    mechanical: {shape: box, size: [20 mm, 20 mm, 7 mm], mass: 0.008, color: "#c9a227"}
+    pins:
+      5V: {role: power_in, voltage_nominal: 5.0, voltage_min: 3.3, voltage_max: 5.5, current_max: 0.05}
+      GND: {role: ground}
+      TX: {role: uart_tx, logic_level: 3.3}
+      RX: {role: uart_rx, logic_level: 3.3}
+    connectors:
+      J1: {type: integral, position: [-10 mm, 0, 2 mm], direction: [-1, 0, 0], pins: {"1": 5V, "2": RX, "3": TX, "4": GND}}
+    behavior:
+      model: gps.nmea
+      params: {update_rate: 10 Hz, baud: 115200, horizontal_cep: 1.5, velocity_noise: 0.05, cold_start: 30 s, current: 0.03}
+    software:
+      - {bus: uart, protocol: nmea-0183, params: {baud: 115200, sentences: [GGA, RMC, VTG]}}
+  - id: hall-encoder-a1120
+    kind: sensor
+    name: Hall-effect wheel encoder (Allegro A1120 + magnets on drive axle)
+    mechanical: {shape: box, size: [12 mm, 8 mm, 6 mm], mass: 0.003}
+    pins:
+      VCC: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.0, voltage_max: 24.0, current_max: 0.004}
+      OUT: {role: gpio, logic_level: 3.3}
+      GND: {role: ground}
+    connectors:
+      J1: {type: integral, position: [-6 mm, 0, 3 mm], direction: [-1, 0, 0], pins: {"1": VCC, "2": OUT, "3": GND}}
+    behavior:
+      model: encoder.hall
+      params: {pulses_per_wheel_rev: 4, output: open_drain_active_low, jitter: 20 us}
+      provenance: {status: datasheet, source: "Allegro A1120: 3.0-24 V supply, open-drain"}
+  - id: fuse-atc-10a
+    kind: fuse
+    name: Inline ATC/ATO blade fuse holder with 10 A fuse
+    mechanical: {shape: box, size: [30 mm, 12 mm, 22 mm], mass: 0.008}
+    pins:
+      A: {role: passive, current_max: 10}
+      B: {role: passive, current_max: 10}
+    connectors:
+      J1: {type: integral, position: [-15 mm, 0, 11 mm], direction: [-1, 0, 0], pins: {"1": A}}
+      J2: {type: integral, position: [15 mm, 0, 11 mm], direction: [1, 0, 0], pins: {"1": B}}
+    internal_links:
+      - {a: A, b: B, kind: fuse, value: 10}
+    behavior:
+      model: fuse.blade
+      params: {rating: 10, cold_resistance: 7 mohm, i2t_melt: 120}
+      provenance: {status: datasheet, source: "Littelfuse ATO 10 A: ~7 mOhm cold resistance; I2t estimated"}

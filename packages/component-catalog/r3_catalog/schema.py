@@ -1,0 +1,175 @@
+"""Catalog schemas: component types, connector types and wire gauges.
+
+Every numeric property records provenance. ``status`` distinguishes values
+copied from a datasheet from engineering estimates; validation reports which
+results depend on estimates.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from r3_model.units import Quantity, Vector
+
+
+class _Model(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+
+ProvenanceStatus = Literal["datasheet", "measured", "estimated", "derived"]
+
+
+class Provenance(_Model):
+    status: ProvenanceStatus
+    source: str = ""
+    notes: str = ""
+
+
+PinRole = Literal[
+    "power_in", "power_out", "ground", "gpio", "pwm_in", "pwm_out",
+    "i2c_sda", "i2c_scl", "spi_mosi", "spi_miso", "spi_sck", "spi_cs",
+    "uart_tx", "uart_rx", "analog", "motor", "rf", "passive", "nc",
+]
+
+
+class Pin(_Model):
+    role: PinRole
+    net: str = Field(default="", description="Internal net name inside the component, e.g. VIN, GND.")
+    voltage_nominal: Quantity | None = None
+    voltage_min: Quantity | None = None
+    voltage_max: Quantity | None = Field(default=None, description="Absolute maximum.")
+    current_max: Quantity | None = None
+    logic_level: Quantity | None = Field(default=None, description="Logic high level (V) for signal pins.")
+    tolerant_5v: bool = False
+    functions: list[str] = Field(default_factory=list, description="e.g. pwm0_ch2, uart0_tx, i2c1_sda.")
+
+
+class ConnectorInstance(_Model):
+    """A connector mounted on a component, in the component frame."""
+
+    type: str
+    position: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
+    direction: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0], description="Unit vector of cable exit.")
+    pins: dict[str, str] = Field(description="connector pin number -> component pin name.")
+
+
+class Mechanical(_Model):
+    shape: Literal["box", "cylinder", "custom"] = "box"
+    size: Vector = Field(description="box: [x, y, z]; cylinder: [diameter, length] along local axis.")
+    axis: Literal["x", "y", "z"] = "z"
+    mass: Quantity
+    material: str = ""
+    density: Quantity | None = None
+    color: str = "#888888"
+    mount_holes: list[Vector] = Field(default_factory=list)
+    keepout_margin: Quantity = 0.002
+    moving: bool = Field(default=False, description="Part rotates or sweeps volume (wheels, gears).")
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
+
+
+class BehaviorModel(_Model):
+    """Reference to a simulation behavior model and its parameters.
+
+    ``model`` names an implementation registered by the simulation packages
+    (e.g. ``battery.lipo``, ``motor.dc_brushed``, ``esc.brushed``,
+    ``regulator.buck``, ``load.computer``, ``servo.pwm``, ``receiver.crsf``,
+    ``gps.nmea``, ``imu.mpu6050``, ``power_monitor.ina226``, ``encoder.hall``,
+    ``fuse.blade``, ``switch.toggle``, ``board.pcb``, ``passive``).
+    """
+
+    model: str
+    params: dict[str, Any] = Field(default_factory=dict)
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
+
+
+class SoftwareInterface(_Model):
+    bus: Literal["i2c", "spi", "uart", "pwm", "gpio", "usb", "none"] = "none"
+    address: int | None = None
+    protocol: str = ""
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
+class InternalLink(_Model):
+    """Signal or power continuity between two pins inside a component, through
+    a non-ideal element (series resistor, fuse, switch, shunt). Pins that share
+    a name are the same node and need no link."""
+
+    a: str
+    b: str
+    kind: Literal["series_resistor", "fuse", "switch", "shunt", "wire", "level_shifter"]
+    value: Quantity = Field(default=0.0, description="Resistance (ohm) or fuse rating (A).")
+
+
+class ComponentType(_Model):
+    id: str
+    kind: Literal[
+        "computer", "battery", "motor", "esc", "servo", "regulator", "sensor",
+        "radio", "pcb", "structure", "wheel", "fuse", "switch", "gearbox", "antenna",
+    ]
+    name: str
+    manufacturer: str = ""
+    part_number: str = ""
+    description: str = ""
+    mechanical: Mechanical
+    pins: dict[str, Pin] = Field(default_factory=dict)
+    connectors: dict[str, ConnectorInstance] = Field(default_factory=dict)
+    internal_links: list[InternalLink] = Field(default_factory=list)
+    behavior: BehaviorModel | None = None
+    software: list[SoftwareInterface] = Field(default_factory=list)
+    thermal: dict[str, Any] = Field(default_factory=dict, description="theta_ja_c_per_w, max_temp_c, ...")
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
+
+
+class ConnectorType(_Model):
+    id: str
+    family: str
+    gender: Literal["male", "female", "header", "socket", "none"]
+    mates_with: list[str]
+    pin_count: int
+    current_rating_per_pin: Quantity = Field(description="Continuous rating at 25 C ambient.")
+    voltage_rating: Quantity
+    contact_resistance: Quantity = Field(description="Per mated contact.")
+    awg_min: int = Field(description="Thickest supported wire (smallest AWG number).")
+    awg_max: int = Field(description="Thinnest supported wire.")
+    mating_cycles: int | None = None
+    locking: bool = False
+    body_size: Vector = Field(default_factory=lambda: [0.01, 0.01, 0.01])
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
+
+
+class WireGauge(_Model):
+    awg: int
+    conductor_diameter: Quantity
+    outer_diameter: Quantity = Field(description="Silicone-insulated outer diameter.")
+    resistance_per_m: Quantity = Field(description="At 20 C, stranded copper.")
+    ampacity: Quantity = Field(description="Continuous, single conductor in free air, silicone 150 C insulation.")
+    mass_per_m: Quantity
+    min_bend_radius_factor: float = Field(default=4.0, description="Minimum bend radius / outer diameter (static).")
+    bending_stiffness: Quantity = Field(description="EI estimate (N*m^2) for slack simulation.")
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
+
+
+class Catalog(_Model):
+    components: dict[str, ComponentType] = Field(default_factory=dict)
+    connectors: dict[str, ConnectorType] = Field(default_factory=dict)
+    wires: dict[int, WireGauge] = Field(default_factory=dict)
+
+    def component(self, type_id: str) -> ComponentType:
+        try:
+            return self.components[type_id]
+        except KeyError:
+            raise KeyError(f"component type {type_id!r} not in catalog") from None
+
+    def connector(self, type_id: str) -> ConnectorType:
+        try:
+            return self.connectors[type_id]
+        except KeyError:
+            raise KeyError(f"connector type {type_id!r} not in catalog") from None
+
+    def wire(self, awg: int) -> WireGauge:
+        try:
+            return self.wires[awg]
+        except KeyError:
+            raise KeyError(f"wire gauge AWG {awg} not in catalog") from None

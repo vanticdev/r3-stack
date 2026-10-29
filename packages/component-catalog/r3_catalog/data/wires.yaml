@@ -1,0 +1,17 @@
+# Stranded copper, silicone insulation (typical hobby/robotics wire).
+# Conductor diameter and resistance follow the AWG standard (ASTM B258 solid
+# equivalent; stranded adds ~2-3 %, not modeled). Ampacity values are
+# conservative free-air chassis-wiring estimates for 150 C silicone at 25 C
+# ambient with ~30 C rise; they are NOT bundled/enclosed ratings.
+provenance: &awg_prov {status: datasheet, source: "AWG standard resistance table (ASTM B258)", notes: "ampacity, OD, mass, stiffness are estimates"}
+wires:
+  - {awg: 10, conductor_diameter: 2.588 mm, outer_diameter: 4.8 mm, resistance_per_m: 3.277 mohm, ampacity: 45, mass_per_m: 0.070, bending_stiffness: 4.0e-4, provenance: *awg_prov}
+  - {awg: 12, conductor_diameter: 2.053 mm, outer_diameter: 4.0 mm, resistance_per_m: 5.211 mohm, ampacity: 35, mass_per_m: 0.045, bending_stiffness: 2.0e-4, provenance: *awg_prov}
+  - {awg: 14, conductor_diameter: 1.628 mm, outer_diameter: 3.3 mm, resistance_per_m: 8.286 mohm, ampacity: 25, mass_per_m: 0.030, bending_stiffness: 1.0e-4, provenance: *awg_prov}
+  - {awg: 16, conductor_diameter: 1.291 mm, outer_diameter: 2.8 mm, resistance_per_m: 13.17 mohm, ampacity: 17, mass_per_m: 0.020, bending_stiffness: 5.0e-5, provenance: *awg_prov}
+  - {awg: 18, conductor_diameter: 1.024 mm, outer_diameter: 2.3 mm, resistance_per_m: 20.95 mohm, ampacity: 12, mass_per_m: 0.013, bending_stiffness: 2.5e-5, provenance: *awg_prov}
+  - {awg: 20, conductor_diameter: 0.812 mm, outer_diameter: 1.8 mm, resistance_per_m: 33.31 mohm, ampacity: 8, mass_per_m: 0.009, bending_stiffness: 1.2e-5, provenance: *awg_prov}
+  - {awg: 22, conductor_diameter: 0.644 mm, outer_diameter: 1.6 mm, resistance_per_m: 52.96 mohm, ampacity: 5, mass_per_m: 0.006, bending_stiffness: 6.0e-6, provenance: *awg_prov}
+  - {awg: 24, conductor_diameter: 0.511 mm, outer_diameter: 1.4 mm, resistance_per_m: 84.22 mohm, ampacity: 3.5, mass_per_m: 0.0045, bending_stiffness: 3.0e-6, provenance: *awg_prov}
+  - {awg: 26, conductor_diameter: 0.405 mm, outer_diameter: 1.2 mm, resistance_per_m: 133.9 mohm, ampacity: 2.2, mass_per_m: 0.003, bending_stiffness: 1.8e-6, provenance: *awg_prov}
+  - {awg: 28, conductor_diameter: 0.321 mm, outer_diameter: 1.0 mm, resistance_per_m: 212.9 mohm, ampacity: 1.4, mass_per_m: 0.002, bending_stiffness: 1.0e-6, provenance: *awg_prov}

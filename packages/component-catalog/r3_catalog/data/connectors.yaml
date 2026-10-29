@@ -1,0 +1,206 @@
+# Connector types. Ratings are continuous per contact at 25 C ambient.
+# Cable-side and board-side halves are separate types linked by mates_with.
+connectors:
+  - id: xt60-male
+    family: Amass XT60
+    gender: male
+    mates_with: [xt60-female]
+    pin_count: 2
+    current_rating_per_pin: 30
+    voltage_rating: 500
+    contact_resistance: 0.8 mohm
+    awg_min: 10
+    awg_max: 14
+    mating_cycles: 1000
+    body_size: [16 mm, 8.2 mm, 15.5 mm]
+    provenance: {status: datasheet, source: "Amass XT60 datasheet: 30 A continuous, 60 A burst, <=0.8 mOhm"}
+  - id: xt60-female
+    family: Amass XT60
+    gender: female
+    mates_with: [xt60-male]
+    pin_count: 2
+    current_rating_per_pin: 30
+    voltage_rating: 500
+    contact_resistance: 0.8 mohm
+    awg_min: 10
+    awg_max: 14
+    mating_cycles: 1000
+    body_size: [16 mm, 8.2 mm, 15.5 mm]
+    provenance: {status: datasheet, source: "Amass XT60 datasheet"}
+  - id: xt30-male
+    family: Amass XT30
+    gender: male
+    mates_with: [xt30-female]
+    pin_count: 2
+    current_rating_per_pin: 15
+    voltage_rating: 500
+    contact_resistance: 1.0 mohm
+    awg_min: 14
+    awg_max: 20
+    mating_cycles: 1000
+    body_size: [10.2 mm, 5.2 mm, 10.6 mm]
+    provenance: {status: datasheet, source: "Amass XT30 datasheet: 15 A continuous, 30 A burst"}
+  - id: xt30-female
+    family: Amass XT30
+    gender: female
+    mates_with: [xt30-male]
+    pin_count: 2
+    current_rating_per_pin: 15
+    voltage_rating: 500
+    contact_resistance: 1.0 mohm
+    awg_min: 14
+    awg_max: 20
+    mating_cycles: 1000
+    body_size: [10.2 mm, 5.2 mm, 10.6 mm]
+    provenance: {status: datasheet, source: "Amass XT30 datasheet"}
+  - id: bullet-3.5-male
+    family: 3.5 mm gold bullet
+    gender: male
+    mates_with: [bullet-3.5-female]
+    pin_count: 1
+    current_rating_per_pin: 40
+    voltage_rating: 60
+    contact_resistance: 0.5 mohm
+    awg_min: 12
+    awg_max: 16
+    body_size: [3.5 mm, 3.5 mm, 14 mm]
+    provenance: {status: estimated, source: "Typical hobby bullet connector ratings (vendor listings)"}
+  - id: bullet-3.5-female
+    family: 3.5 mm gold bullet
+    gender: female
+    mates_with: [bullet-3.5-male]
+    pin_count: 1
+    current_rating_per_pin: 40
+    voltage_rating: 60
+    contact_resistance: 0.5 mohm
+    awg_min: 12
+    awg_max: 16
+    body_size: [5 mm, 5 mm, 16 mm]
+    provenance: {status: estimated, source: "Typical hobby bullet connector ratings"}
+  - id: jst-xh-3-housing
+    family: JST XH 2.50 mm
+    gender: female
+    mates_with: [jst-xh-3-header]
+    pin_count: 3
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 10 mohm
+    awg_min: 22
+    awg_max: 30
+    mating_cycles: 30
+    locking: true
+    body_size: [9.9 mm, 5.75 mm, 7 mm]
+    provenance: {status: datasheet, source: "JST XH connector datasheet (eXH.pdf): 3 A AC/DC, 250 V, AWG 22-30"}
+  - id: jst-xh-3-header
+    family: JST XH 2.50 mm
+    gender: header
+    mates_with: [jst-xh-3-housing]
+    pin_count: 3
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 10 mohm
+    awg_min: 22
+    awg_max: 30
+    locking: true
+    body_size: [9.9 mm, 5.75 mm, 7 mm]
+    provenance: {status: datasheet, source: "JST XH datasheet (B3B-XH-A)"}
+  - id: jst-gh-4-housing
+    family: JST GH 1.25 mm
+    gender: female
+    mates_with: [jst-gh-4-header]
+    pin_count: 4
+    current_rating_per_pin: 1
+    voltage_rating: 50
+    contact_resistance: 20 mohm
+    awg_min: 26
+    awg_max: 30
+    mating_cycles: 50
+    locking: true
+    body_size: [6.25 mm, 4.25 mm, 4.5 mm]
+    provenance: {status: datasheet, source: "JST GH datasheet (eGH.pdf): 1 A, 50 V, AWG 26-30"}
+  - id: jst-gh-4-header
+    family: JST GH 1.25 mm
+    gender: header
+    mates_with: [jst-gh-4-housing]
+    pin_count: 4
+    current_rating_per_pin: 1
+    voltage_rating: 50
+    contact_resistance: 20 mohm
+    awg_min: 26
+    awg_max: 30
+    locking: true
+    body_size: [6.25 mm, 4.25 mm, 4.5 mm]
+    provenance: {status: datasheet, source: "JST GH datasheet (SM04B-GHS-TB)"}
+  - id: servo-3-female
+    family: Futaba J / 2.54 mm servo lead
+    gender: female
+    mates_with: [header-1x3-2.54]
+    pin_count: 3
+    current_rating_per_pin: 3
+    voltage_rating: 30
+    contact_resistance: 15 mohm
+    awg_min: 22
+    awg_max: 26
+    body_size: [7.6 mm, 2.6 mm, 14 mm]
+    provenance: {status: estimated, source: "Typical 2.54 mm crimp housing rating"}
+  - id: header-1x3-2.54
+    family: 2.54 mm pin header
+    gender: header
+    mates_with: [servo-3-female]
+    pin_count: 3
+    current_rating_per_pin: 3
+    voltage_rating: 30
+    contact_resistance: 15 mohm
+    awg_min: 22
+    awg_max: 26
+    body_size: [7.6 mm, 2.5 mm, 8.5 mm]
+    provenance: {status: estimated, source: "Typical 2.54 mm header rating"}
+  - id: header-2x20-2.54
+    family: 2.54 mm 40-pin GPIO header
+    gender: header
+    mates_with: [socket-2x20-2.54]
+    pin_count: 40
+    current_rating_per_pin: 3
+    voltage_rating: 30
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 28
+    body_size: [50.8 mm, 5.08 mm, 8.5 mm]
+    provenance: {status: estimated, source: "Typical 2.54 mm header; Pi 5V pins share board-level limits"}
+  - id: socket-2x20-2.54
+    family: 2.54 mm 40-pin stacking socket
+    gender: socket
+    mates_with: [header-2x20-2.54]
+    pin_count: 40
+    current_rating_per_pin: 3
+    voltage_rating: 30
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 28
+    body_size: [50.8 mm, 5.08 mm, 8.5 mm]
+    provenance: {status: estimated, source: "Typical 2.54 mm female header"}
+  - id: ufl
+    family: Hirose U.FL coaxial
+    gender: none
+    mates_with: [ufl]
+    pin_count: 1
+    current_rating_per_pin: 0.1
+    voltage_rating: 60
+    contact_resistance: 10 mohm
+    awg_min: 30
+    awg_max: 36
+    mating_cycles: 30
+    body_size: [3 mm, 3 mm, 2.5 mm]
+    provenance: {status: datasheet, source: "Hirose U.FL series; RF only, DC rating nominal"}
+  - id: integral
+    family: Soldered / crimped permanent pigtail root
+    gender: none
+    mates_with: [integral]
+    pin_count: 8
+    current_rating_per_pin: 100
+    voltage_rating: 600
+    contact_resistance: 0.2 mohm
+    awg_min: 8
+    awg_max: 32
+    body_size: [5 mm, 5 mm, 5 mm]
+    provenance: {status: estimated, notes: "Represents the permanent attachment of a component's own lead; the wire is the limit."}

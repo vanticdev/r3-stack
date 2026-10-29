@@ -1,39 +1,61 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "blitz"
-version = "3.1.0"
-description = "Battle-Linked Intelligent Tactical Pi Swarm"
-readme = "README.md"
-authors = [
-    { name = "Pinewood Robotics" },
-    { name = "Denis Koterov", email = "denis.koterov@gmail.com" },
-]
-requires-python = ">=3.8"
+name = "r3-platform"
+version = "0.1.0"
+description = "R3 full-stack robotics platform: unified robot model, digital twin, and orchestration."
+requires-python = ">=3.11"
 dependencies = [
-    "protobuf>=7.34.1",
-    "autobahn-client>=0.1.4",
-    "zeroconf>=0.148.0",
-    "asyncio>=4.0.0",
-    "flask>=3.1.2",
-    "colorama>=0.4.6",
-    "psutil>=7.2.2",
-    "pydantic>=2.13.3",
-    "netifaces>=0.11.0",
-    "requests",
+    "pydantic>=2.6",
+    "pyyaml>=6",
+    "numpy>=1.26",
 ]
+
+[project.optional-dependencies]
+sim = ["mujoco>=3.1", "scipy>=1.11", "matplotlib>=3.8", "pillow>=10"]
+mcp = ["mcp>=1.2"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+r3 = "r3_orchestrator.cli:main"
+
+# Platform packages keep their reserved v1 folders. Each folder contains one
+# importable Python package; `cicd/` remains a separate subsystem with its own
+# configuration and is not part of this distribution.
+[tool.setuptools]
+package-dir = { "" = "." }
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["backend*", "watchdog*"]
-namespaces = true
+where = [
+    "packages/robot-model",
+    "packages/component-catalog",
+    "packages/wiring",
+    "packages/simulation",
+    "packages/hardware-interface",
+    "integrations/onshape",
+    "integrations/kicad",
+    "integrations/github",
+    "services/orchestrator",
+    "services/simulation-worker",
+]
+include = ["r3_*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.fs", "*.json", "*.j2", "*.md"]
 
 [tool.pytest.ini_options]
-testpaths = ["watchdog/", "backend/", "__tests__/"]
-python_files = ["test_*.py", "*_tests.py"]
-
-# Discard successful runs; retain only the latest failure and protect active runs.
-tmp_path_retention_count = 1
-tmp_path_retention_policy = "failed"
+testpaths = ["tests"]
+pythonpath = [
+    "packages/robot-model",
+    "packages/component-catalog",
+    "packages/wiring",
+    "packages/simulation",
+    "packages/hardware-interface",
+    "integrations/onshape",
+    "integrations/kicad",
+    "integrations/github",
+    "services/orchestrator",
+    "services/simulation-worker",
+]
