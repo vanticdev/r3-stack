@@ -21,8 +21,10 @@ ONSHAPE_EMAIL=you@example.com python -m r3_onshape.session login --password-file
 python -m r3_onshape.session status
 ```
 
-`default_transport()` prefers this session, then the onshape-native browser bridge, then
-API keys (`ONSHAPE_ACCESS_KEY` / `ONSHAPE_SECRET_KEY`). Screenshots are rendered by
+`default_transport()` prefers API keys (`ONSHAPE_ACCESS_KEY` / `ONSHAPE_SECRET_KEY`) when
+configured, then this session, then the onshape-native browser bridge;
+`R3_ONSHAPE_TRANSPORT=session` forces the session. `describe_transport()` reports the same
+order without network calls (a stored session is reported, not verified). Screenshots are rendered by
 Onshape's `shadedviews` endpoint and steering poses are set through `matevalues`, so the
 whole pipeline (build, verify, assemble, render) runs on a server.
 

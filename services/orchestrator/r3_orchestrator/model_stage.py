@@ -481,12 +481,18 @@ class ModelChecker:
 
     def check_interference(self, solids: dict[str, Solid]) -> list[dict[str, Any]]:
         # Exact B-rep interference from the CAD stage supersedes envelope estimates,
-        # but only when it was computed for this exact component set.
+        # but only when it was computed for this exact component set. The direct-CAD
+        # stage records it in its ``fit`` report (allowed thread/press-fit
+        # intersections, every other pair checked); older builds wrote ``contacts``.
         cad = self.project.read_build_json("cad/cad_model.json") or {}
-        if isinstance(cad, dict) and "contacts" in cad and set(cad.get("parts", {})) >= set(self.spec.components):
+        checked = isinstance(cad, dict) and ("fit" in cad or "contacts" in cad)
+        if checked and set(cad.get("parts", {})) >= set(self.spec.components):
+            fit = cad.get("fit") or {}
             self.add(Diagnostic.info("interference_checked_by_cad",
                                      "static interference evaluated on exact Onshape B-rep by the cad stage; envelope check skipped",
-                                     data={"document": cad.get("source", {}).get("url")}))
+                                     data={"document": cad.get("source", {}).get("url"), "parts": len(cad.get("parts", {})),
+                                           "verified_fasteners": len(fit.get("verified_fasteners", [])),
+                                           "verified_interfaces": len(fit.get("verified_interfaces", []))}))
             return []
         self.result.assume("mechanical", "Interference uses catalog envelopes: boxes exact, cylinders as 48-gon prisms, 'custom' "
                                          "shapes as their bounding box. Overlaps thinner than 0.1 mm count as contact.")
@@ -542,13 +548,18 @@ class ModelChecker:
                 wires[wire.id] = {"length": length, "mass": length * per_m, "source": source}
         if estimated_wires:
             self.result.assume("mechanical", f"{estimated_wires} wire lengths are straight-line estimates x {ROUTE_FACTOR_ESTIMATE} + slack "
-                                             "(no build/wiring/routes.json); connector and fastener masses are not counted.")
+                                             "(no build/wiring/routes.json); connector masses are not counted.")
+        if not any(name not in self.spec.components for name in cad_parts):
+            self.result.assume("mechanical", "Fastener masses are not counted (no CAD fasteners in build/cad/cad_model.json).")
+        # CAD-only parts (fasteners, nuts) carry real mass once the cad stage has modeled them.
+        hardware_mass = sum(float(part.get("mass") or 0.0) for name, part in cad_parts.items()
+                            if name not in self.spec.components and isinstance(part, dict))
         component_mass = sum(c["mass"] for c in components.values())
         wire_mass = sum(w["mass"] for w in wires.values())
-        total = component_mass + wire_mass
+        total = component_mass + wire_mass + hardware_mass
         limit = self.spec.requirements.max_mass
         estimated_mass = sum(c["mass"] for c in components.values() if c["source"] == "estimated")
-        summary = {"total": total, "components": component_mass, "wires": wire_mass, "limit": limit,
+        summary = {"total": total, "components": component_mass, "wires": wire_mass, "hardware": hardware_mass, "limit": limit,
                    "estimated_fraction": estimated_mass / total if total else 0.0,
                    "by_component": components, "by_wire": wires}
         if limit is not None and total > limit:

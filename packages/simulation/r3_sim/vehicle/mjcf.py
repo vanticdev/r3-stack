@@ -3,8 +3,16 @@
 Body tree: every ``mechanical.joints`` child becomes its own body under the
 joint parent's body; every other component is *lumped* into the body of the
 nearest mount ancestor that is a body (fixed mounts carry no relative motion,
-so their mass/inertia is merged with the parallel-axis theorem). The root
-(the world-mounted component, e.g. the chassis) gets a free joint.
+so their mass/inertia is merged with the parallel-axis theorem). Stub axles
+ride with their knuckle, axles and encoder rings with their wheel. CAD parts
+that are not spec components (fasteners, nuts) are lumped into the body of
+their CAD ``owner``. The root (the world-mounted component, e.g. the chassis)
+gets a free joint.
+
+Steering: when the cad stage solved the linkage (``kinematics.steering.table``:
+kingpin angle per servo horn angle from the real tie-rod geometry), the knuckle
+targets interpolate that table; otherwise the bicycle angle is
+``ratio * theta_horn`` split by ideal Ackermann geometry.
 
 All body frames are aligned with the robot frame (+x forward, +y left, +z up);
 a body's origin is its joint origin (root: the robot origin, which is the
@@ -38,6 +46,7 @@ from r3_model.project import Project
 from r3_model.units import to_si
 
 from ..geometry import MassProperties, axis_rotation, box_inertia, combine, cylinder_inertia, rotation_to_quat
+from .servo import ackermann_angles
 
 #: Contact bitmasks: robot geoms (1) collide only with the environment (2).
 ROBOT_CONTYPE, ROBOT_CONAFFINITY = 1, 0
@@ -76,11 +85,24 @@ class SteeringInfo:
     id: str
     actuator_component: str
     joints: list[str]  # [left, right] ordering by +y position
-    ratio: float  # wheel steer angle per servo horn angle
+    ratio: float  # wheel steer angle per servo horn angle (used without a CAD steering table)
     wheelbase: float
     kingpin_track: float
     max_steer: float
     actuators: list[str]
+    table_servo: list[float] | None = None  # servo horn angles (rad, ascending) of the CAD linkage solution
+    table_angles: dict[str, list[float]] = field(default_factory=dict)  # joint -> kingpin angle (rad) per table row
+
+    @property
+    def source(self) -> str:
+        return "cad_linkage" if self.table_servo else "ackermann_ratio"
+
+    def wheel_angles(self, horn_angle: float) -> tuple[float, ...]:
+        """Kingpin target angle per joint (``joints`` order) for servo horn angle ``horn_angle`` (rad)."""
+        if self.table_servo:
+            # Linear interpolation of the solved linkage, held at the table ends (horn travel stops).
+            return tuple(float(np.interp(horn_angle, self.table_servo, self.table_angles[j])) for j in self.joints)
+        return ackermann_angles(self.ratio * horn_angle, self.wheelbase, self.kingpin_track, self.max_steer)
 
 
 @dataclass
@@ -101,6 +123,7 @@ class VehicleModel:
     mass_source: dict[str, str] = field(default_factory=dict)
     geometry: dict[str, dict[str, Any]] = field(default_factory=dict)  # body -> primitive shape (for clearance)
     cables: Any = None  # r3_wiring.mujoco_cables.CablePlan when routes were given
+    cad_extras: dict[str, list[str]] = field(default_factory=dict)  # body -> CAD-only parts (fasteners, nuts) lumped in
 
 
 def _fmt(values: Any) -> str:
@@ -155,6 +178,46 @@ def _owner_body(project: Project, cid: str, joint_children: dict[str, Any], root
             return root
         cid = mount
     return cid
+
+
+def _mesh_name(part: str) -> str:
+    return "mesh_" + part.replace(":", "__")
+
+
+def _gearbox_for(project: Project, trans: Any, joints_by_id: dict[str, Any]) -> str | None:
+    """The gearbox driving ``trans``: on the mount chain of a driven part (wheel -> axle -> gearbox ...),
+    else a part of one of the transmission's ``path`` interfaces (e.g. the axle's drive flat in the gearbox output)."""
+    spec, catalog = project.spec, project.catalog
+    is_gearbox = lambda cid: cid in spec.components and catalog.component(spec.components[cid].type).kind == "gearbox"  # noqa: E731
+    for joint_id in trans.joints:
+        if joint_id not in joints_by_id:
+            continue
+        cid, seen = joints_by_id[joint_id].child, set()
+        while cid in spec.components and cid not in seen:
+            seen.add(cid)
+            if is_gearbox(cid):
+                return cid
+            cid = spec.components[cid].mount
+    interfaces = {i.id: i for i in spec.mechanical.interfaces}
+    for link in trans.path:
+        for part in interfaces[link].parts if link in interfaces else []:
+            if is_gearbox(part):
+                return part
+    return None
+
+
+def _steering_table(cad: dict[str, Any], trans_id: str, joints: list[str]) -> tuple[list[float] | None, dict[str, list[float]]]:
+    """CAD-solved steering linkage rows for ``trans_id``: (servo angles, joint -> kingpin angles), or (None, {})."""
+    steering = ((cad.get("kinematics") or {}).get("steering") or {}) if isinstance(cad, dict) else {}
+    rows = steering.get("table") or []
+    if steering.get("transmission", trans_id) != trans_id or len(rows) < 2:
+        return None, {}
+    if any(steering.get("sides", {}).get(j, {}).get("status", "ok") != "ok" for j in joints):
+        return None, {}  # the linkage locks or fails inside the travel: no trustworthy table
+    if any(row.get(j) is None for row in rows for j in joints):
+        return None, {}
+    rows = sorted(rows, key=lambda row: float(row["servo_rad"]))
+    return [float(row["servo_rad"]) for row in rows], {j: [float(row[j]) for row in rows] for j in joints}
 
 
 def _find_root(project: Project, joint_children: dict[str, Any]) -> str:
@@ -215,6 +278,14 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
         bodies[child] = []
     for cid in spec.components:
         bodies[_owner_body(project, cid, joint_children, root)].append(cid)
+    # CAD-only parts (fasteners, nuts) ride with the body of the component that owns them.
+    cad_extras: dict[str, list[str]] = {body: [] for body in bodies}
+    for name, part in cad_parts.items():
+        owner = part.get("owner") if isinstance(part, dict) else None
+        if name in spec.components or owner not in spec.components:
+            continue
+        if part.get("mass") and part.get("inertia") and part.get("com"):
+            cad_extras[_owner_body(project, owner, joint_children, root)].append(name)
 
     estimated: list[str] = []
     part_props: dict[str, MassProperties] = {}
@@ -240,7 +311,14 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
         assumptions.append(("mechanical", "Components without CAD mass properties are solid homogeneous boxes/cylinders "
                                           "with catalog mass; fixed-mounted parts are lumped into their parent body."))
 
-    body_props = {body: combine([part_props[c] for c in members]) for body, members in bodies.items()}
+    for members in cad_extras.values():
+        for name in members:
+            part_props[name] = cad_mass_properties(cad_parts[name])
+    if any(cad_extras.values()):
+        count = sum(len(m) for m in cad_extras.values())
+        assumptions.append(("mechanical", f"{count} CAD fasteners/nuts are lumped into the body of their owner component "
+                                          "with their Onshape mass properties."))
+    body_props = {body: combine([part_props[c] for c in members + cad_extras[body]]) for body, members in bodies.items()}
     body_origin: dict[str, np.ndarray] = {root: np.zeros(3)}
     for child, joint in joint_children.items():
         body_origin[child] = np.asarray(joint.origin, dtype=float)
@@ -269,18 +347,8 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     for trans in spec.mechanical.transmissions:
         if trans.type in ("differential", "direct"):
             motor_params = _behavior_params(project, trans.actuator)
-            gear_params: dict[str, Any] = {}
-            for joint_id in trans.joints:
-                if joint_id not in joints_by_id:
-                    continue
-                # Walk the mount chain from the driven part (wheel -> axle -> gearbox ...) to its gearbox.
-                cid, seen = joints_by_id[joint_id].child, set()
-                while cid in spec.components and cid not in seen:
-                    seen.add(cid)
-                    if catalog.component(spec.components[cid].type).kind == "gearbox":
-                        gear_params = _behavior_params(project, cid)
-                        break
-                    cid = spec.components[cid].mount
+            gearbox = _gearbox_for(project, trans, joints_by_id)
+            gear_params = _behavior_params(project, gearbox) if gearbox else {}
             drives.append(DriveInfo(
                 id=trans.id, actuator_component=trans.actuator, joints=list(trans.joints), ratio=float(trans.ratio),
                 efficiency=float(trans.efficiency), tendon=f"tendon_{trans.id}",
@@ -297,11 +365,19 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
             left, right = (joints_by_id[j].origin for j in ordered[:2])
             track = _si(params.get("kingpin_track"), abs(left[1] - right[1]))
             limits = joints_by_id[ordered[0]].limits or [-0.6, 0.6]
+            table_servo, table_angles = _steering_table(cad, trans.id, ordered)
             steering.append(SteeringInfo(
                 id=trans.id, actuator_component=trans.actuator, joints=ordered, ratio=float(trans.ratio),
                 wheelbase=_si(params.get("wheelbase"), 0.26), kingpin_track=track,
                 max_steer=_si(params.get("max_steer"), float(max(abs(v) for v in limits))),
-                actuators=[f"act_{j}" for j in ordered]))
+                actuators=[f"act_{j}" for j in ordered], table_servo=table_servo, table_angles=table_angles))
+            if table_servo:
+                assumptions.append(("mechanical", f"Steering {trans.id}: kingpin targets interpolate the CAD-solved linkage "
+                                                  f"table ({len(table_servo)} rows over servo "
+                                                  f"[{table_servo[0]:.3f}, {table_servo[-1]:.3f}] rad)."))
+            else:
+                assumptions.append(("mechanical", f"Steering {trans.id}: no CAD linkage table; bicycle angle = "
+                                                  f"{float(trans.ratio):g} x horn angle with ideal Ackermann split."))
     for steer in steering:
         for joint_id in steer.joints:
             for wheel in wheels.values():
@@ -327,11 +403,11 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     ET.SubElement(asset, "material", name="ground", texture="grass", texrepeat="1 1", texuniform="true", reflectance="0.0")
 
     meshes_used: dict[str, str] = {}
-    for cid in spec.components:
+    for cid in [*spec.components, *(name for members in cad_extras.values() for name in members)]:
         mesh_rel = (cad_parts.get(cid) or {}).get("mesh")
         if mesh_rel and (mesh_dir / mesh_rel).exists():
-            meshes_used[cid] = f"mesh_{cid}"
-            ET.SubElement(asset, "mesh", name=f"mesh_{cid}", file=str(mesh_dir / mesh_rel))
+            meshes_used[cid] = _mesh_name(cid)
+            ET.SubElement(asset, "mesh", name=_mesh_name(cid), file=str(mesh_dir / mesh_rel))
     if meshes_used:
         assumptions.append(("mechanical", "CAD STL meshes are authored in the robot frame (m) and are visual only; "
                                           "collision uses primitive geoms."))
@@ -405,6 +481,10 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
                 geometry[body] = {"shape": shape, "size": size, "axis_vector": (rotation @ axis_rotation(axis))[:, 2].tolist()
                                   if shape == "cylinder" else None, "center_offset": (center_robot - origin).tolist(),
                                   "rotation": rotation.tolist(), "keepout": float(ctype.mechanical.keepout_margin)}
+        for name in cad_extras[body]:
+            if name in meshes_used:
+                ET.SubElement(el, "geom", name=f"vis_{name.replace(':', '__')}", type="mesh", mesh=meshes_used[name],
+                              pos=_fmt(-origin), contype="0", conaffinity="0", group="1", mass="0", rgba="0.62 0.63 0.66 1")
         if body in wheels:
             wheel = wheels[body]
             joint = joint_children[body]
@@ -487,7 +567,7 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     return VehicleModel(xml=xml, root=root, bodies=bodies, body_origin=body_origin, mass_properties=body_props,
                         total_mass=total_mass, wheels=wheels, drives=drives, steering=steering, imu_site=imu_site,
                         imu_component=imu_component, diagnostics=diagnostics, assumptions=assumptions,
-                        mass_source=mass_source, geometry=geometry, cables=cable_plan)
+                        mass_source=mass_source, geometry=geometry, cables=cable_plan, cad_extras=cad_extras)
 
 
 def _add_cables(project: Project, mj: ET.Element, routes: dict[str, Any], root: str, elements: dict[str, ET.Element],
@@ -521,7 +601,8 @@ def write_mjcf(model: VehicleModel, path: Path) -> Path:
 
 def mass_report(model: VehicleModel) -> dict[str, Any]:
     return {body: {"mass": round(p.mass, 6), "com": [round(v, 6) for v in p.com], "source": p.source,
-                   "members": model.bodies[body]} for body, p in model.mass_properties.items()} | {
+                   "members": model.bodies[body], "cad_parts": model.cad_extras.get(body, [])}
+            for body, p in model.mass_properties.items()} | {
         "_total_mass": round(model.total_mass, 6)}
 
 

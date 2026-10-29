@@ -53,13 +53,19 @@ def test_artifacts_written(stage):
 
 
 def test_rc_car_findings_are_structured(stage):
-    _, result = stage
+    root, result = stage
     codes = {d.code for d in result.diagnostics}
     assert "cad_geometry_estimated" in codes and "harness_mass" in codes
     for d in result.diagnostics:
         assert d.stage == "wiring" and d.data, d.code
-    # The motor's bullet connectors face the right rear wheel from ~16 mm away.
-    motor = [d for d in result.diagnostics if d.code == "connector_clearance_violation" and "wheel_rr" in d.subjects]
-    assert motor and all(d.data["min_distance"] < d.data["required"] for d in motor)
+    required = Project.load(root).spec.requirements.min_wire_clearance_moving
+    clearance = [d for d in result.diagnostics if d.code in ("wire_clearance_violation", "connector_clearance_violation")]
+    assert all(d.data["required"] == pytest.approx(required) and d.data["min_distance"] < required for d in clearance)
+    # Every measured connector clearance below the requirement is reported, and only those (e.g. the motor bullets).
+    detail = json.loads((root / "build" / "wiring" / "routing_detail.json").read_text())
+    measured = {(c["connector"], c["component"]) for c in detail["connector_clearances"] if c["min_distance"] < required}
+    reported = {(d.subjects[1], d.data["component"]) for d in clearance if d.code == "connector_clearance_violation"}
+    assert reported == measured
+    assert any(c["connector"].startswith("esc_motor.B") for c in detail["connector_clearances"])
     assert not [d for d in result.diagnostics if d.code in ("wire_route_failed", "connector_wire_gauge_mismatch")]
     assert result.metrics["worst_dynamic_clearance"]["wire"]

@@ -169,8 +169,8 @@ def _swept(kin: Kinematics, shape: Shape, body: str, label: str) -> Shape:
 
 def build_obstacles(project: Project) -> tuple[ObstacleSet, list[Diagnostic]]:
     spec, catalog = project.spec, project.catalog
-    kin = Kinematics(spec)
     cad = project.read_build_json("cad/cad_model.json") or {}
+    kin = Kinematics(spec, cad if isinstance(cad, dict) else None)
     parts: dict[str, Any] = cad.get("parts", {}) if isinstance(cad, dict) else {}
     obstacles: list[Obstacle] = []
     estimated: list[str] = []

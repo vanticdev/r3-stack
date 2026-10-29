@@ -267,22 +267,32 @@ def default_transport() -> Transport | None:
 
 
 def describe_transport() -> dict[str, Any]:
-    """What ``default_transport`` would use, without secrets or network calls
-    to Onshape (only the local bridge health endpoint is probed)."""
+    """What ``default_transport`` would use, in the same order (API keys, then a
+    stored headless session, then the local bridge), without secrets or network
+    calls to Onshape: the session is reported as stored, not verified, and only
+    the local bridge health endpoint is probed."""
     choice = (os.environ.get("R3_ONSHAPE_TRANSPORT") or "auto").lower()
     keys = ApiKeyTransport.from_env() if choice in ("auto", "api-keys") else None
+    session_stored = False
+    if choice in ("auto", "session"):
+        from .session import SessionTransport
+
+        session_stored = SessionTransport(os.environ.get("ONSHAPE_BASE", "https://cad.onshape.com")).has_session
     try:
         bridge = NativeBridgeTransport() if choice in ("auto", "native") else None
         bridge_configured = bridge is not None
     except FileNotFoundError:
         bridge, bridge_configured = None, False
     bridge_connected = bool(bridge and bridge.healthy())
-    if bridge_connected:
-        selected = NativeBridgeTransport.name
-    elif keys is not None and choice != "native":
+    if keys is not None:
         selected = ApiKeyTransport.name
+    elif session_stored or choice == "session":
+        selected = "onshape-session"
+    elif bridge_connected:
+        selected = NativeBridgeTransport.name
     else:
         selected = None
-    return {"choice": choice, "selected": selected, "headless": selected == ApiKeyTransport.name,
+    return {"choice": choice, "selected": selected, "headless": selected in (ApiKeyTransport.name, "onshape-session"),
             "api_keys": {"configured": keys is not None, "auth": keys.auth if keys else None, "base": keys.base if keys else None},
+            "session": {"stored": session_stored},
             "native_bridge": {"configured": bridge_configured, "connected": bridge_connected}}

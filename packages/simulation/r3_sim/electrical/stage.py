@@ -93,29 +93,50 @@ def vehicle_model(project: Any, result: StageResult) -> dict[str, Any]:
         radius = 0.05
         result.assume("vehicle", "No wheel behavior radius found; using 0.05 m.")
     cad = project.read_build_json("cad/cad_model.json")
+    cad_parts = (cad.get("parts") or {}) if isinstance(cad, dict) else {}
     catalog_mass = sum(catalog.components[c.type].mechanical.mass for c in spec.components.values() if c.type in catalog.components)
-    if cad and cad.get("parts"):
-        mass, mass_source = sum(float(p.get("mass", 0.0)) for p in cad["parts"].values()), "cad"
+    if cad_parts:
+        # Per component: CAD mass, else catalog mass (a stale cad_model may lack new parts); plus CAD-only
+        # hardware (fasteners, nuts).
+        mass, missing = 0.0, []
+        for cid, c in spec.components.items():
+            part = cad_parts.get(cid) or {}
+            if part.get("mass"):
+                mass += float(part["mass"])
+            elif c.type in catalog.components:
+                mass += float(c.params.get("mass", catalog.components[c.type].mechanical.mass))
+                missing.append(cid)
+        mass += sum(float(p.get("mass") or 0.0) for name, p in cad_parts.items() if name not in spec.components)
+        mass_source = "cad" if not missing else "cad+catalog"
+        if missing:
+            result.assume("vehicle", f"{len(missing)} components missing from cad_model.json use catalog mass: {', '.join(sorted(missing))}.")
     else:
         mass, mass_source = DEFAULT_VEHICLE_MASS, "estimate"
     lows, highs = [], []
     graph = project.graph
-    for cid, c in spec.components.items():
-        ctype = catalog.components.get(c.type)
-        if not ctype:
-            continue
-        size = list(ctype.mechanical.size)
-        half = (np.array([size[0], size[0], size[1]]) / 2 if ctype.mechanical.shape == "cylinder" else np.array(size[:3]) / 2)
-        position, _ = graph.component_pose(cid)
-        center = position + np.array([0.0, 0.0, half[2]])
-        lows.append(center - half)
-        highs.append(center + half)
+    boxes = [(np.asarray(p["bbox_min"], dtype=float), np.asarray(p["bbox_max"], dtype=float))
+             for p in cad_parts.values() if p.get("bbox_min") and p.get("bbox_max")]
+    if boxes:
+        # Exact CAD bounding boxes (robot frame) of every modeled part.
+        lows, highs = [lo for lo, _ in boxes], [hi for _, hi in boxes]
+    else:
+        for cid, c in spec.components.items():
+            ctype = catalog.components.get(c.type)
+            if not ctype:
+                continue
+            size = list(ctype.mechanical.size)
+            half = (np.array([size[0], size[0], size[1]]) / 2 if ctype.mechanical.shape == "cylinder" else np.array(size[:3]) / 2)
+            position, _ = graph.component_pose(cid)
+            center = position + np.array([0.0, 0.0, half[2]])
+            lows.append(center - half)
+            highs.append(center + half)
     extent = np.max(highs, axis=0) - np.min(lows, axis=0)
     frontal_area = FRONTAL_FILL * extent[1] * max(np.max(highs, axis=0)[2], 0.05)
     env = spec.simulation.environment
     return {"mass": mass, "mass_source": mass_source, "catalog_component_mass": catalog_mass, "wheel_radius": radius,
             "ratio": ratio, "drivetrain_efficiency": efficiency, "rolling_resistance": env.ground_rolling_resistance,
             "friction": env.ground_friction, "gravity": env.gravity, "frontal_area": frontal_area,
+            "frontal_area_source": "cad" if boxes else "catalog",
             "drag_coefficient": DRAG_COEFFICIENT, "air_density": AIR_DENSITY,
             "driven_axle_load_fraction": DRIVEN_AXLE_LOAD_FRACTION}
 
@@ -868,7 +889,8 @@ def _assumptions(result: StageResult, vehicle: dict[str, Any], ops: OperatingPoi
     a("thermal", f"Burst durations: {BURST_DURATION} s; continuous points use steady conductor temperatures.")
     a("connectors", "Burst rating = 2 x continuous unless the catalog provides current_rating_burst (XT60/XT30 datasheet ratio).")
     a("vehicle", f"Mass {vehicle['mass']:.2f} kg ({vehicle['mass_source']}), C_rr {vehicle['rolling_resistance']}, C_d {DRAG_COEFFICIENT}, "
-                 f"frontal area {vehicle['frontal_area']:.4f} m^2 (bounding box x {FRONTAL_FILL}), driven-axle load {DRIVEN_AXLE_LOAD_FRACTION}.")
+                 f"frontal area {vehicle['frontal_area']:.4f} m^2 ({vehicle['frontal_area_source']} bounding box x {FRONTAL_FILL}), "
+                 f"driven-axle load {DRIVEN_AXLE_LOAD_FRACTION}.")
     a("vehicle", f"Cruise {ops.cruise_speed} m/s -> motor {ops.motor_torque_cruise * 1e3:.2f} mN m at {ops.motor_omega_cruise:.0f} rad/s; "
                  f"traction-limited acceleration torque {ops.motor_torque_traction * 1e3:.1f} mN m.")
     a("loads", f"Steering hold load {STEERING_HOLD}; servo stall = {SERVO_STALL_DEMAND} x stall torque demand at zero speed; computer activity {CRUISE_ACTIVITY} at cruise, 1.0 at peaks.")
