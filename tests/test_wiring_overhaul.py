@@ -19,9 +19,7 @@ from r3_wiring.geometry import Box, MeshShape
 from r3_wiring.grid import VoxelGrid
 from r3_wiring.manufacturing import release_status, write_package
 from r3_wiring.planner import ClearanceField, Junction, Segment, bundle_bend_radius, plan_bundle, trilinear, vertex_radii
-from r3_wiring.stage import route_and_check
 from r3_wiring.supports import load_catalog, max_unsupported_span
-from test_wiring_support import write_project
 from test_wiring_witness import box_mesh
 
 RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
@@ -127,10 +125,8 @@ def test_sharp_edges_of_a_box_mesh():
 
 # ------------------------------------------------------------------ end to end (small project)
 @pytest.fixture(scope="module")
-def small(tmp_path_factory):
-    root = write_project(tmp_path_factory.mktemp("overhaul"), block=True, slack="30 mm")
-    project = Project.load(root)
-    return project, route_and_check(project)
+def small(small_wiring):
+    return small_wiring.project, small_wiring.bundle
 
 
 def test_small_project_is_planned_supported_and_measured(small):

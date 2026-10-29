@@ -52,6 +52,9 @@ include = ["r3_*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: needs the full RC-car wiring stage (run once per session by tests/conftest.py); deselect with -m 'not slow'",
+]
 pythonpath = [
     "packages/robot-model",
     "packages/component-catalog",

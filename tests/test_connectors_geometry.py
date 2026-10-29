@@ -136,16 +136,8 @@ def test_hat_connector_poses_match_kicad_board(project):
         assert b.pad_error < 1e-6 and b.pad_residual < 1e-6, name
 
 
-@pytest.fixture(scope="module")
-def routed(project):
-    from r3_wiring.stage import route_and_check
-
-    return route_and_check(project)
-
-
-def test_every_wire_ends_on_its_pins(project, routed):
+def assert_wires_end_on_pins(project, routing, routes) -> int:
     """Independent of the router: each wire endpoint lies within 0.1 mm of the conductor exit of its pin."""
-    routing, routes = routed["routing"], routed["routes"]
     catalog = project.catalog
     checked = 0
     for harness in project.spec.electrical.harnesses:
@@ -176,12 +168,50 @@ def test_every_wire_ends_on_its_pins(project, routed):
                 expected = frame.point(catalog.connector(conn.type).geometry.pins[pin].wire_entry)
                 assert np.linalg.norm(point - expected) <= 1e-4, (wire.id, ref)
                 checked += 1
+    return checked
+
+
+def assert_routes_record_pin_ends(routes) -> None:
+    for wire_id, wire in routes["wires"].items():
+        path = np.asarray(wire["path"])
+        head, tail = wire["fanout"]
+        for index, end in enumerate(wire["ends"]):
+            if end is None:
+                continue
+            point = path[0] if index == 0 else path[-1]
+            assert np.linalg.norm(point - np.asarray(end["position"])) < 1e-6, wire_id
+            assert math.isclose(np.linalg.norm(end["direction"]), 1.0, abs_tol=1e-5)
+            # The fan-out is recorded: it starts on the pin and leaves forward along the wire-entry axis
+            # (its Hermite tangent at the pin is that axis; the first ~1 mm chord of a tight fan turns away).
+            fan = head if index == 0 else tail
+            assert fan > 0, wire_id
+            step = path[1] - path[0] if index == 0 else path[-2] - path[-1]
+            assert step @ np.asarray(end["direction"]) / np.linalg.norm(step) > 0.5, wire_id
+        assert head + tail < len(path)
+    json.dumps(routes)
+
+
+@pytest.fixture(scope="module")
+def routed(rc_car_wiring):
+    """The RC car routed, planned and supported (shared full wiring-stage run, see conftest.py)."""
+    return rc_car_wiring.bundle
+
+
+def test_every_wire_ends_on_its_pins(rc_car_wiring, routed):
+    checked = assert_wires_end_on_pins(rc_car_wiring.project, routed["routing"], routed["routes"])
     assert checked >= 25  # 30 wires, both ends: crimp/cup ends here, pigtails and splices above
 
 
-def test_floating_pairs_share_mating_face(routed, project):
-    routing = routed["routing"]
-    catalog = project.catalog
+def test_branch_project_wires_end_on_their_pins(branch_wiring):
+    """Pigtail, floating mated pair, splices and PCB sockets after routing, planning and supports."""
+    bundle = branch_wiring.bundle
+    assert bundle["planning"] is not None and bundle["planning"].plans
+    # 8 crimp ends (XT60 pair, XT30 sockets) checked against pin geometry; pigtail roots and splices too.
+    assert assert_wires_end_on_pins(branch_wiring.project, bundle["routing"], bundle["routes"]) == 8
+    assert_routes_record_pin_ends(bundle["routes"])
+
+
+def assert_floating_pairs_share_mating_face(routing, catalog) -> None:
     assert routing.floating
     for mate in routing.floating:
         ha, ca = mate.a.split(".")
@@ -194,6 +224,14 @@ def test_floating_pairs_share_mating_face(routed, project):
             assert np.linalg.norm(pa - pb) < 1e-9
 
 
+def test_floating_pairs_share_mating_face(routed, project):
+    assert_floating_pairs_share_mating_face(routed["routing"], project.catalog)
+
+
+def test_branch_project_floating_pair_shares_mating_face(branch_wiring):
+    assert_floating_pairs_share_mating_face(branch_wiring.bundle["routing"], branch_wiring.project.catalog)
+
+
 def test_fanout_core_is_shared_by_bundle(routed):
     """Wires of one branch share their bundle core exactly (MuJoCo cables group them)."""
     from r3_wiring.mujoco_cables import core_path
@@ -202,6 +240,15 @@ def test_fanout_core_is_shared_by_bundle(routed):
     a, b = core_path(wires["W_RX_5V"]), core_path(wires["W_RX_GND"])
     assert a.shape == b.shape and np.allclose(a, b)
     assert not np.allclose(wires["W_RX_5V"]["path"][0], wires["W_RX_GND"]["path"][0])
+
+
+def test_fanout_core_is_shared_by_small_bundle(small_wiring):
+    from r3_wiring.mujoco_cables import core_path
+
+    wires = small_wiring.bundle["routes"]["wires"]
+    cores = [core_path(wires[w]) for w in ("W1", "W2", "W3")]
+    assert all(c.shape == cores[0].shape and np.allclose(c, cores[0]) for c in cores[1:])
+    assert not np.allclose(wires["W1"]["path"][0], wires["W2"]["path"][0])
 
 
 def _digest(path: Path) -> str:
@@ -230,14 +277,4 @@ def test_glb_conversion_is_deterministic(catalog, tmp_path, type_id):
 
 
 def test_routes_json_records_pin_ends(routed):
-    for wire_id, wire in routed["routes"]["wires"].items():
-        path = np.asarray(wire["path"])
-        head, tail = wire["fanout"]
-        for index, end in enumerate(wire["ends"]):
-            if end is None:
-                continue
-            point = path[0] if index == 0 else path[-1]
-            assert np.linalg.norm(point - np.asarray(end["position"])) < 1e-6, wire_id
-            assert math.isclose(np.linalg.norm(end["direction"]), 1.0, abs_tol=1e-5)
-        assert head + tail < len(path)
-    json.dumps(routed["routes"])
+    assert_routes_record_pin_ends(routed["routes"])

@@ -23,8 +23,8 @@ def test_lap_progress_counts_course_laps():
     assert laps == 2 and start == 0.0 and end is not None
 
 
-def test_full_throttle_end_to_end_with_test_controller(tmp_path):
-    project = Project.load(RC_CAR)
+def test_full_throttle_end_to_end_with_test_controller(tmp_path, rc_car_fresh):
+    project = Project.load(rc_car_fresh)
     outcome = run_scenario(project, "full_throttle", [sys.executable, str(CONTROLLER)], out_dir=tmp_path, render=False)
     summary = json.loads((tmp_path / "summary.json").read_text())
     assert outcome.passed, summary["checks"]

@@ -1,4 +1,5 @@
-"""Router geometry: obstacle avoidance, bend radius, cut length, CAD obstacles, moving ends."""
+"""Router geometry: obstacle avoidance, bend radius, cut length, CAD obstacles, moving ends,
+and the router -> planner pipeline keeping every conductor on its pins."""
 
 import json
 import math
@@ -10,17 +11,61 @@ from r3_model.project import Project
 from r3_wiring.checks import run_checks
 from r3_wiring.geometry import Box
 from r3_wiring.obstacles import build_obstacles
-from r3_wiring.router import route_project
+from r3_wiring.router import HarnessRouter, RouterOptions, route_project
 from r3_wiring.smoothing import radius_at_scale
 from test_wiring_support import write_project
 
 
 @pytest.fixture(scope="module")
-def blocked(tmp_path_factory):
+def routed_blocked(tmp_path_factory):
+    """Voxel router alone (``plan=False``): keepouts are a router search constraint."""
     project = Project.load(write_project(tmp_path_factory.mktemp("blocked"), block=True))
     obstacles, _ = build_obstacles(project)
-    routing = route_project(project, obstacles)
+    router = HarnessRouter(project, obstacles, RouterOptions(plan=False))
+    return project, obstacles, router, router.route()
+
+
+@pytest.fixture(scope="module")
+def blocked(routed_blocked):
+    project, obstacles, _, routing = routed_blocked
     return project, obstacles, routing, run_checks(project, obstacles, routing)
+
+
+@pytest.fixture(scope="module")
+def planned(small_wiring):
+    """Router + planner (two passes, the second through cable supports) on the same layout."""
+    bundle = small_wiring.bundle
+    return (small_wiring.project, bundle["obstacles"], bundle["routing"], bundle["planning"],
+            {w: (path, bundle["routing"].wires[w].fanout) for w, path in bundle["before"].items()})
+
+
+def test_planner_keeps_pin_fanouts_and_plans_from_breakouts(planned):
+    project, obstacles, routing, report, before = planned
+    block = obstacles.by_component("block")
+    assert report.plans and report.stats and report.stats["first_pass"]
+    cores = []
+    for wire in routing.wires.values():
+        path, (head, tail) = before[wire.wire_id]
+        assert wire.fanout == (head, tail) and head > 0 and tail > 0
+        # Fan-outs (pin exit up to the breakout) are unchanged; both ends stay on their pins.
+        assert np.array_equal(wire.path[: head + 1], path[: head + 1])
+        assert np.array_equal(wire.path[len(wire.path) - tail - 1:], path[len(path) - tail - 1:])
+        for end, point in zip(wire.ends, (wire.path[0], wire.path[-1])):
+            assert np.linalg.norm(point - end.position) < 1e-4
+        core = wire.path[head: len(wire.path) - tail]
+        assert np.allclose(core, wire.core)
+        cores.append(core)
+        # The planned core leaves each breakout along the fan-out's arrival tangent.
+        for k in (0, 1):
+            pts = core if k == 0 else core[::-1]
+            fan_end = wire.path[head - 1] if k == 0 else wire.path[len(wire.path) - tail]
+            arrival = pts[0] - fan_end
+            leave = pts[1] - pts[0]
+            assert arrival @ leave / (np.linalg.norm(arrival) * np.linalg.norm(leave)) > math.cos(math.radians(20))
+        # The planner holds raw geometry + STATIC_MARGIN at its (trilinear-field) vertices; chords stay clear.
+        dense = np.vstack([np.linspace(a, b, 20) for a, b in zip(wire.path[:-1], wire.path[1:])])
+        assert (block.shape.sdf(dense) - wire.bundle_radius.max()).min() > 0.0
+    assert all(c.shape == cores[0].shape and np.allclose(c, cores[0]) for c in cores[1:])
 
 
 def test_router_avoids_obstacle(blocked):

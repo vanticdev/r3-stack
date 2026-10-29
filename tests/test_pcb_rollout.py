@@ -151,7 +151,8 @@ def test_unpowered_arbiter_outputs_no_pulses_and_reboots_in_failsafe():
     assert device.failsafe and device.output(0.52, 1600.0) == 1500.0
 
 
-def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(project):
+def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(rc_car_fresh):
+    project = Project.load(rc_car_fresh)  # no stale build/wiring cables in the kernel
     scenario = next(s for s in project.spec.simulation.scenarios if s.id == "pi_hang")
     kernel = CoSimKernel(project, scenario)
     assert kernel.freeze_at == pytest.approx(15.0)

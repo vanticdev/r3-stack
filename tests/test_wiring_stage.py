@@ -2,28 +2,19 @@
 
 import csv
 import json
-import shutil
-from pathlib import Path
 
 import pytest
 
 from r3_model.project import Project
-from r3_wiring.stage import format_diagnostics, run
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
 
 
 @pytest.fixture(scope="module")
-def stage(tmp_path_factory):
-    root = tmp_path_factory.mktemp("rc-car")
-    shutil.copy(RC_CAR / "robot.yaml", root / "robot.yaml")
-    project = Project.load(root)
-    result = run(project)
-    print("\n" + format_diagnostics(result))
-    print("harness lengths (mm):", {k: round(v * 1e3, 1) for k, v in result.metrics["harness_length"].items()})
-    print("worst static clearance:", result.metrics["worst_static_clearance"])
-    print("worst dynamic clearance:", result.metrics["worst_dynamic_clearance"])
-    return root, result
+def stage(rc_car_wiring):
+    """The full stage on a fresh copy of the RC car (shared session run, see conftest.py)."""
+    print("worst static clearance:", rc_car_wiring.result.metrics["worst_static_clearance"])
+    print("worst dynamic clearance:", rc_car_wiring.result.metrics["worst_dynamic_clearance"])
+    return rc_car_wiring.root, rc_car_wiring.result
 
 
 def test_routes_json_contract(stage):

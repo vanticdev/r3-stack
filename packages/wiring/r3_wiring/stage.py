@@ -4,8 +4,9 @@ Order (each step works on the geometry of the previous one):
 
 1. obstacles from ``build/cad`` and a CAD mesh audit (closure, winding, units,
    placement, staleness: :mod:`.witness`);
-2. voxel routing (:mod:`.router`, topology and corridors);
-3. curvature-constrained planning with shared occupancy (:mod:`.planner`);
+2. voxel routing (:mod:`.router`, topology, corridors and pin-to-breakout fan-outs);
+3. curvature-constrained planning of the bundle cores between the fixed fan-out
+   breakouts, with shared occupancy (:mod:`.planner`, run by the router);
 4. supports placed as hardware on structure faces (:mod:`.supports`), then a
    second planning pass through them, and the unsupported-span check;
 5. cut lengths from spans, bends and terminations (:mod:`.cutlength`);
@@ -31,6 +32,7 @@ import copy
 import json
 import time
 from collections import Counter
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
@@ -61,16 +63,16 @@ SUPPORT_RETRIES = 2
 
 def route_and_check(project: Project, options: RouterOptions | None = None, *, plan: bool = True,
                     verify: bool = True) -> dict[str, Any]:
-    options = options or RouterOptions(surface_weight=SUPPORTABLE_SURFACE_WEIGHT)
+    options = replace(options or RouterOptions(surface_weight=SUPPORTABLE_SURFACE_WEIGHT), plan=plan)
     obstacles, diagnostics = build_obstacles(project)
     audit_diagnostics, audit = audit_cad(project, obstacles)
     router = HarnessRouter(project, obstacles, options)
-    routing = router.route()
-    before = {w: r.path.copy() for w, r in routing.wires.items()}
+    routing = router.route()  # voxel routing, pin fan-outs and the first (unsupported) planning pass
+    first = routing.planning
+    before = first.before if first is not None else {w: r.path.copy() for w, r in routing.wires.items()}
     planning = supports = None
     planning_diagnostics: list[Diagnostic] = []
     if plan:
-        first = plan_routing(project, router, routing, obstacles=obstacles)
         snapshot = copy.deepcopy(routing)
         supports = place_supports(project, obstacles, routing)
         planning = plan_routing(project, router, routing, supports=support_constraints(supports), obstacles=obstacles)
@@ -226,6 +228,13 @@ def _assumptions(result: StageResult, estimated: bool, drive: Any = None) -> Non
 
 def run(project: Project, options: RouterOptions | None = None, drive_profile: DriveProfile | None = None,
         render: bool = True) -> StageResult:
+    return run_stage(project, options, drive_profile, render)[0]
+
+
+def run_stage(project: Project, options: RouterOptions | None = None, drive_profile: DriveProfile | None = None,
+              render: bool = True) -> tuple[StageResult, dict[str, Any]]:
+    """:func:`run`, also returning the in-memory :func:`route_and_check` bundle (routing,
+    obstacles, supports, cut lengths, ...) plus the slack drive (``"drive"``)."""
     started = time.time()
     result = StageResult(stage=STAGE)
     result.inputs = project.fingerprint()
@@ -346,7 +355,8 @@ def run(project: Project, options: RouterOptions | None = None, drive_profile: D
     _assumptions(result, bool(obstacles.estimated), drive)
     result.duration_s = time.time() - started
     result.write(out / "result.json")
-    return result
+    bundle["drive"] = drive
+    return result, bundle
 
 
 def _planning_detail(planning: Any) -> dict[str, Any]:
@@ -378,4 +388,5 @@ def format_diagnostics(result: StageResult) -> str:
     return "\n".join(lines)
 
 
-__all__ = ["SUPPORTABLE_SURFACE_WEIGHT", "format_diagnostics", "route_and_check", "run", "STAGE", "Severity"]
+__all__ = ["SUPPORTABLE_SURFACE_WEIGHT", "format_diagnostics", "route_and_check", "run", "run_stage", "STAGE",
+           "Severity"]
