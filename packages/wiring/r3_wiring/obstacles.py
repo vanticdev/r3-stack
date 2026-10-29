@@ -113,7 +113,7 @@ def _catalog_shape(project: Project, component: str) -> Shape | None:
         local_center = np.array([0.0, 0.0, length / 2]) if mech.axis == "z" else np.zeros(3)
         return Cylinder(position + rotation @ local_center, rotation @ axis_matrix(mech.axis), radius, length / 2)
     half = size / 2
-    return Box(position + rotation @ np.array([0.0, 0.0, half[2]]), rotation.copy(), half)
+    return Box(position + rotation @ (np.asarray(mech.envelope_offset) + np.array([0.0, 0.0, half[2]])), rotation.copy(), half)
 
 
 def _cad_shape(project: Project, part: dict[str, Any]) -> tuple[Shape, str] | None:

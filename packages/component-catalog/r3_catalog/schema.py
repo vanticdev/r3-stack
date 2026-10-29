@@ -134,7 +134,9 @@ class Solid(_Model):
 
 class Mechanical(_Model):
     shape: Literal["box", "cylinder", "custom"] = "box"
-    size: Vector = Field(description="box: [x, y, z]; cylinder: [diameter, length] along local axis.")
+    size: Vector = Field(description="Overall envelope including protrusions: box/custom [x, y, z]; cylinder [diameter, length] along local axis.")
+    board_outline: Vector | None = Field(default=None, min_length=2, max_length=2, description="PCB outline [x, y], excluding connector protrusions; size remains the overall envelope.")
+    envelope_offset: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0], min_length=3, max_length=3, description="Box/custom envelope bottom-face centre relative to the component frame; preserves board/mount coordinates for asymmetric protrusions. Leave zero for cylinders.")
     axis: Literal["x", "y", "z"] = "z"
     mass: Quantity
     material: str = ""

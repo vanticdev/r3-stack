@@ -86,7 +86,7 @@ def _print_status(payload: dict[str, Any]) -> None:
             continue
         c = stage["counts"]
         print(f"  {stage['stage']:<11} {stage['status']:<12} {c['error']} errors, {c['warning']} warnings"
-              f"{'  (stale: robot.yaml changed)' if stage['stale'] else ''}")
+              f"{'  (stale: inputs changed)' if stage['stale'] else ''}")
 
 
 def _print_diagnose(payload: dict[str, Any]) -> None:

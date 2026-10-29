@@ -542,7 +542,7 @@ class ModelChecker:
                     cid, mech.solids, comp.params, comp.pose.xyz, comp.pose.rpy, comp.params.get("mirror"))) is not None:
                 result[cid] = piecewise  # union of the catalog primitives, not the bounding box
             else:
-                result[cid] = make_solid(cid, mech.shape, list(mech.size), mech.axis, comp.pose.xyz, comp.pose.rpy)
+                result[cid] = make_solid(cid, mech.shape, list(mech.size), mech.axis, comp.pose.xyz, comp.pose.rpy, mech.envelope_offset)
         return result
 
     def check_interference(self, solids: dict[str, Solid]) -> list[dict[str, Any]]:
@@ -550,9 +550,12 @@ class ModelChecker:
         # but only when it was computed for this exact component set. The direct-CAD
         # stage records it in its ``fit`` report (allowed thread/press-fit
         # intersections, every other pair checked); older builds wrote ``contacts``.
+        from .release import is_stale
+
+        fingerprint = self.project.fingerprint()
         cad = self.project.read_build_json("cad/cad_model.json") or {}
         checked = isinstance(cad, dict) and ("fit" in cad or "contacts" in cad)
-        if checked and set(cad.get("parts", {})) >= set(self.spec.components):
+        if checked and not is_stale(cad.get("inputs"), fingerprint) and set(cad.get("parts", {})) >= set(self.spec.components):
             fit = cad.get("fit") or {}
             self.add(Diagnostic.info("interference_checked_by_cad",
                                      "static interference evaluated on exact Onshape B-rep by the cad stage; envelope check skipped",
@@ -561,7 +564,7 @@ class ModelChecker:
                                            "verified_interfaces": len(fit.get("verified_interfaces", []))}))
             return []
         assembly = self.project.read_build_json("model/assembly.json") or {}
-        current = (assembly.get("inputs") or {}).get("robot_yaml_sha256") == self.project.fingerprint().get("robot_yaml_sha256")
+        current = not is_stale(assembly.get("inputs"), fingerprint)
         if (assembly.get("interference_method") == "exact" and current
                 and set(assembly.get("poses", {})) >= set(self.spec.components)):
             # The assembly stage intersected the exact part plans (solids, datasheet features, interface-cut

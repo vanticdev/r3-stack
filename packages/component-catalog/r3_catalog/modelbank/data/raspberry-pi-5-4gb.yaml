@@ -12,19 +12,45 @@ tags: []
 key_specs:
   dimensions:
     value:
-    - 0.08700000000000001
-    - 0.056
-    - 0.0176
+    - 0.0885
+    - 0.057630352
+    - 0.018976
     unit: m
-    source: Raspberry Pi 5 mechanical drawing (85 x 56, 58 x 49 M2.5 pattern, 2x20
-      header); component heights estimated
-    status: datasheet
+    source: Official RP-010083-CA-1 STEP; see docs/guide/model-bank-pi5-measurement.md
+    status: measured
   mass:
     value: 0.046
     unit: kg
     source: Raspberry Pi 5 mechanical drawing (85 x 56, 58 x 49 M2.5 pattern, 2x20
       header); component heights estimated
     status: datasheet
+  board_outline:
+    value:
+    - 0.085
+    - 0.056
+    unit: m
+    source: https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf
+    status: datasheet
+  mount_hole_pitch:
+    value:
+    - 0.058
+    - 0.049
+    unit: m
+    source: https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf
+    status: datasheet
+  pcb_thickness:
+    value: 0.001276
+    unit: m
+    source: 'Official STEP PCB OBJ8572: z=0.030..1.306 mm; nominal catalog mount stack
+      is still 1.6 mm and requires physical-board review'
+    status: measured
+  pcb_faces_z:
+    value:
+    - 3.0e-05
+    - 0.001306
+    unit: m
+    source: Official STEP native B-rep optimal bounds, no tolerance inflation
+    status: measured
 sources:
 - kind: vendor_step
   url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
@@ -41,18 +67,20 @@ sources:
   eid: ''
   part_id: ''
 validation:
-  status: mismatch
+  status: passed
   bbox_m:
   - 0.08849999669473618
   - 0.05763035180279985
   - 0.018975999322719872
   expected_bbox_m:
-  - 0.08700000000000001
-  - 0.056
-  - 0.0176
+  - 0.0885
+  - 0.057630352
+  - 0.018976
   tolerance_m: 0.0015
-  key_features: {}
-  date: '2026-10-29T18:45:22.936256+00:00'
+  key_features:
+    pcb_outline_85x56: true
+    mount_holes_58x49_d2p7: true
+  date: '2026-10-29T19:45:53.829523+00:00'
   validated_by: r3/cascadio
   notes: Axis-specific bbox check; interface features require independent geometry
     inspection.
@@ -82,3 +110,4 @@ placement:
   - 0.0
   - 1.0
 interface_frames: {}
+onshape_connectors: {}

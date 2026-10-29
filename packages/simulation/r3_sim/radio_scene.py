@@ -181,7 +181,7 @@ def _part_mesh(project: Any, cid: str, cad_parts: dict[str, Any]) -> tuple[np.nd
             mesh.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [1, 0, 0]))
     else:
         mesh = trimesh.creation.box(extents=size[:3])
-        mesh.apply_translation([0.0, 0.0, size[2] / 2.0])  # catalog box frame: bottom-face center
+        mesh.apply_translation(np.asarray(mech.envelope_offset) + [0.0, 0.0, size[2] / 2.0])  # catalog box frame: bottom-face center
     vertices = np.asarray(mesh.vertices, dtype=float) @ np.asarray(rotation).T + np.asarray(position)
     return vertices, np.asarray(mesh.faces, dtype=np.int64)
 

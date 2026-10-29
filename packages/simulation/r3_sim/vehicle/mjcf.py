@@ -157,7 +157,7 @@ def catalog_mass_properties(project: Project, cid: str) -> MassProperties:
     else:
         local = box_inertia(mass, size)
     position, rotation = project.graph.component_pose(cid)
-    com = position + rotation @ _local_center(shape, size)
+    com = position + rotation @ (_local_center(shape, size) + np.asarray(mech.envelope_offset))
     return MassProperties(mass, com, rotation @ local @ rotation.T, "catalog")
 
 
@@ -535,7 +535,7 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
             if cid in meshes_used:
                 ET.SubElement(el, "geom", name=f"vis_{cid}", type="mesh", mesh=meshes_used[cid], pos=_fmt(-origin), **common)
             else:
-                center = position + rotation @ _local_center(shape, size) - origin
+                center = position + rotation @ (_local_center(shape, size) + np.asarray(ctype.mechanical.envelope_offset)) - origin
                 if shape == "cylinder":
                     rot = rotation @ axis_rotation(axis)
                     ET.SubElement(el, "geom", name=f"vis_{cid}", type="cylinder", pos=_fmt(center), quat=_fmt(rotation_to_quat(rot)),
@@ -544,7 +544,7 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
                     ET.SubElement(el, "geom", name=f"vis_{cid}", type="box", pos=_fmt(center), quat=_fmt(rotation_to_quat(rotation)),
                                   size=_fmt(np.asarray(size) / 2.0), **common)
             if cid == body and body != root:
-                center_robot = position + rotation @ _local_center(shape, size)
+                center_robot = position + rotation @ (_local_center(shape, size) + np.asarray(ctype.mechanical.envelope_offset))
                 geometry[body] = {"shape": shape, "size": size, "axis_vector": (rotation @ axis_rotation(axis))[:, 2].tolist()
                                   if shape == "cylinder" else None, "center_offset": (center_robot - origin).tolist(),
                                   "rotation": rotation.tolist(), "keepout": float(ctype.mechanical.keepout_margin)}

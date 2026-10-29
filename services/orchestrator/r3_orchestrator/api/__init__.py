@@ -20,6 +20,7 @@ from r3_model.diagnostics import Diagnostic, Severity, StageResult
 from r3_model.project import Project
 
 from .. import stages as stage_runner
+from ..release import is_stale
 from ..hints import hint_for
 
 PROJECT_ENV = "R3_PROJECT"
@@ -52,7 +53,7 @@ def _diag(d: Diagnostic) -> dict[str, Any]:
 def _stage_summary(name: str, result: StageResult | None, fingerprint: dict[str, str]) -> dict[str, Any]:
     if result is None:
         return {"stage": name, "status": "missing", "ok": None}
-    stale = result.inputs.get("robot_yaml_sha256") != fingerprint.get("robot_yaml_sha256")
+    stale = is_stale(result.inputs, fingerprint)
     return {"stage": name, "status": stage_runner.status_of(result), "ok": result.ok, "stale": stale,
             "counts": stage_runner.counts(result.diagnostics), "duration_s": round(result.duration_s, 3),
             "started_at": result.started_at, "metrics": result.metrics,
@@ -244,7 +245,7 @@ def deploy_fleet(project_path: str | Path | None = None, confirm: bool = False, 
         results = stage_runner.load_results(project)
         fingerprint = project.fingerprint()
         blocking = [name for name, r in results.items() if not r.ok]
-        stale = [name for name, r in results.items() if r.inputs.get("robot_yaml_sha256") != fingerprint["robot_yaml_sha256"]]
+        stale = [name for name, r in results.items() if is_stale(r.inputs, fingerprint)]
         if "model" not in results or blocking or "model" in stale:
             return {"ok": False, "code": "validation_required", "failed_stages": blocking, "stale_stages": stale,
                     "message": "run `r3 validate` on the current robot.yaml (no errors) before deploying, or pass --force"}

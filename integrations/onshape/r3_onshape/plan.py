@@ -151,7 +151,7 @@ def _envelope_solids(mech: Any, params: dict[str, Any]) -> list[Any]:
         axis = {"x": [1.0, 0, 0], "y": [0, 1.0, 0], "z": [0, 0, 1.0]}[mech.axis]
         base = [0.0, 0.0, 0.0] if mech.axis == "z" else [-length / 2 * a for a in axis]
         return [Solid(kind="cylinder", name="envelope", position=base, axis=axis, diameter=diameter, length=length)]
-    return [Solid(kind="box", name="envelope", position=[0.0, 0.0, size[2] / 2], size=size)]
+    return [Solid(kind="box", name="envelope", position=[float(v) + c for v, c in zip(mech.envelope_offset, [0.0, 0.0, size[2] / 2])], size=size)]
 
 
 def _feature_ops(frame: _Frame, feature: Any, catalog: Any) -> list:

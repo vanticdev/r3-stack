@@ -21,6 +21,7 @@ from r3_model.project import Project
 
 from . import stages as stage_runner
 from .hints import hint_for
+from .release import is_stale
 
 STAGE = "report"
 SUMMARY_SCHEMA = "r3/report-summary@1"
@@ -55,7 +56,7 @@ def build_summary(project: Project, results: dict[str, StageResult]) -> dict[str
     for name in stage_runner.stage_names():
         r = results.get(name)
         stage_rows.append({"stage": name, "status": stage_runner.status_of(r), "ok": None if r is None else r.ok,
-                           "stale": None if r is None else r.inputs.get("robot_yaml_sha256") != fingerprint.get("robot_yaml_sha256"),
+                           "stale": None if r is None else is_stale(r.inputs, fingerprint),
                            "counts": stage_runner.counts(r.diagnostics) if r else {}, "metrics": r.metrics if r else {},
                            "duration_s": r.duration_s if r else None,
                            "artifacts": [a.model_dump(mode="json") for a in r.artifacts] if r else []})
@@ -193,7 +194,7 @@ def run(project: Project) -> StageResult:
     result.artifact("report/index.html", "html", "Self-contained validation report")
     stale = [s["stage"] for s in summary["stages"] if s.get("stale")]
     if stale:
-        result.assume("report", f"Results for {', '.join(stale)} were computed from an older robot.yaml.")
+        result.assume("report", f"Results for {', '.join(stale)} were computed from older project/catalog/model-bank inputs.")
     result.metrics = {"errors": summary["counts"]["error"], "warnings": summary["counts"]["warning"],
                       "scenarios": len(summary["scenarios"]), "images": len(summary["artifacts"]["images"]), "ok": summary["ok"]}
     result.duration_s = time.time() - start

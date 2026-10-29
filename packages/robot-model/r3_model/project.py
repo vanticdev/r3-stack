@@ -111,6 +111,9 @@ class Project:
         """Revision fingerprints of authored inputs, recorded on every result."""
         digest = hashlib.sha256((self.root / "robot.yaml").read_bytes()).hexdigest()[:16]
         result = {"robot_yaml_sha256": digest}
+        from r3_catalog.revision import catalog_modelbank_revision
+
+        result["catalog_modelbank_revision"] = catalog_modelbank_revision(self.root / "catalog")
         try:
             sha = subprocess.run(["git", "-C", str(self.root), "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
             result["git_commit"] = sha.stdout.strip()

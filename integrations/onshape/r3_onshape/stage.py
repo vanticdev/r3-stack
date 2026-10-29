@@ -54,6 +54,10 @@ def run(project: Project) -> StageResult:
     existing = project.read_build_json("cad/cad_model.json")
     force = os.environ.get("R3_CAD_FORCE") == "1"
     if existing and existing.get("source", {}).get("generator_digest") == digest and not force:
+        # Revalidate matching geometry against the current input revision (the
+        # digest already covers its resolved plans, sources and feature evidence).
+        existing["inputs"] = project.fingerprint()
+        (project.build_dir("cad") / "cad_model.json").write_text(json.dumps(existing, indent=1))
         result.add(Diagnostic.info("cad_model_reused", "cad_model.json matches the current generator digest",
                                    data={"document": existing["source"].get("url"), "digest": digest}))
         _summarize(project, existing, result)

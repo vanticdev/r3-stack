@@ -109,7 +109,7 @@ def _envelope(mech: Any, params: dict[str, Any]) -> mf.Manifold:
         axis = {"x": [1.0, 0, 0], "y": [0, 1.0, 0], "z": [0, 0, 1.0]}[mech.axis]
         base = np.zeros(3) if mech.axis == "z" else -np.asarray(axis) * length / 2
         return _cylinder(base, axis, diameter, length)
-    return mf.Manifold.cube(size, True).translate([0.0, 0.0, size[2] / 2])
+    return mf.Manifold.cube(size, True).translate(np.asarray(mech.envelope_offset) * MM + [0.0, 0.0, size[2] / 2])
 
 
 def to_trimesh(solid: mf.Manifold) -> trimesh.Trimesh:

@@ -64,8 +64,9 @@ def local_vertices(shape: str, size: list[float], axis: str = "z") -> np.ndarray
     raise ValueError(f"unsupported shape {shape!r}")
 
 
-def make_solid(solid_id: str, shape: str, size: list[float], axis: str, xyz: list[float], rpy: list[float]) -> Solid:
-    vertices = local_vertices(shape, size, axis) @ rpy_matrix(rpy).T + np.asarray(xyz, dtype=float)
+def make_solid(solid_id: str, shape: str, size: list[float], axis: str, xyz: list[float], rpy: list[float],
+               envelope_offset: list[float] | None = None) -> Solid:
+    vertices = (local_vertices(shape, size, axis) + np.asarray(envelope_offset or [0, 0, 0])) @ rpy_matrix(rpy).T + np.asarray(xyz, dtype=float)
     hull = ConvexHull(vertices)
     return Solid(solid_id, shape, vertices, hull.equations, float(hull.volume))
 

@@ -1071,6 +1071,7 @@ def write_model(project: Project, report: dict[str, Any], transport: str, digest
     mesh_digest = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:16]
     top = robot.assemblies[TOP_LEVEL]
     model = {
+        "inputs": {**project.fingerprint(), "cad_revision": report.get("microversion") or digest},
         "source": {"provider": "onshape", "transport": transport, "document_id": robot.did, "workspace_id": robot.wid,
                    "element_id": top, "assembly_id": top, "url": robot.url(top), "microversion": report.get("microversion", ""),
                    "generator_digest": digest, "generator_version": ORGANIZER_VERSION, "validator_version": VALIDATOR_VERSION,

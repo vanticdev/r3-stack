@@ -370,10 +370,12 @@ components:
     cad_name: Raspberry Pi 5
     name: Raspberry Pi 5 (8 GB)
     manufacturer: Raspberry Pi Ltd
-    description: Frame at the bottom center of the PCB (1.6 mm). USB/Ethernet block overhangs the +x edge by 2 mm.
+    description: Frame at the PCB bottom centre; 85 x 56 mm board outline. Overall size includes connector overhangs and underside parts, measured from the official STEP. Mount seats retain the nominal 1.6 mm stack pending physical-board review.
     mechanical:
       shape: custom
-      size: [87 mm, 56 mm, 17.6 mm]
+      size: [88.500 mm, 57.630352 mm, 18.976 mm]
+      board_outline: [85 mm, 56 mm]
+      envelope_offset: [1.300 mm, -0.815176 mm, -1.450 mm]
       mass: 0.046
       color: "#1a7f37"
       mount_holes: [[-39 mm, -24.5 mm, 0], [19 mm, -24.5 mm, 0], [-39 mm, 24.5 mm, 0], [19 mm, 24.5 mm, 0]]
@@ -388,7 +390,7 @@ components:
         - {id: hole_2, kind: clearance_hole, position: [19 mm, -24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.6 mm}
         - {id: hole_3, kind: clearance_hole, position: [-39 mm, 24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.6 mm}
         - {id: hole_4, kind: clearance_hole, position: [19 mm, 24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.6 mm}
-      provenance: {status: datasheet, source: "Raspberry Pi 5 mechanical drawing (85 x 56, 58 x 49 M2.5 pattern, 2x20 header); component heights estimated"}
+      provenance: {status: datasheet, source: "Raspberry Pi 5 mechanical drawing: 85 x 56 board, 58 x 49 M2.5 holes; overall envelope from official RP-010083-CA-1 STEP. Solids and 1.6 mm mounting stack remain nominal proxies."}
     model:
       source: vendor
       url: "https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip"

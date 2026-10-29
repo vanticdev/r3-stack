@@ -52,7 +52,7 @@ def object_solids(project: Project) -> dict[str, Solid]:
             solids[cid] = outline_solid(cid, [[to_si(a), to_si(b)] for a, b in outline], float(mech.size[2]),
                                         comp.pose.xyz, comp.pose.rpy)
         else:
-            solids[cid] = make_solid(cid, mech.shape, list(mech.size), mech.axis, comp.pose.xyz, comp.pose.rpy)
+            solids[cid] = make_solid(cid, mech.shape, list(mech.size), mech.axis, comp.pose.xyz, comp.pose.rpy, mech.envelope_offset)
     return solids
 
 
