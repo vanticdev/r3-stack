@@ -32,7 +32,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     # robot.yaml software.config
     "control_rate_hz": 100,
     "mode": "autonomous",
-    "radio_failsafe_timeout_s": 0.25,
+    "radio_failsafe_timeout_s": 0.09,
     "failsafe_action": "brake",
     "low_voltage_cutoff_v": 6.6,
     "low_voltage_limit_v": 7.0,
@@ -57,7 +57,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "link_degraded_lq": 70,              # uplink LQ (%) below which autonomy slows down
     "link_degraded_speed_mps": 2.0,
     "ina226": {"address": 0x40, "shunt_ohm": 0.002, "max_current_a": 10.0},
-    "mpu6050": {"address": 0x68},
+    "mpu6050": {"address": 0x68, "component": "imu", "mounting_rpy_deg": [0, 0, 0]},
     # Traction/launch control, motor current limit and gyro yaw assist; any
     # traction.TractionConfig field may be overridden here.
     "traction": {"enabled": True, "yaw_assist_enabled": True, "target_slip": 0.10,

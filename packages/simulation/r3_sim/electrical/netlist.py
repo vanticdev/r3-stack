@@ -8,8 +8,9 @@ nodes. Two flavours are generated from the same models:
 
 * ``tran`` — lockstep transient: integrator capacitors for SOC, RC pairs, fuse
   melting integrals and thermal nodes, initial conditions via ``.ic``;
-* ``op``   — static operating points: SOC and the conductor self-heating gain
-  are ``EXTERNAL`` sources so one loaded circuit serves every ``op`` request.
+* ``op``   — static operating points: capacitors are open and inductors are
+  shorted explicitly. Control sources use alterable DC values, allowing
+  ngspice source stepping while one loaded circuit serves repeated requests.
 
 Units in the thermal subnetworks: node voltage = temperature in C, current =
 heat flow in W, capacitance = heat capacity in J/K, resistance = K/W.
@@ -89,12 +90,18 @@ class Netlist:
         self.models[name] = card
 
     def external(self, name: str) -> str:
-        """``EXTERNAL`` voltage source ``v<name>`` (value from the ``GetVSRCData``
-        callback); returns its node. The callback receives ``v<name>``."""
+        """Control voltage source ``v<name>``; returns its node.
+
+        Transients use the ``GetVSRCData`` callback; operating points alter
+        the native DC value so ngspice can scale it during source stepping.
+        """
         source = f"v{name}"
         node = f"ext_{name}"
         self.externals[source] = node
-        self.body.append(f"{source} {node} 0 external")  # no "dc": a DC value would override the callback in operating points
+        # DC sources participate in ngspice source stepping; EXTERNAL callbacks
+        # do not. Keep callbacks for lockstep transients, and alter DC values
+        # before each operating-point solve.
+        self.body.append(f"{source} {node} 0 " + ("external" if self.transient else "dc 0"))
         return node
 
     def state(self, node: str, value: float) -> None:

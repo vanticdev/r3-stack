@@ -3,7 +3,7 @@
   "kicad": "10.0.7",
   "steps": {
     "schematic": {
-      "seconds": 16.5,
+      "seconds": 20.9,
       "result": {
         "symbols": 100,
         "labels": 277,
@@ -12,7 +12,7 @@
       }
     },
     "erc": {
-      "seconds": 2.6,
+      "seconds": 2.7,
       "result": {
         "errors": 0,
         "warnings": 0,
@@ -27,7 +27,7 @@
       }
     },
     "board": {
-      "seconds": 4.0,
+      "seconds": 3.7,
       "result": {
         "footprints": 93,
         "tracks": 159,
@@ -43,7 +43,7 @@
       }
     },
     "route": {
-      "seconds": 57.6,
+      "seconds": 37.8,
       "result": {
         "freerouting": "2.5.0",
         "java": 25,
@@ -51,8 +51,8 @@
         "rounds": [
           {
             "round": 1,
-            "freerouting_unrouted": 13,
-            "kicad_unconnected": 5,
+            "freerouting_unrouted": 15,
+            "kicad_unconnected": 3,
             "signal_unconnected": 0,
             "open_nets": []
           }
@@ -67,16 +67,16 @@
       }
     },
     "pour": {
-      "seconds": 2.7,
+      "seconds": 2.6,
       "result": {
         "zones": 1,
-        "stitching_vias": 119,
-        "island_vias": 1,
+        "stitching_vias": 114,
+        "island_vias": 0,
         "untied_islands": 0
       }
     },
     "drc": {
-      "seconds": 2.7,
+      "seconds": 2.1,
       "result": {
         "errors": 0,
         "warnings": 133,
@@ -87,14 +87,14 @@
       }
     }
   },
-  "started": "2026-10-29T18:23:19",
+  "started": "2026-10-29T18:48:32",
   "headless": {
     "gui_processes_started": [],
-    "samples": 247,
+    "samples": 184,
     "preexisting_gui_processes": [],
     "tool_windows_opened": [],
-    "window_samples": 62
+    "window_samples": 46
   },
-  "total_seconds": 86.7,
-  "inputs_digest": "e7293deaac454a4c"
+  "total_seconds": 70.5,
+  "inputs_digest": "45d1666cd19d3492"
 }

@@ -65,7 +65,7 @@ def test_blitz_root_lookup_prefers_cicd(deploy: dict, tmp_path: Path) -> None:
 def test_config_supplier_is_base64_firmware_document(deploy: dict) -> None:
     document = json.loads(base64.b64decode(deploy["config_base64"]()))
     assert document["module"] == "rc_car_controller"
-    assert document["config"]["control_rate_hz"] == 100 and document["config"]["radio_failsafe_timeout_s"] == 0.25
+    assert document["config"]["control_rate_hz"] == 100 and document["config"]["radio_failsafe_timeout_s"] == 0.09
     assert document["bindings"]["crsf"] == {"interface": "uart", "device": "/dev/ttyAMA0", "baud": 420000}
 
 

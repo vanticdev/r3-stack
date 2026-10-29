@@ -140,8 +140,11 @@ def test_hand_calculations_agree_with_ngspice(project):
     battery, motor, esc = system.models["battery"], system.models["motor"], system.models["esc"]
     i_m = stall["motor"]["current"]
     # 1. Motor loop at stall: I = (d V_in - V_brush tanh(I / 0.1)) / (2 r_on + R_leads + R_motor(25 C)),
-    #    R_leads = the conductors that carry exactly the motor current.
-    leads = sum(b["resistance"] for b in stall["_branches"].values() if abs(abs(b["current"]) - abs(i_m)) < 1e-9 * abs(i_m))
+    #    Identify both motor-terminal nets topologically, not by exact current:
+    #    ngspice leakage and roundoff can perturb nominally equal branch currents.
+    motor_nets = {project.graph.net_of(pin.label) for pin in (motor.pos, motor.neg)}
+    leads = sum(b["resistance"] for b in stall["_branches"].values()
+                if project.graph.net_of(b["from"]) in motor_nets and project.graph.net_of(b["to"]) in motor_nets)
     v_in = stall["esc"]["v_in"]
     hand = (1.0 * v_in - 0.2 * math.tanh(i_m / 0.1)) / (2 * esc.r_on + leads + motor.resistance_at(25.0))
     print(f"\nstall: ngspice {i_m:.6f} A, hand {hand:.6f} A (V_in {v_in:.4f} V, leads {leads * 1e3:.3f} mohm)")
@@ -168,6 +171,23 @@ def test_hand_calculations_agree_with_ngspice(project):
     assert entry["temperature_rise"] == pytest.approx(rise, rel=1e-6)
     assert entry["resistance"] == pytest.approx(wire.resistance_at(system.ambient_c + rise), rel=1e-9)
     system.close()
+
+
+def test_repeated_operating_points_are_dc_equilibria(project):
+    """A transient-OP fallback must not masquerade as a settled motor/battery."""
+    system = ElectricalSystem(project)
+    try:
+        for throttle, soc in ((1.0, 0.5), (0.4, 0.8), (1.0, 0.5)):
+            out = system.operating_point({"esc": {"throttle": throttle}, "motor": {"omega": 0.0}}, soc=soc)
+            motor, battery = system.models["motor"], system.models["battery"]
+            current = out["motor"]["current"]
+            assert out["motor"]["voltage"] == pytest.approx(
+                current * motor.resistance_at(system.ambient_c)
+                + motor.brush_drop * math.tanh(current / 0.1), rel=1e-6)
+            assert out["battery"]["v_rc"] == pytest.approx(
+                out["battery"]["current"] * battery.r1_ref, rel=1e-6)
+    finally:
+        system.close()
 
 
 def test_ngspice_runs_in_lockstep_with_the_master_clock(project):
