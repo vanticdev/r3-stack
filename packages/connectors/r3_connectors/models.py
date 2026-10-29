@@ -99,6 +99,20 @@ def fetch_vendor(ref: ModelRef, timeout: float = 120.0) -> Path:
 
 
 def resolve_step(ref: ModelRef, project: "Project | None" = None) -> Path:
+    if ref.params.get("bank_id"):
+        from r3_catalog.modelbank import ModelBank
+        from r3_catalog.modelbank.fetch import acquire, unpack
+        entry = ModelBank().get(ref.params["bank_id"])
+        errors = []
+        for source in entry.sources:
+            if source.format not in ("step", "stp", "stp.zip") or source.kind == "onshape_public":
+                continue
+            try:
+                path, _ = acquire(source)
+                return unpack(path, source)
+            except (OSError, ValueError) as error:
+                errors.append(str(error))
+        raise ModelUnavailable(f"{entry.id}: {'; '.join(errors)}")
     if ref.source == "kicad":
         path = resolve_model_path(ref.path)
     elif ref.source == "vendor":

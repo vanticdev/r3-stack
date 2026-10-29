@@ -17,8 +17,8 @@ the joins. This module turns the spec + catalog into those local parts:
 
 Fabricated parts get holes, bores, sockets and strap slots from their catalog
 interfaces (the joins they serve), so their geometry cannot disagree with the
-assembly; purchased parts keep only their catalog solids and datasheet
-features.
+assembly. Purchased bank models bypass native solid authoring; catalog solids
+remain offline proxy plans and explicit missing-model fallbacks.
 """
 
 from __future__ import annotations
@@ -66,6 +66,7 @@ class LocalPart:
     mirror_of: str | None = None  # key of the part this one is a Mirror feature of
     properties: dict[str, str] = field(default_factory=dict)
     instances: list[str] = field(default_factory=list)
+    bank_model: dict[str, Any] | None = None
 
 
 def _digest(value: Any) -> str:
@@ -293,6 +294,14 @@ def build_part_catalog(project: Project) -> tuple[dict[str, LocalPart], dict[str
             parts[key] = LocalPart(key=key, name=name, studio=ctype.cad_family or cad_name(ctype), type=comp.type, plan=plan,
                                    connectors=interface_connectors(project, comp.type, mirror),
                                    library=not mech.fabricated and ctype.kind != "pcb", mirror=mirror, properties=props)
+        if not ctype.mechanical.fabricated and ctype.kind != "pcb":
+            from .purchased import bank_entry
+            entry = bank_entry(ctype)
+            if entry and entry.available:
+                parts[key].bank_model = entry.model_dump(mode="json")
+                parts[key].studio = parts[key].name
+                parts[key].properties["model_bank_id"] = entry.id
+                parts[key].properties["model_bank_digest"] = _digest(parts[key].bank_model)
         parts[key].instances.append(cid)
         instance_part[cid] = key
     for key, part in parts.items():
@@ -320,6 +329,16 @@ def build_part_catalog(project: Project) -> tuple[dict[str, LocalPart], dict[str
                                                    + (f"x{length * 1e3:g}" if length else ""), "vendor": "",
                                                    "material": ftype.material, "mass_source": "geometry x density",
                                                    "catalog_type": type_id})
+            from r3_catalog.modelbank import ModelBank
+            from .purchased import fastener_model_id
+            bank = ModelBank()
+            entry = next((e for e in bank.entries() if e.id == fastener_model_id(type_id, length)), None)
+            if entry and entry.available:
+                parts[key].bank_model = entry.model_dump(mode="json")
+                parts[key].studio = parts[key].name
+                parts[key].plan.mass = entry.key_specs["mass"].value if "mass" in entry.key_specs else None
+                parts[key].properties["model_bank_id"] = entry.id
+                parts[key].properties["model_bank_digest"] = _digest(parts[key].bank_model)
             parts[key].instances.append(iid)
             instance_part[iid] = key
     return parts, instance_part

@@ -1,0 +1,36 @@
+id: fastener-shcs-m2.5-8mm
+name: M2.5 socket_head_screw 8 mm
+manufacturer: ''
+mpn: ISO 4762 M2.5
+aliases: []
+category: fastener
+tags:
+- shcs-m2.5
+key_specs:
+  length:
+    value: 0.008
+    unit: m
+    source: R3 assembly selected length; vendor SKU not pinned
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: null
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: https://www.kicad.org/libraries/3dmodels/
+  result: mechanical fastener not mapped to an installed STEP; select an exact vendor
+    SKU
+proxy_reason: Standard and nominal size known; supplier SKU/model not pinned. Standard-feature
+  CAD remains an explicitly labelled proxy.
+placement: null
+interface_frames: {}
+onshape_connectors: {}

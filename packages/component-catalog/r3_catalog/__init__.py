@@ -106,6 +106,14 @@ def load_catalog(*extra_dirs: Path) -> Catalog:
             if component.id in catalog.components and root == DATA_DIR:
                 raise ValueError(f"duplicate component id {component.id!r} in {path}")
             catalog.components[component.id] = component
+    # A dataset link is resolved through the existing typed ModelRef. No second
+    # component schema or project configuration format is introduced.
+    from .modelbank import ModelBank
+    from .modelbank.catalog import resolve_model
+    bank = ModelBank()
+    for component in catalog.components.values():
+        if not component.mechanical.fabricated and component.kind != "pcb":
+            component.model = resolve_model(component, bank)
     return catalog
 
 

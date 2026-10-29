@@ -35,23 +35,24 @@ class ModelBank:
         key = hashlib.sha256(str(self.dataset.resolve()).encode()).hexdigest()[:16]
         self.index = Path(index) if index else cache_root() / f'index-{key}.sqlite'
 
-    def entries(self) -> list[ModelEntry]:
+    def entries(self, *, copy: bool = True) -> list[ModelEntry]:
         paths = sorted(self.dataset.glob('*.yaml'))
         signature = tuple((p.name, p.stat().st_mtime_ns, p.stat().st_size) for p in paths)
         key = str(self.dataset.resolve())
         cached = self._datasets.get(key)
         if cached is not None and cached[0] == signature:
-            return [e.model_copy(deep=True) for e in cached[1]]
+            return [e.model_copy(deep=True) for e in cached[1]] if copy else cached[1]
         records = [ModelEntry.model_validate(yaml.safe_load(p.read_text())) for p in paths]
         ids = [r.id for r in records]
         if len(set(ids)) != len(ids):
             raise ValueError('duplicate model-bank id')
         self._datasets[key] = (signature, records)
-        return [e.model_copy(deep=True) for e in records]
+        return [e.model_copy(deep=True) for e in records] if copy else records
 
     def get(self, model_id: str) -> ModelEntry:
         # Look up validated IDs, never interpolate user input into a filesystem path.
-        return next((r for r in self.entries() if r.id == model_id), None) or self._missing(model_id)
+        entry = next((r for r in self.entries(copy=False) if r.id == model_id), None)
+        return entry.model_copy(deep=True) if entry else self._missing(model_id)
 
     @staticmethod
     def _missing(model_id: str) -> Any:
@@ -75,7 +76,7 @@ class ModelBank:
         return entry
 
     def _connect(self) -> sqlite3.Connection:
-        entries = self.entries()
+        entries = self.entries(copy=False)
         digest = hashlib.sha256(json.dumps([e.model_dump(mode='json') for e in entries], sort_keys=True).encode()).hexdigest()
         self.index.parent.mkdir(parents=True, exist_ok=True)
         db = sqlite3.connect(self.index, timeout=30)
@@ -141,7 +142,7 @@ class ModelBank:
         bank_id = (getattr(ref, 'params', {}) or {}).get('bank_id')
         if bank_id:
             return self.get(bank_id)
-        matches = [e for e in self.entries() if component.id in [e.catalog_component, *e.catalog_aliases]]
+        matches = [e for e in self.entries(copy=False) if component.id in [e.catalog_component, *e.catalog_aliases]]
         if len(matches) > 1:
             raise ValueError(f'ambiguous bank models for {component.id}; set model.params.bank_id')
-        return matches[0] if matches else None
+        return matches[0].model_copy(deep=True) if matches else None

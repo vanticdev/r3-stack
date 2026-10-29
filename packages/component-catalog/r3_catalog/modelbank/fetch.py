@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+import subprocess
 import tempfile
 import urllib.request
 import zipfile
@@ -97,8 +98,22 @@ def convert(path: Path, source: Source) -> dict[str, Any]:
         scene = trimesh.load(glb, force='scene')
     else:
         if source.format == 'wrl':
-            raise ValueError('VRML conversion is unavailable; ingest the matching KiCad STEP instead')
-        scene = trimesh.load(model, force='scene')
+            executable = shutil.which('assimp')
+            if not executable:
+                raise ValueError('VRML conversion needs the Assimp CLI; install assimp or use the matching STEP')
+            converted = path.parent / 'vrml.glb'
+            try:
+                process = subprocess.run([executable, 'export', str(model), str(converted), '-fglb2'],
+                                         capture_output=True, text=True, timeout=180)
+            except subprocess.TimeoutExpired as error:
+                raise ValueError('Assimp VRML conversion exceeded 180 seconds') from error
+            if process.returncode or not converted.exists():
+                raise ValueError(f'Assimp VRML conversion failed: {process.stderr[-500:]}')
+            scene = trimesh.load(converted, force='scene')
+            if source.kind == 'kicad_3d':
+                scene.apply_scale(0.00254)  # KiCad's legacy VRML library units are 0.1 inch.
+        else:
+            scene = trimesh.load(model, force='scene')
     if not scene.geometry:
         raise ValueError('model contains no tessellated geometry')
     mesh = scene.to_mesh()

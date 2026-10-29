@@ -53,6 +53,7 @@ include = ["r3_*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.fs", "*.json", "*.j2", "*.md"]
+"r3_catalog.modelbank" = ["data/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
