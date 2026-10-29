@@ -49,3 +49,10 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
     contact iterations; evaluate per-geom solref/solimp instead.
 17. Wiring design: W_MOT_B is routed into the right-rear tire (−0.8 mm in MuJoCo), and the encoder/GPS leads rest on
     the gearbox. Reroute when the layout is converted to the assembly/join model (phase B).
+
+## After phase B merges
+18. Add `source:` slots to robot.yaml for pi (family raspberry-pi-5, ram >= 4 GB), receiver (crsf, 2.4 GHz,
+    4.5–5.5 V), and wheels (group: front/rear, diameter 100–115 mm, width 40–50 mm, hub: 6 mm bore). Run
+    `r3 source --all`, pin the choices, and import the Pi 5 STEP into the parts library.
+19. Tests must generate their own build artifacts (or use fixtures) instead of reading `examples/robots/*/build`.
+    Stale routes.json caused false sim failures twice.
