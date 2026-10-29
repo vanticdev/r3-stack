@@ -5,8 +5,10 @@ from __future__ import annotations
 import os
 import shutil
 
-import pytest
+import re
 import yaml
+
+import pytest
 
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
@@ -25,6 +27,10 @@ def built_template(tmp_path_factory):
     """rc-car with real assembly/model/report results plus stage hand-off files (built once per module)."""
     parent = tmp_path_factory.mktemp("template")
     root = copy_rc_car(parent)
+    # A real model error to exercise failed-stage paths: the heartbeat GPIO binding on an unwired header pin.
+    text = (root / "robot.yaml").read_text()
+    line = next(row for row in text.splitlines() if row.strip().startswith("heartbeat:"))
+    (root / "robot.yaml").write_text(text.replace(line, re.sub(r"pins: \[[^\]]*\]", "pins: [pi.J8.32]", line)))
     api.validate(root, ["assembly", "model"])
     write_stage_outputs(root)
     write_sim_scenario(root, fingerprint=api.load_project(root).fingerprint())
