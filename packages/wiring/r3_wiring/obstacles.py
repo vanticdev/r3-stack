@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -54,9 +55,10 @@ class ObstacleSet:
     kinematics: Kinematics
     estimated: list[str] = field(default_factory=list)
     cad_source: dict[str, Any] = field(default_factory=dict)
+    cable_bodies: list[CableBody] = field(default_factory=list)
 
     def by_component(self, component: str) -> Obstacle | None:
-        for obstacle in self.obstacles:
+        for obstacle in [*self.obstacles, *self.cable_bodies]:
             if obstacle.component == component:
                 return obstacle
         return None
@@ -96,6 +98,117 @@ class ObstacleSet:
                 for k in np.nonzero(better)[0]:
                     which[k] = obstacle.component
         return best, which
+
+
+@dataclass
+class CableBody(Obstacle):
+    """A routed connector half or splice sleeve; ids match viewer connector ids.
+
+    Component bodies (including fuse holders) stay in ``obstacles``. Keeping
+    routed hardware separately avoids treating it as a support host or CAD part.
+    """
+
+    node: Any = None
+    owner: str | None = None
+    mates: str | None = None
+    entry_points: np.ndarray | None = None
+    entry_direction: np.ndarray | None = None
+
+    def entry_mask(self, points: np.ndarray, radius: float | np.ndarray = 0.0) -> np.ndarray:
+        """Local conductor-entry aperture, never an exemption for the whole body.
+
+        Only the last 1 mm of the housing at the wire exit is an entry zone.
+        Its transverse extent includes the contact row and the incident bundle.
+        Splice sleeves are estimated 6 mm long and admit their incident ends.
+        """
+        node = self.node
+        origin = self.entry_points.mean(axis=0) if self.entry_points is not None else node.exit
+        rel = np.atleast_2d(points) - origin
+        if node.kind == "splice":
+            return np.linalg.norm(rel, axis=1) <= 0.003 + node.od / 2 + radius
+        direction = self.entry_direction if self.entry_direction is not None else node.direction
+        axial = rel @ direction
+        transverse = np.linalg.norm(rel - axial[:, None] * direction, axis=1)
+        spread = float(np.linalg.norm(self.entry_points - origin, axis=1).max()) \
+            if self.entry_points is not None else 0.0
+        aperture = spread + max(node.od / 2, 0.0005)
+        return (axial >= -0.001 - radius) & (axial <= node.termination_length) & (transverse <= aperture + radius)
+
+
+@lru_cache(maxsize=128)
+def _connector_shape(connector_json: str) -> tuple[Shape, str]:
+    """Viewer model in the connector frame, cached across routing/planning passes."""
+    from r3_catalog.schema import Catalog, ConnectorType
+    from r3_connectors.models import ModelUnavailable, connector_scene, scene_meshes
+
+    connector = ConnectorType.model_validate_json(connector_json)
+    if connector.geometry is not None:
+        try:
+            import trimesh
+
+            scene = connector_scene(Catalog(connectors={connector.id: connector}), connector.id)
+            meshes = [mesh for _, mesh, _ in scene_meshes(scene)]
+            for mesh in meshes:
+                mesh.merge_vertices()  # glTF splits vertices at material/normal seams
+            # Union closed model pieces: overlapping contacts/housings must not
+            # cancel the winding sign or leave internal surfaces as free space.
+            if not all(mesh.is_volume for mesh in meshes):
+                # Some vendor contact meshes have open seams. Keep each signed
+                # surface separately: concatenation can cancel overlapping shells,
+                # and a boolean may silently discard an open contact entirely.
+                shapes = [MeshShape(mesh.vertices, mesh.faces, spacing=0.0005) for mesh in meshes]
+                return SweptShape(shapes, connector.id), f"connector_{connector.geometry.model.source}"
+            mesh = trimesh.boolean.union(meshes, engine="manifold") if len(meshes) > 1 else meshes[0]
+            return MeshShape(mesh.vertices, mesh.faces, spacing=0.0005), f"connector_{connector.geometry.model.source}"
+        except (ModelUnavailable, FileNotFoundError):
+            pass
+    size = np.asarray(connector.body_size, float)
+    return Box(np.array([0.0, 0.0, -size[2] / 2]), np.eye(3), size / 2), "connector_catalog_box"
+
+
+def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[CableBody]:
+    """All cable-side halves and splice sleeves at their current routed poses.
+
+    Integral pigtails have no separate housing: their fuse/ESC/etc. owner is
+    already a component obstacle, and their conductors enter wire occupancy.
+    """
+    from r3_connectors.frames import Frame, any_perpendicular
+
+    out = []
+    for harness in sorted(nodes):
+        for name, node in sorted(nodes[harness].items()):
+            if node.exit is None:
+                continue
+            entries, entry_direction = None, None
+            if node.kind == "splice":
+                shape = Cylinder(node.exit.copy(), np.eye(3), max(node.od / 2, 0.001), 0.003)
+                source = "splice_sleeve_estimated"
+            elif node.connector_type and node.connector_type != "integral":
+                frame = node.frame
+                if frame is None:
+                    from .terminations import body_length
+
+                    direction = node.direction if node.direction is not None else np.array([0.0, 0.0, 1.0])
+                    origin = node.face if node.face is not None else node.exit - direction * body_length(
+                        project.catalog, node.connector_type)
+                    frame = Frame.from_axes(origin,
+                                            any_perpendicular(direction), -direction)
+                local, source = _connector_shape(project.catalog.connector(node.connector_type).model_dump_json())
+                shape = local.transformed(frame.rotation, frame.origin)
+                geometry = project.catalog.connector(node.connector_type).geometry
+                if geometry is not None:
+                    exits = [pin.wire_entry for pin in geometry.pins.values() if pin.wire_entry is not None]
+                    entries = frame.points(np.asarray(exits)) if exits else None
+                entry_direction = -frame.z
+            else:
+                continue
+            moving = project.spec.components.get(node.component) is not None and bool(
+                project.catalog.component(project.spec.components[node.component].type).mechanical.moving)
+            out.append(CableBody(node.ref, "splice" if node.kind == "splice" else "connector", shape, shape,
+                                 0.0005, bool(moving), node.body, False, source=source, node=node,
+                                 owner=node.component, mates=node.mates, entry_points=entries,
+                                 entry_direction=entry_direction))
+    return out
 
 
 def _catalog_shape(project: Project, component: str) -> Shape | None:
@@ -249,7 +362,7 @@ def plate_obstacles(obstacles: ObstacleSet) -> list[Obstacle]:
 def describe(obstacles: ObstacleSet) -> dict[str, Any]:
     """JSON summary for the routing detail artifact."""
     out = {}
-    for o in obstacles.obstacles:
+    for o in [*obstacles.obstacles, *obstacles.cable_bodies]:
         lo, hi = o.shape.aabb()
         slo, shi = o.swept.aabb()
         out[o.component] = {"kind": o.kind, "source": o.source, "moving": o.moving, "body": o.body,

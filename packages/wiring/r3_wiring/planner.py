@@ -93,6 +93,7 @@ class ClearanceField:
     static: np.ndarray  # flat, min signed distance to static parts (drillable plates except at holes)
     moving: np.ndarray  # flat, min signed distance to moving swept envelopes
     structure: np.ndarray  # flat, distance to static structure (tie anchors)
+    hardware: np.ndarray | None = None  # routed housings / bundles, no blanket termination relaxation
 
     def sample(self, name: str, points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         return trilinear(self.grid, getattr(self, name), points)
@@ -465,11 +466,14 @@ class _Problem:
                 tan["axis"].append(self.axis_index[key])
             static_req, moving_req = self.bounds[k]
             for i in range(n):
-                for name, req, channel in (("static_clearance", static_req[i], 0), ("moving_clearance", moving_req[i], 1)):
+                channels = [("static_clearance", static_req[i], 0), ("moving_clearance", moving_req[i], 1)]
+                if self.fields.hardware is not None:
+                    channels.append(("hardware_clearance", seg.od / 2 + STATIC_MARGIN, 2))
+                for name, req, channel in channels:
                     if req < FIELD_CUTOFF:
                         clear["row"].append(len(labels))
                         labels.append({"kind": name, "segment": k, "point": i, "required": float(req),
-                                       "terminal": bool(self.terminal[k][i])})
+                                       "terminal": bool(self.terminal[k][i]) if channel != 2 else False})
                         clear["point"].append(base + i)
                         clear["req"].append(float(req))
                         clear["field"].append(channel)
@@ -659,6 +663,10 @@ class _Problem:
             moving = cl["field"] == 1
             value = np.where(moving, fm, fs)
             grad = np.where(moving[:, None], gm, gs)
+            hardware = cl["field"] == 2
+            if hardware.any():
+                fh, gh = self.fields.sample("hardware", q[hardware])
+                value[hardware], grad[hardware] = fh, gh
             g[cl["row"]] = (value - cl["req"]) * 1e3
             point_grad(cl["row"], cl["point"], grad * 1e3)
         # Junction moves, axis cones, support planes.
@@ -845,7 +853,8 @@ def _violations(g: np.ndarray, labels: list[dict[str, Any]], planned: list[Segme
                                  f"{max(room - seg.od / 2, 0) * 1e3:.1f} mm of free space: move or rotate the "
                                  f"connector exit, give the bundle a wider path, or split it")
         elif kind.endswith("clearance"):
-            achieved = float(problem.fields.sample("static" if kind.startswith("static") else "moving", p[None])[0][0])
+            field_name = "hardware" if kind.startswith("hardware") else "static" if kind.startswith("static") else "moving"
+            achieved = float(problem.fields.sample(field_name, p[None])[0][0])
             required = label["required"]
             r = seg.od / 2 if seg is not None else 0.0
             near = _near(obstacles, p, moving=kind.startswith("moving"))
@@ -970,8 +979,13 @@ def occupancy_field(grid: VoxelGrid, occupied: list[tuple[np.ndarray, float, set
 
     centers = grid.centers()
     out = np.full(grid.size, FIELD_CUTOFF)
+    seen: set[tuple] = set()
     for points, radius, cats in occupied:
         separation = max([SEPARATION.get(frozenset({a, b}), 0.0) for a in categories for b in cats if a != b] + [0.0])
+        key = (points.shape, points.tobytes(), radius, separation)
+        if key in seen:
+            continue
+        seen.add(key)
         # Voxels farther than the cutoff from the bundle's bounding box see the cutoff (no query needed).
         near = np.all((centers >= points.min(axis=0) - FIELD_CUTOFF) & (centers <= points.max(axis=0) + FIELD_CUTOFF),
                       axis=1)
@@ -1034,6 +1048,8 @@ def build_problem(project: Any, router: Any, routing: Any, harnesses: list[str],
     fanned: set[str] = set()  # node refs whose conductors fan out from their pins
     jacket = {h.id: h.jacket for h in project.spec.electrical.harnesses}
     for pair in routing.floating:
+        if not {pair.a.split(".")[0], pair.b.split(".")[0]} & set(harnesses):
+            continue  # unrelated pairs must not acquire free optimisation variables in this group
         key = f"F:{pair.a}|{pair.b}"
         from .terminations import body_width
 
@@ -1315,9 +1331,12 @@ def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str,
     for group in _groups(project, routing):
         holes = {i for h in group for i in routing.harnesses[h].holes}
         fields = clearance_field(router, holes)
+        fields.hardware = router.cable_field(routing.nodes, set(group))
         categories = _group_categories(project, group)
         if occupied:
-            np.minimum(fields.static, occupancy_field(router.grid, occupied, categories), out=fields.static)
+            occupancy = occupancy_field(router.grid, occupied, categories)
+            np.minimum(fields.static, occupancy, out=fields.static)
+            np.minimum(fields.hardware, occupancy, out=fields.hardware)
         segments, junctions = build_problem(project, router, routing, group, supports)
         if not segments:
             continue
@@ -1327,9 +1346,9 @@ def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str,
         stats["+".join(group)] = plan.stats
         _apply(project, routing, plan, moved)
         for harness in group:
-            for seg in routing.harnesses[harness].segments:
-                pts, _ = resample_polyline(np.asarray(seg["points"], float), 0.001)
-                occupied.append((pts, float(seg["od"]) / 2, categories))
+            for wire_id in routing.harnesses[harness].wires:
+                for pts, radius in router._occupied_runs(routing.wires[wire_id]):
+                    occupied.append((pts, radius, categories))
         for v in plan.violations:
             diagnostics.append(Diagnostic.error(
                 "route_infeasible",
