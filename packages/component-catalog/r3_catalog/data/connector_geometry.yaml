@@ -39,6 +39,150 @@ geometry:
     provenance: {status: "estimated", source: "3.5 mm gold bullet: 9 mm split pin, 5 mm solder cup (hobby vendor drawings; proxy)"}
     pins:
       "1": {position: [0, 0, 0], tip: 9.0 mm, wire_entry: [0, 0, -5.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  fpc-15p-1.0mm-cable:
+    model:
+      source: proxy
+      units: mm
+      placement: {origin: [0, 0, 0], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+      params: {"builder": "ffc_end", "width": 16.0, "thickness": 0.3, "stiffener": 4.0, "contact_width": 0.6}
+      provenance: {status: "estimated", source: "Raspberry Pi 15-way 1.0 mm camera FFC: 16 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable listings; proxy)"}
+    pin_shape: blade
+    pin_size: 0.6 mm
+    envelope: [16.0 mm, 0.3 mm, 4.0 mm]
+    depth: 4.0 mm
+    reach: 0.0 mm
+    color: "#d9a441"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "Raspberry Pi 15-way 1.0 mm camera FFC: 16 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable listings; proxy)"}
+    pins:
+      "1": {position: [-7.0 mm, 0, 0], tip: 0.0 mm}
+      "2": {position: [-6.0 mm, 0, 0], tip: 0.0 mm}
+      "3": {position: [-5.0 mm, 0, 0], tip: 0.0 mm}
+      "4": {position: [-4.0 mm, 0, 0], tip: 0.0 mm}
+      "5": {position: [-3.0 mm, 0, 0], tip: 0.0 mm}
+      "6": {position: [-2.0 mm, 0, 0], tip: 0.0 mm}
+      "7": {position: [-1.0 mm, 0, 0], tip: 0.0 mm}
+      "8": {position: [0, 0, 0], tip: 0.0 mm}
+      "9": {position: [1.0 mm, 0, 0], tip: 0.0 mm}
+      "10": {position: [2.0 mm, 0, 0], tip: 0.0 mm}
+      "11": {position: [3.0 mm, 0, 0], tip: 0.0 mm}
+      "12": {position: [4.0 mm, 0, 0], tip: 0.0 mm}
+      "13": {position: [5.0 mm, 0, 0], tip: 0.0 mm}
+      "14": {position: [6.0 mm, 0, 0], tip: 0.0 mm}
+      "15": {position: [7.0 mm, 0, 0], tip: 0.0 mm}
+  fpc-15p-1.0mm-socket:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_FFC-FPC.3dshapes/TE_1-84952-5_1x15-1MP_P1.0mm_Horizontal.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [0, -1.28 mm, -4.6 mm], x: [1.0, 0.0, 0.0], z: [0.0, 1.0, 0.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_FFC-FPC.3dshapes/TE_1-84952-5_1x15-1MP_P1.0mm_Horizontal.step", notes: "side entry: mating face = front (cable entry) face of the 22.9 x 6.5 x 2.6 mm body, 4.6 mm in front of the footprint origin, contact axis at mid-height 1.28 mm; contacts start about 1.5 mm inside"}
+    footprint: "Connector_FFC-FPC:TE_1-84952-5_1x15-1MP_P1.0mm_Horizontal"
+    footprint_placement: {origin: [0, -1.28 mm, -4.6 mm], x: [1.0, 0.0, 0.0], z: [0.0, 1.0, 0.0]}
+    pin_shape: blade
+    pin_size: 0.5 mm
+    envelope: [22.92 mm, 2.56 mm, 6.54 mm]
+    depth: 6.54 mm
+    reach: 0.0 mm
+    color: "#e8e4c9"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "pads: KiCad footprint Connector_FFC-FPC:TE_1-84952-5_1x15-1MP_P1.0mm_Horizontal via pcbnew; body and mating face: KiCad model Connector_FFC-FPC.3dshapes/TE_1-84952-5_1x15-1MP_P1.0mm_Horizontal.step", notes: "side entry: mating face = front (cable entry) face of the 22.9 x 6.5 x 2.6 mm body, 4.6 mm in front of the footprint origin, contact axis at mid-height 1.28 mm; contacts start about 1.5 mm inside"}
+    pins:
+      "1": {position: [-7.0 mm, 0, 0], tip: -1.5 mm, pad: [-7.0 mm, -1.28 mm, -6.4 mm]}
+      "2": {position: [-6.0 mm, 0, 0], tip: -1.5 mm, pad: [-6.0 mm, -1.28 mm, -6.4 mm]}
+      "3": {position: [-5.0 mm, 0, 0], tip: -1.5 mm, pad: [-5.0 mm, -1.28 mm, -6.4 mm]}
+      "4": {position: [-4.0 mm, 0, 0], tip: -1.5 mm, pad: [-4.0 mm, -1.28 mm, -6.4 mm]}
+      "5": {position: [-3.0 mm, 0, 0], tip: -1.5 mm, pad: [-3.0 mm, -1.28 mm, -6.4 mm]}
+      "6": {position: [-2.0 mm, 0, 0], tip: -1.5 mm, pad: [-2.0 mm, -1.28 mm, -6.4 mm]}
+      "7": {position: [-1.0 mm, 0, 0], tip: -1.5 mm, pad: [-1.0 mm, -1.28 mm, -6.4 mm]}
+      "8": {position: [0, 0, 0], tip: -1.5 mm, pad: [0, -1.28 mm, -6.4 mm]}
+      "9": {position: [1.0 mm, 0, 0], tip: -1.5 mm, pad: [1.0 mm, -1.28 mm, -6.4 mm]}
+      "10": {position: [2.0 mm, 0, 0], tip: -1.5 mm, pad: [2.0 mm, -1.28 mm, -6.4 mm]}
+      "11": {position: [3.0 mm, 0, 0], tip: -1.5 mm, pad: [3.0 mm, -1.28 mm, -6.4 mm]}
+      "12": {position: [4.0 mm, 0, 0], tip: -1.5 mm, pad: [4.0 mm, -1.28 mm, -6.4 mm]}
+      "13": {position: [5.0 mm, 0, 0], tip: -1.5 mm, pad: [5.0 mm, -1.28 mm, -6.4 mm]}
+      "14": {position: [6.0 mm, 0, 0], tip: -1.5 mm, pad: [6.0 mm, -1.28 mm, -6.4 mm]}
+      "15": {position: [7.0 mm, 0, 0], tip: -1.5 mm, pad: [7.0 mm, -1.28 mm, -6.4 mm]}
+  fpc-22p-0.5mm-cable:
+    model:
+      source: proxy
+      units: mm
+      placement: {origin: [0, 0, 0], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+      params: {"builder": "ffc_end", "width": 11.5, "thickness": 0.3, "stiffener": 4.0, "contact_width": 0.3}
+      provenance: {status: "estimated", source: "Raspberry Pi 22-way 0.5 mm camera FFC: 11.5 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable listings; proxy)"}
+    pin_shape: blade
+    pin_size: 0.3 mm
+    envelope: [11.5 mm, 0.3 mm, 4.0 mm]
+    depth: 4.0 mm
+    reach: 0.0 mm
+    color: "#d9a441"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "Raspberry Pi 22-way 0.5 mm camera FFC: 11.5 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable listings; proxy)"}
+    pins:
+      "1": {position: [-5.25 mm, 0, 0], tip: 0.0 mm}
+      "2": {position: [-4.75 mm, 0, 0], tip: 0.0 mm}
+      "3": {position: [-4.25 mm, 0, 0], tip: 0.0 mm}
+      "4": {position: [-3.75 mm, 0, 0], tip: 0.0 mm}
+      "5": {position: [-3.25 mm, 0, 0], tip: 0.0 mm}
+      "6": {position: [-2.75 mm, 0, 0], tip: 0.0 mm}
+      "7": {position: [-2.25 mm, 0, 0], tip: 0.0 mm}
+      "8": {position: [-1.75 mm, 0, 0], tip: 0.0 mm}
+      "9": {position: [-1.25 mm, 0, 0], tip: 0.0 mm}
+      "10": {position: [-0.75 mm, 0, 0], tip: 0.0 mm}
+      "11": {position: [-0.25 mm, 0, 0], tip: 0.0 mm}
+      "12": {position: [0.25 mm, 0, 0], tip: 0.0 mm}
+      "13": {position: [0.75 mm, 0, 0], tip: 0.0 mm}
+      "14": {position: [1.25 mm, 0, 0], tip: 0.0 mm}
+      "15": {position: [1.75 mm, 0, 0], tip: 0.0 mm}
+      "16": {position: [2.25 mm, 0, 0], tip: 0.0 mm}
+      "17": {position: [2.75 mm, 0, 0], tip: 0.0 mm}
+      "18": {position: [3.25 mm, 0, 0], tip: 0.0 mm}
+      "19": {position: [3.75 mm, 0, 0], tip: 0.0 mm}
+      "20": {position: [4.25 mm, 0, 0], tip: 0.0 mm}
+      "21": {position: [4.75 mm, 0, 0], tip: 0.0 mm}
+      "22": {position: [5.25 mm, 0, 0], tip: 0.0 mm}
+  fpc-22p-0.5mm-socket:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_FFC-FPC.3dshapes/Hirose_FH12-22S-0.5SH_1x22-1MP_P0.50mm_Horizontal.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [0, -1.0 mm, -4.4 mm], x: [1.0, 0.0, 0.0], z: [0.0, 1.0, 0.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_FFC-FPC.3dshapes/Hirose_FH12-22S-0.5SH_1x22-1MP_P0.50mm_Horizontal.step", notes: "side entry: mating face = front (cable entry) face of the 15.1 x 6.4 x 2.0 mm body, 4.4 mm in front of the footprint origin, contact axis at mid-height 1.0 mm; contacts start about 1.5 mm inside (FH12 drawing: FPC insertion depth about 3 mm)"}
+    footprint: "Connector_FFC-FPC:Hirose_FH12-22S-0.5SH_1x22-1MP_P0.50mm_Horizontal"
+    footprint_placement: {origin: [0, -1.0 mm, -4.4 mm], x: [1.0, 0.0, 0.0], z: [0.0, 1.0, 0.0]}
+    pin_shape: blade
+    pin_size: 0.3 mm
+    envelope: [15.1 mm, 2.0 mm, 6.4 mm]
+    depth: 6.4 mm
+    reach: 0.0 mm
+    color: "#e8e4c9"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "pads: KiCad footprint Connector_FFC-FPC:Hirose_FH12-22S-0.5SH_1x22-1MP_P0.50mm_Horizontal via pcbnew; body and mating face: KiCad model Connector_FFC-FPC.3dshapes/Hirose_FH12-22S-0.5SH_1x22-1MP_P0.50mm_Horizontal.step", notes: "side entry: mating face = front (cable entry) face of the 15.1 x 6.4 x 2.0 mm body, 4.4 mm in front of the footprint origin, contact axis at mid-height 1.0 mm; contacts start about 1.5 mm inside (FH12 drawing: FPC insertion depth about 3 mm)"}
+    pins:
+      "1": {position: [-5.25 mm, 0, 0], tip: -1.5 mm, pad: [-5.25 mm, -1.0 mm, -6.25 mm]}
+      "2": {position: [-4.75 mm, 0, 0], tip: -1.5 mm, pad: [-4.75 mm, -1.0 mm, -6.25 mm]}
+      "3": {position: [-4.25 mm, 0, 0], tip: -1.5 mm, pad: [-4.25 mm, -1.0 mm, -6.25 mm]}
+      "4": {position: [-3.75 mm, 0, 0], tip: -1.5 mm, pad: [-3.75 mm, -1.0 mm, -6.25 mm]}
+      "5": {position: [-3.25 mm, 0, 0], tip: -1.5 mm, pad: [-3.25 mm, -1.0 mm, -6.25 mm]}
+      "6": {position: [-2.75 mm, 0, 0], tip: -1.5 mm, pad: [-2.75 mm, -1.0 mm, -6.25 mm]}
+      "7": {position: [-2.25 mm, 0, 0], tip: -1.5 mm, pad: [-2.25 mm, -1.0 mm, -6.25 mm]}
+      "8": {position: [-1.75 mm, 0, 0], tip: -1.5 mm, pad: [-1.75 mm, -1.0 mm, -6.25 mm]}
+      "9": {position: [-1.25 mm, 0, 0], tip: -1.5 mm, pad: [-1.25 mm, -1.0 mm, -6.25 mm]}
+      "10": {position: [-0.75 mm, 0, 0], tip: -1.5 mm, pad: [-0.75 mm, -1.0 mm, -6.25 mm]}
+      "11": {position: [-0.25 mm, 0, 0], tip: -1.5 mm, pad: [-0.25 mm, -1.0 mm, -6.25 mm]}
+      "12": {position: [0.25 mm, 0, 0], tip: -1.5 mm, pad: [0.25 mm, -1.0 mm, -6.25 mm]}
+      "13": {position: [0.75 mm, 0, 0], tip: -1.5 mm, pad: [0.75 mm, -1.0 mm, -6.25 mm]}
+      "14": {position: [1.25 mm, 0, 0], tip: -1.5 mm, pad: [1.25 mm, -1.0 mm, -6.25 mm]}
+      "15": {position: [1.75 mm, 0, 0], tip: -1.5 mm, pad: [1.75 mm, -1.0 mm, -6.25 mm]}
+      "16": {position: [2.25 mm, 0, 0], tip: -1.5 mm, pad: [2.25 mm, -1.0 mm, -6.25 mm]}
+      "17": {position: [2.75 mm, 0, 0], tip: -1.5 mm, pad: [2.75 mm, -1.0 mm, -6.25 mm]}
+      "18": {position: [3.25 mm, 0, 0], tip: -1.5 mm, pad: [3.25 mm, -1.0 mm, -6.25 mm]}
+      "19": {position: [3.75 mm, 0, 0], tip: -1.5 mm, pad: [3.75 mm, -1.0 mm, -6.25 mm]}
+      "20": {position: [4.25 mm, 0, 0], tip: -1.5 mm, pad: [4.25 mm, -1.0 mm, -6.25 mm]}
+      "21": {position: [4.75 mm, 0, 0], tip: -1.5 mm, pad: [4.75 mm, -1.0 mm, -6.25 mm]}
+      "22": {position: [5.25 mm, 0, 0], tip: -1.5 mm, pad: [5.25 mm, -1.0 mm, -6.25 mm]}
   header-1x3-2.54:
     model:
       source: kicad

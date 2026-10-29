@@ -130,6 +130,20 @@ KICAD: dict[str, KicadSpec] = {
         (0.0, 0.0, 1.25), (1, 0, 0), (0, 0, 1), True, 0.0, "coax", 0.5,
         "mating face = top of the receptacle (1.25 mm); centre contact on the axis; pad 1 is its solder tab, "
         "pads 2 the shield", "#c8c8c8", pins=("1",), contact_at_origin=True),
+    # MIPI CSI camera FPC sockets (horizontal ZIF; the flat cable enters the front face, opposite the solder tails).
+    "fpc-22p-0.5mm-socket": KicadSpec(
+        "Connector_FFC-FPC:Hirose_FH12-22S-0.5SH_1x22-1MP_P0.50mm_Horizontal",
+        "Connector_FFC-FPC.3dshapes/Hirose_FH12-22S-0.5SH_1x22-1MP_P0.50mm_Horizontal.step",
+        (0.0, -4.4, 1.0), (1, 0, 0), (0, -1, 0), True, -1.5, "blade", 0.3,
+        "side entry: mating face = front (cable entry) face of the 15.1 x 6.4 x 2.0 mm body, 4.4 mm in front of the "
+        "footprint origin, contact axis at mid-height 1.0 mm; contacts start about 1.5 mm inside (FH12 drawing: "
+        "FPC insertion depth about 3 mm)", "#e8e4c9"),
+    "fpc-15p-1.0mm-socket": KicadSpec(
+        "Connector_FFC-FPC:TE_1-84952-5_1x15-1MP_P1.0mm_Horizontal",
+        "Connector_FFC-FPC.3dshapes/TE_1-84952-5_1x15-1MP_P1.0mm_Horizontal.step",
+        (0.0, -4.6, 1.28), (1, 0, 0), (0, -1, 0), True, -1.5, "blade", 0.5,
+        "side entry: mating face = front (cable entry) face of the 22.9 x 6.5 x 2.6 mm body, 4.6 mm in front of the "
+        "footprint origin, contact axis at mid-height 1.28 mm; contacts start about 1.5 mm inside", "#e8e4c9"),
 }
 
 XT30_FEMALE = dict(insert=[8.2, 4.2, 5.6], body=[10.2, 5.2, 5.0], contact_d=2.0)
@@ -177,6 +191,19 @@ PROXIES: dict[str, ProxySpec] = {
         {"width": 7.6, "thickness": 2.6, "length": 14.0, "cavity": 1.0},
         14.0, 0.0, (7.6, 2.6, 14.0), 0.0, "socket", 1.0,
         "Futaba J / 2.54 mm 1x3 crimp housing: 7.6 x 2.6 x 14 mm (vendor listings; proxy)", "#1d1d1d"),
+    # Flat-cable ends: the stiffened FFC end with exposed contacts on one face; no wires (the cable is the conductor).
+    "fpc-22p-0.5mm-cable": ProxySpec(
+        [(str(n), -5.25 + 0.5 * (n - 1), 0.0) for n in range(1, 23)], "ffc_end",
+        {"width": 11.5, "thickness": 0.3, "stiffener": 4.0, "contact_width": 0.3},
+        4.0, 0.0, (11.5, 0.3, 4.0), 0.0, "blade", 0.3,
+        "Raspberry Pi 22-way 0.5 mm camera FFC: 11.5 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable "
+        "listings; proxy)", "#d9a441", wire_entry=False),
+    "fpc-15p-1.0mm-cable": ProxySpec(
+        [(str(n), -7.0 + 1.0 * (n - 1), 0.0) for n in range(1, 16)], "ffc_end",
+        {"width": 16.0, "thickness": 0.3, "stiffener": 4.0, "contact_width": 0.6},
+        4.0, 0.0, (16.0, 0.3, 4.0), 0.0, "blade", 0.6,
+        "Raspberry Pi 15-way 1.0 mm camera FFC: 16 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable "
+        "listings; proxy)", "#d9a441", wire_entry=False),
 }
 
 

@@ -116,8 +116,17 @@ def bullet_female(geometry: ConnectorGeometry, p: dict[str, Any]) -> dict[str, t
                                                                                  -p["socket_depth"] + 0.5)}
 
 
+def ffc_end(geometry: ConnectorGeometry, p: dict[str, Any]) -> dict[str, trimesh.Trimesh]:
+    """Flat flexible cable end: a thin stiffened strip behind the face with exposed contact strips on its +y face."""
+    w, t, length, cw = p["width"], p["thickness"], p["stiffener"], p["contact_width"]
+    out = {"body": _box([w, t, length], [0.0, 0.0, -length / 2])}
+    for number, pos in _pins_mm(geometry):
+        out[f"contact_{number}"] = _box([cw, 0.02, length * 0.8], [pos[0], t / 2 + 0.01, -length * 0.4])
+    return out
+
+
 BUILDERS: dict[str, Callable[[ConnectorGeometry, dict[str, Any]], dict[str, trimesh.Trimesh]]] = {
-    "housing": housing, "xt_female": xt_female, "xt_male": xt_male, "xt_male_pcb_ra": xt_male_pcb_ra,
+    "ffc_end": ffc_end, "housing": housing, "xt_female": xt_female, "xt_male": xt_male, "xt_male_pcb_ra": xt_male_pcb_ra,
     "bullet_male": bullet_male, "bullet_female": bullet_female,
 }
 
