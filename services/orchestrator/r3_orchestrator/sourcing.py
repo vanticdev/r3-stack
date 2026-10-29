@@ -35,6 +35,8 @@ from r3_catalog.sourcing.providers import PROVIDERS, make_providers
 from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
 
+from .purchasing import purchase_summary
+
 BUILD = "sourcing"
 CANDIDATES_FILE = "candidates.json"
 ELECTRICAL = {"connector", "binding", "power", "uart", "pwm", "input", "logic", "i2c", "wire", "harness", "unknown", "catalog"}
@@ -93,7 +95,7 @@ def list_slots(project: Project) -> dict[str, Any]:
                 "requirement_sha256": stored["requirement_sha256"], "reports": stored["reports"]},
         })
     providers = [cls(http=HttpClient(offline=True)).describe() for cls in PROVIDERS.values()]
-    return {"ok": True, "project": str(project.root), "slots": out, "providers": providers}
+    return {"ok": True, "project": str(project.root), "slots": out, "providers": providers, "purchases": purchase_summary(project)}
 
 
 # ------------------------------------------------------------- twin checks
@@ -497,6 +499,9 @@ def price_bom(project: Project, http: HttpClient | None = None, provider_ids: li
     """Price and stock-check the PCB BOM's MPNs (``build/pcb/*-bom.csv`` MPN column) through the distributor APIs."""
     mpns: dict[str, int] = {}
     files = sorted((project.root / "build" / "pcb").glob("*-bom.csv")) if (project.root / "build" / "pcb").exists() else []
+    owned_boards = {Path(board.source).name for board in project.spec.pcb.boards
+                    if project.spec.components[board.component].owned}
+    files = [path for path in files if path.name.removesuffix("-bom.csv") not in owned_boards]
     for path in files:
         with path.open(newline="") as handle:
             for row in csv.DictReader(handle):
@@ -579,6 +584,10 @@ def _price(entry: dict[str, Any]) -> str:
 
 def print_source(payload: dict[str, Any]) -> None:
     if payload.get("view") == "slots":
+        purchases = payload.get("purchases", {})
+        for row in purchases.get("lines", []):
+            print(f"{row['component']:<20} {row['status']:<8} {row['type']}")
+        print(f"To buy: {purchases.get('to_buy_totals', {})}; {purchases.get('unpriced_to_buy', 0)} unpriced")
         if not payload["slots"]:
             print("No sourcing slots. Add `source: {requires: {kind: ..., ...}}` to a component in robot.yaml.")
         for slot in payload["slots"]:

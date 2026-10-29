@@ -9,7 +9,7 @@ import { apiUrl } from "../api/client.ts";
 import { streamEvents, type StreamHandle } from "../api/sse.ts";
 import {
   invalidateSourcing, sourcingApi, useSlots, useStoredSearch, type Candidate, type ParamMatch, type RankedCandidate, type Slot,
-  type SourcingEvent, type Tier, type ValueStatus,
+  type SourcingEvent, type Tier, type ValueStatus, type PurchaseSummary,
 } from "../api/sourcing.ts";
 import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
@@ -67,23 +67,16 @@ export function PartsPage() {
       <div className="page-head">
         <div>
           <h1>Parts</h1>
-          <p>Components declared by requirements. R3 finds real parts online, ranks them with the digital twin and pins your choice in <code>r3.lock.yaml</code>.</p>
+          <p>Track owned parts and what remains to buy. R3 finds parts for sourcing slots and pins your choice in <code>r3.lock.yaml</code>.</p>
         </div>
       </div>
       <QueryView query={slots} height={300}>
         {(data) => {
-          if (!data.slots.length) {
-            return (
-              <Card title="No sourcing slots">
-                <Empty title="Declare a part by its specification">
-                  Add <code>source: {"{requires: {kind: radio, protocol: crsf, band: 2.4 GHz}}"}</code> to a component in robot.yaml,
-                  or run <code>r3 source</code> from the CLI.
-                </Empty>
-              </Card>
-            );
-          }
+          if (!data.slots.length) return data.purchases ? <PurchaseParts purchases={data.purchases} /> : <Card title="No sourcing slots"><Empty title="Declare parts in robot.yaml" /></Card>;
           const slot = data.slots.find((s) => s.slot === selected) ?? data.slots[0]!;
           return (
+            <div className="stack">
+              {data.purchases && <PurchaseParts purchases={data.purchases} />}
             <div className="grid side" style={{ gridTemplateColumns: "300px minmax(0, 1fr)" }}>
               <div className="stack">
                 <Card title="Slots" flush>
@@ -103,6 +96,7 @@ export function PartsPage() {
                 </Card>
               </div>
               <SlotDetail key={slot.slot} pid={pid} slot={slot} />
+            </div>
             </div>
           );
         }}
@@ -351,4 +345,12 @@ function CandidateDetail({ entry, candidate }: { entry: RankedCandidate; candida
       </div>
     </div>
   );
+}
+
+export function PurchaseParts({ purchases }: { purchases: PurchaseSummary }) {
+  return <Card title="Parts" subtitle={`To buy: ${Object.entries(purchases.to_buy_totals).map(([currency, total]) => `${total.toFixed(2)} ${currency}`).join(" · ") || "No priced parts"}${purchases.unpriced_to_buy ? ` · ${purchases.unpriced_to_buy} unpriced` : ""}`}>
+    <table><thead><tr><th>Component</th><th>Status</th><th className="num">To buy</th></tr></thead><tbody>
+      {purchases.lines.map((part) => <tr key={part.component}><td title={part.note}>{part.component}<div className="muted small">{part.type}</div></td><td><Chip tone={part.owned ? "info" : part.status === "sourced" ? "good" : "muted"}>{part.owned ? "Owned" : part.status === "sourced" ? "Sourced" : "To buy"}</Chip></td><td className="num">{part.owned ? "—" : part.purchase_cost === null ? "Unpriced" : `${part.purchase_cost.toFixed(2)} ${part.currency}`}</td></tr>)}
+    </tbody></table>
+  </Card>;
 }
