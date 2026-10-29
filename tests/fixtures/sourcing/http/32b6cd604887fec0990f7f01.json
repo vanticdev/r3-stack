@@ -1,0 +1,14 @@
+{
+  "body_file": "32b6cd604887fec0990f7f01.body",
+  "body_sha256": "2884c882599a884ff4029d117fffa8271a79e9485228719c64f9d979ec97ac30",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"1c4cdf9f1a90a7885d6f73025b96156898e26997ac8a32a1a6d3cfc30aed9ed1\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Vario%202400.json",
+  "retrieved_at": 1793253131.739886,
+  "size": 655,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Vario%202400.json"
+}

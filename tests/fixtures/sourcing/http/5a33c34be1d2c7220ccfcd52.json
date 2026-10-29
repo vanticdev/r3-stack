@@ -1,0 +1,14 @@
+{
+  "body_file": "5a33c34be1d2c7220ccfcd52.body",
+  "body_sha256": "b61201ef476afa6c7d08911d96bf65cd51a28b1857afc14b259b21f23551eecb",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"e490360fc542945e5d440ce902e7d2bbec185efae77292455300d32ab30d7fbc\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%20C3%202400%20PWM.json",
+  "retrieved_at": 1793253131.0389912,
+  "size": 551,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%20C3%202400%20PWM.json"
+}

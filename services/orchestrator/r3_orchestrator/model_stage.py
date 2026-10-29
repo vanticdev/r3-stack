@@ -20,6 +20,9 @@ Checks (stable diagnostic codes):
   ``power_in_undervoltage``, ``logic_level_overvoltage``, ``logic_level_marginal``
 * buses: ``i2c_address_conflict``
 * mechanics: ``component_interference``, ``mass_exceeds_requirement``
+* sourcing (``source:`` slots, see :mod:`r3_orchestrator.sourcing`): ``component_unsourced``,
+  ``sourcing_catalog_missing``, ``sourcing_digest_mismatch``, ``sourcing_pin_stale``,
+  ``source_requirement_unmet``, ``source_requirement_unverified``
 """
 
 from __future__ import annotations
@@ -733,6 +736,10 @@ def run(project: Project) -> StageResult:
     solids = checker.solids()
     overlaps = checker.check_interference(solids)
     mass = checker.check_mass()
+    if project.spec.source_slots():
+        from .sourcing import check_pins
+
+        result.extend(check_pins(project))
     result.assume("electrical", "Rail voltages are the single power_out source's nominal/min/max; fuses, switches and shunts "
                                 "are treated as zero-drop. Load-dependent drops are computed by the electrical stage.")
 

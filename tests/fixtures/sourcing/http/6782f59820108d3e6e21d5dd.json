@@ -1,0 +1,14 @@
+{
+  "body_file": "6782f59820108d3e6e21d5dd.body",
+  "body_sha256": "aa669159b768c488a709fa20b8e179d51d07f85dfcc607b292986cdf8bf16c6b",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"310b85e0c1b0e8b9afbe1257f1956f83e835a5520124a3e0eaccc23d64ac931d\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%20C3%20LR1121%20PWM.json",
+  "retrieved_at": 1793253131.2019289,
+  "size": 602,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%20C3%20LR1121%20PWM.json"
+}

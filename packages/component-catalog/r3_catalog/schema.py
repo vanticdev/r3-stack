@@ -18,7 +18,8 @@ class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
 
-ProvenanceStatus = Literal["datasheet", "measured", "estimated", "derived"]
+# ``vendor``: a value published by the seller (product page, listing) rather than a manufacturer datasheet.
+ProvenanceStatus = Literal["datasheet", "vendor", "measured", "estimated", "derived"]
 
 
 class Provenance(_Model):

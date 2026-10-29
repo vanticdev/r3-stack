@@ -52,8 +52,37 @@ class Requirements(_Model):
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
+class SourceSpec(_Model):
+    """A component slot declared by requirements and sourced online (``r3 source``).
+
+    ``requires`` are hard filters keyed by parameter name. Values are a
+    quantity (``2.4 GHz``, matched within a small tolerance), a range
+    (``[4.5 V, 5.5 V]``), a bound (``">= 4 GB"``), a tagged size (``12 mm hex``)
+    or a plain string (``crsf``); ``kind`` is the catalog kind. ``prefer`` holds
+    soft preferences (``price: low``, ``mass: low``, ``vendor: <name>``, or a
+    parameter target). The chosen part is pinned in ``r3.lock.yaml`` under
+    ``sourcing.<group or component id>`` and becomes a project catalog entry;
+    until then ``type`` (if given) is used.
+    """
+
+    requires: dict[str, Any] = Field(description="Hard requirements; must include `kind`.")
+    prefer: dict[str, Any] = Field(default_factory=dict, description="Soft preferences used in ranking.")
+    quantity: int | None = Field(default=None, ge=1, description="Units to buy (default: components sharing the slot).")
+    budget: str | float | None = Field(default=None, description="Total budget for `quantity` units, e.g. '120 USD'.")
+    providers: list[str] = Field(default_factory=list, description="Restrict the search to these provider ids.")
+    group: str | None = Field(default=None, description="Slot name shared by several components (one choice, one lock entry).")
+
+    @model_validator(mode="after")
+    def _check_kind(self) -> "SourceSpec":
+        if not isinstance(self.requires.get("kind"), str) or not self.requires["kind"]:
+            raise ValueError("source.requires must name the catalog `kind` (e.g. wheel, radio, computer)")
+        return self
+
+
 class ComponentInstance(_Model):
-    type: str = Field(description="Catalog id, e.g. raspberry-pi-5-8gb.")
+    type: str = Field(default="", description="Catalog id, e.g. raspberry-pi-5-8gb. Optional when `source` is given; "
+                                              "a pinned sourcing choice replaces it.")
+    source: SourceSpec | None = Field(default=None, description="Requirements for sourcing this part online.")
     mount: str = Field(default="world", description="Parent component id or 'world'.")
     pose: Pose = Field(default_factory=Pose, description="Pose of the component frame in the robot frame.")
     params: dict[str, Any] = Field(default_factory=dict, description="Overrides of catalog parameters.")
@@ -357,9 +386,18 @@ class RobotSpec(_Model):
             raise ValueError(f"unsupported schema {self.schema_!r}; expected {SCHEMA_ID}")
         ids = set(self.components)
         for cid, comp in self.components.items():
+            if not comp.type and comp.source is None:
+                raise ValueError(f"component {cid!r} needs a catalog `type` or a `source` block")
             if comp.mount != "world" and comp.mount not in ids:
                 raise ValueError(f"component {cid!r} mounts on unknown component {comp.mount!r}")
         self._check_mount_graph()
+        for slot, members in self.source_slots().items():
+            first = self.components[members[0]].source
+            for cid in members[1:]:
+                other = self.components[cid].source
+                if (other.requires, other.prefer) != (first.requires, first.prefer):
+                    raise ValueError(f"components {members[0]!r} and {cid!r} share sourcing group {slot!r} "
+                                     "but declare different requires/prefer")
         for joint in self.mechanical.joints:
             for end in (joint.parent, joint.child):
                 if end != "world" and end not in ids:
@@ -391,6 +429,14 @@ class RobotSpec(_Model):
             if module.runs_on not in ids:
                 raise ValueError(f"software module {module.name!r} runs on unknown component {module.runs_on!r}")
         return self
+
+    def source_slots(self) -> dict[str, list[str]]:
+        """Sourcing slot key (``source.group`` or the component id) -> component ids, in spec order."""
+        slots: dict[str, list[str]] = {}
+        for cid, comp in self.components.items():
+            if comp.source is not None:
+                slots.setdefault(comp.source.group or cid, []).append(cid)
+        return slots
 
     def _check_mount_graph(self) -> None:
         """Mount parents must form a forest rooted at ``world`` (no cycles)."""

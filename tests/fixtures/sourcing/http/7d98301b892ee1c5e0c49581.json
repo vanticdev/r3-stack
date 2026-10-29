@@ -1,0 +1,14 @@
+{
+  "body_file": "7d98301b892ee1c5e0c49581.body",
+  "body_sha256": "9c748d827adca31a877adcacb1169975eb42a5f0307c1c2e83be3e75531d78a6",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"55c99fd65f17ce2ff34773d6c462f3cf77a527b4931b773bf6686494eb717efa\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/HelloRadio%20HR7E.json",
+  "retrieved_at": 1793253132.044069,
+  "size": 787,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/HelloRadio%20HR7E.json"
+}

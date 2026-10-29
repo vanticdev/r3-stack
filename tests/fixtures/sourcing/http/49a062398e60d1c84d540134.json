@@ -1,0 +1,14 @@
+{
+  "body_file": "49a062398e60d1c84d540134.body",
+  "body_sha256": "3902acc75a7654dcb764894fd51c368b297c578d47b6f79bc67929ce220f5ed8",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"99775b87167debba2e637fc15248ce20347bc188596546f01091148f664449c6\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%202400%20True%20Diversity%20PA%20PWM%2014.json",
+  "retrieved_at": 1793253131.375547,
+  "size": 733,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Generic%202400%20True%20Diversity%20PA%20PWM%2014.json"
+}

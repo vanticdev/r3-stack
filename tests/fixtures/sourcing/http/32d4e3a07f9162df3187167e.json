@@ -1,0 +1,14 @@
+{
+  "body_file": "32d4e3a07f9162df3187167e.body",
+  "body_sha256": "eb35ab457203bf8a9a6a0afa3cc54dc9402725c1afaf0cd0b8373c243bc508de",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"0d4d66ceddd77f7aaa51a6395f4e8aa218a2917c287c84b0854259a166c618b3\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Frank%202400.json",
+  "retrieved_at": 1793253131.6888268,
+  "size": 1027,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Frank%202400.json"
+}

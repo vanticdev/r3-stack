@@ -157,6 +157,12 @@ class RobotGraph:
     def _build(self) -> None:
         spec, catalog = self.spec, self.catalog
         for cid, comp in spec.components.items():
+            if not comp.type:
+                self.diagnostics.append(Diagnostic.error(
+                    "component_unsourced", f"component {cid!r} is declared by requirements (source) but no part is pinned yet",
+                    subjects=[cid], data={"slot": comp.source.group or cid if comp.source else cid},
+                    hint=f"Run `r3 source {cid}` and choose a candidate (`--choose N`), or give it a catalog `type`."))
+                continue
             try:
                 ctype = catalog.component(comp.type)
             except KeyError as error:

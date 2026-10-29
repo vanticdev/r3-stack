@@ -1,0 +1,14 @@
+{
+  "body_file": "326a6e48c64be537cae89331.body",
+  "body_sha256": "2945499b0f6ec317f82183715719062ddf7b531ac9f0c3e82516bddaf8cda49f",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"eb05888c765b1b8dea8d5394e3d7242c6f822b06ec2730ea2f8cf3af39283da5\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Radiomaster%20ER%20Series.json",
+  "retrieved_at": 1793253132.288479,
+  "size": 1010,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Radiomaster%20ER%20Series.json"
+}

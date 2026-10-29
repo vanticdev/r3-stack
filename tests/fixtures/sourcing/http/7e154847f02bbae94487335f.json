@@ -1,0 +1,14 @@
+{
+  "body_file": "7e154847f02bbae94487335f.body",
+  "body_sha256": "70d1f7eff3176cdf1de744bbd0ed5d2e28b48f7c4684acad424a492914def176",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"e2f27aca396a54bdfd3e48766df16e2ce640ef430934b9c5b884767cdcf31a72\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Radiomaster%202400%20ER8G.json",
+  "retrieved_at": 1793253132.203858,
+  "size": 741,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/Radiomaster%202400%20ER8G.json"
+}

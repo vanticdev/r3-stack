@@ -1,0 +1,14 @@
+{
+  "body_file": "5b1c08e88adbe2b9a37f2f00.body",
+  "body_sha256": "0d4cf841a08ceac52822c011e9352bae7130e4d1ca902b2bebecf3f73c3fd932",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"574c0a7cc7b26f294dcba9316e16216744eb44d5f1a882ce2eee14c330a4d329\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/DIY%20S3%20DEVKIT%202400%20True%20Diversity%20PWM%2016.json",
+  "retrieved_at": 1793253131.5227048,
+  "size": 735,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/DIY%20S3%20DEVKIT%202400%20True%20Diversity%20PWM%2016.json"
+}

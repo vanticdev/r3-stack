@@ -1,0 +1,14 @@
+{
+  "body_file": "612476f2f48a67d8ff0f0f8d.body",
+  "body_sha256": "dbd4bec1d30c5d8d5d642bdef25c109728bf5e491781349a52be8f9c5e652255",
+  "headers": {
+    "Content-Type": "text/plain; charset=utf-8",
+    "ETag": "\"7c407838e3fef5b258ea479d65ba6b7c3f7b10aaa6343f901f07ecd62415e9f3\""
+  },
+  "method": "GET",
+  "request_url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/SPRacing%20RXG1%20Gyro%202400%20RX%20GYRO.json",
+  "retrieved_at": 1793253132.331659,
+  "size": 2417,
+  "status": 200,
+  "url": "https://raw.githubusercontent.com/ExpressLRS/targets/master/RX/SPRacing%20RXG1%20Gyro%202400%20RX%20GYRO.json"
+}
