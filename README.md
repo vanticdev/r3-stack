@@ -1,9 +1,44 @@
 # B.L.I.T.Z
 
-Multi-process robotics stack with a Python watchdog, codegen, and deploy tooling.
+Robotics development platform, currently implementing multi-process deployment
+with a Python watchdog, codegen, and deploy tooling.
 
 See [BLITZ values](values.md) for the design principles that guide development
 and prevent regressions.
+
+## Repository layout for v1
+
+The repository now reserves the following areas for the full-stack robotics
+platform. New areas contain README placeholders only; no platform services,
+schemas, simulators, or web application have been implemented yet.
+
+```text
+apps/web/                    Single future platform web application
+services/orchestrator/       Project API, change coordination, validation jobs
+services/simulation-worker/  Execution of simulation jobs
+packages/robot-model/        Versioned robot specification and derived graph
+packages/component-catalog/  Supported component descriptions and model references
+packages/wiring/             Electrical connections and physical cable routing
+packages/simulation/         Shared clock, simulator coordination, and results
+packages/hardware-interface/ Virtual and physical hardware interface contracts
+integrations/onshape/        Mechanical design import and version references
+integrations/kicad/          Electronics import; provider choice remains provisional
+integrations/github/         Repository references and CI workflow integration
+examples/robots/             Future reproducible robot examples
+docs/architecture/          Platform structure and boundaries
+docs/deployment/            Existing BLITZ deployment documentation
+backend/                    Existing deployment and compilation tooling
+watchdog/                   Existing target-side runtime
+proto/                      Existing watchdog protocol definitions
+scripts/                    Existing installers and operational commands
+docker/, ops/               Existing test images and system service definitions
+__tests__/                  Existing deployment and runtime tests
+```
+
+The standalone marketing site has been removed. `apps/web/` is the home for the
+single future site. Existing deployment commands below still use their original
+paths. See the [repository layout guide](docs/architecture/repository-layout.md)
+for ownership, dependency boundaries, and unresolved implementation decisions.
 
 ## Install BLITZ
 
@@ -128,7 +163,7 @@ Optional `FLEET_SIZE` and `DEVICE_PROFILES` settings in that
 script check the fleet before building or transferring anything. The count is
 exact; types use architecture/OS/capability profiles and require distinct devices.
 Use `--expected-systems 3` for a temporary count override. See the
-[configuration examples](docs/device-discovery.md#optional-fleet-expectations).
+[configuration examples](docs/deployment/device-discovery.md#optional-fleet-expectations).
 
 Use repeatable `--blacklist HOST_OR_IP` arguments to exclude devices before
 catalog requests, building, or transfer. Blacklists match advertised hostnames
@@ -140,7 +175,7 @@ The 3.0 discovery protocol uses `_watchdog._tcp.local.` and lightweight,
 versioned mDNS metadata containing identity and service endpoints. Full system
 specifications and capabilities come from the watchdog's cached HTTP catalog.
 Update watchdogs and deployment tooling together. See
-[device discovery and capabilities](docs/device-discovery.md) for the contract,
+[device discovery and capabilities](docs/deployment/device-discovery.md) for the contract,
 refresh behavior, and simulation endpoint configuration.
 
 If a device is unavailable but its system build key is known, prepare its cache
@@ -224,14 +259,14 @@ make deploy
 
 ### Module entrypoints, libraries, resources, and target constraints
 
-For an existing project, follow [backend migration](docs/backend-migration.md)
+For an existing project, follow [backend migration](docs/deployment/backend-migration.md)
 to reorganize older layouts after updating BLITZ.
 
-See [deployment architecture](docs/deployment-architecture.md) for the backend
-and frontend layouts, deployment dataflow, target bundle retention, native
+See [deployment architecture](docs/deployment/deployment-architecture.md) for the
+deployment layout, deployment dataflow, target bundle retention, native
 library linking/loading, and runtime paths and flags.
 
-See [deployment examples](docs/deployment-examples.md) for a complete
+See [deployment examples](docs/deployment/deployment-examples.md) for a complete
 `backend/deploy.py` template, two Python module entrypoints, Python using a C++ library,
 C++/Rust executables, resources, target restrictions, and deployment commands.
 

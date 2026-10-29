@@ -5,16 +5,27 @@
 BLITZ is a multi-process robotics stack. The Python deployment tooling discovers
 target systems, builds architecture-specific bundles, syncs them to the fleet,
 and assigns typed process plans. The watchdog runs those processes on each
-target. The `website/` directory contains the standalone Next.js marketing site.
+target. The v1 platform folders reserve space for robot design, integration,
+simulation, and a single web application; they contain documentation only.
 
 ## Project layout
 
+- `apps/web/`: the single future web interface for the robotics platform.
+- `services/`: planned orchestration and simulation worker entrypoints.
+- `packages/`: planned robot model, component catalog, wiring, simulation, and
+  hardware interface libraries.
+- `integrations/`: planned adapters for external CAD, electronics, and GitHub tools.
+- `examples/robots/`: reserved for versioned example robot projects.
+- `docs/architecture/`: platform boundaries and repository layout.
+- `docs/deployment/`: existing deployment and watchdog documentation.
 - `backend/`: deployment, bundling, compilation, networking, and module APIs.
 - `watchdog/`: target-side discovery, monitoring, process management, and routes.
 - `proto/`: protobuf source definitions.
 - `scripts/`: setup, deployment, runtime, and installer scripts.
 - `__tests__/`: repository-level Python tests.
-- `website/`: Next.js frontend; follow `website/AGENTS.md` for work in this tree.
+
+See [repository layout](docs/architecture/repository-layout.md) for ownership
+and the distinction between existing functionality and reserved folders.
 
 ## Working rules
 
@@ -35,6 +46,9 @@ target. The `website/` directory contains the standalone Next.js marketing site.
   `SupportedModules` over ad hoc dictionaries or new config formats.
 - Keep deployment behavior compatible with both local Python execution and the
   existing installer/Gradle integration unless a change explicitly replaces it.
+- Build the future product in the reserved v1 folders. Keep a single web app in
+  `apps/web/`; the standalone marketing site has been removed. Shared platform
+  packages are distinct from deployable robot modules under `backend/`.
 - Automatically update `backend/deployment/.blitz-build-version` when making
   substantive non-test changes to backend, deployment, compilation, watchdog,
   runtime, installer, or protocol behavior. Do not wait for a separate request.
@@ -50,13 +64,31 @@ target. The `website/` directory contains the standalone Next.js marketing site.
   artifacts, caches, or machine-specific paths.
 - Preserve unrelated work in the repository and keep changes scoped to the task.
 
+## Automatic commits
+
+- Automatically create a local Git commit when a completed task makes a
+  substantial, cohesive change, unless the user asks to leave it uncommitted.
+  Do not wait for a separate commit request.
+- Substantial changes include features, meaningful bug fixes or refactors,
+  repository restructuring, and coordinated documentation changes. Judge by
+  impact and completeness rather than a fixed file or line count. Isolated
+  typo, formatting, or minor documentation edits do not require a commit.
+- Run the applicable validation first and review the diff and staged files.
+  Commit only changes belonging to the task, including required version bumps;
+  preserve unrelated user edits and staged work. Do not commit incomplete work
+  or changes with unresolved validation failures; report any validation blocker.
+- Use a concise commit message describing the completed change, and report the
+  commit hash in the final response. Automatic commits do not authorize pushing,
+  amending existing commits, or rewriting history.
+
 ## Validation
 
 - Run targeted Python tests while iterating:
   `.venv/bin/python -m pytest path/to/test_file.py`.
 - Run `make test` when changing shared deployment or watchdog behavior.
 - Run `make generate` after changing protobuf definitions.
-- For `website/`, run `pnpm lint` and `pnpm build` from that directory.
+- `apps/web/` has no implementation or build commands yet. Define its validation
+  commands when the web application is introduced.
 
 ## Style
 

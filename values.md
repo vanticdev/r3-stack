@@ -4,7 +4,7 @@ BLITZ should make a mixed fleet of robotics computers feel like one deployable
 system. These values guide implementation, review, and future agent decisions.
 They describe the intended design; existing behavior can still need correction.
 Read them alongside [AGENTS.md](AGENTS.md) and the
-[architecture guide](docs/deployment-architecture.md).
+[architecture guide](docs/deployment/deployment-architecture.md).
 
 ## 1. Discover endpoints; collect one catalog
 
