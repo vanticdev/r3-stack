@@ -16,6 +16,10 @@ yaw rate that disagrees with the driver's (or the path follower's) intent:
   speed error that holds the slip ratio near its target.
 * ``LaunchLimiter``: forward throttle slew-rate limit at low speed ("punch").
 * ``YawStabilizer``: gyro yaw damping against the kinematic bicycle model.
+* ``BrakeSlipController``: anti-lock modulation of the ESC brake. Full brake
+  at speed locks the rear wheels and the car spins out (the twin showed a
+  180 degree spin from 8.3 m/s); the brake fraction is servoed on the braking
+  slip ratio instead, always staying on the ESC's brake side of neutral.
 
 Everything is pure computation on values handed in by the control loop, so it
 is deterministic and unit-testable without a HAL.
@@ -76,6 +80,12 @@ class TractionConfig:
     yaw_integral_leak_s: float = 1.0          # leak time constant while steering away from centre
     yaw_hold_steer_rad: float = 0.05          # |steer command| below which heading is held (no leak)
     yaw_integral_limit_rad: float = 0.15
+    # --- anti-lock braking (supervisor BRAKING state)
+    brake_target_slip: float = 0.12           # braking slip ratio (v_g - v_w) / v_g held by the modulation
+    brake_gain_per_s: float = 60.0            # d ln(b)/dt per unit slip error
+    brake_min_fraction: float = 0.02          # brake fraction floor: never back to neutral (that arms reverse)
+    brake_initial_fraction: float = 0.3       # first brake frame (full brake locks the wheels within 0.1 s)
+    brake_full_below_mps: float = 1.0         # below this ground speed the brake is applied fully
     free_rolling_current_a: float = 2.5       # below this estimated motor current the wheel rolls freely
     steer_lag_s: float = 0.08                 # servo first-order lag for the yaw reference (estimate)
     yaw_error_throttle_cut_rps: float = 0.6   # yaw error beyond which forward force is cut back
@@ -391,6 +401,49 @@ class YawStabilizer:
         return 1.0 if excess <= 0.0 else _clamp(1.0 - excess / cut, 0.3, 1.0)
 
 
+class BrakeSlipController:
+    """Anti-lock modulation of the brushed ESC's brake.
+
+    The ESC's brake shorts the motor (both low-side FETs, fraction ``b``), so the
+    braking torque scales with the back-EMF and hence with speed: at 8 m/s it far
+    exceeds the rear tires' grip, the rear wheels lock and lose their lateral grip,
+    and the car spins. With braking slip lambda_b = (v_g - v_w) / max(v_g, eps) the
+    brake fraction follows
+
+        d ln(b) / dt = -k (lambda_b - lambda*),   b in [b_min, 1],
+
+    a multiplicative (log-domain) integral law: the brake-to-current map of a
+    shorted motor is strongly nonlinear in ``b``, and the log domain gives the same
+    relative authority at every operating point. The command never returns to
+    neutral: after a brake, neutral followed by a reverse pulse is *reverse* on a
+    hobby ESC (forward/brake/reverse logic), so ``b`` is floored at ``b_min``.
+    Below ``brake_full_below_mps`` (where the 4-pulse encoder is too slow for slip
+    feedback and the back-EMF torque is small) the brake is full.
+    """
+
+    def __init__(self, config: TractionConfig) -> None:
+        self.config = config
+        self.fraction = config.brake_initial_fraction
+        self.slip = 0.0
+
+    def reset(self) -> None:
+        self.fraction = self.config.brake_initial_fraction
+        self.slip = 0.0
+
+    def update(self, dt: float, ground_speed: float, wheel_speed: float) -> float:
+        """Brake fraction in [b_min, 1] for this tick."""
+        cfg = self.config
+        v_g = max(0.0, ground_speed)
+        if v_g < cfg.brake_full_below_mps:
+            self.slip = 0.0
+            self.fraction = 1.0
+            return self.fraction
+        self.slip = (v_g - max(0.0, wheel_speed)) / max(v_g, cfg.slip_speed_floor_mps)
+        error = self.slip - cfg.brake_target_slip
+        self.fraction = _clamp(self.fraction * math.exp(-cfg.brake_gain_per_s * error * dt), cfg.brake_min_fraction, 1.0)
+        return self.fraction
+
+
 @dataclass(frozen=True)
 class TractionOutput:
     throttle: float
@@ -412,6 +465,7 @@ class TractionControl:
         self.slip = SlipController(config, self.motor)
         self.launch = LaunchLimiter(config)
         self.yaw = YawStabilizer(config, wheelbase_m, max_steer_rad)
+        self.brake = BrakeSlipController(config)
         self.battery_v = config.nominal_battery_v
         self.throttle_ceiling = 1.0
         self.motor_current = 0.0
@@ -447,6 +501,14 @@ class TractionControl:
         self.throttle_ceiling = self.slip.ceiling(dt, self.ground.speed, wheel_speed, self.battery_v, scale, driving)
         return self.throttle_ceiling
 
+    def brake_command(self, dt: float, wheel_speed: float, yaw_rate: float) -> TractionOutput:
+        """Failsafe brake: anti-lock brake fraction as an ESC throttle (< 0) and yaw-hold steering."""
+        v_g = max(0.0, self.ground.speed)
+        fraction = self.brake.update(dt, v_g, wheel_speed)
+        steer_rad = self.yaw.update(dt, 0.0, v_g, yaw_rate) if self.config.yaw_assist_enabled else 0.0
+        self.motor_current = 0.0
+        return TractionOutput(-self.motor.throttle_for_duty(fraction), steer_rad)
+
     def apply(self, dt: float, throttle: float, steer_rad: float, wheel_speed: float, yaw_rate: float) -> TractionOutput:
         v_g = max(0.0, self.ground.speed)
         if throttle > 0.0:
@@ -464,5 +526,5 @@ class TractionControl:
         return TractionOutput(throttle, steer_rad)
 
 
-__all__ = ["DcMotorModel", "GroundSpeedConfig", "GroundSpeedEstimator", "LaunchLimiter", "SlipController",
+__all__ = ["BrakeSlipController", "DcMotorModel", "GroundSpeedConfig", "GroundSpeedEstimator", "LaunchLimiter", "SlipController",
            "TractionConfig", "TractionControl", "TractionOutput", "YawStabilizer"]

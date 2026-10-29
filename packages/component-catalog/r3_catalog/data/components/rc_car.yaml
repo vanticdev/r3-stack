@@ -548,8 +548,12 @@ components:
                           efficiency: [[0.1, 0.83], [0.5, 0.95], [1.0, 0.96], [2.0, 0.96], [2.5, 0.95]],
                           hold_up_capacitance: 29.7 uF}
         input_capacitance: 220 uF   # C3 bulk on VIN_HAT (after the shunt), plus the regulators' input ceramics
+        # Active brake first (QuicRun 1060 Fwd/Rev/Brk: reverse stick after forward = brake), then neutral:
+        # r3_kicad.arbiter. brake_hold covers the longest stop (8 m/s top speed); deadband_us and
+        # esc_reverse_delay mirror the ESC's own neutral deadband (3 %) and reverse delay.
         failsafe: {part: ATtiny412, heartbeat: HEARTBEAT, timeout: 0.1, neutral_us: 1500, frame: 0.02, rearm_edges: 3,
-                   rearm_band_us: 50, supply: 3V3}
+                   rearm_band_us: 50, supply: 3V3, brake_us: 1000, brake_hold: 3.0 s, deadband_us: 15,
+                   esc_reverse_delay: 0.1 s}
         reverse_protection: {part: DMP3013SFV, rds_on: 12 mohm}
         tvs: {part: SMAJ10A, v_standoff: 10.0, v_breakdown_min: 11.1, v_breakdown_max: 12.3, v_clamp: 17.0, i_pp: 23.5}
         ina226: {address: 0x40, shunt: 2 mohm, bus: I2C, measures: hat_branch_only}

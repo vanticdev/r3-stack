@@ -8,7 +8,8 @@ co-simulation needs around it:
   (a write that changes the level is one edge, as on the physical pin);
 * the arbiter decides once per output frame (``frame`` = 20 ms, aligned to the
   PWM period starting at t = 0): in PASS the ESC sees the Pi's pulse, in
-  FAILSAFE the arbiter's own ``neutral_us`` pulses;
+  FAILSAFE the arbiter's own pulses: ``brake_us`` for ``brake_hold`` when the
+  ESC is brake-armed (after forward driving), then ``neutral_us``;
 * it runs from the computer's 3V3: unpowered, its output is held low by the
   pull-down (no pulses, the ESC's own signal-loss failsafe applies) and it boots
   again in FAILSAFE when power returns.
@@ -28,10 +29,10 @@ def arbiter_params(failsafe: dict[str, Any] | None, timeout: float | None = None
     failsafe = failsafe or {}
     defaults = ArbiterParams()
     values: dict[str, Any] = {}
-    for key in ("timeout", "frame"):
+    for key in ("timeout", "frame", "brake_hold", "esc_reverse_delay"):
         if failsafe.get(key) is not None:
             values[key] = float(to_si(failsafe[key]))
-    for key in ("neutral_us", "rearm_band_us"):
+    for key in ("neutral_us", "rearm_band_us", "brake_us", "deadband_us"):
         if failsafe.get(key) is not None:
             values[key] = float(failsafe[key])
     if failsafe.get("rearm_edges") is not None:
@@ -53,6 +54,7 @@ class ArbiterDevice:
     edges: int = 0
     last_edge_t: float | None = None
     next_frame: float = 0.0
+    frame_out: float | None = None  # pulse the arbiter itself drives in the current FAILSAFE frame
     events: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -85,11 +87,18 @@ class ArbiterDevice:
         while t + 1e-9 >= self.next_frame:
             frame_t = self.next_frame
             self.next_frame += self.params.frame
-            before = self.model.state
-            self.model.output_pulse(frame_t, input_us if input_us > 0 else None)
+            before, was_braking = self.model.state, self.model.braking(frame_t - self.params.frame)
+            self.frame_out = self.model.output_pulse(frame_t, input_us if input_us > 0 else None)
             if self.model.state is not before:
-                self.events.append({"t": frame_t, "event": f"arbiter_{self.model.state.value}", "board": self.board,
-                                    "last_heartbeat_edge_t": self.last_edge_t})
+                event = {"t": frame_t, "event": f"arbiter_{self.model.state.value}", "board": self.board,
+                         "last_heartbeat_edge_t": self.last_edge_t}
+                if self.failsafe:
+                    braking = self.model.braking(frame_t)
+                    event["brake_until"] = self.model.brake_until if braking else None
+                    event["brake_us"] = self.params.brake_us if braking else None
+                self.events.append(event)
+            elif was_braking and self.failsafe and not self.model.braking(frame_t):
+                self.events.append({"t": frame_t, "event": "arbiter_brake_end", "board": self.board})
         if self.failsafe:
-            return self.params.neutral_us
+            return self.frame_out if self.frame_out is not None else self.params.neutral_us
         return input_us

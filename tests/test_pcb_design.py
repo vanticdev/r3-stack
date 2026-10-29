@@ -82,13 +82,43 @@ def test_arbiter_boots_in_failsafe_and_rearms_only_at_neutral():
     assert all(us == 1700.0 for _, us in frames)
 
 
-def test_arbiter_times_out_within_100_ms_plus_one_frame():
+def test_arbiter_times_out_within_100_ms_plus_one_frame_and_brakes_before_neutral():
+    params = ArbiterParams()
     arb = FailsafeArbiter()
     _run(arb, 0.0, 0.1, 0.01, 1500.0)
     assert arb.state is ArbiterState.PASS
     last_edge = arb.last_edge
-    frames = _run(arb, 0.1, 0.5, None, 1900.0)                    # Pi hangs: heartbeat stops, PWM keeps commanding
-    first_neutral = next(t for t, us in frames if us == 1500.0)
-    assert first_neutral - last_edge <= ArbiterParams().timeout + ArbiterParams().frame + 1e-9
-    assert all(us == 1500.0 for t, us in frames if t >= first_neutral)
+    frames = _run(arb, 0.1, 4.0, None, 1900.0)                    # Pi hangs: heartbeat stops, PWM keeps commanding
+    first_failsafe = next(t for t, us in frames if us != 1900.0)
+    assert first_failsafe - last_edge <= params.timeout + params.frame + 1e-9
+    # After forward driving the reverse pulse is the ESC's brake: brake for brake_hold, then neutral for good.
+    failsafe = [(t, us) for t, us in frames if t >= first_failsafe]
+    assert {us for t, us in failsafe if t < first_failsafe + params.brake_hold - 1e-9} == {params.brake_us}
+    assert {us for t, us in failsafe if t >= first_failsafe + params.brake_hold + 1e-9} == {params.neutral_us}
     assert arb.failsafe_latency() == pytest.approx(0.12)
+
+
+def test_arbiter_never_sends_a_reverse_pulse_the_esc_could_take_as_reverse():
+    params = ArbiterParams()
+    # Reversing (forward -> neutral -> brake -> neutral -> reverse): a reverse pulse would keep reversing.
+    arb = FailsafeArbiter()
+    _run(arb, 0.0, 0.1, 0.01, 1500.0)
+    for command in (1800.0, 1500.0, 1200.0, 1500.0, 1200.0):
+        _run(arb, round(arb.last_edge + 0.01, 4), round(arb.last_edge + 0.5, 4), 0.01, command)
+    assert arb.esc.value == "reverse"
+    frames = _run(arb, round(arb.last_edge + 0.01, 4), round(arb.last_edge + 1.0, 4), None, 1200.0)
+    assert {us for _, us in frames if us != 1200.0} == {params.neutral_us}
+    # Braking when the Pi hangs: the reverse pulse continues the brake.
+    arb = FailsafeArbiter()
+    _run(arb, 0.0, 0.1, 0.01, 1500.0)
+    _run(arb, 0.1, 0.6, 0.01, 1800.0)
+    _run(arb, 0.6, 0.8, 0.01, 1300.0)
+    assert arb.esc.value == "brake"
+    frames = _run(arb, 0.8, 1.2, None, 1300.0)
+    assert params.brake_us in {us for _, us in frames}
+    # brake_hold = 0 is the neutral-only contract.
+    arb = FailsafeArbiter(ArbiterParams(brake_hold=0.0))
+    _run(arb, 0.0, 0.1, 0.01, 1500.0)
+    _run(arb, 0.1, 0.5, 0.01, 1800.0)
+    frames = _run(arb, 0.5, 1.0, None, 1800.0)
+    assert {us for _, us in frames if us != 1800.0} == {params.neutral_us}

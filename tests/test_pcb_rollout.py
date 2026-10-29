@@ -115,7 +115,8 @@ def _run(device: ArbiterDevice, t0: float, t1: float, pulse: float, beat: bool, 
 def test_arbiter_params_from_catalog(project):
     params = arbiter_params(project.catalog.component("r3-carrier-hat").behavior.params["failsafe"])
     assert params == ArbiterParams(part="ATtiny412", timeout=0.1, neutral_us=1500.0, frame=0.02, rearm_edges=3,
-                                   rearm_band_us=50.0)
+                                   rearm_band_us=50.0, brake_us=1000.0, brake_hold=3.0, deadband_us=15.0,
+                                   esc_reverse_delay=0.1)
 
 
 def test_arbiter_boots_neutral_and_rearms_only_at_neutral():
@@ -128,17 +129,20 @@ def test_arbiter_boots_neutral_and_rearms_only_at_neutral():
     assert all(pulse == 1800.0 for _, pulse in trace)
 
 
-def test_arbiter_neutral_within_timeout_plus_one_frame_after_the_last_edge():
-    device = _device()
+def test_arbiter_brakes_within_timeout_plus_one_frame_after_the_last_edge_then_neutral():
+    device = _device(brake_hold=1.0)
     _run(device, 0.0, 0.5, 1500.0, beat=True)
     _run(device, 0.5, 1.0, 1800.0, beat=True)
     last_edge = device.last_edge_t
-    trace = _run(device, 1.0, 1.5, 1800.0, beat=False)     # main loop hung: PWM keeps 1800 us, no heartbeat
-    first_neutral = next(t for t, pulse in trace if pulse == 1500.0)
-    assert 0.1 <= first_neutral - last_edge <= 0.12 + 1e-9
-    assert all(pulse == 1500.0 for t, pulse in trace if t >= first_neutral)
+    trace = _run(device, 1.0, 2.5, 1800.0, beat=False)     # main loop hung: PWM keeps 1800 us, no heartbeat
+    first = next(t for t, pulse in trace if pulse != 1800.0)
+    assert 0.1 <= first - last_edge <= 0.12 + 1e-9
+    assert {pulse for t, pulse in trace if first <= t < first + 1.0 - 1e-9} == {1000.0}  # active brake
+    assert {pulse for t, pulse in trace if t >= first + 1.0 + 1e-9} == {1500.0}           # then neutral
     event = next(e for e in device.events if e["event"] == "arbiter_failsafe")
     assert event["last_heartbeat_edge_t"] == pytest.approx(last_edge)
+    assert event["brake_until"] == pytest.approx(first + 1.0)
+    assert any(e["event"] == "arbiter_brake_end" for e in device.events)
 
 
 def test_unpowered_arbiter_outputs_no_pulses_and_reboots_in_failsafe():
@@ -180,7 +184,8 @@ def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(rc_car_fresh):
         assert device.edges >= 29 and not device.failsafe
         esc.set_pulse_us(1700.0)
         hal.clock.sleep_until(0.5)                         # no heartbeat for 200 ms
-        assert device.failsafe and kernel.esc_pulse == pytest.approx(1500.0)
+        # After forward driving the arbiter brakes first (brake_us), then holds neutral.
+        assert device.failsafe and kernel.esc_pulse == pytest.approx(device.params.brake_us)
     finally:
         hal.close()
         thread.join(5.0)
