@@ -1,23 +1,20 @@
 """2.4 GHz ExpressLRS radio link: propagation, LoRa packet errors, receiver.
 
-Propagation (per packet):
+Propagation (per packet), handset -> car antenna:
 
-* Two-ray ground reflection, full form with a complex Fresnel reflection
-  coefficient of a lossy dielectric ground (relative permittivity eps_r,
-  conductivity sigma):  eps = eps_r - j 60 sigma lambda,
-  Gamma_V = (eps sin(psi) - sqrt(eps - cos^2 psi)) / (eps sin(psi) + sqrt(eps - cos^2 psi)),
-  Gamma_H = (sin(psi) - sqrt(eps - cos^2 psi)) / (sin(psi) + sqrt(eps - cos^2 psi)),
-  times a Rayleigh roughness factor exp(-8 (pi sigma_h sin(psi) / lambda)^2).
-  Field sum E = (lambda / 4 pi) [exp(-j k d1) / d1 + Gamma exp(-j k d2) / d2],
-  PL = -20 log10 |E|. Beyond the breakpoint d_c = 4 h_t h_r / lambda the loss
-  approaches 40 log10(d) - 20 log10(h_t h_r).
-* Log-normal shadowing with Gudmundson spatial correlation:
+* **Sionna RT** ray tracing (``radio_sionna``) of the scene built from the spec
+  (``radio_scene``): ITU ground, obstacle boxes, dipole antennas, the car's own
+  body. The coherent multipath sum at the ELRS FHSS hop frequency gives the
+  channel gain *including* small-scale fading. This is the default.
+* **Analytic fallback** (``radio_analytic``): closed-form two-ray + knife edges,
+  used only when Sionna RT cannot be imported (or ``R3_RADIO_BACKEND=analytic``),
+  always reported by a ``radio_propagation_fallback`` diagnostic.
+* Large-scale log-normal shadowing for clutter the scene does not contain
+  (terrain undulation, grass, people), Gudmundson-correlated:
   S(x + dx) = rho S(x) + sqrt(1 - rho^2) sigma N(0, 1), rho = exp(-|dx| / d_corr).
-* Obstacles: single knife-edge diffraction per static box (ITU-R P.526):
-  nu = h sqrt(2 (d1 + d2) / (lambda d1 d2)), J(nu) = 6.9 + 20 log10(sqrt((nu - 0.1)^2 + 1) + nu - 0.1)
-  for nu > -0.78 (h = obstruction height above the line of sight; negative = clearance).
 
-Link budget: P_rx = P_tx + G_tx + G_rx - PL - S - J. Noise:
+Link budget: P_rx = P_tx + G_channel - S - J (G_channel includes the antenna
+gains; J is the fallback knife-edge term, 0 with ray tracing). Noise:
 N = -174 dBm/Hz + 10 log10(BW) + NF, combined in power with interference.
 The datasheet ``sensitivity_dbm`` fixes the required SNR at the 10 % PER
 point (SNR_req = sensitivity - N_thermal); PER follows a LoRa waterfall
@@ -26,16 +23,22 @@ point (SNR_req = sensitivity - N_thermal); PER follows a LoRa waterfall
 
 from __future__ import annotations
 
-import cmath
 import math
-from dataclasses import dataclass, field
+import os
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 
+from r3_model.diagnostics import Diagnostic
 from r3_model.units import to_si
 
 from . import crsf
+from .radio_analytic import (  # noqa: F401 - re-exported for existing callers
+    AnalyticPropagation, ChannelSample, Propagation, knife_edge_loss_db, reflection_coefficient,
+)
+from .radio_scene import RadioScene, scene_from_environment
 
 SPEED_OF_LIGHT = 299_792_458.0
 BOLTZMANN_DBM_HZ = -174.0  # kT at 290 K
@@ -53,84 +56,6 @@ def thermal_noise_dbm(bandwidth_hz: float, noise_figure_db: float) -> float:
 
 def power_sum_dbm(*levels: float) -> float:
     return 10.0 * math.log10(sum(10.0 ** (level / 10.0) for level in levels))
-
-
-def reflection_coefficient(grazing: float, permittivity: complex, polarization: str = "vertical") -> complex:
-    sin_psi, cos_psi = math.sin(grazing), math.cos(grazing)
-    root = cmath.sqrt(permittivity - cos_psi * cos_psi)
-    if polarization == "horizontal":
-        return (sin_psi - root) / (sin_psi + root)
-    return (permittivity * sin_psi - root) / (permittivity * sin_psi + root)
-
-
-def knife_edge_loss_db(nu: float) -> float:
-    if nu <= -0.78:
-        return 0.0
-    return 6.9 + 20.0 * math.log10(math.sqrt((nu - 0.1) ** 2 + 1.0) + nu - 0.1)
-
-
-@dataclass
-class Propagation:
-    frequency: float
-    permittivity: float = 15.0
-    conductivity: float = 0.01  # S/m, moist ground at 2.4 GHz (estimate)
-    roughness: float = 0.01  # m RMS (mown grass, estimate)
-    polarization: str = "vertical"
-    obstacles: list[dict[str, Any]] = field(default_factory=list)
-
-    @property
-    def wavelength(self) -> float:
-        return SPEED_OF_LIGHT / self.frequency
-
-    def complex_permittivity(self) -> complex:
-        return complex(self.permittivity, -60.0 * self.conductivity * self.wavelength)
-
-    def breakpoint_distance(self, h_tx: float, h_rx: float) -> float:
-        return 4.0 * h_tx * h_rx / self.wavelength
-
-    def two_ray_loss_db(self, tx: np.ndarray, rx: np.ndarray) -> float:
-        lam = self.wavelength
-        k = 2.0 * math.pi / lam
-        dx, dy = rx[0] - tx[0], rx[1] - tx[1]
-        horizontal = max(math.hypot(dx, dy), 1e-3)
-        h_t, h_r = max(tx[2], 1e-3), max(rx[2], 1e-3)
-        d_los = math.sqrt(horizontal ** 2 + (h_t - h_r) ** 2)
-        d_ref = math.sqrt(horizontal ** 2 + (h_t + h_r) ** 2)
-        grazing = math.atan2(h_t + h_r, horizontal)
-        gamma = reflection_coefficient(grazing, self.complex_permittivity(), self.polarization)
-        gamma *= math.exp(-8.0 * (math.pi * self.roughness * math.sin(grazing) / lam) ** 2)
-        field_sum = cmath.exp(-1j * k * d_los) / d_los + gamma * cmath.exp(-1j * k * d_ref) / d_ref
-        gain = (lam / (4.0 * math.pi)) ** 2 * abs(field_sum) ** 2
-        return -10.0 * math.log10(max(gain, 1e-30))
-
-    def obstacle_loss_db(self, tx: np.ndarray, rx: np.ndarray) -> float:
-        """Knife-edge loss of the worst obstacle (boxes: center, size)."""
-        lam = self.wavelength
-        worst = 0.0
-        path = rx - tx
-        horizontal = math.hypot(path[0], path[1])
-        if horizontal < 1e-6:
-            return 0.0
-        u = np.array([path[0] / horizontal, path[1] / horizontal])
-        for obstacle in self.obstacles:
-            center = np.asarray([to_si(v) for v in obstacle.get("center", [0, 0, 0])], dtype=float)
-            size = np.asarray([to_si(v) for v in obstacle.get("size", [0.3, 0.3, 0.3])], dtype=float)
-            rel = center[:2] - tx[:2]
-            s = float(rel @ u)
-            if s <= 0.0 or s >= horizontal:
-                continue
-            lateral = abs(float(rel[0] * u[1] - rel[1] * u[0]))
-            half_extent = 0.5 * float(np.hypot(size[0] * u[1], size[1] * u[0]))  # footprint half-width across the path
-            top = center[2] + size[2] / 2.0
-            z_los = tx[2] + (rx[2] - tx[2]) * s / horizontal
-            if lateral <= half_extent:
-                h = top - z_los
-            else:
-                h = -math.hypot(lateral - half_extent, max(0.0, z_los - top))
-            d1, d2 = s, horizontal - s
-            nu = h * math.sqrt(2.0 * (d1 + d2) / (lam * d1 * d2))
-            worst = max(worst, knife_edge_loss_db(nu))
-        return worst
 
 
 class Shadowing:
@@ -166,29 +91,42 @@ def packet_error_rate(snr_db: float, snr_required_db: float, width_db: float = P
     return 1.0 / (1.0 + math.exp(x))
 
 
+#: ExpressLRS ISM2G4 FHSS domain: 80 channels, 1 MHz apart from 2400.4 MHz (ExpressLRS FHSS.cpp).
+ELRS_FHSS_START_HZ, ELRS_FHSS_SPACING_HZ, ELRS_FHSS_CHANNELS = 2400.4e6, 1.0e6, 80
+#: Packets per hop (ExpressLRS 2.4 GHz LoRa rate table, FHSShopInterval; estimate for rates not listed).
+ELRS_HOP_INTERVAL = {500: 4, 250: 4, 150: 4, 50: 2}
+
+
 @dataclass
 class LinkSample:
     rx_power_dbm: float
-    path_loss_db: float
+    path_loss_db: float  # propagation loss excluding the catalog antenna peak gains (includes pattern, obstacles, body)
     shadowing_db: float
-    obstacle_db: float
+    obstacle_db: float  # separate knife-edge term (fallback only)
     snr_db: float
     per: float
     distance: float
+    fading_db: float = 0.0  # coherent multipath sum relative to its local (incoherent) mean
+    frequency: float = 0.0
+
+
+def select_backend(renv: dict[str, Any]) -> str:
+    """``R3_RADIO_BACKEND`` env var, then ``radio_environment.propagation_backend``; default Sionna RT."""
+    choice = os.environ.get("R3_RADIO_BACKEND") or str(renv.get("propagation_backend", "sionna_rt"))
+    return "analytic" if choice.strip().lower() in ("analytic", "analytic_two_ray", "two_ray", "fallback") else "sionna_rt"
 
 
 class RadioLink:
     """TX (pilot handset) -> RX (car receiver) uplink and telemetry downlink."""
 
-    def __init__(self, environment: Any, receiver_params: dict[str, Any], rng: np.random.Generator) -> None:
-        tx = environment.radio_transmitter
+    def __init__(self, environment: Any, receiver_params: dict[str, Any], rng: np.random.Generator,
+                 scene: RadioScene | None = None, scene_dir: Path | None = None, backend: str | None = None) -> None:
         renv = dict(environment.radio_environment or {})
-        self.tx_position = np.asarray(tx.position, dtype=float) if tx else np.array([0.0, 0.0, 1.2])
-        if tx is not None and tx.height is not None:
-            self.tx_position[2] = tx.height
-        self.tx_power_dbm = float(tx.power_dbm) if tx else 20.0
-        self.tx_gain_dbi = float(tx.antenna_gain_dbi) if tx else 2.0
         p = receiver_params
+        self.scene = scene if scene is not None else scene_from_environment(environment, receiver_params)
+        self.tx_position = np.asarray(self.scene.tx_position, dtype=float)
+        self.tx_power_dbm = float(self.scene.tx_power_dbm)
+        self.tx_gain_dbi = float(self.scene.tx_gain_dbi)
         self.frequency = to_si(p.get("frequency", 2.44e9))
         self.packet_rate = to_si(p.get("packet_rate", 150.0))
         self.sensitivity_dbm = float(p.get("sensitivity_dbm", -108.0))
@@ -204,39 +142,84 @@ class RadioLink:
         self.noise_dbm = power_sum_dbm(self.n_thermal_dbm, self.interference_dbm)
         self.snr_required_db = self.sensitivity_dbm - self.n_thermal_dbm
         self.lora_snr_limit_db = LORA_SNR_LIMIT.get(self.spreading_factor, -7.5)
+        # Previous analytic model, kept as the labeled fallback and as a plotted reference.
         self.propagation = Propagation(
             frequency=self.frequency, permittivity=float(renv.get("ground_permittivity", 15.0)),
             conductivity=float(renv.get("ground_conductivity", 0.01)), roughness=float(renv.get("ground_roughness_m", 0.01)),
             polarization=str(renv.get("polarization", "vertical")), obstacles=list(environment.obstacles or []))
+        self.analytic = AnalyticPropagation(self.tx_position, self.propagation, self.tx_gain_dbi, self.rx_gain_dbi)
+        self.diagnostics: list[Diagnostic] = []
+        requested = backend or select_backend(renv)
+        self.model: Any = self.analytic
+        if requested == "sionna_rt":
+            try:
+                from .radio_sionna import SionnaPropagation
+
+                directory = scene_dir or Path(os.environ.get("TMPDIR", "/tmp")) / f"r3_radio_scene_{self.scene.digest()}"
+                self.model = SionnaPropagation(
+                    self.scene, directory, grid_m=float(renv.get("rt_grid_m", 0.25)),
+                    max_depth=int(renv.get("rt_max_depth", 3)), samples_per_src=int(renv.get("rt_samples_per_source", 200_000)))
+            except Exception as exc:  # noqa: BLE001 - missing package, LLVM or variant -> labeled fallback
+                self.diagnostics.append(Diagnostic.warning(
+                    "radio_propagation_fallback",
+                    f"Sionna RT unavailable ({type(exc).__name__}: {exc}); using the analytic two-ray FALLBACK "
+                    "(no ray-traced multipath, obstacles as knife edges, no car body)",
+                    subjects=["radio"], data={"sionna_available": 0.0}))
+        else:
+            self.diagnostics.append(Diagnostic.warning(
+                "radio_propagation_fallback", "analytic two-ray propagation FALLBACK forced (R3_RADIO_BACKEND / "
+                "radio_environment.propagation_backend); Sionna RT ray tracing is not used", subjects=["radio"],
+                data={"sionna_available": -1.0}))
         sigma = float(renv.get("shadowing_sigma_db", 0.0))
         corr = float(renv.get("shadowing_decorrelation_m", 10.0))
         self.uplink_shadow = Shadowing(sigma, corr, rng)
         self.rng = rng
+        self.hop_interval = int(p.get("fhss_hop_interval", ELRS_HOP_INTERVAL.get(rate, 4)))
+        self.fhss_frequencies = ELRS_FHSS_START_HZ + ELRS_FHSS_SPACING_HZ * np.arange(ELRS_FHSS_CHANNELS)
+        self.hop_sequence = rng.permutation(ELRS_FHSS_CHANNELS)
+
+    @property
+    def backend(self) -> str:
+        return self.model.name
+
+    def hop_frequency(self, slot_index: int) -> float:
+        """Carrier of packet slot ``slot_index`` (pseudo-random ELRS hop sequence over the ISM band)."""
+        if self.model is self.analytic:
+            return self.frequency
+        return float(self.fhss_frequencies[self.hop_sequence[(slot_index // self.hop_interval) % ELRS_FHSS_CHANNELS]])
 
     def assumptions(self) -> list[tuple[str, str]]:
-        return [
+        out = [
             ("radio", f"ELRS {int(self.packet_rate)} Hz = LoRa SF{self.spreading_factor} / {self.bandwidth / 1e3:.1f} kHz; "
                       f"thermal noise {self.n_thermal_dbm:.1f} dBm (NF {self.noise_figure_db} dB), with interference "
                       f"{self.noise_dbm:.1f} dBm."),
             ("radio", f"Datasheet sensitivity {self.sensitivity_dbm} dBm defines SNR_req = {self.snr_required_db:.1f} dB at 10 % PER "
                       f"(LoRa SF{self.spreading_factor} demod limit {self.lora_snr_limit_db} dB; implied implementation "
                       f"loss {self.snr_required_db - self.lora_snr_limit_db:.1f} dB)."),
-            ("radio", "Two-ray ground reflection with complex Fresnel coefficient (ground conductivity "
-                      f"{self.propagation.conductivity} S/m and roughness {self.propagation.roughness} m are estimates), "
-                      "isotropic elevation pattern, static obstacles as single knife edges, no small-scale fading beyond the two-ray "
-                      "multipath, downlink shares the uplink shadowing (reciprocal channel)."),
+            ("radio", f"Gudmundson log-normal shadowing sigma {self.uplink_shadow.sigma} dB / {self.uplink_shadow.decorrelation} m "
+                      "for clutter outside the scene; downlink shares the uplink channel and shadowing (reciprocal)."),
         ]
+        if self.model is not self.analytic:
+            out.append(("radio", f"FHSS: {ELRS_FHSS_CHANNELS} channels from {ELRS_FHSS_START_HZ / 1e6:.1f} MHz, hop every "
+                                 f"{self.hop_interval} packets, pseudo-random sequence (seeded; not the ELRS hash)."))
+        return out + [("radio", text) for text in self.model.assumptions()]
 
-    def sample(self, rx_position: np.ndarray, tx_power_dbm: float | None = None, shadow: float | None = None) -> LinkSample:
-        tx = self.tx_position
-        path_loss = self.propagation.two_ray_loss_db(tx, rx_position)
-        obstacle = self.propagation.obstacle_loss_db(tx, rx_position)
+    def sample(self, rx_position: np.ndarray, tx_power_dbm: float | None = None, shadow: float | None = None,
+               rotation: np.ndarray | None = None, frequency: float | None = None) -> LinkSample:
+        f = self.frequency if frequency is None else frequency
+        channel = self.model.channel(rx_position, rotation, f)
         shadowing = self.uplink_shadow.update(rx_position) if shadow is None else shadow
-        power = (self.tx_power_dbm if tx_power_dbm is None else tx_power_dbm) + self.tx_gain_dbi + self.rx_gain_dbi
-        rx_power = power - path_loss - shadowing - obstacle
+        power = self.tx_power_dbm if tx_power_dbm is None else tx_power_dbm
+        rx_power = power + channel.gain_db - shadowing - channel.obstacle_db
         snr = rx_power - self.noise_dbm
-        return LinkSample(rx_power, path_loss, shadowing, obstacle, snr, packet_error_rate(snr, self.snr_required_db),
-                          float(np.linalg.norm(rx_position - tx)))
+        return LinkSample(rx_power, self.tx_gain_dbi + self.rx_gain_dbi - channel.gain_db, shadowing, channel.obstacle_db, snr,
+                          packet_error_rate(snr, self.snr_required_db), float(np.linalg.norm(rx_position - self.tx_position)),
+                          channel.gain_db - channel.mean_gain_db, f)
+
+    def mean_rx_power_dbm(self, points: np.ndarray, model: Any | None = None) -> tuple[np.ndarray, np.ndarray]:
+        """Static-scene (no body, no shadowing) RX power at car-antenna ``points``: (coherent at carrier, local mean)."""
+        coherent, mean = (model or self.model).static_gain_db(points)
+        return self.tx_power_dbm + coherent, self.tx_power_dbm + mean
 
 
 @dataclass
@@ -288,8 +271,10 @@ class ElrsReceiver:
             out.append((start + (k + 1) * self.byte_time, byte))
         self.tx_free_t = start + len(data) * self.byte_time
 
-    def advance(self, t_end: float, rx_position: np.ndarray, channels_us: list[float], powered: bool) -> list[tuple[float, int]]:
-        """Process packet slots up to ``t_end``; returns (arrival time, byte) pairs on the RX->Pi UART."""
+    def advance(self, t_end: float, rx_position: np.ndarray, channels_us: list[float], powered: bool,
+                rotation: np.ndarray | None = None) -> list[tuple[float, int]]:
+        """Process packet slots up to ``t_end``; returns (arrival time, byte) pairs on the RX->Pi UART.
+        ``rotation`` (car body to world) poses the car body in the ray-traced scene."""
         out: list[tuple[float, int]] = []
         if not powered:
             self.powered_since = None
@@ -304,7 +289,8 @@ class ElrsReceiver:
             t = self.next_slot
             self.next_slot += self.period
             self.slot_index += 1
-            sample = self.link.sample(rx_position)
+            frequency = self.link.hop_frequency(self.slot_index)
+            sample = self.link.sample(rx_position, rotation=rotation, frequency=frequency)
             self.last_sample = sample
             received = self.rng.random() >= sample.per
             self.history.append(1 if received else 0)
@@ -330,7 +316,8 @@ class ElrsReceiver:
                     self.connected = False
                     self.link_lost_events.append(self.last_packet_t)
             if self.connected and self.slot_index % self.stats_interval == 0:
-                down = self.link.sample(rx_position, tx_power_dbm=self.link.telemetry_power_dbm, shadow=sample.shadowing_db)
+                down = self.link.sample(rx_position, tx_power_dbm=self.link.telemetry_power_dbm, shadow=sample.shadowing_db,
+                                       rotation=rotation, frequency=frequency)
                 stats = crsf.LinkStatistics(
                     uplink_rssi_ant1_dbm=self.last_rssi, uplink_rssi_ant2_dbm=self.last_rssi, uplink_link_quality=self.lq,
                     uplink_snr_db=self.last_snr, active_antenna=0, rf_mode=crsf.ELRS_RF_MODE.get(int(round(self.link.packet_rate)), 2),
