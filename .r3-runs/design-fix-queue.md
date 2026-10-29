@@ -28,3 +28,15 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
 10. Scenario coverage: a 900 s endurance run, a seed sweep, friction and temperature sweeps, and
     a timestep-convergence check. [sim]
 11. Graph strictness: nonexistent pins, partial mates, occupancy, mount cycles. [r3_model]
+
+## From the fully coupled twin (firmware-traction agent)
+12. Autonomous cross-track fails because of GPS bias: the estimate is up to 1.9 m off with a 1.5 m CEP receiver, while
+    the controller tracks its estimate to 0.30 m rms. Fix: an RTK GNSS rover (u-blox ZED-F9P class) with RTCM
+    corrections over the ELRS/telemetry link or a separate 915 MHz link from a base station. Model it in the twin
+    (cm-level RTK fixed, float/fix transitions, and a correction-link dependency).
+13. The encoder reads only the left rear wheel, so the open differential hides spin on the right. Fix: sense the
+    differential carrier (the spur output), or put encoders on both wheels.
+14. The sim evaluator starts measuring cross-track at the capture circle of waypoint 1, an artefact; it should
+    start at the first path segment. Map full stick to 2012 µs.
+15. `full_throttle` passes at 8.045 m/s, which is only just enough: the motor's no-load limit is about 8.05 m/s. Margin
+    is close to zero. Consider a 9.0:1 final drive (pinion change) and re-verify current and thermals.
