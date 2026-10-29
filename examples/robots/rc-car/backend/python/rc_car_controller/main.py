@@ -227,7 +227,8 @@ class RcCarController:
             cruise = min(cruise, float(self.cfg["link_degraded_speed_mps"]))
         reference = self.planner.update(self.dt, result.progress_m, self.pursuit.end_s, result.curvature, cruise)
         self.speed_reference = reference
-        throttle = self.speed_controller.update(self.dt, reference, est.speed, max_throttle=self.throttle_scale)
+        throttle = self.speed_controller.update(self.dt, reference, est.speed, max_throttle=self.throttle_scale,
+                                                 reference_accel=self.planner.reference_accel)
         return Command(throttle, self.pulses.steer_from_angle(result.steer_rad))
 
     def _manual_command(self) -> Command:
@@ -260,6 +261,8 @@ class RcCarController:
         out = self.supervisor.update(now, link_ok, arm_us, throttle_us, self.ready, wheel_speed, finished, self.battery.cutoff)
         for name, fields in out.events:
             level = "warning" if name in ("radio_failsafe", "low_voltage_cutoff") else "info"
+            if name == "mission_complete" and self.pursuit is not None:
+                fields = {**fields, "laps": self.pursuit.laps, "progress_m": round(self.pursuit.progress, 2)}
             if name == "low_voltage_cutoff":
                 fields = {**fields, "filtered_v": round(self.battery.filtered_v or 0.0, 3), "reason": self.battery.cutoff_reason,
                           "cutoff_v": self.battery.config.cutoff_v}

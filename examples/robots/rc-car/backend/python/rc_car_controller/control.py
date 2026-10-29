@@ -253,6 +253,7 @@ class SpeedPlanner:
             v_corner = max(cfg.min_corner_speed_mps, math.sqrt(cfg.max_lateral_accel_mps2 * radius))
             self._corners.append((s, v_corner))
         self.reference = 0.0
+        self.reference_accel = 0.0
 
     def _limit_at(self, progress: float, end_s: float) -> float:
         cfg = self.config
@@ -277,30 +278,36 @@ class SpeedPlanner:
         target = min(cruise, self._limit_at(progress, end_s))
         if abs(curvature) > 1e-6:
             target = min(target, math.sqrt(cfg.max_lateral_accel_mps2 / abs(curvature)))
+        previous = self.reference
         if target > self.reference:
             self.reference = min(target, self.reference + cfg.accel_mps2 * dt)
         else:
-            self.reference = max(target, self.reference - cfg.decel_mps2 * 1.5 * dt)
+            self.reference = max(target, self.reference - cfg.decel_mps2 * dt)
+        self.reference_accel = (self.reference - previous) / dt if dt > 0 else 0.0
         return self.reference
 
 
 @dataclass
 class SpeedControllerConfig:
-    kp: float = 0.12                     # throttle per (m/s)
-    ki: float = 0.25                     # throttle per (m/s * s)
+    kp: float = 0.2                      # throttle per (m/s)
+    ki: float = 0.15                     # throttle per (m/s * s)
     speed_at_full_throttle_mps: float = 10.0  # feed-forward slope (estimate, 540 motor / 9.6:1 / 55 mm wheel)
     deadband_offset: float = 0.04        # ESC deadband 0.03 (catalog) + margin
     integrator_limit: float = 0.35
-    max_brake: float = 0.5
+    max_brake: float = 0.6
     brake_min_speed_mps: float = 0.4
+    accel_at_full_throttle_mps2: float = 9.0   # free speed / motor time constant (estimate)
+    decel_at_full_brake_mps2: float = 4.4      # traction limited: mu g x rear axle load share (estimate)
 
 
 class SpeedController:
     """Throttle = feed-forward(v_ref) + Kp e + Ki integral(e), with anti-windup.
 
-    Feed-forward is the steady-state throttle of a DC motor drive:
-    u_ff = deadband + v_ref / v_full. Negative throttle (ESC brake) is only
-    issued while the car is rolling forward so it can never select reverse.
+    Feed-forward is the steady-state throttle of a DC motor drive,
+    u_ff = deadband + v_ref / v_full, plus the reference acceleration over the
+    full-throttle acceleration (or full-brake deceleration). Negative throttle
+    (ESC brake) is only issued while the car is rolling forward so it can never
+    select reverse.
     """
 
     def __init__(self, config: SpeedControllerConfig | None = None) -> None:
@@ -310,18 +317,26 @@ class SpeedController:
     def reset(self) -> None:
         self.integral = 0.0
 
-    def update(self, dt: float, reference: float, measured: float, max_throttle: float = 1.0) -> float:
+    def update(self, dt: float, reference: float, measured: float, max_throttle: float = 1.0,
+               reference_accel: float = 0.0) -> float:
         cfg = self.config
         if reference <= 0.05 and measured < cfg.brake_min_speed_mps:
             self.integral = 0.0
             return 0.0
         error = reference - measured
         feed_forward = (cfg.deadband_offset + reference / cfg.speed_at_full_throttle_mps) if reference > 0.05 else 0.0
+        if reference_accel > 0:
+            feed_forward += reference_accel / cfg.accel_at_full_throttle_mps2
+        else:
+            feed_forward += reference_accel / cfg.decel_at_full_brake_mps2
         unsaturated = feed_forward + cfg.kp * error + cfg.ki * self.integral
         low = -cfg.max_brake if measured >= cfg.brake_min_speed_mps else 0.0
         output = clamp(unsaturated, low, max_throttle)
-        # Conditional integration: do not integrate further into saturation.
-        if not ((output >= max_throttle and error > 0) or (output <= low and error < 0)):
+        # Conditional integration: not into saturation, and not while the reference
+        # ramps (feed-forward carries transients; integrating the measurement lag of
+        # the period-based wheel speed during a ramp causes overshoot).
+        ramping = abs(reference_accel) > 0.1
+        if not ramping and not ((output >= max_throttle and error > 0) or (output <= low and error < 0)):
             self.integral = clamp(self.integral + error * dt, -cfg.integrator_limit / max(cfg.ki, 1e-9),
                                   cfg.integrator_limit / max(cfg.ki, 1e-9))
         return output

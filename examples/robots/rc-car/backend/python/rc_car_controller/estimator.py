@@ -200,7 +200,7 @@ class WheelSpeedEstimator:
     The sensor has no direction channel; the sign comes from the commanded direction.
     """
 
-    def __init__(self, metres_per_edge: float, window_s: float = 0.15, stale_s: float = 0.5) -> None:
+    def __init__(self, metres_per_edge: float, window_s: float = 0.1, stale_s: float = 0.5) -> None:
         self.metres_per_edge = metres_per_edge
         self.window_s = window_s
         self.stale_s = stale_s
