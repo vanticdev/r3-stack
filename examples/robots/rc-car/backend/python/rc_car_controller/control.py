@@ -477,7 +477,6 @@ class State(str, enum.Enum):
 @dataclass
 class SupervisorConfig:
     mode: str = "autonomous"
-    arm_channel: int = 5
     arm_threshold_us: float = 1700.0
     disarm_threshold_us: float = 1300.0
     failsafe_action: str = "brake"
