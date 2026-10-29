@@ -50,8 +50,7 @@ internal briefs, builds an autonomous RC car from scratch ("literally nothing") 
 - Everything structural (frame, mounts, brackets, body) is 3D printed.
 - No custom gears or gearbox: the drivetrain (motor, gearbox/differential, axles, wheels) is bought
   off the shelf.
-- The user already owns a Raspberry Pi 5 (they said "5 GB RAM"; official variants are 1/2/4/8/16 GB, so confirm
-  with the user), an MPU-6050 IMU and an **Arducam UC-717** camera. Everything else is bought: GPS module, wheels,
+- The user already owns a **Raspberry Pi 5 4 GB** (confirmed by the user), an MPU-6050 IMU and an **Arducam UC-717** camera. Everything else is bought: GPS module, wheels,
   motor(s), ESC/drivers, battery, servo, and so on.
 - The Arducam UC-717 faces forward. No LiDAR.
 - It must drive autonomously in the twin.
