@@ -317,18 +317,32 @@ class FitChecker:
                     self.report.links.append(Link(name, part, fastener.id, "fastener"))
 
     def hole_faces(self, part: str, seat: np.ndarray, axis: np.ndarray, d: float) -> list[Face]:
-        """Concave cylinders around the fastener axis: a round hole (coaxial) or
-        the arcs of a slot (parallel, axis within the arc radius) wide enough
-        for the shank."""
+        """Faces that form a hole for the shank: a coaxial concave cylinder, or the
+        two end arcs of a slot (equal radius >= d/2, parallel, with the fastener
+        axis on the segment between their axes)."""
         geometry = self.part(part)
         if geometry is None:
             return []
-        out = []
-        for face in geometry.faces_of("CYLINDER"):
-            angle, offset = coaxial(face, seat, axis)
-            if face.convex is False and angle <= ANGLE_TOL and face.radius >= d / 2 - 1e-5 and offset <= face.radius * 2 + OFFSET_TOL:
-                out.append(face)
-        return out
+        concave = [f for f in geometry.faces_of("CYLINDER") if f.convex is False and coaxial(f, seat, axis)[0] <= ANGLE_TOL
+                   and f.radius >= d / 2 - 1e-5]
+        round_holes = [f for f in concave if coaxial(f, seat, axis)[1] <= OFFSET_TOL]
+        if round_holes:
+            return round_holes
+        for i, a in enumerate(concave):
+            for b in concave[i + 1:]:
+                if abs(a.radius - b.radius) > 1e-6:
+                    continue
+                # Project both arc axes and the fastener axis into the plane normal to the axis.
+                pa = a.origin - seat - ((a.origin - seat) @ axis) * axis
+                pb = b.origin - seat - ((b.origin - seat) @ axis) * axis
+                seg = pb - pa
+                length = float(np.linalg.norm(seg))
+                if length < 1e-9:
+                    continue
+                t = float(np.clip(-pa @ seg / length ** 2, 0.0, 1.0))
+                if np.linalg.norm(pa + t * seg) <= OFFSET_TOL and 0.0 < t < 1.0:
+                    return [a, b]
+        return []
 
     @property
     def fabricated(self) -> set[str]:
@@ -853,6 +867,27 @@ class FitChecker:
         if missing:
             self.err("part_not_retained", f"{len(missing)} parts are not held to {root} by verified attachments: {missing}",
                      missing, count=len(missing))
+
+
+def rotor_crossing_links(spec: Any, links: list[Link]) -> set[int]:
+    """Indices of fastener/thread links that would lock an internally rotating
+    interface: a horn screw clamps the horn and threads into the servo's output
+    shaft (which turns inside the case); a wheel nut clamps a bearing's inner
+    race (the outer race is pressed into the carrier). The link from such a
+    fastener to the case-side part (servo / bearing) carries no rigid joint."""
+    rotating = [(i.parts[0], i.parts[1], i.parts[0]) for i in spec.mechanical.interfaces if i.kind == "spline"]
+    rotating += [(i.parts[0], i.parts[1], i.parts[1]) for i in spec.mechanical.interfaces
+                 if i.kind == "revolute_fit" and i.params.get("internal_rotation")]
+    out: set[int] = set()
+    fasteners = {f.id: set(spec.link_parts(f.id) or []) for f in spec.mechanical.fasteners}
+    for index, link in enumerate(links):
+        members = fasteners.get(link.via)
+        if members is None or link.kind not in ("fastener", "thread"):
+            continue
+        for a, b, case in rotating:
+            if a in members and b in members and case in (link.a, link.b):
+                out.add(index)
+    return out
 
 
 # ------------------------------------------------------------------- physics

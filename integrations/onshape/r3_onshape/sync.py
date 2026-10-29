@@ -199,10 +199,14 @@ def antenna_position(project: Project, model: GeometryModel) -> dict[str, Any]:
     part = model[antenna]
     dipoles = [f for f in part.faces_of("CYLINDER") if abs(float(f.direction @ np.array([0.0, 0.0, 1.0]))) < 1e-6]
     if dipoles:
-        face = max(dipoles, key=lambda f: float(np.ptp(f.triangles.reshape(-1, 3) @ f.direction)) if f.triangles is not None else 0.0)
-        pts = face.triangles.reshape(-1, 3)
-        t = (pts - face.origin) @ face.direction
-        feed = face.origin + face.direction * (t.min() + t.max()) / 2
+        # The dipole's cylinder is split into two arm faces by the feed junction:
+        # the feed point is the middle of all faces coaxial with the longest arm.
+        arm = max(dipoles, key=lambda f: float(np.ptp(f.triangles.reshape(-1, 3) @ f.direction)) if f.triangles is not None else 0.0)
+        coaxial_arms = [f for f in dipoles if abs(abs(float(f.direction @ arm.direction)) - 1) < 1e-6 and abs(f.radius - arm.radius) < 1e-7
+                        and np.linalg.norm(np.cross(f.origin - arm.origin, arm.direction)) < 1e-6 and f.triangles is not None]
+        pts = np.concatenate([f.triangles.reshape(-1, 3) for f in coaxial_arms])
+        t = (pts - arm.origin) @ arm.direction
+        feed = arm.origin + arm.direction * (t.min() + t.max()) / 2
     else:
         feed = (part.lo + part.hi) / 2
     mount_z = float(model[receiver].lo[2])
@@ -249,45 +253,75 @@ def render_views(api: Transport, doc: DocumentRef, assembly: Any, out_dir: Path,
             report.kinematics.setdefault("render_errors", []).append(f"{filename}: {str(error)[:200]}")
 
 
-def full_lock_views(assembly: Any, kinematics: dict[str, Any], out_dir: Path, report: SyncReport,
+def render_mesh_pose(model: GeometryModel, colors: dict[str, str], transforms: dict[str, list[list[float]]], path: Path,
+                     view: list[float], center: list[float], half_width: float, title: str) -> None:
+    """Shaded render of the exported Onshape meshes in a solved pose (painter's
+    algorithm; used where the Onshape REST API cannot drive the mechanism)."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.collections import PolyCollection
+    from matplotlib.colors import to_rgb
+
+    rows = np.asarray(camera(view, center)).reshape(3, 4)
+    rot, shift = rows[:, :3], rows[:, 3]
+    light = np.array([0.3, 0.4, 0.86])
+    polys, depth, shades = [], [], []
+    for name, part in model.parts.items():
+        tris = part.vertices[part.triangles]
+        if name in transforms:
+            m = np.asarray(transforms[name])
+            tris = tris @ m[:, :3].T + m[:, 3]
+        cam = tris @ rot.T + shift
+        keep = np.all(np.abs(cam[:, :, :2]).max(axis=2) < half_width * 1.6, axis=1)
+        cam = cam[keep]
+        if not len(cam):
+            continue
+        normals = np.cross(cam[:, 1] - cam[:, 0], cam[:, 2] - cam[:, 0])
+        lengths = np.linalg.norm(normals, axis=1)
+        visible = (normals[:, 2] > 0) & (lengths > 0)
+        cam, normals, lengths = cam[visible], normals[visible], lengths[visible]
+        base = np.asarray(to_rgb(colors.get(name, "#888888")))
+        intensity = 0.35 + 0.65 * np.clip((normals / lengths[:, None]) @ light, 0, 1)
+        polys.extend(cam[:, :, :2])
+        depth.extend(cam[:, :, 2].mean(axis=1))
+        shades.extend(np.clip(base[None, :] * intensity[:, None], 0, 1))
+    order = np.argsort(depth)
+    fig, ax = plt.subplots(figsize=(9, 7), dpi=130)
+    ax.add_collection(PolyCollection([polys[i] for i in order], facecolors=[shades[i] for i in order], edgecolors=[shades[i] for i in order], linewidths=0.3))
+    ax.set_xlim(-half_width, half_width)
+    ax.set_ylim(-half_width * 0.78, half_width * 0.78)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title(title, fontsize=10)
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def full_lock_views(model: GeometryModel, plans: dict[str, Any], kinematics: dict[str, Any], out_dir: Path, report: SyncReport,
                     result: StageResult | None = None) -> None:
-    horn = next((m for m in assembly.mates if m["link"].kind == "spline"), None)
-    if horn is None or not kinematics.get("servo_travel_rad"):
-        return
-    lo, hi = kinematics["servo_travel_rad"]
-    rows = kinematics.get("table", [])
-    checks = []
-    for label, angle in (("left", hi), ("right", lo)):
-        try:
-            assembly.set_mate_value(horn["feature_id"], angle)
-            # Cross-check Onshape's assembly solver against the Python linkage solution.
-            values = {v["featureId"]: v for v in assembly.api.json("GET", assembly.base + "/matevalues").get("mateValues", [])}
-            row = min(rows, key=lambda r: abs(r["servo_rad"] - angle)) if rows else {}
-            for mate in assembly.mates:
-                if mate["joint"] in kinematics.get("sides", {}) and mate["feature_id"] in values:
-                    onshape = float(values[mate["feature_id"]].get("rotationZ", 0.0))
-                    python = row.get(mate["joint"])
-                    checks.append({"servo_rad": angle, "joint": mate["joint"], "onshape_rad": onshape, "python_rad": python})
-            assembly.shaded_view(out_dir / f"onshape_full_lock_{label}.png", camera([0.0, 0.0, 1.0], [0.24, 0.0, 0.06]), pixel_size=0.00025)
-            report.images.append(f"onshape_full_lock_{label}.png")
-            report.kinematics["onshape_solver_check"] = checks
-        except (OnshapeError, KeyError) as error:
-            report.kinematics.setdefault("render_errors", []).append(str(error)[:200])
-    try:
-        assembly.set_mate_value(horn["feature_id"], 0.0)
-    except OnshapeError:
-        pass
+    """Full-lock evidence. Onshape's REST API does not drive closed-loop mates
+    (updateMateValues and occurrence transforms leave the linkage at its
+    current values and move the rest of the assembly rigidly), so the full-lock
+    views are rendered from the Onshape-exported meshes posed by the verified
+    linkage solution, the same poses the motion sweep checked."""
+    poses = (kinematics.get("sweep") or {}).get("lock_poses") or {}
+    colors = {name: plan.color for name, plan in plans.items()}
+    for label, pose in poses.items():
+        sample = pose["sample"]
+        angles = ", ".join(f"{k} {v:+.3f} rad" for k, v in sample.items() if k != "servo_rad")
+        title = f"Full {label} lock: servo {sample['servo_rad']:+.3f} rad; {angles} (Onshape meshes, solved pose)"
+        for suffix, view, center, width in (("", [0.0, 0.0, 1.0], [0.245, 0.0, 0.06], 0.11),
+                                             ("_iso", [0.9, -0.6, 1.0], [0.245, 0.0, 0.07], 0.09)):
+            filename = f"cad_full_lock_{label}{suffix}.png"
+            render_mesh_pose(model, colors, pose["parts"], out_dir / filename, view, center, width, title)
+            report.images.append(filename)
+    report.kinematics["onshape_drive"] = ("not available headless: the Onshape REST API does not drive closed-loop mates; full-lock "
+                                          "poses come from the verified Python linkage solution")
     if result is not None:
-        checks = report.kinematics.get("onshape_solver_check", [])
-        if not checks:
-            result.add(Diagnostic.error("steering_solver_mismatch", "Onshape did not solve the steering linkage at full lock", subjects=["steering"]))
-        for check in checks:
-            error = abs(check["onshape_rad"] - (check["python_rad"] or 0.0))
-            check["difference_deg"] = round(float(np.degrees(error)), 4)
-            if check["python_rad"] is None or error > np.radians(0.5):
-                result.add(Diagnostic.error("steering_solver_mismatch", f"{check['joint']}: Onshape solves {check['onshape_rad']:.4f} rad, "
-                                            f"the linkage table {check['python_rad']} rad at servo {check['servo_rad']:.4f} rad",
-                                            subjects=[check["joint"]], data=check))
+        result.add(Diagnostic.info("steering_onshape_drive_unsupported", report.kinematics["onshape_drive"], subjects=["steering"]))
 
 
 def sync(project: Project, api: Transport, result: StageResult, builder: Builder, keep_failed: bool = False,
@@ -327,7 +361,7 @@ def sync(project: Project, api: Transport, result: StageResult, builder: Builder
         assembly = build_assembly(api, doc, project, model, fit, result)
         report.assembly = assembly.verify()
         render_views(api, doc, assembly, build_dir, report)
-        full_lock_views(assembly, report.kinematics, build_dir, report, result)
+        full_lock_views(model, plans, report.kinematics, build_dir, report, result)
         ok = result.ok
         return report
     except (OnshapeError, ValueError, KeyError, AttributeError, TypeError) as error:

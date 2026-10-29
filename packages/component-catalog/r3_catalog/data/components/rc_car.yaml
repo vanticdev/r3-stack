@@ -414,7 +414,7 @@ components:
     behavior:
       model: receiver.crsf
       params: {frequency: 2.44 GHz, packet_rate: 150 Hz, sensitivity_dbm: -108, noise_figure_db: 6, antenna_gain_dbi: 2.0,
-               antenna_height_above_mount: 0.0836, uart_baud: 420000, failsafe_timeout: 1.0, current_active: 0.06, telemetry_power_dbm: 17}
+               antenna_height_above_mount: 0.0829, uart_baud: 420000, failsafe_timeout: 1.0, current_active: 0.06, telemetry_power_dbm: 17}
       provenance: {status: datasheet, source: "ExpressLRS docs: 150 Hz LoRa sensitivity -108 dBm; RP1 power ~60 mA (estimated)"}
     software:
       - {bus: uart, protocol: crsf, params: {baud: 420000}}

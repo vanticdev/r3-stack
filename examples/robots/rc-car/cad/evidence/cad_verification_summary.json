@@ -1,0 +1,738 @@
+{
+ "document": "https://cad.onshape.com/documents/7f38296c6a64ee6e82e32ee3/w/350a32bf8773bd0828574622/e/4c3385f677ae474914982ad5",
+ "microversion": "697364f995235c5218ecc77d",
+ "generator_digest": "5c9adc382e5439cd",
+ "mesh_digest": "7ff2cba419d874f6",
+ "metrics": {
+  "onshape_document": "https://cad.onshape.com/documents/7f38296c6a64ee6e82e32ee3/w/350a32bf8773bd0828574622/e/4c3385f677ae474914982ad5",
+  "cad_features_posted": 869,
+  "cad_build_seconds": 469.8,
+  "cad_parts_built": 119,
+  "parts": 119,
+  "total_mass_kg": 1.7659,
+  "verified_fasteners": 61,
+  "verified_interfaces": 36,
+  "ackermann_pct_full_lock": 97.14428025226876,
+  "assembly_mates": 120
+ },
+ "ok": true,
+ "diagnostics": [
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "mot_1: a 7.5 mm x 60 mm tool path is blocked by wheel_rr",
+   "subjects": [
+    "fastener:mot_1",
+    "wheel_rr"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "mot_2: a 7.5 mm x 60 mm tool path is blocked by wheel_rr",
+   "subjects": [
+    "fastener:mot_2",
+    "wheel_rr"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "enc_1: a 5.8 mm x 60 mm tool path is blocked by hub_rl, wheel_rl",
+   "subjects": [
+    "fastener:enc_1",
+    "hub_rl",
+    "wheel_rl"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "enc_2: a 5.8 mm x 60 mm tool path is blocked by hub_rl, wheel_rl",
+   "subjects": [
+    "fastener:enc_2",
+    "hub_rl",
+    "wheel_rl"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "ear_1: a 7.5 mm x 60 mm tool path is blocked by servo_horn, tie_rod, fastener:bs_hl",
+   "subjects": [
+    "fastener:ear_1",
+    "servo_horn",
+    "tie_rod",
+    "fastener:bs_hl"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "ear_2: a 7.5 mm x 60 mm tool path is blocked by servo_horn, tie_rod_r, fastener:bs_hr",
+   "subjects": [
+    "fastener:ear_2",
+    "servo_horn",
+    "tie_rod_r",
+    "fastener:bs_hr"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "pi_d1: a 6.5 mm x 60 mm tool path is blocked by chassis",
+   "subjects": [
+    "fastener:pi_d1",
+    "chassis"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "pi_d2: a 6.5 mm x 60 mm tool path is blocked by chassis, battery",
+   "subjects": [
+    "fastener:pi_d2",
+    "chassis",
+    "battery"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "pi_d3: a 6.5 mm x 60 mm tool path is blocked by chassis, tape_esc, esc",
+   "subjects": [
+    "fastener:pi_d3",
+    "chassis",
+    "tape_esc",
+    "esc"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "pi_d4: a 6.5 mm x 60 mm tool path is blocked by chassis, battery",
+   "subjects": [
+    "fastener:pi_d4",
+    "chassis",
+    "battery"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "pi_s1: a 7.0 mm x 60 mm tool path is blocked by hat, fastener:hat_1",
+   "subjects": [
+    "fastener:pi_s1",
+    "hat",
+    "fastener:hat_1"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "pi_s2: a 7.0 mm x 60 mm tool path is blocked by hat, fastener:hat_2",
+   "subjects": [
+    "fastener:pi_s2",
+    "hat",
+    "fastener:hat_2"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "pi_s3: a 7.0 mm x 60 mm tool path is blocked by hat, fastener:hat_3",
+   "subjects": [
+    "fastener:pi_s3",
+    "hat",
+    "fastener:hat_3"
+   ]
+  },
+  {
+   "severity": "warning",
+   "code": "fastener_tool_access_blocked",
+   "message": "pi_s4: a 7.0 mm x 60 mm tool path is blocked by hat, fastener:hat_4",
+   "subjects": [
+    "fastener:pi_s4",
+    "hat",
+    "fastener:hat_4"
+   ]
+  },
+  {
+   "severity": "info",
+   "code": "steering_onshape_drive_unsupported",
+   "message": "not available headless: the Onshape REST API does not drive closed-loop mates; full-lock poses come from the verified Python linkage solution",
+   "subjects": [
+    "steering"
+   ]
+  },
+  {
+   "severity": "info",
+   "code": "cad_previous_document_trashed",
+   "message": "superseded Onshape document moved to trash",
+   "subjects": []
+  }
+ ],
+ "steering": {
+  "servo_travel_rad": [
+   -0.5230751768227005,
+   0.5230751768227005
+  ],
+  "sides": {
+   "steer_fl": {
+    "status": "ok",
+    "failed_at_servo_rad": null,
+    "rod_length_m": 0.061500000000000006,
+    "min_transmission_angle_deg": 61.92384029974324,
+    "wheel_angle_range_rad": [
+     -0.3665343415408674,
+     0.44476987752905955
+    ],
+    "limits_rad": [
+     -0.45,
+     0.45
+    ],
+    "kingpin": [
+     0.26,
+     0.0675,
+     0.043149999999999994
+    ],
+    "knuckle_ball": [
+     0.23500000000000001,
+     0.0675,
+     0.0826
+    ],
+    "horn_ball": [
+     0.23500000000000001,
+     0.006,
+     0.0826
+    ]
+   },
+   "steer_fr": {
+    "status": "ok",
+    "failed_at_servo_rad": null,
+    "rod_length_m": 0.061500000000000006,
+    "min_transmission_angle_deg": 61.92384029974324,
+    "wheel_angle_range_rad": [
+     -0.44476987752905955,
+     0.3665343415408671
+    ],
+    "limits_rad": [
+     -0.45,
+     0.45
+    ],
+    "kingpin": [
+     0.26,
+     -0.0675,
+     0.043149999999999994
+    ],
+    "knuckle_ball": [
+     0.23500000000000001,
+     -0.0675,
+     0.0826
+    ],
+    "horn_ball": [
+     0.23500000000000001,
+     -0.006,
+     0.0826
+    ]
+   }
+  },
+  "ackermann_pct_full_lock": 97.14428025226876,
+  "center_ratio": {
+   "steer_fl": 0.7919608435087194,
+   "steer_fr": 0.7919608435087194
+  },
+  "table": [
+   {
+    "servo_rad": -0.523075176823,
+    "steer_fl": -0.3665343415408674,
+    "steer_fl_transmission_deg": 65.2847218453129,
+    "steer_fr": -0.44476987752905955,
+    "steer_fr_transmission_deg": 61.92384029974324,
+    "ackermann_pct": 97.14428025226816
+   },
+   {
+    "servo_rad": -0.496921417982,
+    "steer_fl": -0.3511839785864936,
+    "steer_fl_transmission_deg": 66.40223592784142,
+    "steer_fr": -0.4212228570975556,
+    "steer_fr_transmission_deg": 63.395294371162606,
+    "ackermann_pct": 95.03742781395442
+   },
+   {
+    "servo_rad": -0.47076765914,
+    "steer_fl": -0.33542951604520027,
+    "steer_fl_transmission_deg": 67.53561636060996,
+    "steer_fr": -0.39781046792388747,
+    "steer_fr_transmission_deg": 64.85893782443767,
+    "ackermann_pct": 93.12100543243542
+   },
+   {
+    "servo_rad": -0.444613900299,
+    "steer_fl": -0.3192897564280632,
+    "steer_fl_transmission_deg": 68.68414020433288,
+    "steer_fr": -0.3745313226800201,
+    "steer_fr_transmission_deg": 66.31501063623847,
+    "ackermann_pct": 91.38215391588415
+   },
+   {
+    "servo_rad": -0.418460141458,
+    "steer_fl": -0.30278252402307826,
+    "steer_fl_transmission_deg": 69.84712564775401,
+    "steer_fr": -0.35138456099658466,
+    "steer_fr_transmission_deg": 67.76371581605578,
+    "ackermann_pct": 89.80920369497267
+   },
+   {
+    "servo_rad": -0.392306382617,
+    "steer_fl": -0.2859247000046266,
+    "steer_fl_transmission_deg": 71.02393033731899,
+    "steer_fr": -0.3283698118245819,
+    "steer_fr_transmission_deg": 69.20522276823627,
+    "ackermann_pct": 88.39155297327073
+   },
+   {
+    "servo_rad": -0.366152623776,
+    "steer_fl": -0.26873225886285784,
+    "steer_fl_transmission_deg": 72.21394970693048,
+    "steer_fr": -0.3054871624745973,
+    "steer_fr_transmission_deg": 70.63967013416915,
+    "ackermann_pct": 87.11956188241511
+   },
+   {
+    "servo_rad": -0.339998864935,
+    "steer_fl": -0.2512203054918208,
+    "steer_fl_transmission_deg": 73.41661532790735,
+    "steer_fr": -0.28273713337957906,
+    "steer_fr_transmission_deg": 72.0671681930357,
+    "ackermann_pct": 85.98446022621967
+   },
+   {
+    "servo_rad": -0.313845106094,
+    "steer_fl": -0.2334031123890334,
+    "steer_fl_transmission_deg": 74.63139329565537,
+    "steer_fr": -0.26012065780244525,
+    "steer_fr_transmission_deg": 73.48780088534353,
+    "ackermann_pct": 84.97826679792115
+   },
+   {
+    "servo_rad": -0.287691347252,
+    "steer_fl": -0.21529415652095685,
+    "steer_fl_transmission_deg": 75.85778266623798,
+    "steer_fr": -0.23763906585506187,
+    "steer_fr_transmission_deg": 74.90162751180836,
+    "ackermann_pct": 84.09371858459835
+   },
+   {
+    "servo_rad": -0.261537588411,
+    "steer_fl": -0.19690615550086898,
+    "steer_fl_transmission_deg": 77.09531395290597,
+    "steer_fr": -0.2152940723182799,
+    "steer_fr_transmission_deg": 76.30868415038479,
+    "ackermann_pct": 83.32420844585113
+   },
+   {
+    "servo_rad": -0.23538382957,
+    "steer_fl": -0.17825110278483156,
+    "steer_fl_transmission_deg": 78.34354769130906,
+    "steer_fr": -0.19308776782971926,
+    "steer_fr_transmission_deg": 77.70898482777798,
+    "ackermann_pct": 82.66373007967073
+   },
+   {
+    "servo_rad": -0.209230070729,
+    "steer_fl": -0.15934030167765867,
+    "steer_fl_transmission_deg": 79.60207307856857,
+    "steer_fr": -0.171022613113732,
+    "steer_fr_transmission_deg": 79.10252247368092,
+    "ackermann_pct": 82.10682927827001
+   },
+   {
+    "servo_rad": -0.183076311888,
+    "steer_fl": -0.140184397967972,
+    "steer_fl_transmission_deg": 80.87050669149924,
+    "steer_fr": -0.14910143596165673,
+    "steer_fr_transmission_deg": 80.4892696827896,
+    "ackermann_pct": 81.64856063291927
+   },
+   {
+    "servo_rad": -0.156922553047,
+    "steer_fl": -0.12079341106810774,
+    "steer_fl_transmission_deg": 82.14849128708326,
+    "steer_fr": -0.12732743074129632,
+    "steer_fr_transmission_deg": 81.86917930432173,
+    "ackermann_pct": 81.28444897924145
+   },
+   {
+    "servo_rad": -0.130768794206,
+    "steer_fl": -0.10117676356392546,
+    "steer_fl_transmission_deg": 83.4356946877082,
+    "steer_fr": -0.1057041602522905,
+    "steer_fr_transmission_deg": 83.24218487566445,
+    "ackermann_pct": 81.01045498433334
+   },
+   {
+    "servo_rad": -0.104615035365,
+    "steer_fl": -0.08134330910735012,
+    "steer_fl_transmission_deg": 84.73180875296931,
+    "steer_fr": -0.08423555978140553,
+    "steer_fr_transmission_deg": 84.60820091382745,
+    "ackermann_pct": 80.82294436919048
+   },
+   {
+    "servo_rad": -0.078461276523,
+    "steer_fl": -0.06130135860470861,
+    "steer_fl_transmission_deg": 86.03654843943912,
+    "steer_fr": -0.06292594324145627,
+    "steer_fr_transmission_deg": 85.96712307600104,
+    "ackermann_pct": 80.7186603371534
+   },
+   {
+    "servo_rad": -0.052307517682,
+    "steer_fl": -0.041058704675013484,
+    "steer_fl_transmission_deg": 87.34965094921499,
+    "steer_fr": -0.041780011308736834,
+    "steer_fr_transmission_deg": 87.3188281981204,
+    "ackermann_pct": 80.69469884336861
+   },
+   {
+    "servo_rad": -0.026153758841,
+    "steer_fl": -0.020622644347297138,
+    "steer_fl_transmission_deg": 88.67087496902124,
+    "steer_fr": -0.020802861477986847,
+    "steer_fr_transmission_deg": 88.66317421970724,
+    "ackermann_pct": 80.74848639412203
+   },
+   {
+    "servo_rad": 0.0,
+    "steer_fl": 0.0,
+    "steer_fl_transmission_deg": 90.0,
+    "steer_fr": 0.0,
+    "steer_fr_transmission_deg": 90.0
+   },
+   {
+    "servo_rad": 0.026153758841,
+    "steer_fl": 0.020802861477986847,
+    "steer_fl_transmission_deg": 88.66317421970724,
+    "steer_fr": 0.020622644347297138,
+    "steer_fr_transmission_deg": 88.67087496902124,
+    "ackermann_pct": 80.74848639412203
+   },
+   {
+    "servo_rad": 0.052307517682,
+    "steer_fl": 0.041780011308736834,
+    "steer_fl_transmission_deg": 87.3188281981204,
+    "steer_fr": 0.041058704675013484,
+    "steer_fr_transmission_deg": 87.34965094921499,
+    "ackermann_pct": 80.69469884336861
+   },
+   {
+    "servo_rad": 0.078461276523,
+    "steer_fl": 0.06292594324145627,
+    "steer_fl_transmission_deg": 85.96712307600104,
+    "steer_fr": 0.06130135860470861,
+    "steer_fr_transmission_deg": 86.03654843943912,
+    "ackermann_pct": 80.7186603371534
+   },
+   {
+    "servo_rad": 0.104615035365,
+    "steer_fl": 0.08423555978140553,
+    "steer_fl_transmission_deg": 84.60820091382745,
+    "steer_fr": 0.0813433091073504,
+    "steer_fr_transmission_deg": 84.73180875296919,
+    "ackermann_pct": 80.82294436918241
+   },
+   {
+    "servo_rad": 0.130768794206,
+    "steer_fl": 0.1057041602522905,
+    "steer_fl_transmission_deg": 83.24218487566445,
+    "steer_fr": 0.10117676356392573,
+    "steer_fr_transmission_deg": 83.4356946877082,
+    "ackermann_pct": 81.010454984328
+   },
+   {
+    "servo_rad": 0.156922553047,
+    "steer_fl": 0.12732743074129632,
+    "steer_fl_transmission_deg": 81.86917930432173,
+    "steer_fr": 0.12079341106810744,
+    "steer_fr_transmission_deg": 82.14849128708329,
+    "ackermann_pct": 81.28444897924581
+   },
+   {
+    "servo_rad": 0.183076311888,
+    "steer_fl": 0.14910143596165673,
+    "steer_fl_transmission_deg": 80.4892696827896,
+    "steer_fr": 0.14018439796797225,
+    "steer_fr_transmission_deg": 80.87050669149924,
+    "ackermann_pct": 81.64856063291678
+   },
+   {
+    "servo_rad": 0.209230070729,
+    "steer_fl": 0.171022613113732,
+    "steer_fl_transmission_deg": 79.10252247368092,
+    "steer_fr": 0.15934030167765895,
+    "steer_fr_transmission_deg": 79.60207307856857,
+    "ackermann_pct": 82.10682927826758
+   },
+   {
+    "servo_rad": 0.23538382957,
+    "steer_fl": 0.19308776782971926,
+    "steer_fl_transmission_deg": 77.70898482777798,
+    "steer_fr": 0.1782511027848313,
+    "steer_fr_transmission_deg": 78.34354769130906,
+    "ackermann_pct": 82.66373007967225
+   },
+   {
+    "servo_rad": 0.261537588411,
+    "steer_fl": 0.2152940723182799,
+    "steer_fl_transmission_deg": 76.30868415038479,
+    "steer_fr": 0.19690615550086873,
+    "steer_fr_transmission_deg": 77.095313952906,
+    "ackermann_pct": 83.32420844585256
+   },
+   {
+    "servo_rad": 0.287691347252,
+    "steer_fl": 0.23763906585506187,
+    "steer_fl_transmission_deg": 74.90162751180836,
+    "steer_fr": 0.21529415652095688,
+    "steer_fr_transmission_deg": 75.85778266623798,
+    "ackermann_pct": 84.09371858459815
+   },
+   {
+    "servo_rad": 0.313845106094,
+    "steer_fl": 0.26012065780244525,
+    "steer_fl_transmission_deg": 73.48780088534353,
+    "steer_fr": 0.23340311238903347,
+    "steer_fr_transmission_deg": 74.63139329565537,
+    "ackermann_pct": 84.97826679792097
+   },
+   {
+    "servo_rad": 0.339998864935,
+    "steer_fl": 0.28273713337957906,
+    "steer_fl_transmission_deg": 72.0671681930357,
+    "steer_fr": 0.25122030549182084,
+    "steer_fr_transmission_deg": 73.41661532790735,
+    "ackermann_pct": 85.98446022621953
+   },
+   {
+    "servo_rad": 0.366152623776,
+    "steer_fl": 0.3054871624745973,
+    "steer_fl_transmission_deg": 70.63967013416915,
+    "steer_fr": 0.26873225886285823,
+    "steer_fr_transmission_deg": 72.21394970693048,
+    "ackermann_pct": 87.11956188241408
+   },
+   {
+    "servo_rad": 0.392306382617,
+    "steer_fl": 0.3283698118245819,
+    "steer_fl_transmission_deg": 69.20522276823627,
+    "steer_fr": 0.28592470000462694,
+    "steer_fr_transmission_deg": 71.02393033731899,
+    "ackermann_pct": 88.39155297327002
+   },
+   {
+    "servo_rad": 0.418460141458,
+    "steer_fl": 0.35138456099658466,
+    "steer_fl_transmission_deg": 67.76371581605578,
+    "steer_fr": 0.30278252402307804,
+    "steer_fr_transmission_deg": 69.84712564775401,
+    "ackermann_pct": 89.80920369497319
+   },
+   {
+    "servo_rad": 0.444613900299,
+    "steer_fl": 0.3745313226800201,
+    "steer_fl_transmission_deg": 66.31501063623847,
+    "steer_fr": 0.31928975642806295,
+    "steer_fr_transmission_deg": 68.68414020433285,
+    "ackermann_pct": 91.38215391588469
+   },
+   {
+    "servo_rad": 0.47076765914,
+    "steer_fl": 0.39781046792388747,
+    "steer_fl_transmission_deg": 64.85893782443767,
+    "steer_fr": 0.33542951604520055,
+    "steer_fr_transmission_deg": 67.53561636060996,
+    "ackermann_pct": 93.12100543243479
+   },
+   {
+    "servo_rad": 0.496921417982,
+    "steer_fl": 0.4212228570975556,
+    "steer_fl_transmission_deg": 63.395294371162606,
+    "steer_fr": 0.3511839785864942,
+    "steer_fr_transmission_deg": 66.40223592784136,
+    "ackermann_pct": 95.03742781395331
+   },
+   {
+    "servo_rad": 0.523075176823,
+    "steer_fl": 0.44476987752905955,
+    "steer_fl_transmission_deg": 61.92384029974324,
+    "steer_fr": 0.3665343415408671,
+    "steer_fr_transmission_deg": 65.2847218453129,
+    "ackermann_pct": 97.14428025226876
+   }
+  ]
+ },
+ "sweep": {
+  "samples": [
+   {
+    "servo_rad": -0.523075176823,
+    "steer_fl": -0.3665343415408671,
+    "steer_fr": -0.44476987752905933
+   },
+   {
+    "servo_rad": -0.418460141458,
+    "steer_fl": -0.30278252402307776,
+    "steer_fr": -0.3513845609965842
+   },
+   {
+    "servo_rad": -0.313845106094,
+    "steer_fl": -0.2334031123890333,
+    "steer_fr": -0.2601206578024453
+   },
+   {
+    "servo_rad": -0.209230070729,
+    "steer_fl": -0.15934030167765892,
+    "steer_fr": -0.17102261311373226
+   },
+   {
+    "servo_rad": -0.104615035365,
+    "steer_fl": -0.08134330910735037,
+    "steer_fr": -0.08423555978140526
+   },
+   {
+    "servo_rad": 0.0,
+    "steer_fl": 0.0,
+    "steer_fr": 0.0
+   },
+   {
+    "servo_rad": 0.104615035365,
+    "steer_fl": 0.08423555978140526,
+    "steer_fr": 0.08134330910735064
+   },
+   {
+    "servo_rad": 0.209230070729,
+    "steer_fl": 0.17102261311373226,
+    "steer_fr": 0.15934030167765864
+   },
+   {
+    "servo_rad": 0.313845106094,
+    "steer_fl": 0.2601206578024453,
+    "steer_fr": 0.23340311238903325
+   },
+   {
+    "servo_rad": 0.418460141458,
+    "steer_fl": 0.3513845609965842,
+    "steer_fr": 0.3027825240230777
+   },
+   {
+    "servo_rad": 0.523075176823,
+    "steer_fl": 0.44476987752905933,
+    "steer_fr": 0.3665343415408671
+   }
+  ],
+  "margin_m": 0.0005,
+  "failures": [],
+  "spin": {
+   "spin_fl": {
+    "rotating_parts": [
+     "wheel_fl"
+    ],
+    "angles_deg": [
+     0.0,
+     30.0,
+     60.0,
+     90.0,
+     120.0,
+     150.0
+    ],
+    "failures": 0
+   },
+   "spin_fr": {
+    "rotating_parts": [
+     "wheel_fr"
+    ],
+    "angles_deg": [
+     0.0,
+     30.0,
+     60.0,
+     90.0,
+     120.0,
+     150.0
+    ],
+    "failures": 0
+   },
+   "spin_rl": {
+    "rotating_parts": [
+     "axle_rl",
+     "enc_magnet_1",
+     "enc_magnet_2",
+     "enc_magnet_3",
+     "enc_magnet_4",
+     "enc_ring",
+     "fastener:nut_rl",
+     "spacer_rl",
+     "wheel_rl"
+    ],
+    "angles_deg": [
+     0.0,
+     30.0,
+     60.0,
+     90.0,
+     120.0,
+     150.0
+    ],
+    "failures": 0
+   },
+   "spin_rr": {
+    "rotating_parts": [
+     "axle_rr",
+     "fastener:nut_rr",
+     "spacer_rr",
+     "wheel_rr"
+    ],
+    "angles_deg": [
+     0.0,
+     30.0,
+     60.0,
+     90.0,
+     120.0,
+     150.0
+    ],
+    "failures": 0
+   }
+  }
+ },
+ "rf": {
+  "antenna_component": "rx_antenna",
+  "receiver": "receiver",
+  "antenna_position": [
+   0.17499999701976776,
+   0.0,
+   0.1625
+  ],
+  "antenna_height_above_mount": 0.0829000011086464,
+  "mount_z": 0.07959999889135361
+ },
+ "assumptions": [
+  {
+   "domain": "mechanical",
+   "statement": "Purchased parts are catalog envelopes plus their datasheet features; their mass is a labeled catalog mass override (inertia scaled from the envelope geometry)."
+  },
+  {
+   "domain": "mechanical",
+   "statement": "Fabricated parts (plates, brackets, knuckles, axles, horn, tie rods, straps, tape) get mass from geometry x material density; fasteners are full-geometry steel/brass parts (hex sockets not modeled)."
+  },
+  {
+   "domain": "mechanical",
+   "statement": "Fit checks use Onshape B-rep surface definitions plus tessellations with chord <= 0.05 mm and angle <= 2.0 deg; intersections below 0.05 mm^3 are tessellation slivers of coincident surfaces."
+  },
+  {
+   "domain": "mechanical",
+   "statement": "Threads are modeled at the screw major diameter in tap-drill holes; engagement = intersection volume / (pi/4 (d^2 - D_drill^2)), required >= 1.5 d in metal and >= 2 d in plastic."
+  },
+  {
+   "domain": "mechanical",
+   "statement": "Motion sweep: linkage solved in Python from verified CAD axes; 11 servo samples, 0.5 mm clearance margin moving vs static; wheel spin at [0.0, 30.0, 60.0, 90.0, 120.0, 150.0] deg."
+  }
+ ]
+}

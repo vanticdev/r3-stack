@@ -1,9 +1,13 @@
 cad:
-  attempt: 6
-  document_id: 314246dec6d07475f0ca7c44
-  element_id: 9d77b679d1c916902ea71d0e
-  generator_digest: 1a7a9093e7808f8c
+  assembly_id: b1a24dce6b1ba2ba3e98f1e7
+  attempt: 13
+  document_id: 7f38296c6a64ee6e82e32ee3
+  element_id: 4c3385f677ae474914982ad5
+  generator_digest: 5c9adc382e5439cd
+  mesh_digest: 7ff2cba419d874f6
+  microversion: 697364f995235c5218ecc77d
   provider: onshape
-  revision: 1a7a9093e7808f8c
-  url: https://cad.onshape.com/documents/314246dec6d07475f0ca7c44/w/57e0e065fe043f19dde9637b/e/9d77b679d1c916902ea71d0e
-  workspace_id: 57e0e065fe043f19dde9637b
+  revision: 697364f995235c5218ecc77d
+  url: https://cad.onshape.com/documents/7f38296c6a64ee6e82e32ee3/w/350a32bf8773bd0828574622/e/4c3385f677ae474914982ad5
+  validator_version: fit-2.0
+  workspace_id: 350a32bf8773bd0828574622

@@ -26,7 +26,7 @@ from r3_model.project import Project
 
 from . import features as fx
 from .client import Transport
-from .fit import FitReport, Link, coaxial, unit
+from .fit import FitReport, Link, coaxial, rotor_crossing_links, unit
 from .model import GeometryModel
 
 POSE_TOL = 1e-6  # m / rad equivalents for occurrence transforms
@@ -129,12 +129,9 @@ class AssemblyBuilder:
             return "FASTENED"
         def cost(link: Link) -> float:
             return 50.0 if link.kind == "ball_joint" else (2.0 if not link.rigid else 1.0)
-        # A horn screw threads into the servo's output shaft and a wheel nut clamps a
-        # bearing's inner race: those links must not lock the case to the rotor.
-        internal = {i.parts[1] for i in self.spec.mechanical.interfaces if i.kind == "revolute_fit" and i.params.get("internal_rotation")}
-        internal |= {i.parts[0] for i in self.spec.mechanical.interfaces if i.kind == "spline"}
+        crossing = {id(self.fit.links[i]) for i in rotor_crossing_links(self.spec, self.fit.links)}
         usable = [l for l in self.fit.links if l.a in self.model.parts and l.b in self.model.parts
-                  and not (l.kind in ("fastener", "thread") and (l.a in internal or l.b in internal))
+                  and id(l) not in crossing
                   and not (l.kind == "drive_flat" and not l.rigid)  # rotating-bore outputs turn inside the case
                   and self._faces_for(l) is not None]  # e.g. a screw in a slot has no coaxial face to mate on
         adjacency: dict[str, list[Link]] = {}

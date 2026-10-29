@@ -19,7 +19,7 @@ from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
 from r3_model.units import to_si
 
-from .fit import VOLUME_TOL, FitReport, Link, unit
+from .fit import VOLUME_TOL, FitReport, Link, rotor_crossing_links, unit
 from .kinematics import Linkage, Side, rotation, steering_table
 from .model import GeometryModel
 
@@ -83,14 +83,8 @@ class Motion:
         self.model = model
         self.fit = fit
         self.result = result
-        # Clamping a bearing's inner race does not lock its outer race: fastener
-        # links to the bore side of internally rotating fits are not rigid.
-        # The same holds for a servo: a horn screw threads into its output shaft,
-        # which turns inside the case. Such fastener/thread links do not make
-        # the internally rotating part rigid with the rest of its stack.
-        internal = {i.parts[1] for i in self.spec.mechanical.interfaces if i.kind == "revolute_fit" and i.params.get("internal_rotation")}
-        internal |= {i.parts[0] for i in self.spec.mechanical.interfaces if i.kind == "spline"}
-        self.links = [l for l in fit.links if not (l.kind in ("fastener", "thread") and (l.a in internal or l.b in internal))]
+        crossing = rotor_crossing_links(self.spec, fit.links)
+        self.links = [l for i, l in enumerate(fit.links) if i not in crossing]
         self.partners = {(l.a, l.b) for l in fit.links} | {(l.b, l.a) for l in fit.links}
         for interface in self.spec.mechanical.interfaces:
             for thrust in interface.params.get("thrust", []) or []:
@@ -237,6 +231,7 @@ class Motion:
         failures: list[dict[str, Any]] = []
         min_gap: dict[str, float] = {}
         poses = []
+        lock_poses: dict[str, dict[str, Any]] = {}
         for i, theta in enumerate(table["thetas"]):
             row = table["rows"][i]
             sample = {"servo_rad": theta, **{s.joint: row[s.joint] for s in linkage.sides}}
@@ -244,15 +239,22 @@ class Motion:
                 continue
             solids: dict[str, dict[str, Any]] = {}
             horn_rot = rotation(linkage.servo_axis, theta)
-            solids["horn"] = self._transformed(groups["horn"], _matrix(horn_rot, linkage.servo_point))
+            matrices = {"horn": _matrix(horn_rot, linkage.servo_point)}
+            solids["horn"] = self._transformed(groups["horn"], matrices["horn"])
             for side in linkage.sides:
                 phi = row[side.joint]
-                solids[side.joint] = self._transformed(groups[side.joint], _matrix(rotation(side.kingpin_axis, phi), side.kingpin_point))
+                matrices[side.joint] = _matrix(rotation(side.kingpin_axis, phi), side.kingpin_point)
+                solids[side.joint] = self._transformed(groups[side.joint], matrices[side.joint])
                 h0, k0 = side.horn_ball, side.knuckle_ball
                 h1 = linkage.servo_point + horn_rot @ (h0 - linkage.servo_point)
                 k1 = side.kingpin_point + rotation(side.kingpin_axis, phi) @ (k0 - side.kingpin_point)
                 rot = _align(k0 - h0, k1 - h1)
-                solids[f"rod:{side.joint}"] = self._transformed(groups[f"rod:{side.joint}"], _matrix(rot, h0, h1 - h0))
+                matrices[f"rod:{side.joint}"] = _matrix(rot, h0, h1 - h0)
+                solids[f"rod:{side.joint}"] = self._transformed(groups[f"rod:{side.joint}"], matrices[f"rod:{side.joint}"])
+            if i in (0, len(table["thetas"]) - 1):
+                # Full-lock pose of every moving part, used to pose and cross-check the Onshape assembly.
+                lock_poses["left" if theta > 0 else "right"] = {
+                    "sample": sample, "parts": {n: m.tolist() for g, m in matrices.items() for n in groups[g] if n in self.model.parts}}
             all_moving = {n: s for group in solids.values() for n, s in group.items()}
             for label, group in solids.items():
                 self._check(group, static, MARGIN, "steer_vs_static", sample, failures, min_gap)
@@ -279,7 +281,7 @@ class Motion:
                                              f"({'intersects ' + str(failure['volume_mm3']) + ' mm^3' if failure['volume_mm3'] else 'gap ' + str(failure['gap_mm']) + ' mm < ' + str(MARGIN * 1e3) + ' mm margin'})",
                                              subjects=[failure["moving"], failure["other"]], data=failure))
         tight = sorted(min_gap.items(), key=lambda kv: kv[1])[:10]
-        return {"samples": poses, "margin_m": MARGIN, "failures": list(unique.values()), "closest_static_gaps_mm": {k: round(v * 1e3, 3) for k, v in tight},
+        return {"samples": poses, "lock_poses": lock_poses, "margin_m": MARGIN, "failures": list(unique.values()), "closest_static_gaps_mm": {k: round(v * 1e3, 3) for k, v in tight},
                 "spin": spin}
 
     def spin_sweep(self, failures: list[dict[str, Any]]) -> dict[str, Any]:
