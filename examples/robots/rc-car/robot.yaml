@@ -18,34 +18,50 @@ requirements:
 
 # Robot frame: +x forward, +y left, +z up; origin on the ground below the rear axle center.
 components:
-  chassis:     {type: chassis-plate-al6061, pose: {xyz: [130 mm, 0, 25 mm]}}
+  chassis:
+    type: chassis-plate-al6061
+    pose: {xyz: [130 mm, 0, 25 mm]}
+    params:
+      # Plate outline in the chassis frame: 130 mm wide rear, tapering to 70 mm ahead of
+      # the battery so the steered front wheels sweep clear of the plate.
+      outline: [[-170 mm, -65 mm], [40 mm, -65 mm], [70 mm, -35 mm], [170 mm, -35 mm],
+                [170 mm, 35 mm], [70 mm, 35 mm], [40 mm, 65 mm], [-170 mm, 65 mm]]
+      # [x, y, diameter]: deck standoffs (M3), gearbox (M3), servo mount (M3).
+      holes: [[-90 mm, 45 mm, 3.2 mm], [-52 mm, -45 mm, 3.2 mm], [65 mm, 28 mm, 3.2 mm], [65 mm, -28 mm, 3.2 mm],
+              [-150 mm, 20 mm, 3.2 mm], [-150 mm, -20 mm, 3.2 mm], [-110 mm, 20 mm, 3.2 mm], [-110 mm, -20 mm, 3.2 mm],
+              [120 mm, 24 mm, 3.2 mm], [120 mm, -24 mm, 3.2 mm]]
   deck:        {type: upper-deck-petg, mount: chassis, pose: {xyz: [120 mm, 0, 75 mm]}}
-  standoff_rl: {type: standoff-m3-47, mount: chassis, pose: {xyz: [45 mm, 45 mm, 28 mm]}}
-  standoff_rr: {type: standoff-m3-47, mount: chassis, pose: {xyz: [45 mm, -45 mm, 28 mm]}}
+  standoff_rl: {type: standoff-m3-47, mount: chassis, pose: {xyz: [40 mm, 45 mm, 28 mm]}}
+  standoff_rr: {type: standoff-m3-47, mount: chassis, pose: {xyz: [78 mm, -45 mm, 28 mm]}}
   standoff_fl: {type: standoff-m3-47, mount: chassis, pose: {xyz: [195 mm, 28 mm, 28 mm]}}
   standoff_fr: {type: standoff-m3-47, mount: chassis, pose: {xyz: [195 mm, -28 mm, 28 mm]}}
-  knuckle_fl:  {type: steering-knuckle, mount: chassis, pose: {xyz: [260 mm, 68 mm, 35 mm]}}
-  knuckle_fr:  {type: steering-knuckle, mount: chassis, pose: {xyz: [260 mm, -68 mm, 35 mm]}}
+  knuckle_fl:  {type: steering-knuckle, mount: arm_fl, pose: {xyz: [260 mm, 67.5 mm, 35 mm]}}
+  knuckle_fr:  {type: steering-knuckle, mount: arm_fr, pose: {xyz: [260 mm, -67.5 mm, 35 mm]}}
+  arm_fl:      {type: suspension-arm-pa12, mount: chassis, pose: {xyz: [260 mm, 47.5 mm, 25 mm]}}
+  arm_fr:      {type: suspension-arm-pa12, mount: chassis, pose: {xyz: [260 mm, -47.5 mm, 25 mm]}}
+  tie_rod:     {type: steering-tie-rod, mount: servo, pose: {xyz: [250 mm, 0, 72 mm]}}
   wheel_fl:    {type: wheel-110x45, mount: knuckle_fl, pose: {xyz: [260 mm, 100 mm, 55 mm]}}
   wheel_fr:    {type: wheel-110x45, mount: knuckle_fr, pose: {xyz: [260 mm, -100 mm, 55 mm]}}
-  wheel_rl:    {type: wheel-110x45, mount: gearbox, pose: {xyz: [0, 100 mm, 55 mm]}}
-  wheel_rr:    {type: wheel-110x45, mount: gearbox, pose: {xyz: [0, -100 mm, 55 mm]}}
+  axle_rl:     {type: axle-shaft-6mm, mount: gearbox, pose: {xyz: [0, 53.75 mm, 55 mm]}}
+  axle_rr:     {type: axle-shaft-6mm, mount: gearbox, pose: {xyz: [0, -53.75 mm, 55 mm]}}
+  wheel_rl:    {type: wheel-110x45, mount: axle_rl, pose: {xyz: [0, 100 mm, 55 mm]}}
+  wheel_rr:    {type: wheel-110x45, mount: axle_rr, pose: {xyz: [0, -100 mm, 55 mm]}}
   gearbox:     {type: gearbox-spur-diff-9.6, mount: chassis, pose: {xyz: [0, 0, 28 mm]}}
   motor:       {type: motor-540-brushed, mount: chassis, pose: {xyz: [50 mm, -35 mm, 46 mm]}}
-  esc:         {type: esc-brushed-60a, mount: chassis, pose: {xyz: [65 mm, 40 mm, 28 mm]}}
+  esc:         {type: esc-brushed-60a, mount: chassis, pose: {xyz: [70 mm, 42 mm, 28 mm]}}
   battery:     {type: lipo-2s-5000-25c, mount: chassis, pose: {xyz: [158 mm, 0, 28 mm]}}
   servo:       {type: servo-digital-20kg, mount: chassis, pose: {xyz: [250 mm, 0, 28 mm]}}
   fuse:        {type: fuse-atc-10a, mount: chassis, pose: {xyz: [75 mm, 0, 28 mm], rpy: [0, 0, 90 deg]}}
-  pi:          {type: raspberry-pi-5-8gb, mount: deck, pose: {xyz: [110 mm, 0, 81 mm]}}
-  hat:         {type: r3-carrier-hat, mount: pi, pose: {xyz: [102.5 mm, 0, 93.5 mm]}}
+  pi:          {type: raspberry-pi-5-8gb, mount: deck, pose: {xyz: [110 mm, 0, 78 mm]}}
+  hat:         {type: r3-carrier-hat, mount: pi, pose: {xyz: [102.5 mm, 0, 88.1 mm]}}
   receiver:    {type: elrs-receiver-2g4, mount: deck, pose: {xyz: [190 mm, 40 mm, 78 mm]}}
   gps:         {type: gps-ublox-m10, mount: deck, pose: {xyz: [50 mm, -35 mm, 78 mm]}}
-  encoder:     {type: hall-encoder-a1120, mount: gearbox, pose: {xyz: [0, 36 mm, 40 mm]}}
+  encoder:     {type: hall-encoder-a1120, mount: gearbox, pose: {xyz: [0, 34 mm, 40 mm]}}
 
 mechanical:
   joints:
-    - {id: steer_fl, type: revolute, parent: chassis, child: knuckle_fl, origin: [260 mm, 85 mm, 55 mm], axis: [0, 0, 1], limits: [-0.45, 0.45], damping: 0.02}
-    - {id: steer_fr, type: revolute, parent: chassis, child: knuckle_fr, origin: [260 mm, -85 mm, 55 mm], axis: [0, 0, 1], limits: [-0.45, 0.45], damping: 0.02}
+    - {id: steer_fl, type: revolute, parent: chassis, child: knuckle_fl, origin: [260 mm, 67.5 mm, 55 mm], axis: [0, 0, 1], limits: [-0.45, 0.45], damping: 0.02}
+    - {id: steer_fr, type: revolute, parent: chassis, child: knuckle_fr, origin: [260 mm, -67.5 mm, 55 mm], axis: [0, 0, 1], limits: [-0.45, 0.45], damping: 0.02}
     - {id: spin_fl, type: continuous, parent: knuckle_fl, child: wheel_fl, origin: [260 mm, 100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005}
     - {id: spin_fr, type: continuous, parent: knuckle_fr, child: wheel_fr, origin: [260 mm, -100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005}
     - {id: spin_rl, type: continuous, parent: chassis, child: wheel_rl, origin: [0, 100 mm, 55 mm], axis: [0, 1, 0], damping: 0.0005}
@@ -57,7 +73,7 @@ mechanical:
       actuator: servo
       joints: [steer_fl, steer_fr]
       ratio: 0.5            # wheel steer angle per servo horn angle
-      params: {wheelbase: 260 mm, kingpin_track: 170 mm, max_steer: 0.45}
+      params: {wheelbase: 260 mm, kingpin_track: 135 mm, max_steer: 0.45}
 
 electrical:
   ground_net: GND

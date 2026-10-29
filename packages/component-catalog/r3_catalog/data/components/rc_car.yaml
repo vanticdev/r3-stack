@@ -189,8 +189,8 @@ components:
       J_ESC: {type: header-1x3-2.54, position: [-26 mm, -22 mm, 12 mm], direction: [0, 0, 1], pins: {"1": ESC_PWM, "2": BEC_6V, "3": GND}}
       J_SERVO: {type: header-1x3-2.54, position: [-18 mm, -22 mm, 12 mm], direction: [0, 0, 1], pins: {"1": SERVO_PWM, "2": BEC_6V, "3": GND}}
       J_RX: {type: jst-gh-4-header, position: [24 mm, 10 mm, 12 mm], direction: [1, 0, 0], pins: {"1": 5V, "2": CRSF_TX, "3": CRSF_RX, "4": GND}}
-      J_GPS: {type: jst-gh-4-header, position: [-30 mm, 5 mm, 12 mm], direction: [-1, 0, 0], pins: {"1": 5V, "2": GPS_TX, "3": GPS_RX, "4": GND}}
-      J_ENC: {type: jst-xh-3-header, position: [-30 mm, -8 mm, 12 mm], direction: [-1, 0, 0], pins: {"1": 3V3, "2": ENC, "3": GND}}
+      J_GPS: {type: jst-gh-4-header, position: [-28 mm, 5 mm, 12 mm], direction: [-1, 0, 0], pins: {"1": 5V, "2": GPS_TX, "3": GPS_RX, "4": GND}}
+      J_ENC: {type: jst-xh-3-header, position: [-27 mm, -8 mm, 12 mm], direction: [-1, 0, 0], pins: {"1": 3V3, "2": ENC, "3": GND}}
     internal_links:
       - {a: PI_ESC_PWM, b: ESC_PWM, kind: series_resistor, value: 220}
       - {a: PI_SERVO_PWM, b: SERVO_PWM, kind: series_resistor, value: 220}
@@ -273,3 +273,15 @@ components:
       model: fuse.blade
       params: {rating: 10, cold_resistance: 7 mohm, i2t_melt: 120}
       provenance: {status: datasheet, source: "Littelfuse ATO 10 A: ~7 mOhm cold resistance; I2t estimated"}
+  - id: axle-shaft-6mm
+    kind: structure
+    name: Rear drive shaft, 6 mm hardened steel
+    mechanical: {shape: cylinder, axis: y, size: [6 mm, 47.5 mm], mass: 0.0105, material: Steel 4140, density: 7850, color: "#9aa0a6", moving: true}
+  - id: suspension-arm-pa12
+    kind: structure
+    name: Front lower suspension arm, PA12 SLS
+    mechanical: {shape: box, size: [20 mm, 25 mm, 10 mm], mass: 0.005, material: Nylon PA12, density: 1010, color: "#3b3f45"}
+  - id: steering-tie-rod
+    kind: structure
+    name: Steering tie rod, 4 mm steel
+    mechanical: {shape: cylinder, axis: y, size: [4 mm, 115 mm], mass: 0.0113, material: Steel 1045, density: 7850, color: "#9aa0a6", moving: true}
