@@ -420,7 +420,7 @@ def place_supports(project: Any, obstacles: ObstacleSet, routing: Any,
     return SupportReport(supports, diagnostics, [], limits)
 
 
-def check_requested_supports(project: Any, report: SupportReport) -> None:
+def check_requested_supports(project: Any, report: SupportReport, routing: Any) -> None:
     """An authored tie point requires checked hardware, including after planner retries.
 
     Never retain a simulation pin when installation access, retention or routing made
@@ -429,11 +429,15 @@ def check_requested_supports(project: Any, report: SupportReport) -> None:
     for harness in project.spec.electrical.harnesses:
         for hint in harness.route.tie_points:
             point = np.asarray(hint, float)
-            distances = [float(np.linalg.norm(s.position - point)) for s in report.supports
-                         if s.harness == harness.id]
-            if not distances or min(distances) > HINT_MATCH:
+            installed = [s for s in report.supports if s.harness == harness.id]
+            distances = [float(np.linalg.norm(s.position - point)) for s in installed]
+            holding = [s for s in installed if np.linalg.norm(s.position - point) <= HINT_MATCH and
+                       all(w in routing.wires and not routing.wires[w].failed and
+                           project_to_polyline(routing.wires[w].path, s.position[None])[0] <= s.bundle_od / 2 + 0.002
+                           for w in s.wires)]
+            if not holding:
                 report.diagnostics.append(Diagnostic.error(
-                    "cable_support_unplaceable", f"{harness.id}: requested tie has no installable support hardware",
+                    "cable_support_unplaceable", f"{harness.id}: requested tie has no installed support holding its wires",
                     subjects=[harness.id], data={"position": point.tolist(), "required_match": HINT_MATCH,
                                                 "nearest_support": min(distances) if distances else None,
                                                 "units": "m"},

@@ -71,9 +71,24 @@ def test_missing_requested_hardware_blocks_manufacturing_release():
                               wires=[SimpleNamespace(id="wire")])
     project = SimpleNamespace(spec=SimpleNamespace(electrical=SimpleNamespace(harnesses=[harness])))
     report = SupportReport([], [], [], {})
-    check_requested_supports(project, report)
+    check_requested_supports(project, report, SimpleNamespace(wires={}))
     assert [d.code for d in report.diagnostics] == ["cable_support_unplaceable"]
     release = release_status(project, report.diagnostics)
     assert release["status"] == "unreleased"
     assert not release["harnesses"]["lead"]["valid"]
     assert not release["wires"]["wire"]["valid"]
+
+
+def test_support_ignored_inside_a_fixed_fanout_does_not_satisfy_request():
+    point = np.array([0.0, 0.01, 0.0])
+    harness = SimpleNamespace(id="lead", route=SimpleNamespace(tie_points=[point]), wires=[])
+    project = SimpleNamespace(spec=SimpleNamespace(electrical=SimpleNamespace(harnesses=[harness])))
+    support = SimpleNamespace(harness="lead", position=point, wires=["wire"], bundle_od=0.002)
+    report = SupportReport([support], [], [], {})
+    wire = SimpleNamespace(path=np.array([[-0.02, 0, 0], [0.02, 0, 0]]), failed=False)
+    check_requested_supports(project, report, SimpleNamespace(wires={"wire": wire}))
+    assert [d.code for d in report.diagnostics] == ["cable_support_unplaceable"]
+    wire.path[:, 1] = 0.01
+    report.diagnostics.clear()
+    check_requested_supports(project, report, SimpleNamespace(wires={"wire": wire}))
+    assert not report.diagnostics

@@ -100,7 +100,7 @@ def route_and_check(project: Project, options: RouterOptions | None = None, *, p
         planning_diagnostics = planning.diagnostics
         for harness_id, harness in routing.harnesses.items():
             harness.tie_points = [s.position.copy() for s in supports.supports if s.harness == harness_id]
-        check_requested_supports(project, supports)
+        check_requested_supports(project, supports, routing)
         add_cad_pass_throughs(project, routing)  # grommeted slots in the CAD hold the bundles passing through
         check_spans(project, routing, supports)
         cuts = compute_cut_lengths(project, routing, supports.spans, obstacles.kinematics)
