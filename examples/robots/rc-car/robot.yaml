@@ -335,7 +335,8 @@ electrical:
     - id: esc_power
       connectors:
         A: {type: integral, mates: esc.J_PWR}
-        B: {type: xt60-male, mates: power_y.P2}
+        # The mated XT60 pair stays beside the battery ahead of the ESC, clear of the front wheels' steering sweep.
+        B: {type: xt60-male, mates: power_y.P2, position: [170 mm, 40 mm, 48 mm]}
       wires:
         - {id: W_ESC_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
         - {id: W_ESC_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
