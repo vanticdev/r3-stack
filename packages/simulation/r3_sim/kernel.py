@@ -271,7 +271,6 @@ class CoSimKernel:
         if isinstance(self.gps, RtkGnssReceiver):
             self._setup_rtk(project, radio_scene)
 
-        self.imu_rotation = np.eye(3)
         self.imu_component: str | None = None
         self.i2c_devices: dict[str, list[Any]] = {}
         for bmap in self.bindings.values():
@@ -287,7 +286,6 @@ class CoSimKernel:
                     if interface.protocol == "mpu6050":
                         devices.append(Mpu6050(interface.address, self.rng_imu))
                         self.imu_component = cid
-                        _, self.imu_rotation = project.graph.component_pose(cid)
                     elif interface.protocol == "ina226":
                         shunt = to_si((params.get("ina226") or {}).get("shunt", 0.002))
                         devices.append(Ina226(interface.address, shunt, self.rng_ina))
@@ -842,7 +840,8 @@ class CoSimKernel:
         if self.imu is not None:
             self.imu.set_powered(self.pi_powered)
             acc, gyro = state.imu()
-            self.imu.update(dt, self.imu_rotation.T @ acc, self.imu_rotation.T @ gyro, self.temperature_c + 8.0)
+            # MuJoCo sensors already report in the site frame compiled from the IMU component pose.
+            self.imu.update(dt, acc, gyro, self.temperature_c + 8.0)
         if self.ina is not None:
             self.ina.set_powered(self.pi_powered)
             branch = _first(out, [("_branches", self.hat_supply_wire or "", "current"), (self.board_id or "", "current_in"),

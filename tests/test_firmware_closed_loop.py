@@ -44,7 +44,8 @@ def test_radio_failsafe_brakes_then_neutral_and_disarms(tmp_path: Path) -> None:
     last_frame = max(t for t in (i / 150.0 for i in range(int(link_lost_at * 150) + 1)) if t < link_lost_at)
     detection_delay = failsafe[0].t - last_frame
     # Frames are read on 10 ms ticks: detection <= timeout + read latency (1 tick) + one tick.
-    assert 0.25 < detection_delay <= 0.25 + 0.02 + 1e-6, f"got {detection_delay:.3f} s"
+    timeout = controller.cfg["radio_failsafe_timeout_s"]
+    assert timeout < detection_delay <= timeout + 0.02 + 1e-6, f"got {detection_delay:.3f} s"
     speed_at_loss = failsafe[0].fields["speed_mps"]
     assert speed_at_loss > 3.5
 

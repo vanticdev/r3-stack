@@ -68,6 +68,7 @@ class CarParams:
     motor_tau: float = 1.2           # s, first-order speed response
     traction_accel: float = 4.4      # mu g * rear-axle load fraction (0.9 * 9.81 * 0.5)
     brake_accel: float = 4.4         # full ESC brake, traction limited
+    esc_r_on: float = 0.002         # per leg, same averaged brake-conductance contract as the twin
     coast_decel: float = 0.35        # rolling resistance + drivetrain drag
     wheel_radius: float = 0.055
     pulses_per_rev: float = float(DEFAULT_CONFIG["encoder_pulses_per_rev"])  # spur-shaft magnets: per mean wheel rev
@@ -342,7 +343,17 @@ class FakeCarHal(Hal):
                 accel = max(accel, -p.coast_decel)
             self.motor_current = p.motor_current_full * u * max(0.0, 1.0 - car.v / p.free_speed) + 4.0 * u
         elif u < 0 and car.v > 0:
-            accel = -min(p.brake_accel, -u * p.brake_accel * 1.2)
+            # The ESC shorts its motor terminals through two PWM-controlled low-side legs:
+            # R_bridge = 2 R_on / b, not a brake force linear in stick position. The old
+            # linear test double could not exercise the small duties used by real ABS.
+            # Acceptance distances still come from MuJoCo + ngspice, not this test double.
+            b = max(0.001, (-u - 0.03) / 0.97)
+            ke = 60.0 / (2.0 * math.pi * p.motor_kv)
+            back_emf = ke * car.v / p.wheel_radius * p.gear_ratio
+            current = max(0.0, back_emf - p.brush_drop) / (p.motor_resistance + 2 * p.esc_r_on / b)
+            friction_current = p.no_load_current * math.tanh(car.v / p.wheel_radius * p.gear_ratio)
+            force = ke * (current + friction_current) * p.gear_ratio * p.gear_efficiency / p.wheel_radius
+            accel = -min(p.brake_accel, force / p.mass + p.coast_decel)
             self.motor_current = 0.0
         else:
             accel = -p.coast_decel if car.v > 0 else 0.0
