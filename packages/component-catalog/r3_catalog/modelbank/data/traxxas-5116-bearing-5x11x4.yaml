@@ -1,0 +1,47 @@
+id: traxxas-5116-bearing-5x11x4
+name: Ball bearing 5 x 11 x 4 mm, sealed (Traxxas 5116; ISO 685)
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.011
+    - 0.011
+    - 0.004
+    unit: m
+    source: 'ISO 15 bearing 685: d 5, D 11, B 4 mm (Traxxas 5116, parts list 58234-8);
+      mass estimated'
+    status: datasheet
+  mass:
+    value: 0.0017
+    unit: kg
+    source: 'ISO 15 bearing 685: d 5, D 11, B 4 mm (Traxxas 5116, parts list 58234-8);
+      mass estimated'
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: traxxas-5116-bearing-5x11x4
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.131834+00:00'
+- provider: manufacturer
+  url: https://traxxas.com/products/parts/5116
+  result: parts/drawings pointer; no STEP located
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

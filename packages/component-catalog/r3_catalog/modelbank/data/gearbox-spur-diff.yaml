@@ -1,0 +1,43 @@
+id: gearbox-spur-diff
+name: Rear transmission, 18T/66T m0.6 spur + internal reduction + open differential,
+  9.07:1 total
+manufacturer: ''
+mpn: ''
+aliases: []
+category: gearbox
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.095
+    - 0.075
+    - 0.06
+    unit: m
+    source: Envelope of a 1/10 2WD transmission with motor plate and gear cover
+    status: estimated
+  mass:
+    value: 0.12
+    unit: kg
+    source: Envelope of a 1/10 2WD transmission with motor plate and gear cover
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: gearbox-spur-diff
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.148393+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

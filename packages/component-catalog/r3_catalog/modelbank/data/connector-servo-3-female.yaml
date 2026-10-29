@@ -1,0 +1,31 @@
+id: connector-servo-3-female
+name: servo-3-female
+manufacturer: ''
+mpn: ''
+aliases:
+- servo-3-female
+category: connector
+tags:
+- connector
+- servo-3-female
+key_specs: {}
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: null
+catalog_aliases: []
+searched_sources:
+- provider: kicad_3d
+  url: https://gitlab.com/kicad/libraries/kicad-packages3D
+  result: no installed STEP mapped to this connector
+proxy_reason: No exact model in the installed KiCad library; existing connector geometry
+  is explicitly a datasheet proxy.
+placement: null
+interface_frames: {}

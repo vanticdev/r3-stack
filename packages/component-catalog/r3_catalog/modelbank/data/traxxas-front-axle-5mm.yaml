@@ -1,0 +1,46 @@
+id: traxxas-front-axle-5mm
+name: Front axle, 5 mm steel spindle for 2WD front wheels with bearings (Traxxas 3637
+  type), M4 thread
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.007
+    - 0.007
+    - 0.034
+    unit: m
+    source: Traxxas 3637 front axles (parts list 58234-8); dimensions estimated
+    status: estimated
+  mass:
+    value: 0.006
+    unit: kg
+    source: Traxxas 3637 front axles (parts list 58234-8); dimensions estimated
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: traxxas-front-axle-5mm
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.133329+00:00'
+- provider: manufacturer
+  url: https://traxxas.com/products/parts/front
+  result: parts/drawings pointer; no STEP located
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

@@ -1,0 +1,42 @@
+id: esc-brushed-60a
+name: Brushed ESC 60 A, 2-3S, 6 V / 2 A BEC
+manufacturer: Hobbywing
+mpn: QuicRun 1060
+aliases: []
+category: esc
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0465
+    - 0.034
+    - 0.035500000000000004
+    unit: m
+    source: Hobbywing QuicRun 1060 product page
+    status: datasheet
+  mass:
+    value: 0.049
+    unit: kg
+    source: Hobbywing QuicRun 1060 product page
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: esc-brushed-60a
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.159126+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

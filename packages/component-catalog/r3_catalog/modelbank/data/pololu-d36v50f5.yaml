@@ -1,0 +1,76 @@
+id: pololu-d36v50f5
+name: Pololu 5 V 5.5 A step-down regulator D36V50F5 (#4091), powers a Raspberry Pi
+  5 from 2S without a custom PCB
+manufacturer: Pololu
+mpn: '4091'
+aliases: []
+category: regulator
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0254
+    - 0.0254
+    - 0.0095
+    unit: m
+    source: 'https://www.pololu.com/file/0J1732/d36v50fx-step-down-voltage-regulator-dimensions.pdf
+      (which three corners carry holes: check the drawing)'
+    status: datasheet
+  mass:
+    value: 0.007
+    unit: kg
+    source: 'https://www.pololu.com/file/0J1732/d36v50fx-step-down-voltage-regulator-dimensions.pdf
+      (which three corners carry holes: check the drawing)'
+    status: datasheet
+sources:
+- kind: vendor_step
+  url: https://www.pololu.com/file/0J1733/d36v50fx-step-down-voltage-regulator.step
+  format: step
+  license: unspecified; verify redistribution terms
+  sha256: cdcc9e55ba1de3adfb59c330732e107a6419216c4c6f5f16396c5423757c5155
+  retrieved_at: '2026-10-29T18:41:36.840539+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
+validation:
+  status: unverified
+  bbox_m:
+  - 0.02539999969303608
+  - 0.02539999969303608
+  - 0.00947479996830225
+  expected_bbox_m:
+  - 0.0254
+  - 0.0254
+  - 0.0095
+  tolerance_m: 0.0015
+  key_features: {}
+  date: '2026-10-29T18:45:24.355465+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
+catalog_component: pololu-d36v50f5
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: vendor CAD pointer
+  date: '2026-10-29T18:41:35.139443+00:00'
+proxy_reason: ''
+placement:
+  origin:
+  - 0.0
+  - 0.0
+  - 0.0
+  x:
+  - 1.0
+  - 0.0
+  - 0.0
+  z:
+  - 0.0
+  - 0.0
+  - 1.0
+interface_frames: {}

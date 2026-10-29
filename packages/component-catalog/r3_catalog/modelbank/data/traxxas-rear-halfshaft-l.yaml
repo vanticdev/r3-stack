@@ -1,0 +1,48 @@
+id: traxxas-rear-halfshaft-l
+name: Traxxas Slash 2WD rear half-shaft, left (6852X driveshaft + 2753X stub axle
+  + pinned 12 mm hex), rigid on a printed frame
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.013900000000000001
+    - 0.132
+    - 0.013900000000000001
+    unit: m
+    source: Traxxas 6852X/2753X (parts list 58234-8); stub axle 42 mm long, 13 mm
+      max dia (vendor); lengths estimated
+    status: estimated
+  mass:
+    value: 0.045
+    unit: kg
+    source: Traxxas 6852X/2753X (parts list 58234-8); stub axle 42 mm long, 13 mm
+      max dia (vendor); lengths estimated
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: traxxas-rear-halfshaft-l
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.129804+00:00'
+- provider: manufacturer
+  url: https://traxxas.com/products/parts/rear
+  result: parts/drawings pointer; no STEP located
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

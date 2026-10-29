@@ -1,0 +1,44 @@
+id: gensace-5000-2s-60c-xt60
+name: Gens Ace 5000 mAh 7.4 V 60C 2S1P LiPo, hard case, XT60 (GEA50002S60X6)
+manufacturer: Gens Ace
+mpn: GEA50002S60X6
+aliases: []
+category: battery
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.135
+    - 0.0427
+    - 0.0222
+    unit: m
+    source: gensace.de (133 x 42 x 20 mm, 247 g); envelope from readymaderc.com (135
+      x 42.7 x 22.2 mm) for a tray with margin
+    status: datasheet
+  mass:
+    value: 0.247
+    unit: kg
+    source: gensace.de (133 x 42 x 20 mm, 247 g); envelope from readymaderc.com (135
+      x 42.7 x 22.2 mm) for a tray with margin
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: gensace-5000-2s-60c-xt60
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.141596+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

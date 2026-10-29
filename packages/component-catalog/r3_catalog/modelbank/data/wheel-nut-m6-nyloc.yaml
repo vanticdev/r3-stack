@@ -1,0 +1,44 @@
+id: wheel-nut-m6-nyloc
+name: Prevailing-torque hex nut M6 with nylon insert (wheel retention)
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0115
+    - 0.01
+    - 0.006
+    unit: m
+    source: DIN 985 M6 (s 10, h 6); thread modeled at the tap drill (fasteners.yaml
+      nut-m6-nyloc)
+    status: datasheet
+  mass:
+    value: 0.0032
+    unit: kg
+    source: DIN 985 M6 (s 10, h 6); thread modeled at the tap drill (fasteners.yaml
+      nut-m6-nyloc)
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: wheel-nut-m6-nyloc
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.179661+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

@@ -1,0 +1,56 @@
+id: connector-ufl
+name: ufl
+manufacturer: ''
+mpn: ''
+aliases:
+- ufl
+category: connector
+tags:
+- connector
+- ufl
+key_specs: {}
+sources:
+- kind: kicad_3d
+  url: https://gitlab.com/kicad/libraries/kicad-packages3D/-/raw/master/Connector_Coaxial.3dshapes/U.FL_Hirose_U.FL-R-SMT-1_Vertical.step
+  format: step
+  license: KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs
+    and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/
+  sha256: bb861ac13b1fa3709690e81d82a64544b02d4420ea410f7334fc7a4b57f8e71a
+  retrieved_at: '2026-10-29T18:41:35.216075+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: null
+catalog_aliases: []
+searched_sources:
+- provider: kicad_3d
+  url: https://gitlab.com/kicad/libraries/kicad-packages3D
+  result: installed STEP
+proxy_reason: ''
+placement:
+  origin:
+  - 0.0
+  - 0.0
+  - -0.00125
+  x:
+  - 1.0
+  - 0.0
+  - 0.0
+  z:
+  - 0.0
+  - 0.0
+  - 1.0
+interface_frames: {}

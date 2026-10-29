@@ -1,0 +1,56 @@
+id: connector-jst-gh-4-header
+name: jst-gh-4-header
+manufacturer: ''
+mpn: ''
+aliases:
+- jst-gh-4-header
+category: connector
+tags:
+- connector
+- jst-gh-4-header
+key_specs: {}
+sources:
+- kind: kicad_3d
+  url: https://gitlab.com/kicad/libraries/kicad-packages3D/-/raw/master/Connector_JST.3dshapes/JST_GH_SM04B-GHS-TB_1x04-1MP_P1.25mm_Horizontal.step
+  format: step
+  license: KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs
+    and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/
+  sha256: aacba39c0ebf407941d81e202e5fc85121532adadfd38f26725330dea8815ac7
+  retrieved_at: '2026-10-29T18:41:35.196325+00:00'
+  requires_login: false
+  direct: true
+  member: ''
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: null
+catalog_aliases: []
+searched_sources:
+- provider: kicad_3d
+  url: https://gitlab.com/kicad/libraries/kicad-packages3D
+  result: installed STEP
+proxy_reason: ''
+placement:
+  origin:
+  - 0.0
+  - -0.0013700000000000001
+  - 0.00013000000000000002
+  x:
+  - 1.0
+  - 0.0
+  - 0.0
+  z:
+  - 0.0
+  - 1.0
+  - 0.0
+interface_frames: {}

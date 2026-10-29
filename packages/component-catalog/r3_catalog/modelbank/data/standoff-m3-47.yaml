@@ -1,0 +1,42 @@
+id: standoff-m3-47
+name: M3 x 47 mm aluminum standoff, female-female
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0055
+    - 0.0055
+    - 0.047
+    unit: m
+    source: Typical M3 F-F round standoff, 6 mm thread depth each end
+    status: estimated
+  mass:
+    value: 0.0028
+    unit: kg
+    source: Typical M3 F-F round standoff, 6 mm thread depth each end
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: standoff-m3-47
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.144923+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

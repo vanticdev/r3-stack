@@ -1,0 +1,84 @@
+id: raspberry-pi-5-4gb
+name: Raspberry Pi 5 (4 GB)
+manufacturer: Raspberry Pi Ltd
+mpn: ''
+aliases:
+- Raspberry Pi 5
+- Pi 5
+- RPi5
+- SC1111
+category: computer
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.08700000000000001
+    - 0.056
+    - 0.0176
+    unit: m
+    source: Raspberry Pi 5 mechanical drawing (85 x 56, 58 x 49 M2.5 pattern, 2x20
+      header); component heights estimated
+    status: datasheet
+  mass:
+    value: 0.046
+    unit: kg
+    source: Raspberry Pi 5 mechanical drawing (85 x 56, 58 x 49 M2.5 pattern, 2x20
+      header); component heights estimated
+    status: datasheet
+sources:
+- kind: vendor_step
+  url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+  format: stp.zip
+  license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive).
+    Provided for guidance only, without guarantee of accuracy.
+  sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+  retrieved_at: '2026-10-29T18:45:22.936311+00:00'
+  requires_login: false
+  direct: true
+  member: rpi-5b_no_graphics.step
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
+validation:
+  status: mismatch
+  bbox_m:
+  - 0.08849999669473618
+  - 0.05763035180279985
+  - 0.018975999322719872
+  expected_bbox_m:
+  - 0.08700000000000001
+  - 0.056
+  - 0.0176
+  tolerance_m: 0.0015
+  key_features: {}
+  date: '2026-10-29T18:45:22.936256+00:00'
+  validated_by: r3/cascadio
+  notes: Axis-specific bbox check; interface features require independent geometry
+    inspection.
+catalog_component: raspberry-pi-5-4gb
+catalog_aliases:
+- raspberry-pi-5-1gb
+- raspberry-pi-5-2gb
+- raspberry-pi-5-8gb
+- raspberry-pi-5-16gb
+searched_sources:
+- provider: catalog
+  url: https://www.raspberrypi.com/products/raspberry-pi-5/ (4 GB variant)
+  result: vendor CAD pointer
+  date: '2026-10-29T18:41:35.143565+00:00'
+proxy_reason: ''
+placement:
+  origin:
+  - -0.0425
+  - -0.028
+  - 0.0
+  x:
+  - 1.0
+  - 0.0
+  - 0.0
+  z:
+  - 0.0
+  - 0.0
+  - 1.0
+interface_frames: {}

@@ -1,0 +1,47 @@
+id: traxxas-1747-nut-m4-nyloc
+name: Traxxas 1747 4 mm nylon locking nut (wheel nut)
+manufacturer: ''
+mpn: ''
+aliases: []
+category: other
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0081
+    - 0.007
+    - 0.005
+    unit: m
+    source: ISO 10511 M4 (s 7, m 5); Traxxas 1747 nuts 4 mm nylon locking (parts list
+      58234-8)
+    status: datasheet
+  mass:
+    value: 0.0012
+    unit: kg
+    source: ISO 10511 M4 (s 7, m 5); Traxxas 1747 nuts 4 mm nylon locking (parts list
+      58234-8)
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: traxxas-1747-nut-m4-nyloc
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.134444+00:00'
+- provider: manufacturer
+  url: https://traxxas.com/products/parts/1747
+  result: parts/drawings pointer; no STEP located
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

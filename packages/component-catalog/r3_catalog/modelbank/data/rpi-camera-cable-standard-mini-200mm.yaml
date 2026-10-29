@@ -1,0 +1,43 @@
+id: rpi-camera-cable-standard-mini-200mm
+name: Raspberry Pi Camera Cable Standard-Mini, 15-way 1.0 mm to 22-way 0.5 mm, 200
+  mm (SC1128)
+manufacturer: Raspberry Pi Ltd
+mpn: SC1128
+aliases: []
+category: cable
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.016
+    - 0.004
+    - 0.0003
+    unit: m
+    source: https://www.adafruit.com/product/5818 ; https://www.pakronics.com.au/products/raspberry-pi-camera-cable-standard-mini-200mm-rpi-sc1128
+    status: datasheet
+  mass:
+    value: 0.002
+    unit: kg
+    source: https://www.adafruit.com/product/5818 ; https://www.pakronics.com.au/products/raspberry-pi-camera-cable-standard-mini-200mm-rpi-sc1128
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: rpi-camera-cable-standard-mini-200mm
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.126822+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

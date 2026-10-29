@@ -1,0 +1,43 @@
+id: wheel-110x45
+name: 1/10 scale wheel and foam-insert rubber tire, 110 x 45 mm, front (plain 6.05
+  mm hub bore)
+manufacturer: ''
+mpn: ''
+aliases: []
+category: wheel
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.11
+    - 0.11
+    - 0.045
+    unit: m
+    source: ''
+    status: estimated
+  mass:
+    value: 0.085
+    unit: kg
+    source: ''
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: wheel-110x45
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.145810+00:00'
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

@@ -1,0 +1,48 @@
+id: traxxas-3695-magnum-272
+name: Traxxas Pro-Built Magnum 272 transmission (2WD, planetary differential, slipper
+  clutch), 23T/86T 48P
+manufacturer: Traxxas
+mpn: '3695'
+aliases: []
+category: gearbox
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.1
+    - 0.088
+    - 0.064
+    unit: m
+    source: Envelope estimated for the Slash 2WD layout; https://traxxas.com/products/parts/3695
+      (no drawing published)
+    status: estimated
+  mass:
+    value: 0.26
+    unit: kg
+    source: Envelope estimated for the Slash 2WD layout; https://traxxas.com/products/parts/3695
+      (no drawing published)
+    status: estimated
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: traxxas-3695-magnum-272
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: https://traxxas.com/products/parts/3695
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.127798+00:00'
+- provider: manufacturer
+  url: https://traxxas.com/products/parts/3695
+  result: parts/drawings pointer; no STEP located
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}

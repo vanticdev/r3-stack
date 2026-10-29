@@ -1,0 +1,48 @@
+id: arducam-fpc-22-22-150mm
+name: Camera FFC, 22-pin 0.5 mm to 22-pin 0.5 mm, 150 mm (included with Arducam B0445;
+  for a Raspberry Pi 5)
+manufacturer: Arducam
+mpn: ''
+aliases: []
+category: cable
+tags: []
+key_specs:
+  dimensions:
+    value:
+    - 0.0115
+    - 0.004
+    - 0.0003
+    unit: m
+    source: 'uctronics.com B0445 listing: 150 mm 22pin-22pin FPC included; envelope
+      = the end stiffener only (the flat cable bends)'
+    status: datasheet
+  mass:
+    value: 0.001
+    unit: kg
+    source: 'uctronics.com B0445 listing: 150 mm 22pin-22pin FPC included; envelope
+      = the end stiffener only (the flat cable bends)'
+    status: datasheet
+sources: []
+validation:
+  status: unverified
+  bbox_m: null
+  expected_bbox_m: null
+  tolerance_m: 0.0015
+  key_features: {}
+  date: ''
+  validated_by: ''
+  notes: ''
+catalog_component: arducam-fpc-22-22-150mm
+catalog_aliases: []
+searched_sources:
+- provider: catalog
+  url: ''
+  result: no exact model pinned
+  date: '2026-10-29T18:41:35.125597+00:00'
+- provider: manufacturer
+  url: https://forum.arducam.com/t/10317
+  result: UC-717 exact STEP not located; other Arducam boards are not substitutes
+proxy_reason: No exact, publicly downloadable model pinned. Catalog dimensions are
+  a labelled proxy; do not substitute a similar product.
+placement: null
+interface_frames: {}
