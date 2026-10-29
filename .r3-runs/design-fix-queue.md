@@ -56,3 +56,6 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
     `r3 source --all`, pin the choices, and import the Pi 5 STEP into the parts library.
 19. Tests must generate their own build artifacts (or use fixtures) instead of reading `examples/robots/*/build`.
     Stale routes.json caused false sim failures twice.
+20. The official Pi 5 STEP has a 1.28 mm PCB, but the catalog assumes 1.6 mm. That leaves a 0.22 mm gap between the header
+    and socket faces (the 4.68 mm pin engagement is OK). Lower the Pi standoffs and the HAT by about 0.29 mm, per
+    `.r3-agents/requests/connectors.md`. [mechanical, phase B follow-up]
