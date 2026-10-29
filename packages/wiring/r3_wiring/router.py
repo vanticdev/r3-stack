@@ -1,8 +1,10 @@
 """3D harness router.
 
 Each harness is a tree of conductors between connector terminations and
-splices. Branches (wires sharing the same two end nodes) are searched with A*
-on a voxel grid over the chassis volume, cheapest first. The step cost is::
+splices. Harnesses and their branches (wires sharing the same two end nodes)
+are searched deterministically with larger bundles first, using A* on a voxel
+grid over the chassis volume. Routed connector bodies and previously routed
+harness surfaces reserve their occupied volume. The step cost is::
 
     cost = step_length * (1 + w_s * s_surface + m_moving + k_keepaway) * discount
            + w_bend * turn_angle + pass_through_cost
@@ -33,7 +35,7 @@ from __future__ import annotations
 import heapq
 import math
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -49,7 +51,7 @@ from r3_connectors.pins import (PinEnd, component_connector_frame, floating_pair
 from .bodies import ROOT
 from .geometry import bundle_diameter, polyline_length, project_to_polyline, resample_polyline
 from .grid import Fields, VoxelGrid, compute_fields
-from .obstacles import ObstacleSet
+from .obstacles import ObstacleSet, cable_obstacles
 from .planner import plan_routing
 from .smoothing import curvature_radius, make_segment, relax
 from .terminations import (body_width, exit_offset, mated_pair_length, termination_allowance)
@@ -239,6 +241,8 @@ class HarnessRouter:
         self.grid = VoxelGrid.around(obstacles, self.opt.voxel)
         keep = {c for h in self.spec.electrical.harnesses for c in h.route.keep_away}
         self.fields: Fields = compute_fields(self.grid, obstacles, keep)
+        self.component_fields = self.fields
+        self._cable_fields: dict[tuple, np.ndarray] = {}
         self.c_req = float(self.spec.requirements.min_wire_clearance_moving)
         self.border = self.grid.border()
         self.diagnostics: list[Diagnostic] = []
@@ -316,22 +320,84 @@ class HarnessRouter:
     def route(self) -> RoutingResult:
         nodes = self._resolve_nodes()
         floating = self._place_floating(nodes)
+        self.obstacles.cable_bodies = cable_obstacles(self.project, nodes)
         wires: dict[str, WireRoute] = {}
         harnesses: dict[str, HarnessRoute] = {}
-        for harness in self.spec.electrical.harnesses:
+        occupied_raw = np.full(self.grid.size, 0.05)
+        from .planner import occupancy_field
+
+        order = sorted(self.spec.electrical.harnesses,
+                       key=lambda h: (-sum(self._wire_od(w.awg) ** 2 for w in h.wires), h.id))
+        for harness in order:
+            raw = self.cable_field(nodes, {harness.id})
+            raw = np.minimum(raw, occupied_raw)
+            self._routing_hardware = raw
+            base = self.component_fields
+            self.fields = replace(base, static_clear=np.minimum(base.static_clear, raw),
+                                  static_raw=np.minimum(base.static_raw, raw))
+            self._contexts.clear()
+            self._graphs.clear()
             routed = self._route_harness(harness, nodes[harness.id])
             if routed is None:
                 continue
             harness_route, wire_routes = routed
             harnesses[harness.id] = harness_route
             wires.update(wire_routes)
+            occupied: list[tuple[np.ndarray, float, set[str]]] = []
+            for wire in wire_routes.values():
+                # Preserve the radius of each physical run, including pin fan-outs.
+                for points, radius in self._occupied_runs(wire):
+                    occupied.append((points, radius, set()))
+            if occupied:
+                np.minimum(occupied_raw, occupancy_field(self.grid, occupied, set()), out=occupied_raw)
+        self.fields = self.component_fields
+        self._contexts.clear()
+        self._graphs.clear()
         self._size_holes(wires)
         stats = {"voxel": self.opt.voxel, "grid_shape": list(self.grid.shape), "voxels": self.grid.size,
-                 "astar_expansions": self.expansions, "relaxed_segments_reverted": self.relax_reverted}
+                 "astar_expansions": self.expansions, "relaxed_segments_reverted": self.relax_reverted,
+                 "route_order": [h.id for h in order], "cable_body_obstacles": len(self.obstacles.cable_bodies)}
         result = RoutingResult(wires, harnesses, nodes, floating, self.holes, self.diagnostics, self.grid, stats)
         if self.opt.plan:
             result.planning = plan_routing(self.project, self, result, obstacles=self.obstacles)
+        self.obstacles.cable_bodies = cable_obstacles(self.project, result.nodes)
         return result
+
+    @staticmethod
+    def _occupied_runs(wire: WireRoute) -> list[tuple[np.ndarray, float]]:
+        """Constant-radius chunks of a wire (shared cores are harmless duplicates)."""
+        out = []
+        for a, b, ra, rb in zip(wire.path[:-1], wire.path[1:], wire.bundle_radius[:-1], wire.bundle_radius[1:]):
+            points, _ = resample_polyline(np.array([a, b]), 0.001)
+            out.append((points, float(max(ra, rb))))
+        # Coalesce equal-radius neighbours to avoid a KD-tree per path edge.
+        merged: list[tuple[np.ndarray, float]] = []
+        for points, radius in out:
+            if merged and abs(merged[-1][1] - radius) < 1e-9:
+                merged[-1] = (np.vstack([merged[-1][0], points[1:]]), radius)
+            else:
+                merged.append((points, radius))
+        return merged
+
+    def cable_field(self, nodes: dict[str, dict[str, NodePoint]], harnesses: set[str]) -> np.ndarray:
+        """Routed hardware field; only incident harness entry apertures are open.
+
+        Re-evaluated after planning because floating pairs/splices can move.
+        The posed SDF cache avoids re-tessellating or querying unchanged bodies.
+        """
+        centers = self.grid.centers()
+        out = np.full(self.grid.size, 0.05)
+        for body in cable_obstacles(self.project, nodes):
+            node = body.node
+            key = (body.component, body.source, tuple(node.exit),
+                   None if node.frame is None else tuple(node.frame.matrix().ravel()))
+            if key not in self._cable_fields:
+                self._cable_fields[key] = body.shape.sdf_bounded(centers, 0.05) - body.keepout
+            raw = self._cable_fields[key]
+            if node.harness in harnesses:
+                raw = np.where(body.entry_mask(centers), 0.05, raw)
+            np.minimum(out, raw, out=out)
+        return out
 
     # ----------------------------------------------------------------- nodes
     def _wire_od(self, awg: int) -> float:
@@ -696,7 +762,7 @@ class HarnessRouter:
         def branch_od(wires: list) -> float:
             return bundle_diameter(self._wire_od(w.awg) for w in wires)
 
-        order = sorted(branches, key=lambda k: (-len(branches[k]), k))
+        order = sorted(branches, key=lambda k: (-branch_od(branches[k]), k))
         for index, key in enumerate(order):
             a, b = (nodes[key[0]], nodes[key[1]])
             if a.lead_end is None or b.lead_end is None:
@@ -1135,6 +1201,9 @@ class HarnessRouter:
         return lambda points: grid.sample(combined, points)
 
     def _hard_clear(self, points: np.ndarray, r: float, exclude: set[str], harness_holes: set[int]) -> bool:
+        hardware = getattr(self, "_routing_hardware", None)
+        if hardware is not None and np.any(self.grid.sample(hardware, points) < r - 2e-4):
+            return False
         static = [o for o in self.obstacles.static if o.component not in exclude and o.plate_axis is None]
         d, _ = self.obstacles.min_distance(points, static)
         if np.any(d < r - 2e-4):

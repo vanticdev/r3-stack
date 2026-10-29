@@ -32,6 +32,7 @@ def routes_json(result: RoutingResult, clearances: list[dict[str, Any]]) -> dict
     return {
         "wires": {w.wire_id: {"harness": w.harness, "awg": w.awg, "path": _pts(w.path),
                               "routed_length": round(w.routed_length, 6), "cut_length": round(w.cut_length, 6),
+                              "bundle_radius": [round(float(r), 7) for r in w.bundle_radius],
                               "ends": [end_json(e) for e in w.ends], "fanout": list(w.fanout)}
                   for w in result.wires.values()},
         "harnesses": {h.harness: {"bundle_path": _pts(h.bundle_path), "length": round(h.length, 6),

@@ -9,6 +9,13 @@ Every finding is a :class:`Diagnostic` with a stable code and numeric data
 * ``connector_clearance_violation``: same, for a connector body.
 * ``wire_intersects_component``: wire penetrates a component (outside its own
   termination zone; drilled pass-throughs excepted).
+* ``wire_intersects_connector``: bundle surface penetrates a routed cable-side
+  housing or splice sleeve, outside its own local conductor-entry aperture.
+* ``connector_intersects_component``: a cable-side body penetrates a static
+  component other than its connector owner/mating half.
+* ``wire_intersects_wire``: bundle surfaces of different harnesses or separate
+  branches overlap; shared cores and local physical joins/splices are excepted.
+  Penetrations, radii, arc lengths and witness positions are in metres.
 * ``wire_too_short`` / ``connector_strain``: a span between pins on bodies that
   move relative to each other cannot cover the full joint travel (or is
   within 5 % of taut), or a spec cut length is shorter than the route.
@@ -31,13 +38,23 @@ from r3_model.diagnostics import Diagnostic
 from r3_model.project import Project
 
 from .bodies import ROOT, Kinematics
-from .geometry import Box, polyline_length, project_to_polyline, resample_polyline
-from .obstacles import Obstacle, ObstacleSet
+from .geometry import polyline_length, project_to_polyline, resample_polyline
+from .obstacles import CableBody, Obstacle, ObstacleSet, cable_obstacles
 from .router import NodePoint, RoutingResult, WireRoute
-from .terminations import body_length, connector_mass, mated_pair_length
+from .terminations import connector_mass, mated_pair_length
 
 TIE_MASS = 0.0002  # 100 mm nylon zip tie, ~0.2 g (estimate)
 TIE_MATCH = 0.0015  # a tie pins a wire if within bundle radius + this
+
+
+def _polyline_distances(points: np.ndarray, path: np.ndarray) -> np.ndarray:
+    """Exact point-to-segment distances (bounded memory for long shared cores)."""
+    best = np.full(len(points), math.inf)
+    for a, b in zip(path[:-1], path[1:]):
+        v = b - a
+        t = np.clip((points - a) @ v / max(float(v @ v), 1e-18), 0, 1)
+        np.minimum(best, np.linalg.norm(points - (a + t[:, None] * v), axis=1), out=best)
+    return best
 
 
 @dataclass
@@ -80,6 +97,7 @@ class HarnessChecker:
         self.obstacles = obstacles
         self.kin: Kinematics = obstacles.kinematics
         self.routing = routing
+        self.obstacles.cable_bodies = cable_obstacles(project, routing.nodes)
         self.c_req = float(self.spec.requirements.min_wire_clearance_moving)
         self.diagnostics: list[Diagnostic] = []
         self._surface_cache: dict[str, np.ndarray] = {}
@@ -89,8 +107,8 @@ class HarnessChecker:
         nodes = self.routing.nodes[wire.harness]
         return nodes[wire.from_node], nodes[wire.to_node]
 
-    def _samples(self, wire: WireRoute) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        points, arc = resample_polyline(wire.path, 0.001)
+    def _samples(self, wire: WireRoute, spacing: float = 0.001) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        points, arc = resample_polyline(wire.path, spacing)
         vertex_arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(wire.path, axis=0), axis=1))])
         radius = np.interp(arc, vertex_arc, wire.bundle_radius)
         return points, arc, radius
@@ -121,6 +139,7 @@ class HarnessChecker:
     def run(self) -> CheckReport:
         clearances, wire_min = self._clearance_and_intersection()
         connector_clearances = self._connector_clearance()
+        self._wire_intersections()
         self._bend_radius()
         pins = {w.wire_id: wire_pins(w, self.routing.harnesses[w.harness].tie_points, *self._nodes(w))
                 for w in self.routing.wires.values()}
@@ -158,9 +177,21 @@ class HarnessChecker:
                     if d[k] < current["worst"]["min_distance"]:
                         current["worst"] = entry
             wire_min[wire.wire_id] = best
-            for obstacle in self.obstacles.obstacles:
+            for obstacle in [*self.obstacles.obstacles, *self.obstacles.cable_bodies]:
                 d = obstacle.shape.sdf_bounded(points, 0.05) - radius
-                d[self._exempt_mask(arc, obstacle.component, start, end)] = math.inf
+                if isinstance(obstacle, CableBody):
+                    incident = np.zeros(len(arc), dtype=bool)
+                    if start.ref == obstacle.component:
+                        incident |= arc <= start.termination_length
+                    if end.ref == obstacle.component:
+                        incident |= arc[-1] - arc <= end.termination_length
+                    # The splice joins bundle surfaces, not just centrelines:
+                    # its local entry cap is the sleeve entry Minkowski-summed
+                    # with this run's radius. Non-incident wires get no aperture.
+                    entry_radius = radius if obstacle.kind == "splice" else 0.0
+                    d[incident & obstacle.entry_mask(points, entry_radius)] = math.inf
+                else:
+                    d[self._exempt_mask(arc, obstacle.component, start, end)] = math.inf
                 if obstacle.plate_axis is not None:
                     d[self._hole_mask(points, obstacle, wire.harness)] = math.inf
                 k = int(np.argmin(d))
@@ -182,60 +213,124 @@ class HarnessChecker:
                       "per_wire_min_distance": item["wires"], "units": "m"},
                 hint="Reroute or add a tie point to hold the bundle away from the swept volume."))
         for (harness, component), item in intersections.items():
+            body = next((b for b in self.obstacles.cable_bodies if b.component == component), None)
             self.diagnostics.append(Diagnostic.error(
-                "wire_intersects_component",
+                "wire_intersects_connector" if body else "wire_intersects_component",
                 f"{harness} penetrates {component} by {item['depth'] * 1e3:.1f} mm",
-                subjects=[harness, *sorted(item["wires"]), component],
+                subjects=list(dict.fromkeys([harness, *sorted(item["wires"]), component,
+                                             *([body.node.harness] if body else [])])),
                 data={"penetration": item["depth"], "component": component, "position": item["position"],
-                      "arc_length": item.get("arc"), "per_wire_penetration": item["wires"], "units": "m"}))
+                      "arc_length": item.get("arc"), "per_wire_penetration": item["wires"],
+                      **({"connector": component, "geometry_source": body.source} if body else {}), "units": "m"}))
         return clearances, wire_min
 
     def _connector_clearance(self) -> list[dict[str, Any]]:
         out = []
-        moving = self.obstacles.moving
-        seen_pairs = set()
-        for harness, nodes in self.routing.nodes.items():
-            for node in nodes.values():
-                if node.kind not in ("connector", "floating") or node.direction is None or node.face is None:
+        for body in self.obstacles.cable_bodies:
+            node = body.node
+            points = body.shape.surface_points(0.0005)
+            best = (math.inf, "")
+            for obstacle in self.obstacles.obstacles:
+                if obstacle.component == body.owner or obstacle.component == body.mates:
                     continue
-                if node.connector_type == "integral":
-                    continue
-                if node.kind == "floating":
-                    pair = next((f for f in self.routing.floating if node.ref in (f.a, f.b)), None)
-                    if pair is None or (pair.a, pair.b) in seen_pairs:
-                        continue
-                    seen_pairs.add((pair.a, pair.b))
-                    length, center, label = pair.length, pair.center, f"{pair.a}|{pair.b}"
-                else:
-                    length = body_length(self.catalog, node.connector_type)
-                    center, label = node.face + node.direction * length / 2, node.ref
-                size = self.catalog.connector(node.connector_type).body_size
-                z = node.direction / np.linalg.norm(node.direction)
-                helper = np.array([0.0, 0.0, 1.0]) if abs(z[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
-                x = np.cross(helper, z); x /= np.linalg.norm(x)
-                y = np.cross(z, x)
-                body = Box(center, np.column_stack([x, y, z]), np.array([size[0] / 2, size[1] / 2, length / 2]))
-                points = body.surface_points(0.001)
-                best = (math.inf, "")
-                for obstacle in moving:
-                    if obstacle.component in node.exempt:
-                        continue
-                    d = float(obstacle.swept.sdf_bounded(points, 0.2).min())
+                shape = obstacle.swept if obstacle.moving else obstacle.shape
+                distance = shape.sdf_bounded(points, 0.05)
+                k = int(np.argmin(distance))
+                d, position = float(distance[k]), points[k]
+                if obstacle.moving:
                     if d < best[0]:
                         best = (d, obstacle.component)
-                if not np.isfinite(best[0]):
                     continue
-                entry = {"connector": label, "component": best[1], "min_distance": best[0]}
-                out.append(entry)
+                # Both directions cover containment of either solid in the other.
+                lo, hi = body.shape.aabb()
+                olo, ohi = shape.aabb()
+                if np.any(hi < olo) or np.any(ohi < lo):
+                    continue
+                other = shape.surface_points(0.001)
+                reverse = body.shape.sdf_bounded(other, 0.005)
+                j = int(np.argmin(reverse))
+                if reverse[j] < d:
+                    d, position = float(reverse[j]), other[j]
+                if d < -0.0005:
+                    self.diagnostics.append(Diagnostic.error(
+                        "connector_intersects_component",
+                        f"connector {body.component} penetrates {obstacle.component} by {-d * 1e3:.1f} mm",
+                        subjects=[node.harness, body.component, obstacle.component],
+                        data={"penetration": -d, "connector": body.component, "component": obstacle.component,
+                              "connector_type": node.connector_type, "position": position.tolist(),
+                              "geometry_source": body.source, "units": "m"}))
+            if np.isfinite(best[0]):
+                out.append({"connector": body.component, "component": best[1], "min_distance": best[0]})
                 if best[0] < self.c_req:
                     self.diagnostics.append(Diagnostic.error(
                         "connector_clearance_violation",
-                        f"connector {label} body is {best[0] * 1e3:.1f} mm from moving {best[1]} "
-                        f"(required {self.c_req * 1e3:.0f} mm{'; it intersects the swept volume' if best[0] < 0 else ''})",
-                        subjects=[harness, label, best[1]],
+                        f"connector {body.component} body is {best[0] * 1e3:.1f} mm from moving {best[1]} "
+                        f"(required {self.c_req * 1e3:.0f} mm)",
+                        subjects=[node.harness, body.component, best[1]],
                         data={"min_distance": best[0], "required": self.c_req, "component": best[1],
-                              "connector_type": node.connector_type, "position": center.tolist(), "units": "m"}))
+                              "connector_type": node.connector_type, "position": node.exit.tolist(), "units": "m"}))
         return out
+
+    def _wire_intersections(self) -> None:
+        """Compare swept bundle surfaces; shared runs are physical single objects.
+
+        0.5 mm centreline sampling bounds the distance error by 0.5 mm; findings
+        below use a 0.5 mm penetration threshold, as for component checks.
+        A shared graph segment, or the local merge at an incident junction, is
+        exempt. The rest of those same wires are still checked against each other.
+        """
+        from scipy.spatial import cKDTree
+
+        samples = {w.wire_id: self._samples(w, 0.0005) for w in self.routing.wires.values()}
+        found: dict[tuple[str, str], dict[str, Any]] = {}
+        for a, b in itertools.combinations(sorted(self.routing.wires.values(), key=lambda w: w.wire_id), 2):
+            pa, aa, ra = samples[a.wire_id]
+            pb, ab, rb = samples[b.wire_id]
+            pairs = cKDTree(pa).query_ball_tree(cKDTree(pb), float(ra.max() + rb.max()))
+            ia = np.repeat(np.arange(len(pa)), [len(p) for p in pairs])
+            ib = np.asarray([j for p in pairs for j in p], dtype=int)
+            if not len(ia):
+                continue
+            gap = np.linalg.norm(pa[ia] - pb[ib], axis=1) - ra[ia] - rb[ib]
+            valid = gap < -0.0005
+            if a.harness == b.harness:
+                segments = self.routing.harnesses[a.harness].segments
+                shared = [np.asarray(s["points"], float) for s in segments
+                          if a.wire_id in s["wires"] and b.wire_id in s["wires"]]
+                for core in shared:
+                    # Both witnesses must be in the shared bundle's local tube.
+                    da = _polyline_distances(pa, core)
+                    db = _polyline_distances(pb, core)
+                    join = ra[ia] + rb[ib] + 0.001
+                    valid &= ~((da[ia] <= join) & (db[ib] <= join))
+                nodes = self.routing.nodes[a.harness]
+                common = {a.from_node, a.to_node} & {b.from_node, b.to_node}
+                for name in common:
+                    node = nodes[name]
+                    # Fan-outs into one connector/core and actual solder splices
+                    # merge locally. A crossing farther down either branch remains.
+                    reach = (0.003 + node.od) if node.kind == "splice" else max(node.fan_length, 2 * node.od)
+                    valid &= ~((np.linalg.norm(pa[ia] - node.exit, axis=1) <= reach) &
+                               (np.linalg.norm(pb[ib] - node.exit, axis=1) <= reach))
+            if not valid.any():
+                continue
+            k = int(np.argmin(np.where(valid, gap, math.inf)))
+            key = tuple(sorted((a.harness, b.harness)))
+            item = found.setdefault(key, {"wires": set(), "penetration": 0.0})
+            item["wires"].update((a.wire_id, b.wire_id))
+            if -gap[k] > item["penetration"]:
+                item.update(penetration=float(-gap[k]), wire_a=a.wire_id, wire_b=b.wire_id,
+                            radius_a=float(ra[ia[k]]), radius_b=float(rb[ib[k]]),
+                            arc_length_a=float(aa[ia[k]]), arc_length_b=float(ab[ib[k]]),
+                            witness=[pa[ia[k]].tolist(), pb[ib[k]].tolist()],
+                            position=((pa[ia[k]] + pb[ib[k]]) / 2).tolist())
+        for harnesses, item in sorted(found.items()):
+            wires = sorted(item.pop("wires"))
+            self.diagnostics.append(Diagnostic.error(
+                "wire_intersects_wire", f"{' / '.join(dict.fromkeys(harnesses))} bundle surfaces overlap "
+                f"by {item['penetration'] * 1e3:.1f} mm",
+                subjects=list(dict.fromkeys([*harnesses, *wires])), data={**item, "units": "m"},
+                hint="Separate the branches or route one bundle around the other; preserve real splice joins."))
 
     def _bend_radius(self) -> None:
         for harness_id, harness in self.routing.harnesses.items():
