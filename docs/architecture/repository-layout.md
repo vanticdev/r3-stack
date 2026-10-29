@@ -11,7 +11,7 @@ provider, or independent microservice deployment.
 | Directory | Responsibility |
 | --- | --- |
 | `apps/web/` | The single user interface for projects, robot editing, wiring, simulation results, and deployment. |
-| `services/orchestrator/` | Project-facing API, versioned input resolution, dependency checks, job scheduling, and artifact/result references. |
+| `services/orchestrator/` | Project-facing API (`r3` CLI, MCP server, HTTP API `r3 serve`: see [api.md](api.md)), versioned input resolution, dependency checks, job scheduling, and artifact/result references. |
 | `services/simulation-worker/` | Execute scheduled simulations with pinned inputs and return results and diagnostics. |
 
 The standalone marketing site has been removed. Any future public pages belong
