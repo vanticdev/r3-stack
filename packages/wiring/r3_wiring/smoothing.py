@@ -73,6 +73,12 @@ def _gradient(field: FieldFn, points: np.ndarray, eps: float) -> np.ndarray:
     return grad / norm
 
 
+def _first_difference(m: int):
+    from scipy.sparse import diags
+
+    return diags([-np.ones(m - 1), np.ones(m - 1)], [0, 1], shape=(m - 1, m))
+
+
 def _second_difference(m: int):
     from scipy.sparse import diags
 
@@ -80,17 +86,19 @@ def _second_difference(m: int):
 
 
 def relax(segments: list[RelaxSegment], field: FieldFn, iterations: int = 40, spacing: float = 0.002,
-          anchor: float = 0.02, eps: float = 0.001, margin: float = 0.0003, penalty: float = 1.0e6) -> None:
+          anchor: float = 0.02, eps: float = 0.001, margin: float = 0.0003, penalty: float = 1.0e6,
+          stiffness_scale: float = 2.0, max_step: float = 0.0015) -> None:
     """In-place relaxation of all segments (each independently).
 
     Each iteration solves the proximal, constrained smoothing step
-    ``min |x - y|^2 + a |x - x0|^2 + k |D2 x|^2 + w sum_active (n_i . (x_i - q_i))^2``
-    with the clamped points fixed. ``k = (1.5 R / h)^4`` smooths over the
+    ``min |x - y|^2 + a |x - x0|^2 + k |D2 x|^2 + T |D1 x|^2 + w sum_active (n_i . (x_i - q_i))^2``
+    with the clamped points fixed. ``k = (2 R / h)^4`` smooths over the
     target bend radius ``R``; points that violate the clearance field become
     active half-space constraints (normal ``n_i`` from the field gradient,
-    ``q_i`` on the required clearance surface), so the rod bends *around*
-    obstacles with its stiffness instead of being kinked by projection."""
-    from scipy.sparse import bmat, csc_matrix, diags, eye, kron
+    ``q_i`` on the required clearance surface; released when their multiplier
+    turns negative), so the rod bends *around* obstacles with its stiffness
+    instead of being kinked by projection."""
+    from scipy.sparse import eye, kron
     from scipy.sparse.linalg import spsolve
 
     for segment in segments:
@@ -104,9 +112,17 @@ def relax(segments: list[RelaxSegment], field: FieldFn, iterations: int = 40, sp
         fixed_cols = np.concatenate([np.arange(len(head)), np.arange(len(head) + n, m)])
         d2f, d2c = d2[:, free_cols], d2[:, fixed_cols]
         fixed = np.vstack([head, tail])
-        k = (1.5 * segment.bend_radius / spacing) ** 4
-        bending = kron(d2f.T @ d2f, eye(3)).tocsc()
-        coupling = (d2f.T @ (d2c @ fixed))  # (n, 3)
+        k = (stiffness_scale * segment.bend_radius / spacing) ** 4
+        # Weak tension (cable pulled taut between ties) with bending/tension
+        # length scale sqrt(EI/T) = 4 R, so the rod neither balloons nor hugs corners.
+        tension = k / (4.0 * segment.bend_radius / spacing) ** 2
+        d1 = _first_difference(m).tocsc()
+        d1f, d1c = d1[:, free_cols], d1[:, fixed_cols]
+        bending = kron(k * (d2f.T @ d2f) + tension * (d1f.T @ d1f), eye(3)).tocsc()
+        coupling = k * (d2f.T @ (d2c @ fixed)) + tension * (d1f.T @ (d1c @ fixed))  # (n, 3)
+        # Proximal weight: one step smooths over ~1 R, so the rod moves
+        # gradually and cannot jump through obstacles between constraint updates.
+        prox = k / (segment.bend_radius / spacing) ** 4
         original = segment.free.copy()
         # Terminations may sit inside a keepout (a connector 1.5 mm above the
         # deck). The required clearance ramps from the end's own depth to the
@@ -122,26 +138,40 @@ def relax(segments: list[RelaxSegment], field: FieldFn, iterations: int = 40, sp
         offsets = np.zeros(n)
         active = np.zeros(n, dtype=bool)
         x = original.copy()
-        for it in range(iterations):
+        buffer = 0.0005  # activate constraints slightly before contact
+        extra = 0
+        it = 0
+        while True:
             values = field(x)
-            violating = values < target
+            violating = values < target + buffer
+            if it >= iterations and (not np.any(values < target - 1e-4) or extra >= 15):
+                break
+            if it >= iterations:
+                extra += 1
             if violating.any():
                 grad = _gradient(field, x[violating], eps)
                 normals[violating] = grad
-                goal = x[violating] + grad * (target[violating] - values[violating] + margin)[:, None]
+                goal = x[violating] + grad * (target[violating] + buffer - values[violating])[:, None]
                 offsets[violating] = np.einsum("ij,ij->i", grad, goal)
                 active |= violating
-            release = active & (values > target + 0.002)
+            release = active & (values > target + 0.003)
             active &= ~release
-            blocks = [np.outer(normals[i], normals[i]) * (penalty if active[i] else 0.0) for i in range(n)]
-            constraint = csc_matrix(_block_diag(blocks))
-            system = (1 + anchor) * eye(3 * n) + k * bending + constraint
-            rhs = (x + anchor * original - k * coupling).ravel()
+            constraint = _block_diag(normals, np.where(active, penalty, 0.0))
+            system = (prox * (1 + anchor)) * eye(3 * n) + bending + constraint
+            rhs = (prox * (x + anchor * original) - coupling).ravel()
             rhs += (normals * (offsets * np.where(active, penalty, 0.0))[:, None]).ravel()
-            x = spsolve(system.tocsc(), rhs).reshape(n, 3)
-            if it % 5 == 4:
+            proposal = spsolve(system.tocsc(), rhs).reshape(n, 3)
+            step = proposal - x
+            length = np.linalg.norm(step, axis=1, keepdims=True)
+            x = x + step * np.minimum(1.0, max_step / np.maximum(length, 1e-12))
+            # Half-space, not equality: a constraint that pulls its point toward
+            # the obstacle (point on the free side of its plane) is released.
+            pulling = active & (np.einsum("ij,ij->i", normals, x) > offsets + 1e-7)
+            active &= ~pulling
+            if it % 5 == 4 and it < iterations:
                 chain = np.vstack([head[-1:], x, tail[:1]])
                 x = _uniform(chain, n + 2)[1:-1]
+            it += 1
         # Final safety projection (small residuals of the penalty method only).
         for _ in range(2):
             values = field(x)
@@ -153,10 +183,16 @@ def relax(segments: list[RelaxSegment], field: FieldFn, iterations: int = 40, sp
         segment.free = x
 
 
-def _block_diag(blocks: list[np.ndarray]):
-    from scipy.sparse import block_diag
+def _block_diag(normals: np.ndarray, weights: np.ndarray):
+    """Sparse block-diagonal matrix of ``w_i n_i n_i^T`` (3x3 blocks)."""
+    from scipy.sparse import csc_matrix
 
-    return block_diag(blocks, format="csc")
+    n = len(normals)
+    blocks = weights[:, None, None] * np.einsum("ij,ik->ijk", normals, normals)
+    base = 3 * np.arange(n)
+    rows = (base[:, None, None] + np.arange(3)[None, :, None]).repeat(3, axis=2)
+    cols = (base[:, None, None] + np.arange(3)[None, None, :]).repeat(3, axis=1)
+    return csc_matrix((blocks.ravel(), (rows.ravel(), cols.ravel())), shape=(3 * n, 3 * n))
 
 
 def curvature_radius(points: np.ndarray) -> np.ndarray:
@@ -171,3 +207,23 @@ def curvature_radius(points: np.ndarray) -> np.ndarray:
     phi = np.arccos(np.clip(cos, -1.0, 1.0))
     with np.errstate(divide="ignore"):
         return np.where(phi > 1e-6, 0.5 * (la + lb) / (2 * np.sin(phi / 2)), np.inf)
+
+
+def radius_at_scale(points: np.ndarray, delta: float = 0.003, step: float = 0.0005) -> np.ndarray:
+    """Circumradius of (p(s - delta), p(s), p(s + delta)) along arc length:
+    a bend-radius measurement insensitive to vertex spacing artefacts."""
+    points = np.asarray(points, dtype=float)
+    seg = np.linalg.norm(np.diff(points, axis=0), axis=1)
+    cum = np.concatenate([[0.0], np.cumsum(seg)])
+    if cum[-1] < 2 * delta:
+        return np.zeros(0)
+    s = np.arange(delta, cum[-1] - delta, step)
+
+    def at(values: np.ndarray) -> np.ndarray:
+        return np.column_stack([np.interp(values, cum, points[:, a]) for a in range(3)])
+
+    a, b, c = at(s - delta), at(s), at(s + delta)
+    ab, bc, ca = np.linalg.norm(b - a, axis=1), np.linalg.norm(c - b, axis=1), np.linalg.norm(a - c, axis=1)
+    area2 = np.linalg.norm(np.cross(b - a, c - a), axis=1)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(area2 > 1e-15, ab * bc * ca / (2 * area2), np.inf)

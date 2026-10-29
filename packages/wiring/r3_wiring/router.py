@@ -64,7 +64,7 @@ class RouterOptions:
     hole_clearance: float = 0.003  # grommet allowance added to the bundle OD
     max_expansions: int = 3_000_000
     relax_spacing: float = 0.002
-    relax_iterations: int = 40
+    relax_iterations: int = 60
     fillet_min_angle: float = math.radians(8.0)  # smaller turns are measured, not filleted
 
 

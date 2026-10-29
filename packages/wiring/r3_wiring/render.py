@@ -73,17 +73,30 @@ def _draw_obstacles_2d(ax, obstacles: ObstacleSet, view: str) -> None:
             ax.text(center[0], center[1], obstacle.component, fontsize=5.5, color="#333333", ha="center", va="center")
 
 
+def _stacked(wires: dict[str, dict[str, Any]], lw: float) -> list[tuple[dict[str, Any], float]]:
+    """Wires of a harness drawn widest-first so a bundle shows every colour as a stripe."""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for wire in wires.values():
+        groups.setdefault(wire.get("harness", ""), []).append(wire)
+    out = []
+    for members in groups.values():
+        n = len(members)
+        for k, wire in enumerate(members):
+            out.append((wire, lw + 0.9 * (n - 1 - k)))
+    return out
+
+
 def _draw_wires_2d(ax, wires: dict[str, dict[str, Any]], view: str, lw: float = 1.4, ls: str = "-",
                    alpha: float = 1.0) -> None:
     a, b, _, _ = VIEWS[view]
-    for wire in wires.values():
+    for wire, width in _stacked(wires, lw):
         path = np.asarray(wire["path"]) * MM
         if len(path) < 2:
             continue
         color = wire.get("color", "")
         if _outline(color):
-            ax.plot(path[:, a], path[:, b], color="#333333", lw=lw + 0.9, ls=ls, alpha=alpha, solid_capstyle="round")
-        ax.plot(path[:, a], path[:, b], color=_wire_color(color), lw=lw, ls=ls, alpha=alpha, solid_capstyle="round")
+            ax.plot(path[:, a], path[:, b], color="#333333", lw=width + 0.9, ls=ls, alpha=alpha, solid_capstyle="round")
+        ax.plot(path[:, a], path[:, b], color=_wire_color(color), lw=width, ls=ls, alpha=alpha, solid_capstyle="round")
 
 
 def _finish_2d(ax, view: str, title: str) -> None:
@@ -108,13 +121,13 @@ def _draw_iso(ax, obstacles: ObstacleSet, wires: dict[str, dict[str, Any]], ties
             for shape in (shapes[0], shapes[-1]):
                 for edge in shape.edges():
                     ax.plot(*(edge * MM).T, color=SWEEP_COLOR, lw=0.5, alpha=0.6)
-    for wire in wires.values():
+    for wire, width in _stacked(wires, lw):
         path = np.asarray(wire["path"]) * MM
         if len(path) < 2:
             continue
         if _outline(wire.get("color", "")):
-            ax.plot(*path.T, color="#333333", lw=lw + 0.8)
-        ax.plot(*path.T, color=_wire_color(wire.get("color", "")), lw=lw)
+            ax.plot(*path.T, color="#333333", lw=width + 0.8)
+        ax.plot(*path.T, color=_wire_color(wire.get("color", "")), lw=width)
     if ties:
         t = np.asarray(ties) * MM
         ax.scatter(*t.T, color="#111111", marker="s", s=10, depthshade=False, label="tie point")
@@ -195,7 +208,8 @@ def render_slack(out_dir: Path, obstacles: ObstacleSet, routes: dict[str, Any], 
     plus the clearance-to-moving-parts time history of the test drive."""
     out_dir.mkdir(parents=True, exist_ok=True)
     routed = {k: dict(v, color=detail["wires"][k]["color"]) for k, v in routes["wires"].items()}
-    sagged = {k: {"path": p, "color": detail["wires"][k]["color"]} for k, p in snapshot.items() if k in detail["wires"]}
+    sagged = {k: {"path": p, "color": detail["wires"][k]["color"], "harness": detail["wires"][k]["harness"]}
+              for k, p in snapshot.items() if k in detail["wires"]}
     paths = []
     fig, axes = plt.subplots(2, 1, figsize=(11, 9.5), dpi=150, gridspec_kw={"height_ratios": [1.15, 0.85]})
     for ax, view in zip(axes, ("top", "side")):
