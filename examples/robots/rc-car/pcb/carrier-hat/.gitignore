@@ -1,0 +1,9 @@
+# KiCad session state, backups and automation scratch
+.history/
+_restore_backup*/
+*-backups/
+~*.lck
+*.kicad_prl
+fp-info-cache
+work/
+__pycache__/
