@@ -319,10 +319,10 @@ electrical:
         F1: {type: integral, mates: fuse.J1}
         F2: {type: integral, mates: fuse.J2}
       splices:
-        # SP 7 mm off the fuse holder input (J1, its front end on the right of the battery): the fuse sits at the
-        # splice. The fused output (J2, aft) turns back under the deck to the deck's power slot below the HAT's XT30.
-        SP: {position: [188 mm, -37 mm, 40 mm]}
-        SN: {position: [188 mm, -25 mm, 47 mm]}
+        # SP 7 mm off the fuse holder input (J1, its front end on the right of the battery, 15 mm aft of the front
+        # wheels' steering sweep): the fuse sits at the splice. The fused output (J2, aft) turns back under the deck to the deck's power slot below the HAT's XT30.
+        SP: {position: [178 mm, -37 mm, 40 mm]}
+        SN: {position: [178 mm, -25 mm, 47 mm]}
       wires:
         - {id: W_Y_P_IN, from: P1.1, to: SP, awg: 12, color: red, signal: VBAT}
         - {id: W_Y_P_ESC, from: SP, to: P2.1, awg: 12, color: red, signal: VBAT}

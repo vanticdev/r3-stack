@@ -45,8 +45,8 @@ components:
       strap_slots: {kind: strap_slot, origin: [11 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {width: 22 mm, slots: [[-11 mm, -25.5 mm, 11 mm, -23 mm], [-11 mm, 23 mm, 11 mm, 25.5 mm]]}, description: "Two 22 x 2.5 mm slots either side of the battery for the hook-and-loop strap"}
       # Fuse holder on the right of the battery, along x: input (J1) forward from the splices, output (J2) aft,
       # turning back under the deck to the HAT feed slot.
-      fuse_seat: {kind: face_mount, origin: [36 mm, -37 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      tie_slots: {kind: strap_slot, origin: [36 mm, -37 mm, 0], z: [0, 0, -1], x: [0, -1, 0], params: {width: 4 mm, slots: [[-7.5 mm, -2 mm, -5.5 mm, 2 mm], [5.5 mm, -2 mm, 7.5 mm, 2 mm]]}, description: "Cable-tie slots that retain the fuse holder"}
+      fuse_seat: {kind: face_mount, origin: [26 mm, -37 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      tie_slots: {kind: strap_slot, origin: [26 mm, -37 mm, 0], z: [0, 0, -1], x: [0, -1, 0], params: {width: 4 mm, slots: [[-7.5 mm, -2 mm, -5.5 mm, 2 mm], [5.5 mm, -2 mm, 7.5 mm, 2 mm]]}, description: "Cable-tie slots that retain the fuse holder"}
   - id: upper-deck-petg
     kind: structure
     cad_name: Electronics deck
