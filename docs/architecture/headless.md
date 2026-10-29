@@ -103,3 +103,46 @@ r3-kicad-headless -- python -c "from kipy import KiCad; print(KiCad().get_versio
 > were removed. Board editing uses KiCad's bundled `pcbnew` Python module
 > (`python3-pcbnew` from the KiCad PPA on Linux), and checks, netlists and
 > exports use `kicad-cli`. `r3 doctor` reports this as `kicad-pcbnew`.
+
+## Onshape document organization (phase B)
+
+The organized RC-car document (`r3_onshape.organized`) is built over REST with the
+headless session or API keys. Everything that defines the CAD, places it and verifies it is
+headless. Organizational edits that Onshape exposes only in its editor protocol are not.
+
+**Headless over REST (server):**
+
+* documents, Part Studios, Assemblies and versions: create, delete, version;
+* the Variable Studio (`createVariableStudio`, `setVariables`) and its references from each
+  Part Studio (`setVariableStudioReferences`); features use `#name` expressions;
+* standard features (sketch, extrude with start offset, revolve, Hole, Mirror, mate
+  connector) and part metadata (name, appearance, material, mass override, part number);
+* assembly instances (including the linked parts-library version), occurrence transforms
+  and mates. The solved occurrence transforms are read back from the assembly definition and
+  compared with the compiled poses;
+* `bodydetails`, fine tessellations and mass properties for the fit checks; shaded views for
+  every Part Studio, subassembly and the top level;
+* organization-check reads: feature names, types and expressions (`getPartStudioFeatures`),
+  sketch solve status (`getSketchInfo` returns `sketchSolveStatus`, so `cad_unconstrained_sketch`
+  is exact), part names, mate names, construction-plane counts, and document tab folders
+  (`getDocumentContents` returns the `BTElementGroup` tree).
+
+**Not in the REST API (done through the onshape-native bridge on a developer machine):**
+
+| Operation | Native message | REST gap |
+| --- | --- | --- |
+| Create tab folders, move tabs into them | `ui.document.GBTUiEditElementGroups` | REST reads folders but cannot create or move them |
+| Part Studio feature folders | `partstudiofolders.GBTUiCreateFolder` | `getPartStudioFeatures` omits folder nodes, so folder membership (`cad_feature_not_in_folder`) can only be read in the editor |
+| Assembly instance and mate folders | `ui.assembly.GBTUiCreateAssemblyFolder` | the assembly definition has no sidebar folders (`cad_assembly_unfoldered` needs the editor) |
+| Hide planes, sketches and mate connectors | `ui.GBTSetFeatureVisibility` inside `ui.assembly.GBTUiBatchVisibilityChange` | REST has no visibility field for Part Studio features; assembly visibility is read with the bridge's `display_state` |
+| Flexible subassemblies | none found (REST or captured native) | subassemblies are inserted rigid; steering motion is verified by the linkage solver and the MuJoCo animation |
+
+Sketches consumed by a feature are hidden by Onshape itself, so even a headless build shows
+no sketch clutter. The phase B builder creates no construction planes at all:
+`cad_excess_construction_planes` counts them over REST, and the only plane features are
+Onshape's three default planes.
+
+On a server without the bridge, the build and every REST check still run. The organization
+writes are skipped and recorded in `cad_model.json` (`organization.organize.skipped`). The check
+emits `cad_organization_check_partial`, listing the codes it could not evaluate. It does not
+report them as passing.

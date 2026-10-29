@@ -59,6 +59,8 @@ class Vehicle:
         self.drive_actuators = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"act_{d.id}") for d in vm.drives]
         self.drive_tendons = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_TENDON, d.tendon) for d in vm.drives]
         self.steer_actuators = [[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, a) for a in s.actuators] for s in vm.steering]
+        self.horn_actuators = [mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, s.horn_actuator) if s.horn_actuator else -1
+                               for s in vm.steering]
         self.servos = [SteeringServo.from_params(_behavior_params(project, s.actuator_component)) for s in vm.steering]
         self.body_ids = {name: mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name) for name in vm.bodies}
         sensor = lambda name: model.sensor_adr[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, name)]  # noqa: E731
@@ -106,6 +108,8 @@ class Vehicle:
         self.steer_targets[index] = angles
         for act, angle in zip(self.steer_actuators[index], angles):
             self.data.ctrl[act] = angle
+        if self.horn_actuators[index] >= 0:
+            self.data.ctrl[self.horn_actuators[index]] = servo.theta
 
     # ------------------------------------------------------------------ step
     def _apply_resistances(self) -> None:

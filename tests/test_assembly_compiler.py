@@ -106,8 +106,10 @@ def test_assembly_stage_writes_artifacts(tmp_path):
     assert payload["root"] == "plate" and len(payload["poses"]) == 20 and len(payload["loops"]) == 10
     assert payload["poses"]["hat"]["xyz"] == pytest.approx([-0.03, 0, 0.0556])
     assert payload["joints"][0]["id"] == "wheel_spin"
-    # The axle inside the wheel hub is an allowed insertion, not interference.
-    assert [(i["a"], i["b"], i["insertion"]) for i in payload["interference"]] == [("axle", "wheel", "axle.shaft~wheel.hub")]
+    # Exact solids: every overlap is an allowed one (the bench parts are catalog envelopes without modeled holes, so the
+    # axle in the wheel hub and the screws in their parts overlap them), and each is recorded with its reason.
+    assert payload["interference"] and all(i["insertion"] for i in payload["interference"])
+    assert ("axle", "wheel") in {(i["a"], i["b"]) for i in payload["interference"]}
     png = project.root / "build" / "model" / "assembly_graph.png"
     assert png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
     assert result.metrics["loop_closures"] == 10 and result.metrics["interferences"] == 0
@@ -181,9 +183,9 @@ def test_motor_on_a_seat_inside_the_plate_is_interference(tmp_path):
     result = run_assembly(project)
     (diag,) = [d for d in result.diagnostics if d.code == "object_interference"]
     assert diag.subjects == ["motor", "plate", "plate.motor_pad~motor.face"]
-    # 48-gon prism of the 36 mm can inside the 4 mm plate: 24 r^2 sin(7.5 deg) x 4 mm.
-    assert diag.data["overlap_volume"] == pytest.approx(24 * 0.018 ** 2 * math.sin(math.radians(7.5)) * 0.004, rel=1e-6)
-    assert diag.data["depth"] == pytest.approx(0.004) and diag.data["joined"] is True
+    # Exact solids: the 36 mm can (96-gon tessellation) inside the 4 mm plate, pi r^2 x 4 mm.
+    assert diag.data["overlap_volume"] == pytest.approx(math.pi * 0.018 ** 2 * 0.004, rel=2e-3)
+    assert diag.data["depth"] == pytest.approx(0.004, abs=1e-6) and diag.data["joined"] is True
 
 
 def test_missing_join_is_object_not_joined(tmp_path):
@@ -257,8 +259,16 @@ def test_clearance_hole_too_small_is_hole_size_mismatch(tmp_path):
     def tight(types):
         types["bench-deck"]["interfaces"]["h_fl"]["params"]["holes"] = [[0, 0, "3.0 mm", "clearance", "3 mm"]]
     diag = only(bench(tmp_path, catalog=tight), "hole_size_mismatch")
-    assert diag.data["hole_d"] == pytest.approx(3.0e-3) and diag.data["iso273_min"] == pytest.approx(3.2e-3)
-    assert diag.data["iso273_max"] == pytest.approx(3.6e-3)
+    # The bench deck is PETG: the FDM print-fit table (0.2..0.6 mm over the screw) applies, not ISO 273.
+    assert diag.data["hole_d"] == pytest.approx(3.0e-3) and diag.data["print_min"] == pytest.approx(3.2e-3)
+    assert diag.data["print_max"] == pytest.approx(3.6e-3) and diag.data["process"] == "fdm"
+
+
+def test_metal_clearance_hole_uses_iso_273(tmp_path):
+    def tight(types):
+        types["bench-plate"]["interfaces"]["so_fl"]["params"]["holes"] = [[0, 0, "3.0 mm", "clearance", "4 mm"]]
+    diag = only(bench(tmp_path, catalog=tight), "hole_size_mismatch")
+    assert diag.data["iso273_min"] == pytest.approx(3.2e-3) and diag.data["iso273_max"] == pytest.approx(3.6e-3)
 
 
 def test_tapped_to_tapped_is_hole_size_mismatch(tmp_path):
@@ -351,11 +361,12 @@ def test_unjoined_object_with_authored_pose_is_kept_with_warning(tmp_path):
 
 
 def test_specs_without_assembly_are_untouched():
-    project = Project.load(ROOT / "examples" / "robots" / "rc-car")
-    raw = yaml.safe_load((ROOT / "examples" / "robots" / "rc-car" / "robot.yaml").read_text())
+    legacy = ROOT / "tests" / "fixtures" / "rc_car_layout_v0"  # an authored-pose robot (the RC car now uses joins)
+    project = Project.load(legacy)
+    raw = yaml.safe_load((legacy / "robot.yaml").read_text())
     assert project.spec.assembly is None and project.assembly is None
     assert not hasattr(project, "_catalog")  # loading does not touch the catalog
-    reference = Project.load(ROOT / "examples" / "robots" / "rc-car")
+    reference = Project.load(legacy)
     for cid, comp in project.spec.components.items():
         assert comp.pose == reference.spec.components[cid].pose
         assert comp.mount == raw["components"][cid].get("mount", "world")

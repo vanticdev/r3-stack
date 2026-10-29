@@ -26,41 +26,31 @@ from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
 
 from .client import Transport, default_transport
-from .sync import sync, write_cad_model
-
-
-def _direct_builder():
-    """The direct-CAD builder (standard Onshape features only)."""
-    try:
-        from .direct import build_robot, input_digest
-    except ImportError:
-        return None
-    return build_robot, input_digest
 
 
 def run(project: Project) -> StageResult:
     result = StageResult(stage="cad", inputs=project.fingerprint())
     started = time.time()
-    result.assume("mechanical", "Purchased parts are catalog envelopes plus their datasheet features; their mass is a labeled catalog "
-                                "mass override (inertia scaled from the envelope geometry).")
-    result.assume("mechanical", "Fabricated parts (plates, brackets, knuckles, axles, horn, tie rods, straps, tape) get mass from "
-                                "geometry x material density; fasteners are full-geometry steel/brass parts (hex sockets not modeled).")
+    result.assume("mechanical", "Purchased parts are catalog envelopes plus their datasheet features, modeled once in the linked "
+                                "R3 Parts Library; their mass is a labeled catalog mass override (inertia from the envelope geometry).")
+    result.assume("mechanical", "Fabricated parts get holes, bores, sockets and slots from their catalog interfaces (the joins they "
+                                "serve); mass from geometry x material density. Fasteners are full-geometry parts (no hex sockets).")
+    result.assume("mechanical", "Fit checks run on the Onshape Part Studio geometry moved by the solved assembly transforms, which "
+                                "must equal the compiled poses.")
     if project.spec.cad.provider == "none":
         result.add(Diagnostic.info("cad_disabled", "cad.provider is none"))
         return result
-    direct = _direct_builder()
-    if direct is None:
-        result.add(Diagnostic.error("cad_builder_unavailable", "direct-CAD builder (r3_onshape.direct) is not installed"))
+    if project.spec.assembly is None:
+        result.add(Diagnostic.error("cad_assembly_required", "the organized CAD build needs an assembly section (objects joined at interfaces)"))
         return result
-    builder, input_digest = direct
+    from .organized import input_digest, sync_organized, write_model
+
     digest = input_digest(project)
     existing = project.read_build_json("cad/cad_model.json")
     force = os.environ.get("R3_CAD_FORCE") == "1"
     if existing and existing.get("source", {}).get("generator_digest") == digest and not force:
         result.add(Diagnostic.info("cad_model_reused", "cad_model.json matches the current generator digest",
                                    data={"document": existing["source"].get("url"), "digest": digest}))
-        if not (project.build_dir("cad") / "views" / "iso.png").exists():
-            _views(project, default_transport(), existing.get("source", {}), result)
         _summarize(project, existing, result)
         result.duration_s = time.time() - started
         return result
@@ -68,30 +58,32 @@ def run(project: Project) -> StageResult:
     if api is None:
         result.add(Diagnostic.warning("cad_geometry_estimated", "no Onshape transport (headless session, onshape-native bridge or API keys); "
                                       "downstream stages use catalog geometry",
-                                      hint="Run `python -m r3_onshape.session login` once, or start the onshape-native companion."))
+                                      hint="Run `python -m r3_onshape.session login` once, or configure Onshape API keys."))
         return result
     previous = (project.lock.get("cad", {}) or {})
     attempt = previous.get("attempt", 0) + 1
-    report = sync(project, api, result, builder, attempt_label=f"attempt-{attempt}")
-    if result.ok and report.document:
-        path = write_cad_model(project, report, api.name, digest)
+    report = sync_organized(project, api, result, attempt_label=os.environ.get("R3_CAD_LABEL", ""))
+    if result.ok and report.get("robot") is not None:
+        path = write_model(project, report, api.name, digest)
         model = json.loads(path.read_text())
         result.artifact(path.relative_to(project.build_dir()), "json", "Per-part mass properties, meshes, fit report, steering table, RF")
-        for name, part in sorted(report.parts.items()):
+        for name, part in sorted(model["parts"].items()):
             result.artifact(f"cad/{part['mesh']}", "stl")
-        for image in report.images:
-            result.artifact(f"cad/{image}", "plot_png", "Onshape shaded view (headless)")
-        project.write_lock("cad", {"provider": "onshape", "document_id": report.document.did, "workspace_id": report.document.wid,
-                                   "element_id": report.document.part_studio, "assembly_id": report.assembly.get("element_id"),
-                                   "url": report.document.url(), "microversion": report.microversion, "generator_digest": digest,
-                                   "validator_version": model["source"]["validator_version"], "mesh_digest": model["source"]["mesh_digest"],
-                                   "attempt": attempt, "revision": report.microversion or digest})
-        _views(project, api, {"document_id": report.document.did, "workspace_id": report.document.wid,
-                              "element_id": report.document.part_studio}, result)
+        for image in model.get("images", []):
+            result.artifact(f"cad/{image}", "plot_png", "Onshape shaded view (headless REST) or solved-pose render")
+        robot = report["robot"]
+        project.write_lock("cad", {"provider": "onshape", "document_id": robot.did, "workspace_id": robot.wid,
+                                   "element_id": model["source"]["element_id"], "assembly_id": model["source"]["assembly_id"],
+                                   "url": model["source"]["url"], "microversion": model["source"]["microversion"],
+                                   "generator_digest": digest, "validator_version": model["source"]["validator_version"],
+                                   "mesh_digest": model["source"]["mesh_digest"], "attempt": attempt,
+                                   "revision": model["source"]["microversion"] or digest,
+                                   "library_document_id": model["source"]["library"]["document_id"],
+                                   "library_version_id": model["source"]["library"]["version_id"]})
         _summarize(project, model, result)
         old = previous.get("document_id")
-        if old and old != report.document.did:
-            # Keep exactly one live document per robot: the superseded build is trashed.
+        if old and old != robot.did:
+            # Keep exactly one live document per robot (plus the parts library): the superseded build is trashed.
             try:
                 from .sync import delete_document
                 delete_document(api, old)
@@ -123,6 +115,10 @@ def _views(project: Project, api: Transport | None, source: dict, result: StageR
     result.metrics["cad_views"] = len(paths)
 
 
+def _count(value: object) -> int:
+    return value if isinstance(value, int) else len(value or [])  # type: ignore[arg-type]
+
+
 def _summarize(project: Project, model: dict, result: StageResult) -> None:
     parts = model.get("parts", {})
     total = sum(p["mass"] for p in parts.values())
@@ -132,7 +128,7 @@ def _summarize(project: Project, model: dict, result: StageResult) -> None:
                            "verified_fasteners": len(fit.get("verified_fasteners", [])),
                            "verified_interfaces": len(fit.get("verified_interfaces", [])),
                            "ackermann_pct_full_lock": steering.get("ackermann_pct_full_lock"),
-                           "assembly_mates": len((model.get("assembly") or {}).get("mates", []))})
+                           "assembly_mates": _count((model.get("assembly") or {}).get("mates", []))})
     limit = project.spec.requirements.max_mass
     if limit and total > limit:
         result.add(Diagnostic.error("mass_budget_exceeded", f"CAD mass {total:.3f} kg exceeds {limit:.3f} kg",

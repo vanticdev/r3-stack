@@ -35,7 +35,7 @@ class PulseMap:
     steer_left_us: float = 1722.0
     steer_center_us: float = 1500.0
     steer_right_us: float = 1278.0
-    max_steer_rad: float = 0.45
+    max_steer_rad: float = 0.4021
 
     def esc_pulse(self, throttle: float) -> float:
         u = clamp(throttle, -1.0, 1.0)
@@ -163,7 +163,7 @@ class WaypointPath:
 @dataclass
 class PurePursuitConfig:
     wheelbase_m: float = 0.26
-    max_steer_rad: float = 0.45
+    max_steer_rad: float = 0.4021
     lookahead_min_m: float = 1.2
     lookahead_max_m: float = 6.0
     lookahead_base_m: float = 1.0
@@ -296,7 +296,7 @@ class SpeedPlanner:
 class SpeedControllerConfig:
     kp: float = 0.2                      # throttle per (m/s)
     ki: float = 0.15                     # throttle per (m/s * s)
-    speed_at_full_throttle_mps: float = 10.0  # feed-forward slope (estimate, 540 motor / 9.6:1 / 55 mm wheel)
+    speed_at_full_throttle_mps: float = 10.0  # feed-forward slope (estimate, 540 motor / 9.07:1 / 55 mm wheel)
     deadband_offset: float = 0.04        # ESC deadband 0.03 (catalog) + margin
     integrator_limit: float = 0.35
     max_brake: float = 0.6

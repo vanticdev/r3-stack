@@ -37,6 +37,7 @@ STAGE = "assembly"
 INSERTION_KINDS = {"bore", "ball_socket", "spline"}
 INSERTION_TOLERANCE = 1e-4  # m: a 48-gon shaft prism inside a bore of the same nominal size
 CONTACT_TOLERANCE = 1e-5  # m: a seat origin this close to its envelope surface is on it
+EXACT_VOLUME_TOL = 5e-11  # m^3 (0.05 mm^3): mesh-boolean slivers of coincident faces stay below this
 
 
 def object_solids(project: Project) -> dict[str, Solid]:
@@ -130,13 +131,172 @@ def check_interference(project: Project, assembly: AssemblyResult, solids: dict[
     return found
 
 
+def allowed_pairs(project: Project) -> dict[frozenset[str], str]:
+    """Part pairs whose solids legitimately overlap: threads (screw/stud in its tapped
+    part, bolt in its nut), press fits, splines and line-to-line running fits."""
+    allowed: dict[frozenset[str], str] = {}
+    for fastener in project.spec.mechanical.fasteners:
+        if fastener.thread_into:
+            allowed[frozenset({fastener.part, fastener.thread_into})] = f"thread {fastener.id}"
+        if fastener.nut_part:
+            allowed[frozenset({fastener.part, fastener.nut_part})] = f"thread {fastener.id}"
+    for interface in project.spec.mechanical.interfaces:
+        clearance = interface.params.get("clearance")
+        line_to_line = interface.kind == "revolute_fit" and clearance and to_si(clearance[0]) < 0
+        if interface.kind in ("press_fit", "spline") or line_to_line:
+            allowed[frozenset(interface.parts)] = f"{interface.kind} {interface.id}"
+    # A purchased part given only as a catalog envelope (no solids, features or fabrication) has no modeled
+    # holes or bores: what is joined or fastened to it necessarily overlaps it. Recorded, not hidden.
+    def envelope_only(cid: str) -> bool:
+        comp = project.spec.components.get(cid)
+        if comp is None:
+            return False
+        mech = project.catalog.component(comp.type).mechanical
+        return not (mech.fabricated or mech.solids or mech.features or comp.params.get("solids"))
+
+    related: set[frozenset[str]] = set()
+    for fastener in project.spec.mechanical.fasteners:
+        members = [fastener.part, *fastener.clamps, *([fastener.thread_into] if fastener.thread_into else [])]
+        related |= {frozenset({fastener.part, m}) for m in members if m != fastener.part}
+    joined: dict[str, set[str]] = {}
+    for join in (project.spec.assembly.joins if project.spec.assembly else []):
+        a, b = join.a.partition(".")[0], join.b.partition(".")[0]
+        joined.setdefault(a, set()).add(b)
+        joined.setdefault(b, set()).add(a)
+        kinds = set()
+        for end in (join.a, join.b):
+            obj, _, name = end.partition(".")
+            iface = project.catalog.component(project.spec.components[obj].type).interfaces.get(name)
+            kinds.add(iface.kind if iface else "")
+        if kinds & {"shaft", "bore", "spline", "ball_stud", "ball_socket"}:  # insertion joins only, not planar seats
+            related.add(frozenset({a, b}))
+    for fastener in project.spec.mechanical.fasteners:  # an envelope joined to the stack (e.g. a wheel on the axle a screw enters)
+        stack = {*fastener.clamps, *([fastener.thread_into] if fastener.thread_into else [])}
+        for member in stack:
+            related |= {frozenset({fastener.part, other}) for other in joined.get(member, set())}
+    for pair in related:
+        if pair not in allowed and any(envelope_only(c) for c in pair):
+            allowed[pair] = "envelope-only part (holes and bores not modeled)"
+    return allowed
+
+
+def check_exact_interference(project: Project, result: StageResult) -> list[dict[str, Any]] | None:
+    """Exact solids (the CAD part plans: catalog solids, datasheet features and the
+    holes/bores the interfaces cut, fasteners included) at the compiled poses,
+    intersected pairwise with manifold3d. None when the CAD planner is unavailable."""
+    try:
+        from r3_onshape.parts import build_part_catalog, instance_poses, world_manifold
+    except ImportError:
+        return None
+    parts, instances = build_part_catalog(project)
+    poses = instance_poses(project)
+    solids = {iid: world_manifold(parts[key], poses[iid]) for iid, key in instances.items()}
+    boxes = {iid: np.asarray(solid.bounding_box()).reshape(2, 3) for iid, solid in solids.items()}
+    allowed = allowed_pairs(project)
+    found = []
+    for a, b in itertools.combinations(sorted(solids), 2):
+        (la, ha), (lb, hb) = boxes[a], boxes[b]
+        if np.any(ha < lb) or np.any(hb < la):
+            continue
+        volume = (solids[a] ^ solids[b]).volume()
+        if volume <= EXACT_VOLUME_TOL:
+            continue
+        reason = allowed.get(frozenset({a, b}))
+        found.append({"a": a, "b": b, "volume": volume, "allowed": reason})
+        if reason is None:
+            region = np.asarray((solids[a] ^ solids[b]).bounding_box()).reshape(2, 3)
+            extent = region[1] - region[0]
+            joins = [j.join_id for j in (project.spec.assembly.joins if project.spec.assembly else [])
+                     if {j.a.partition(".")[0], j.b.partition(".")[0]} == {a, b}]
+            result.add(Diagnostic.error(
+                "object_interference", f"{a} and {b} intersect by {volume * 1e9:.3f} mm^3 (exact solids at the compiled poses)"
+                + (f"; they are joined by {', '.join(joins)}" if joins else ""),
+                subjects=[a, b, *joins], data={"overlap_volume": volume, "method": "exact", "extent": extent.tolist(),
+                                               "depth": float(extent.min()), "center": ((region[0] + region[1]) / 2).tolist(),
+                                               "joined": bool(joins), "joins": joins},
+                hint="A join or a catalog dimension puts one part inside another: check the interface frames and solids."))
+    result.metrics["exact_solids"] = len(solids)
+    project._exact_solids = solids  # reused by the seat-contact check
+    return found
+
+
+def check_caps(project: Project, result: StageResult) -> list[dict[str, Any]]:
+    """Printed screw caps: inner diameter = head + 2 x cap clearance of their print
+    process (print_fits.yaml), and, on the PCB, the cap footprint against the
+    board's own keep-outs (build/pcb/<board>/board.json ``mounting``)."""
+    out = []
+    boards = {b.component: b for b in project.spec.pcb.boards}
+    for join in (project.spec.assembly.joins if project.spec.assembly else []):
+        for end, other in ((join.a, join.b), (join.b, join.a)):
+            obj, _, name = end.partition(".")
+            ctype = project.catalog.component(project.spec.components[obj].type)
+            params = (ctype.interfaces.get(name).params if name in ctype.interfaces else {}) or {}
+            if "cap_for" not in params:
+                continue
+            head = project.catalog.fastener(params["cap_for"])
+            fit = project.catalog.print_fits.get(params.get("process", "fdm"))
+            inner = to_si(params["inner_d"])
+            needed = head.head_diameter + 2 * to_si(fit.cap_clearance) if fit else head.head_diameter
+            entry = {"cap": obj, "on": other, "inner_d": inner, "required_inner_d": needed, "outer_d": float(ctype.mechanical.size[0])}
+            if abs(inner - needed) > 1e-6:
+                result.add(Diagnostic.error("cap_clearance_mismatch",
+                                            f"{obj}: inner diameter {inner * 1e3:.2f} mm != head {head.head_diameter * 1e3:.2f} mm + "
+                                            f"2 x {to_si(fit.cap_clearance) * 1e3:.2f} mm ({fit.process} cap clearance)",
+                                            subjects=[obj], data=entry))
+            board_obj = other.partition(".")[0]
+            board = boards.get(board_obj)
+            if board is not None:
+                path = project.root / "build" / "pcb" / board.source.split("/")[-1] / "board.json"
+                if path.exists():
+                    mounting = json.loads(path.read_text()).get("mounting", {})
+                    keepout = (mounting.get("keepouts") or {}).get("top_components_radius")
+                    entry["board_keepout_radius"] = keepout
+                    if keepout is not None and entry["outer_d"] / 2 > keepout + 1e-6:
+                        result.add(Diagnostic.warning(
+                            "cap_keepout_exceeded",
+                            f"{obj}: cap radius {entry['outer_d'] / 2 * 1e3:.2f} mm exceeds the board's top-component keep-out "
+                            f"{keepout * 1e3:.2f} mm around its mounting hole (board.json)",
+                            subjects=[obj, board_obj], data={**entry, "excess": entry["outer_d"] / 2 - keepout},
+                            hint="Widen the KiCad rule area around the mounting holes to the cap radius (PCB stage), or shrink the cap."))
+            out.append(entry)
+    return out
+
+
 def _signed_distance(solid: Solid, point: np.ndarray) -> float:
     """Signed distance to a convex envelope (exact on and inside the surface; a lower bound outside)."""
     return min(float(np.max(piece.halfspaces[:, :3] @ point + piece.halfspaces[:, 3])) for piece in (solid.pieces or (solid,)))
 
 
-def check_seat_contact(project: Project, assembly: AssemblyResult, solids: dict[str, Solid], result: StageResult) -> None:
-    """Fasten seats must touch: each planar seat origin lies on its object's envelope."""
+def _surface_distance_exact(solid: Any, point: np.ndarray, probe: float = 5e-5) -> float:
+    """0 when ``point`` lies on the exact solid's surface (a probe ball is partly
+    inside), else the probe radius signed outside (+) or inside (-)."""
+    import manifold3d as m3d
+
+    ball = m3d.Manifold.sphere(probe, 24).translate(tuple(float(v) for v in point))
+    fraction = (ball ^ solid).volume() / ball.volume()
+    if fraction <= 0.02:
+        return probe
+    if fraction >= 0.98:
+        return -probe
+    return 0.0
+
+
+def _seat_distance_exact(solid: Any, frame: np.ndarray, iface: Any) -> float:
+    """Probe the seat plane at its origin and on a ring just outside its holes
+    (a seat point on a hole axis lies in the hole): 0 if any probe is on the surface."""
+    hole = max((h.d / 2 for h in iface.holes if abs(h.x) < 1e-9 and abs(h.y) < 1e-9), default=0.0)
+    radii = sorted({hole + 3e-4, *(1e-3 + 4e-4 * k for k in range(11))})
+    probes = [frame[:3, 3]] + [frame[:3, 3] + r * (math.cos(t) * frame[:3, 0] + math.sin(t) * frame[:3, 1])
+                               for r in radii for t in np.linspace(0.0, 2 * math.pi, 8, endpoint=False)]
+    values = [_surface_distance_exact(solid, point) for point in probes]
+    return 0.0 if any(v == 0.0 for v in values) else values[0]
+
+
+def check_seat_contact(project: Project, assembly: AssemblyResult, solids: dict[str, Solid], result: StageResult,
+                       exact: dict[str, Any] | None = None) -> None:
+    """Fasten seats must touch: each planar seat origin lies on its object's surface
+    (the exact part solid when available, else the catalog envelope). Thread
+    engagements of studs (``thread`` holes) are not seats and are skipped."""
     for join_id, entry in assembly.joins.items():
         if not entry.get("valid") or entry["kind"] != "fasten":
             continue
@@ -144,8 +304,14 @@ def check_seat_contact(project: Project, assembly: AssemblyResult, solids: dict[
         ifaces = [assembly.interfaces[ref] for ref in refs]
         if not all(i.kind in ("face_mount", "hole_pattern", "adhesive_pad") for i in ifaces):
             continue
-        distances = {ref: _signed_distance(solids[i.obj], assembly.interface_world(ref)[:3, 3])
-                     for ref, i in zip(refs, ifaces) if i.obj in solids}
+        if any(h.kind == "thread" for i in ifaces for h in i.holes):
+            continue
+        if exact is not None:
+            distances = {ref: _seat_distance_exact(exact[i.obj], assembly.interface_world(ref), i)
+                         for ref, i in zip(refs, ifaces) if i.obj in exact}
+        else:
+            distances = {ref: _signed_distance(solids[i.obj], assembly.interface_world(ref)[:3, 3])
+                         for ref, i in zip(refs, ifaces) if i.obj in solids}
         off = {ref: d for ref, d in distances.items() if abs(d) > CONTACT_TOLERANCE}
         if off or abs(entry.get("offset", 0.0)) > CONTACT_TOLERANCE:
             result.add(Diagnostic.warning(
@@ -254,14 +420,23 @@ def run(project: Project) -> StageResult:
     result.assume("mechanical", "Interference uses catalog envelopes (boxes exact, cylinders as 48-gon prisms); a shaft inside a "
                                 "joined bore is allowed. The exact check is the CAD stage's mesh booleans.")
     solids = object_solids(project)
-    interference = check_interference(project, assembly, solids, result)
-    check_seat_contact(project, assembly, solids, result)
+    exact = check_exact_interference(project, result)
+    if exact is None:
+        interference = check_interference(project, assembly, solids, result)
+    else:
+        result.assume("mechanical", "Interference is exact: CAD part plans (catalog solids, datasheet features, interface-cut "
+                                    "holes and bores, every fastener) intersected pairwise at the compiled poses with manifold3d; "
+                                    "threads, press fits and splines are the only allowed overlaps.")
+        interference = [{"a": e["a"], "b": e["b"], "volume": e["volume"], "insertion": e["allowed"]} for e in exact]
+    caps = check_caps(project, result)
+    check_seat_contact(project, assembly, solids, result, getattr(project, "_exact_solids", None))
 
     out_dir = project.build_dir("model")
     payload = assembly.to_json()
     payload.update({
         "tolerance": {"position": float(project.spec.assembly.tolerance.position), "angle": float(project.spec.assembly.tolerance.angle)},
         "interference": interference,
+        "caps": caps,
         "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics],
     })
     (out_dir / "assembly.json").write_text(json.dumps(payload, indent=2, default=float))

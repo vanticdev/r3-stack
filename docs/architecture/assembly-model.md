@@ -151,13 +151,57 @@ tree parent, unless `mount` is authored, and adds the derived joints. Downstream
 stages (graph, wiring, sim, electrical) therefore run unchanged. Specs without
 `assembly:` are not touched: the catalog is not even loaded.
 
-## 5. Onshape (phase B)
+## 5. Derived mechanics (fasteners, fit interfaces, joints)
 
-Phase B carries the model into Onshape:
+The CAD fit checks, the motion sweep and the simulator read robot-frame
+`mechanical.fasteners`, `mechanical.interfaces` and `mechanical.joints`. With an
+`assembly:` section these are **derived** from the joins at load time
+(`r3_model/mechanics.py`), so no robot-frame coordinate is authored twice:
 
-- Each object type becomes a Part Studio built with standard features, with a
-  mate connector at every interface frame.
-- The robot becomes an Assembly with fastened, revolute, slider and ball mates
-  between those connectors.
-- R3 checks that the occurrence transforms solved by Onshape equal the compiled
-  poses.
+| Join | Derived |
+| --- | --- |
+| `fasten` with `fasteners`, clearance + tapped hole pair | one screw per pair (`<join id>` or `<join id>_<n>`): head on the clearance side's far face, threading into the tapped side; `part` defaults to `shcs-m<d>` |
+| both holes clearance, `fasteners.nut` | a through bolt ending in that nut, head on side `head`, grip = both thicknesses + offset |
+| a `thread` hole on an object + a tapped hole | a fastener whose body is that object (kingpin screw, ball stud, stacking standoff): type from the interface's `fastener` param |
+| a nut object (`fastener: nut-…`) on a `thread` stud | the nut fastener; `fasteners.clamps` lists the clamped stack |
+| shaft/bore | `revolute_fit` (revolute/slider), `drive_flat`, `press_fit` (interference), `spline` (`teeth`); a clearance `fasten` slip fit (spacer tube) derives nothing |
+| ball, header/socket, adhesive pads, strap seat/slot | `ball_joint`, `connector_retention`, `adhesive`, `strap` (the join naming `verify.strap`) |
+
+`verify` on a join holds the exact-geometry limits copied into the derived
+interface (radial clearance, interference, engagement, retainers, thrust parts);
+`verify.kind` overrides the derived kind, e.g. a gearbox output that rotates with
+the axle (`kind: drive_flat, rotating_bore: true` on a revolute join) or a bonded
+magnet (`kind: adhesive`). `damping`/`friction` on a moving join go to its
+derived joint. Authored `mechanical.interfaces` may give `frame: <component>` to
+write their axis in that object's frame (e.g. the encoder's magnetic target).
+
+**Mirrored instances.** `params.mirror: [1, -1, 1]` mirrors a type's interfaces
+(origin, z, x mirrored; the frame stays right-handed, so hole and pin y
+coordinates change sign) together with its geometry.
+
+**Printed parts.** Holes and bores in PETG/PA12 parts use the process table in
+`r3_catalog/data/print_fits.yaml` (FDM, SLS: hole-to-screw clearance, sliding
+clearance, press interference, cap clearance) instead of ISO 273/286. All values
+are labeled estimates.
+
+**Interference.** The assembly stage intersects the exact CAD part plans
+(catalog solids, datasheet features, the holes and bores interfaces cut, every
+derived fastener) pairwise at the compiled poses. Threads, press fits and
+splines are the only allowed overlaps. Seats are probed on the exact solids.
+
+## 6. Onshape (phase B)
+
+`r3_onshape.organized` builds the document from the joins:
+
+- Each object type becomes a Part Studio modeled at the object's own origin: standard
+  features on standard planes only (start-offset extrudes, face-started holes, Mirror for
+  right-hand parts), fully defined sketches, named features in feature folders, and
+  `mc_<interface>` mate connectors (`mc_<interface>_h<n>` at each clearance hole's far face).
+  Purchased parts and fasteners live in the versioned `R3 Parts Library` document.
+- Subassemblies (`cad.subassemblies` in robot.yaml) and the top-level assembly are mated on
+  those connectors. Each mate reproduces the compiled `M = Rz(clock)·Tz(offset)·Rx(π)`:
+  primary axes flipped, rotation −clock, offset −offset. Mates cover every tree join, the
+  ball-joint loop closures, and one fastened mate per fastener.
+- R3 reads the solved occurrence transforms back and requires them to equal the compiled
+  poses (`assembly_pose_mismatch`). The fit checks then run on the Onshape geometry at
+  those transforms.

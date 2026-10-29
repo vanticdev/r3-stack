@@ -1,4 +1,8 @@
-"""Spec additions: fasteners, interfaces, joint interfaces, transmission paths, mount graph."""
+"""Spec additions: fasteners, interfaces, joint interfaces, transmission paths, mount graph.
+
+Runs on the direct-CAD revision of the RC car with robot-frame fasteners and interfaces
+(``tests/fixtures/cad/robot_world_frame_v0.yaml``); the current robot.yaml derives them from
+its assembly joins (``tests/test_cad_phaseb.py``)."""
 
 import copy
 from pathlib import Path
@@ -8,7 +12,7 @@ import yaml
 
 from r3_model.spec import RobotSpec
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car" / "robot.yaml"
+RC_CAR = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "cad" / "robot_world_frame_v0.yaml"
 
 
 @pytest.fixture(scope="module")

@@ -31,9 +31,11 @@ def test_mjcf_compiles_with_expected_structure(project):
                         for cid, c in project.spec.components.items())
     expected_mass += sum(cad_parts[name]["mass"] for extras in vm.cad_extras.values() for name in extras)
     assert sum(model.body_mass) == pytest.approx(expected_mass, rel=1e-6)
-    # One body per joint child plus the free root; everything else rides with its mount chain.
+    # One body per joint child plus the free root, plus each tie rod (ball-jointed to the horn, closed to its knuckle by an
+    # equality constraint); everything else rides with its mount chain.
     joints = project.spec.mechanical.joints
-    assert set(vm.bodies) == {"chassis"} | {j.child for j in joints}
+    assert set(vm.bodies) == {"chassis", "tie_rod", "tie_rod_r"} | {j.child for j in joints}
+    assert model.neq == 2 and {model.joint(i).name for i in range(model.njnt)} >= {"ball_tie_rod", "ball_tie_rod_r", "steer_servo"}
     assert "battery" in vm.bodies["chassis"] and "pi" in vm.bodies["chassis"]
     for cid, comp in project.spec.components.items():
         if comp.mount in vm.bodies and cid not in vm.bodies:  # e.g. stub axles on knuckles, axles on wheels
@@ -102,7 +104,7 @@ def test_car_rolls_straight_under_constant_torque(project):
     assert abs(vehicle.position()[1]) < 0.02
     assert abs(vehicle.yaw()) < 0.01
     # No longitudinal slip at moderate torque: ground speed = motor speed * r / N.
-    assert vehicle.forward_speed() == pytest.approx(vehicle.motor_omega() * 0.055 / 9.6, rel=0.02)
+    assert vehicle.forward_speed() == pytest.approx(vehicle.motor_omega() * 0.055 / 9.066, rel=0.02)
 
 
 def test_top_speed_consistent_with_motor_limit(project):
@@ -120,6 +122,8 @@ def test_top_speed_consistent_with_motor_limit(project):
     ke = 60.0 / (2 * math.pi * float(params["kv_rpm_per_v"]))
     v_batt = kernel.last_outputs[kernel.battery_id]["v_terminal"]
     omega_max = (v_batt - float(params.get("brush_drop", 0.2))) / ke  # no-load motor speed at this supply
-    bound = omega_max * 0.055 / 9.6
-    assert 0.8 * bound < speed < bound
-    assert speed == pytest.approx(kernel.vehicle.motor_omega() * 0.055 / 9.6, rel=0.03)
+    bound = omega_max * 0.055 / 9.066
+    # The 9.066:1 drive spins the motor nearer its no-load speed only up to the load line: drag and rolling resistance
+    # hold it near 80 % of the no-load wheel speed (8.5 of 10.7 m/s at this supply).
+    assert 0.75 * bound < speed < bound
+    assert speed == pytest.approx(kernel.vehicle.motor_omega() * 0.055 / 9.066, rel=0.03)

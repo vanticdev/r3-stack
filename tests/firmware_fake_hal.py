@@ -70,7 +70,7 @@ class CarParams:
     brake_accel: float = 4.4         # full ESC brake, traction limited
     coast_decel: float = 0.35        # rolling resistance + drivetrain drag
     wheel_radius: float = 0.055
-    pulses_per_rev: int = 4
+    pulses_per_rev: float = float(DEFAULT_CONFIG["encoder_pulses_per_rev"])  # spur-shaft magnets: per mean wheel rev
     battery_ocv: float = 8.0
     battery_r_int: float = 0.025
     battery_ocv_drop_per_s: float = 0.0
@@ -91,7 +91,7 @@ class CarParams:
     motor_resistance: float = 0.13   # deliberately not the firmware's 0.12 (model error)
     brush_drop: float = 0.2
     no_load_current: float = 1.6
-    gear_ratio: float = 9.6
+    gear_ratio: float = 9.066
     gear_efficiency: float = 0.88
     drag_area: float = 0.04
     spin_growth: float = 4.0         # 1/s, yaw divergence while the rear axle slides

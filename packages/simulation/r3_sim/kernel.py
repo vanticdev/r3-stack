@@ -274,6 +274,7 @@ class CoSimKernel:
         self.encoder_line: tuple[str, int] | None = None
         self.encoder: HallEncoder | None = None
         self.encoder_joint: str | None = None
+        self.encoder_carrier: tuple[list[str], float] | None = None
         for bmap in self.bindings.values():
             if bmap.interface == "gpio" and bmap.attachments:
                 cid = bmap.attachments[0].component
@@ -283,9 +284,17 @@ class CoSimKernel:
                     self.encoder = HallEncoder(int(params.get("pulses_per_wheel_rev", 1)), to_si(params.get("jitter", 0.0)),
                                                self.rng_encoder)
                     self.encoder_line = (bmap.device, int(bmap.channel or 0))
-                    self.encoder_joint = self._nearest_drive_joint(cid)
-                    self.assumptions.append(("sensors", f"Hall encoder magnets ride on {self.encoder_joint} (drive joint nearest "
-                                                        f"to {cid})."))
+                    if params.get("target") == "differential_carrier" and self.vm.drives:
+                        # Magnets on the spur shaft: carrier angle (mean of the driven wheels) x spur/carrier ratio.
+                        self.encoder_joint = "carrier"
+                        self.encoder_carrier = (list(self.vm.drives[0].joints), float(params.get("target_ratio", 1.0)))
+                        self.assumptions.append(("sensors", f"Hall encoder magnets ride on the spur shaft: {cid} sees the differential "
+                                                            f"carrier (mean of {', '.join(self.vm.drives[0].joints)}) x "
+                                                            f"{self.encoder_carrier[1]:g}."))
+                    else:
+                        self.encoder_joint = self._nearest_drive_joint(cid)
+                        self.assumptions.append(("sensors", f"Hall encoder magnets ride on {self.encoder_joint} (drive joint nearest "
+                                                            f"to {cid})."))
 
         mode = initial.get("mode", spec.software.config.get("mode", "autonomous"))
         self.pilot = Pilot(scenario.pilot or {}, spec.software.config)
@@ -549,7 +558,12 @@ class CoSimKernel:
             bus_v = _first(out, [(self.board_id or "", "v_in"), ("_nets", "VBAT"), (self.battery_id, "v_terminal")], 0.0)
             self.ina.update(dt, float(branch), float(bus_v))
         if self.encoder is not None and self.encoder_joint is not None:
-            edges = self.encoder.update(t0, t1, state.joint_angle(self.encoder_joint))
+            if self.encoder_carrier is not None:
+                joints, ratio = self.encoder_carrier
+                angle = ratio * sum(state.joint_angle(j) for j in joints) / len(joints)
+            else:
+                angle = state.joint_angle(self.encoder_joint)
+            edges = self.encoder.update(t0, t1, angle)
             line = self.gpio_lines.get(self.encoder_line) if self.pi_powered else None
             for t_edge, rising in edges:
                 if line is not None:

@@ -96,6 +96,15 @@ class TwinHalServer:
         assert self.conn is not None
         self.conn.sendall(json.dumps(message, separators=(",", ":")).encode() + b"\n")
 
+    def _reply(self, message: dict[str, Any]) -> bool:
+        """Send a reply; False when the program has gone (e.g. killed or reset while the
+        request was being served across a brownout): the caller treats it as closed."""
+        try:
+            self._send(message)
+        except OSError:
+            return False
+        return True
+
     def serve_one(self) -> str:
         """Read and answer one request. Returns ``ok``, ``closed``, ``timeout``,
         ``brownout`` (a brownout reply was sent), or ``end`` (scenario over)."""
@@ -113,8 +122,8 @@ class TwinHalServer:
         except (json.JSONDecodeError, UnicodeDecodeError):
             self.errors["bad_request"] = self.errors.get("bad_request", 0) + 1
             self.bad_lines.append(line[:200])
-            self._send({"id": None, "ok": False, "t": self.kernel.t, "error": "bad_request", "message": "invalid JSON"})
-            return "ok"
+            return "ok" if self._reply({"id": None, "ok": False, "t": self.kernel.t, "error": "bad_request", "message": "invalid JSON"}) \
+                else "closed"
         self.requests += 1
         rid = request.get("id")
         op = str(request.get("op", ""))
@@ -129,7 +138,8 @@ class TwinHalServer:
         if status == "end":
             self.ended = True
             return "end"
-        self._send({"id": rid, "ok": True, "t": round(self.kernel.t, 9), **result})
+        if not self._reply({"id": rid, "ok": True, "t": round(self.kernel.t, 9), **result}):
+            return "closed"
         if op == "bye":
             self.bye = self.ended = True
             return "end"

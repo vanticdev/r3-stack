@@ -1,13 +1,597 @@
 cad:
-  assembly_id: b1a24dce6b1ba2ba3e98f1e7
-  attempt: 13
-  document_id: 7f38296c6a64ee6e82e32ee3
-  element_id: 4c3385f677ae474914982ad5
-  generator_digest: 5c9adc382e5439cd
-  mesh_digest: 7ff2cba419d874f6
-  microversion: 697364f995235c5218ecc77d
+  assembly_id: ce9c5c5279d9866cc858c81a
+  attempt: 19
+  document_id: 4131b20ac1d9b00551ccc53a
+  element_id: ce9c5c5279d9866cc858c81a
+  generator_digest: 6a04f840408f5a07
+  library_document_id: 4d6e613b90c2bb0a65805a0d
+  library_version_id: f04290525c8dd239fcfd0018
+  mesh_digest: 42e4968c0503f5b4
+  microversion: da62aa95171993d1aa890647
   provider: onshape
-  revision: 697364f995235c5218ecc77d
-  url: https://cad.onshape.com/documents/7f38296c6a64ee6e82e32ee3/w/350a32bf8773bd0828574622/e/4c3385f677ae474914982ad5
+  revision: da62aa95171993d1aa890647
+  url: https://cad.onshape.com/documents/4131b20ac1d9b00551ccc53a/w/43c3f297228d9d8f5222124c/e/ce9c5c5279d9866cc858c81a
   validator_version: fit-2.0
-  workspace_id: 350a32bf8773bd0828574622
+  workspace_id: 43c3f297228d9d8f5222124c
+cad_library:
+  digest: 1cf92f94f33a39de
+  document_id: 4d6e613b90c2bb0a65805a0d
+  name: R3 Parts Library
+  studios:
+    Ball studs:
+      connectors:
+        ball-stud-m3-5.8x6:
+          mc_ball: F4uzaBW1x90SpA9_2
+          mc_thread: FDmXDvWlV2GDQ0e_2
+        ball-stud-m3-5.8x8:
+          mc_ball: FlnhswyNvXgok78_2
+          mc_thread: FJfOhRsY8JhsuzF_2
+      element_id: 2e9c2adeac208f33ece6a16a
+      folders:
+        Base shape:
+        - Fps7Egm5uMnoB7L_0
+        - Fk38XOUrG392qWs_0
+        - FjC3MnVqnj9Gj8k_0
+        - FI8DTezDYv2QjVs_1
+        - F25toIdKdKOPqnZ_1
+        - FVmmedt9XnlvslG_1
+        - Fq8dumZqZd9ZTYQ_1
+        - FF4W3LVYn3YvJO6_1
+        - F41pNyxIIM6Ltyq_1
+        - F8Dr6r0QRxmCR48_2
+        - FlDnC3mJxaOBmMM_2
+        - FRJYIUAdMAN5Ps2_2
+        Mate connectors:
+        - FDmXDvWlV2GDQ0e_2
+        - F4uzaBW1x90SpA9_2
+        - FJfOhRsY8JhsuzF_2
+        - FlnhswyNvXgok78_2
+      part_ids:
+        ball-stud-m3-5.8x6: JID
+        ball-stud-m3-5.8x8: JRD
+    Bearing MR106ZZ:
+      connectors:
+        bearing-mr106zz:
+          mc_inner: F1OfG2relMpYsu1_1
+          mc_outer: FvGTsd3Ro4QAsIo_1
+      element_id: e41c6da92ef84e96ca036074
+      folders:
+        Base shape:
+        - FctiRT1Dfyns549_0
+        - FgOOjb52PxoeWjL_0
+        Bores & shafts:
+        - FM9yO6LlRP5mbqZ_1
+        - Ft7LmpeTiWCwnIo_1
+        Mate connectors:
+        - FvGTsd3Ro4QAsIo_1
+        - F1OfG2relMpYsu1_1
+      part_ids:
+        bearing-mr106zz: JHD
+    Deck standoff M3x47:
+      connectors:
+        standoff-m3-47:
+          mc_bottom: FyF9ybDKJvijz9A_1
+          mc_top: FTzMQA0j8XBqvYx_1
+      element_id: 3acb4749c6ef9c74f47331be
+      folders:
+        Base shape:
+        - FEhSI9cYIKPY4Ae_0
+        - FfgliUeqbmu8Axj_0
+        Mate connectors:
+        - FyF9ybDKJvijz9A_1
+        - FTzMQA0j8XBqvYx_1
+        Mounting holes:
+        - FMUSSPZugc4aR6O_1
+        - FFP2opGpIUoYabW_1
+        - FoJspKDrxLchBNb_1
+        - FqNb00201NdYwUl_1
+      part_ids:
+        standoff-m3-47: JHD
+    ELRS T-antenna:
+      connectors:
+        elrs-t-antenna:
+          mc_seat: FXO99m6lI9ptlSQ_1
+      element_id: b140a02721078955f53fa9f9
+      folders:
+        Base shape:
+        - Fmj18EnKj7OGSon_0
+        - FlCc1Qo5A78PEGl_0
+        - FugZBLecATSjOG7_1
+        - FHITdA9YmiCLNOh_1
+        - FqA0MzsN8vJRjS9_1
+        - FoVgXKBC6IL7FxI_1
+        Mate connectors:
+        - FXO99m6lI9ptlSQ_1
+      part_ids:
+        elrs-t-antenna: JHD
+    ELRS receiver RP1:
+      connectors:
+        elrs-receiver-2g4:
+          mc_bottom: FK4XoKj5ufGcC4T_1
+      element_id: 22e060dc31b6f6da0686da8f
+      folders:
+        Base shape:
+        - FYOLPsmZ1TvcRcu_0
+        - FUrKwISgvVpncBe_0
+        Mate connectors:
+        - FK4XoKj5ufGcC4T_1
+      part_ids:
+        elrs-receiver-2g4: JHD
+    ESC QuicRun 1060:
+      connectors:
+        esc-brushed-60a:
+          mc_bottom: FbH355fr86OsQoP_1
+      element_id: af12fcea4ba4105acafa4058
+      folders:
+        Base shape:
+        - F5cA44r8zPCQd2M_0
+        - FsqqKDRNi3UvvEs_0
+        Mate connectors:
+        - FbH355fr86OsQoP_1
+      part_ids:
+        esc-brushed-60a: JHD
+    Fuse holder ATC 10A:
+      connectors:
+        fuse-atc-10a:
+          mc_bottom: F8Rozaowvun1bDq_1
+          mc_tie_path: FLquGIqSNGsIJH2_1
+      element_id: 991c2c72b21382344748234b
+      folders:
+        Base shape:
+        - FyURI3zajf7KVgO_0
+        - FX2EWjvVL0CZdLf_0
+        Mate connectors:
+        - F8Rozaowvun1bDq_1
+        - FLquGIqSNGsIJH2_1
+      part_ids:
+        fuse-atc-10a: JHD
+    GPS u-blox M10:
+      connectors:
+        gps-ublox-m10:
+          mc_bottom: FC6iDzY5qnGQyjg_1
+      element_id: 27ff4093e3f397a62b10ed91
+      folders:
+        Base shape:
+        - FF3c3tlh328Al4v_0
+        - FppEvjb2cNDoqJQ_0
+        Mate connectors:
+        - FC6iDzY5qnGQyjg_1
+      part_ids:
+        gps-ublox-m10: JHD
+    Hall encoder board:
+      connectors:
+        hall-encoder-a1120:
+          mc_mount: Fcdev1oUVFMjYv8_1
+          mc_mount_h1: FuayRQ22HqsdztY_1
+          mc_mount_h2: FTtPNSKrvKNPhog_1
+      element_id: e41ee328d9a30f019d89bef3
+      folders:
+        Base shape:
+        - FHB94lwSKBpAvaK_0
+        - FC9r0L6cT5TLcjY_0
+        Mate connectors:
+        - Fcdev1oUVFMjYv8_1
+        - FuayRQ22HqsdztY_1
+        - FTtPNSKrvKNPhog_1
+        Mounting holes:
+        - F2uOULFHzDNkffb_1
+        - F8Ewf1eFH8h8haJ_1
+        - Fi4jCtWBVbgOgPT_1
+        - FSADFjJO1d9GpXP_1
+      part_ids:
+        hall-encoder-a1120: JHD
+    Kingpin screw M3x20:
+      connectors:
+        kingpin-screw-m3x20:
+          mc_shank: FfPJECYfxLhTsUp_1
+          mc_thread: Fg5TucrTXlogjmJ_1
+      element_id: 8bd10a6abcbff8f3f6cd00f0
+      folders:
+        Base shape:
+        - FaS3ynWGHmLdFbk_0
+        - FN8fxjQSMvLLuqd_0
+        - FeEMpQoN6yN61HC_0
+        Mate connectors:
+        - Fg5TucrTXlogjmJ_1
+        - FfPJECYfxLhTsUp_1
+      part_ids:
+        kingpin-screw-m3x20: JID
+    LiPo 2S 5000:
+      connectors:
+        lipo-2s-5000-25c:
+          mc_bottom: FFrl6SLbEJfHT1G_1
+          mc_strap_path: FSa3jQsQlnX2LHJ_1
+      element_id: 3421ebf5429d99a47e332c79
+      folders:
+        Base shape:
+        - FOwFOVTvbtSXS6u_0
+        - Fc9kzuYsIYti6hC_0
+        Mate connectors:
+        - FFrl6SLbEJfHT1G_1
+        - FSa3jQsQlnX2LHJ_1
+      part_ids:
+        lipo-2s-5000-25c: JHD
+    Magnet N52 2x1:
+      connectors:
+        magnet-n52-2x1:
+          mc_body: FKNXOm1UjS84ETK_1
+      element_id: 8a9b54dbaf7a3fa17baca9be
+      folders:
+        Base shape:
+        - FjfS4RuUChNVbMl_0
+        - FroiIhGuD03AadP_0
+        Mate connectors:
+        - FKNXOm1UjS84ETK_1
+      part_ids:
+        magnet-n52-2x1: JHD
+    Motor 540:
+      connectors:
+        motor-540-brushed:
+          mc_face: Ff122lGpg6gvhQp_1
+          mc_shaft: FumZKZ0OnGGTMDJ_1
+      element_id: 107034216a6e746d6313b8c7
+      folders:
+        Base shape:
+        - FPKqpT57RAvZ9Zu_0
+        - FEiqti8cti5M9JQ_0
+        Bores & shafts:
+        - FEj9K58y2PrtbzT_1
+        - FnijCCPzwevoYHZ_1
+        Mate connectors:
+        - Ff122lGpg6gvhQp_1
+        - FumZKZ0OnGGTMDJ_1
+        Mounting holes:
+        - FhHcmnKjIvDHCKu_1
+        - FQnnLfYjuKpHZ5l_1
+        - FgJFA7SET6IYnW3_1
+        - FnJNMPFEEY74XJc_1
+      part_ids:
+        motor-540-brushed: JHD
+    Nuts M3:
+      connectors:
+        nut-m3-nyloc:
+          mc_seat: FDWE7gRQhDtAHpu_1
+      element_id: 5bf8c5349dc1a77f7c270b24
+      folders:
+        Base shape:
+        - FzY3okea67iz1BL_0
+        - FlUDLg0QSFmkbhV_0
+        Mate connectors:
+        - FDWE7gRQhDtAHpu_1
+      part_ids:
+        nut-m3-nyloc: JHD
+    Nyloc nut M6:
+      connectors:
+        wheel-nut-m6-nyloc:
+          mc_seat: F4Oo2HiRAISFkBY_1
+      element_id: 24d8ccd3c70d06608fbb4b7c
+      folders:
+        Base shape:
+        - FjZaWkiBuiVpYZB_0
+        - Fr6b9i4BQ8p4Z9v_0
+        Cutouts:
+        - Fqhnz7Dm0jnUNOo_1
+        - FUanlK2HvsEXaiM_1
+        Mate connectors:
+        - F4Oo2HiRAISFkBY_1
+      part_ids:
+        wheel-nut-m6-nyloc: JHD
+    Raspberry Pi 5:
+      connectors:
+        raspberry-pi-5-8gb:
+          mc_J8: FSfOVrUTGmoKBbc_1
+          mc_h1: FYZTssC9s5rzYY3_1
+          mc_h1_h1: FtwZTUotCUns68b_1
+          mc_h2: F3sY75NJgkQqQ7q_1
+          mc_h2_h1: Fpo5W7JFBSGkkpn_1
+          mc_h3: FxYIXqAWKyP3rCD_1
+          mc_h3_h1: Fmj6mOHmQG8UF3B_1
+          mc_h4: F538w2QFwE4ZDfM_1
+          mc_h4_h1: Fl3pFdI5rAzf5G4_1
+          mc_t1: FmPMJCiHi9xd9PV_1
+          mc_t1_h1: FKxCYE2W01rvgQR_1
+          mc_t2: FZKdwe7EwbQMhSS_1
+          mc_t2_h1: F0q27DXONrzvC7f_1
+          mc_t3: FvaXBFAoyZteBnV_1
+          mc_t3_h1: Fn68H4JrYtUAlsJ_1
+          mc_t4: FBVzG9oTUpBPt0W_1
+          mc_t4_h1: FcA59TYmo0QQe3E_1
+      element_id: 3fc34e7076076193e6681266
+      folders:
+        Base shape:
+        - FkG8GZrGJ7ahqCA_0
+        - FFuP0MPnrTDXuN2_0
+        - FnOMM0PfQpwLJrF_1
+        - FeS8bLUd06xk9qw_1
+        - FZPIFPwFvYI8EDf_1
+        - F9YX1ldHZznwh9F_1
+        - FWBE76nTFnRexIc_1
+        - F53PRAbFcvHhiDJ_1
+        - F9VBKwlbKfYq4TD_1
+        - FfTK0MAMUgZ9s63_1
+        Mate connectors:
+        - FYZTssC9s5rzYY3_1
+        - FtwZTUotCUns68b_1
+        - F3sY75NJgkQqQ7q_1
+        - Fpo5W7JFBSGkkpn_1
+        - FxYIXqAWKyP3rCD_1
+        - Fmj6mOHmQG8UF3B_1
+        - F538w2QFwE4ZDfM_1
+        - Fl3pFdI5rAzf5G4_1
+        - FmPMJCiHi9xd9PV_1
+        - FKxCYE2W01rvgQR_1
+        - FZKdwe7EwbQMhSS_1
+        - F0q27DXONrzvC7f_1
+        - FvaXBFAoyZteBnV_1
+        - Fn68H4JrYtUAlsJ_1
+        - FBVzG9oTUpBPt0W_1
+        - FcA59TYmo0QQe3E_1
+        - FSfOVrUTGmoKBbc_1
+        Mounting holes:
+        - F2FVskxm6q0hSsq_1
+        - FWDSG5VzOXInNBM_1
+        - F6eJ6W1ax1Z0IcL_1
+        - FKjSD21PBxtmYPk_1
+        - FqSfNZ3CrliktUF_1
+        - FaBbj2SceLplXy1_1
+        - FYu4jNfDHXs69I7_1
+        - FLQDOoXU2Vb34h5_1
+      part_ids:
+        raspberry-pi-5-8gb: JHD
+    Rear transmission:
+      connectors:
+        gearbox-spur-diff:
+          mc_encoder: FVxiSOXI8fquHGI_1
+          mc_motor_mount: Fa6qOfHP9y6cB2s_1
+          mc_motor_mount_h1: FkExeT0Ubj5zkM1_1
+          mc_motor_mount_h2: F41Lyah5JAOcuCm_1
+          mc_mount: FfiXAjnLdnXyES4_1
+          mc_output_l: FUZBqb9EPkAGUvO_1
+          mc_output_r: FaOb8cfgO0NA3ta_1
+          mc_pinion: FzsrqbxaRy28DGn_1
+          mc_spur_shaft: Fz9ifOm5nXzenLY_1
+      element_id: 03700e2b00a41099b649c1f8
+      folders:
+        Base shape:
+        - Foj4vtPy0rQObb5_0
+        - Fr60REUfQpJlAkX_0
+        - FYPfZFOzMvBFylN_1
+        - FjYnWjQH78wVjvA_1
+        - FLzBGsTOh43LvLl_1
+        - FQe1bQCoo2i3lUP_1
+        - FKyrDDl9K6DBKeN_1
+        - FbCQji4SzuAGLvq_1
+        Bores & shafts:
+        - FSG9WytZRo9iH9K_1
+        - FwXVn5VvRNFmzQg_1
+        - FzPDXRbdMvUTPZf_1
+        - FSbrTkudSnAQcoq_1
+        - FLlwvcI2EXXc7mJ_1
+        - FO6MuRIbWqk8Ps8_1
+        - FcWN8oqHCLqnhnR_1
+        - FkNlwCV6PEu2JI6_1
+        Cutouts:
+        - FGYdr9pJOSG4JFl_1
+        - FMUb13c13h7jk9j_1
+        - Fr4by0B9CaAJVtD_1
+        - FiqIkKfMm7DbOUg_1
+        Mate connectors:
+        - FfiXAjnLdnXyES4_1
+        - Fa6qOfHP9y6cB2s_1
+        - FkExeT0Ubj5zkM1_1
+        - F41Lyah5JAOcuCm_1
+        - FzsrqbxaRy28DGn_1
+        - FUZBqb9EPkAGUvO_1
+        - FaOb8cfgO0NA3ta_1
+        - Fz9ifOm5nXzenLY_1
+        - FVxiSOXI8fquHGI_1
+        Mounting holes:
+        - FAILyWaaycj7fBC_1
+        - FLMTRO0zcJzlPAk_1
+        - FBf4IErE84BCa3U_1
+        - FTg6WHOk5BMOC04_1
+        - FYZlzT7z6uvAMWG_1
+        - FdfEZ8H5ZqNU4Mv_1
+        - FEggc6bCHq7S1ty_1
+        - FHRLHFV7rv4gnzb_1
+        - FNXDSWcwGGoBOWw_1
+        - FAzJMTYlKD5qEOq_1
+        - FCApV7bo0Iw0Olc_1
+        - Fn86WwDdt9MkU2D_1
+      part_ids:
+        gearbox-spur-diff: JHD
+    Servo DS3218:
+      connectors:
+        servo-digital-20kg:
+          mc_cap_a1: F3dx2kmqLogy9TK_2
+          mc_cap_a2: Fqdv4RpgMFJCNmM_2
+          mc_cap_b1: Fzg3odYsPS5YMNu_2
+          mc_cap_b2: FjGLBf6KTsn8Xqr_2
+          mc_ears_a: FWxtB9jcKyLcdmR_2
+          mc_ears_a_h1: FTYBdki4BPqRgDP_2
+          mc_ears_a_h2: FrAZDPMjQWiiR0A_2
+          mc_ears_b: Fbn6nzR93Eq6b2D_2
+          mc_ears_b_h1: FScTOtdvibDqQ7O_2
+          mc_ears_b_h2: FDpSrLCqDWSOUPH_2
+          mc_output: F8TuoLWbCrjEvil_2
+        servo-output-25t:
+          mc_journal: FY4b87PV4NIguMu_2
+          mc_spline: F74ulYqCmW0tN8u_2
+          mc_top: FabJ0fLjtRa0DaG_2
+      element_id: 8545e1f5b982970df0da07d4
+      folders:
+        Base shape:
+        - FBh1rdAYhhs8Pr3_0
+        - FwuUXjMP125L6JU_0
+        - F3fbrNTpjHXAUBb_1
+        - FIV6dtbsRPKAqBw_1
+        - FE6uQPl4E8a8LKc_1
+        - FlL6UWITJbgqO1C_1
+        Bores & shafts:
+        - Fz3m6ihr0eUgTrf_2
+        - FnEennayleCBHsg_2
+        Mate connectors:
+        - FWxtB9jcKyLcdmR_2
+        - FTYBdki4BPqRgDP_2
+        - FrAZDPMjQWiiR0A_2
+        - Fbn6nzR93Eq6b2D_2
+        - FScTOtdvibDqQ7O_2
+        - FDpSrLCqDWSOUPH_2
+        - F3dx2kmqLogy9TK_2
+        - Fqdv4RpgMFJCNmM_2
+        - Fzg3odYsPS5YMNu_2
+        - FjGLBf6KTsn8Xqr_2
+        - F8TuoLWbCrjEvil_2
+        - FY4b87PV4NIguMu_2
+        - F74ulYqCmW0tN8u_2
+        - FabJ0fLjtRa0DaG_2
+        Mounting holes:
+        - F8R90EdsrHQzNuM_2
+        - F6qJszC0SnOGjkt_2
+        - FMJDWT3vxJUzNlP_2
+        - FpRlR8y7bnpmT8x_2
+        - FARHUSOpYISHIEs_2
+        - FdYcuzatDoTZKAz_2
+        - FFil55xgEzULts0_2
+        - F5NopKW3CZunoie_2
+        - FHY2cJ7u5IIJUGA_2
+        - FNZJDo4w0HjZJEP_2
+      part_ids:
+        servo-digital-20kg: JHD
+        servo-output-25t: JOD
+    Socket head screws M2:
+      connectors:
+        shcs-m2x16:
+          mc_seat: F9fQSHMNiKhRFPR_1
+      element_id: c477c7babee9009ac812f65d
+      folders:
+        Base shape:
+        - F1rfFd2URkvJwNp_0
+        - FFvNiHscUoRgueN_0
+        - Fry3pX4UYNL8Sdb_0
+        Mate connectors:
+        - F9fQSHMNiKhRFPR_1
+      part_ids:
+        shcs-m2x16: JID
+    Socket head screws M2.5:
+      connectors:
+        shcs-m2.5x6:
+          mc_seat: FEfPpYc8qvheaeS_2
+        shcs-m2.5x8:
+          mc_seat: Fs20Pe1B1YUnp4n_2
+      element_id: b5a180d62ee5af5f938e0a9d
+      folders:
+        Base shape:
+        - FIxtbLh4dGstBkV_0
+        - F9vCeVg6ArQ4MPV_0
+        - FyzBMs6l6MYQ0I2_0
+        - FhzdDhdWu09I6vf_1
+        - F647dYu5iQ3IPT3_1
+        - FBMjC3odGRl8IpL_1
+        Mate connectors:
+        - FEfPpYc8qvheaeS_2
+        - Fs20Pe1B1YUnp4n_2
+      part_ids:
+        shcs-m2.5x6: JID
+        shcs-m2.5x8: JMD
+    Socket head screws M3:
+      connectors:
+        shcs-m3x10:
+          mc_seat: FkVslhHKVyuJssQ_3
+        shcs-m3x12:
+          mc_seat: FR4jvXBp4ZDguJo_3
+        shcs-m3x8:
+          mc_seat: Fqc6xvYCCUFnwCE_3
+      element_id: 2728a8f56b3d3f8e91dcefc1
+      folders:
+        Base shape:
+        - FK9q4RG8BJmE79f_0
+        - FMZxT3Wu8NRzOeC_0
+        - F0QuCSQ657eoftV_0
+        - Fp1Nme8AAmdksy8_1
+        - FNogt93SvhbkAnm_1
+        - FJrwKYodkbEPEkm_1
+        - FnUZXZq4mTO6339_2
+        - FufXObi2cH7LQcp_2
+        - F7v7s1sbmu7yQ6v_2
+        Mate connectors:
+        - FkVslhHKVyuJssQ_3
+        - FR4jvXBp4ZDguJo_3
+        - Fqc6xvYCCUFnwCE_3
+      part_ids:
+        shcs-m3x10: JID
+        shcs-m3x12: JMD
+        shcs-m3x8: JQD
+    Spacer M2.5 F-F 10:
+      connectors:
+        spacer-m2.5-ff-10:
+          mc_bottom: FRgO2SHa6Ww80t9_1
+          mc_top: F6aAN95YScITqkh_1
+      element_id: baeb66455e17b6df7eba6162
+      folders:
+        Base shape:
+        - F8yXX0GsaqAz92u_0
+        - FXKncb7ATZ9Jmm7_0
+        Mate connectors:
+        - FRgO2SHa6Ww80t9_1
+        - F6aAN95YScITqkh_1
+        Mounting holes:
+        - FDFdITaYWMZincx_1
+        - FIEmogBG9kZbAUE_1
+      part_ids:
+        spacer-m2.5-ff-10: JHD
+    Standoff M-F M2.5x11:
+      connectors:
+        hat-standoff-mf-m2.5-11:
+          mc_stud: FnnaovaAXsBnCRR_1
+          mc_top: FbXxjMYBaPQZJjl_1
+      element_id: 3ae5186da8b2bd9c9c4268e6
+      folders:
+        Base shape:
+        - FOJWq5ttybQWCRs_0
+        - FqG4TlnFFwUsatw_0
+        - FVfGtokHclHnUDZ_1
+        - Fm53L5FhCih4qdD_1
+        Mate connectors:
+        - FnnaovaAXsBnCRR_1
+        - FbXxjMYBaPQZJjl_1
+        Mounting holes:
+        - FQ9qOBoRWdEeKA5_1
+        - FxcJr1r9kZrwiEY_1
+      part_ids:
+        hat-standoff-mf-m2.5-11: JHD
+    Wheels:
+      connectors:
+        wheel-110x45:
+          mc_hub: FKw5MJUZzGCZ6Q5_2
+        wheel-110x45-d:
+          mc_hub: FZsqKKPzAdT2Jjk_2
+      element_id: 63f280eb5e80ce631c4fcb9d
+      folders:
+        Base shape:
+        - FXqbwuemaDkWZ6P_0
+        - FN1d1Og0xX70L9z_0
+        - FbKcnaKjgyEx4Rs_1
+        - Ff4VhlYvRZZF25D_1
+        Bores & shafts:
+        - F6FG1qMHe0nb6m0_2
+        - F6dMW4FA8ozvzvQ_2
+        - FXPt5jZl30GD5iF_2
+        - FZ4Judc3I8zp4Ur_2
+        - FZMAIi496zskCMj_2
+        - FeoLKfhoNDE7W0U_2
+        - F4ZAhyYUe058n8P_2
+        - FhJRR0AyPBpT2ML_2
+        - FNsAckJc9psBZik_2
+        - FXRWvVzPLT0NBu2_2
+        - FsPYsOLt8P8xNmz_2
+        - FqvlEkFVI2cyEmJ_2
+        Mate connectors:
+        - FKw5MJUZzGCZ6Q5_2
+        - FZsqKKPzAdT2Jjk_2
+      part_ids:
+        wheel-110x45: JHD
+        wheel-110x45-d: JKD
+  url: https://cad.onshape.com/documents/4d6e613b90c2bb0a65805a0d/w/b1c2b422c17fdd96f63b9335
+  version_id: f04290525c8dd239fcfd0018
+  workspace_id: b1c2b422c17fdd96f63b9335

@@ -5,6 +5,7 @@
 components:
   - id: chassis-plate-al6061
     kind: structure
+    cad_name: Chassis plate
     name: Main chassis plate, 6061-T6 aluminum, 3 mm
     description: Waterjet plate; rear section 130 mm wide, front tapers to 70 mm for steering sweep.
     mechanical:
@@ -19,9 +20,31 @@ components:
       # fasteners and straps that use the plate.
       solids:
         - {kind: prism, name: plate, position: [0, 0, 0], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 3 mm, profile: "@outline"}
+        # Relief under the 540 can: with the 18T pinion the motor sits 0.2 mm lower (center distance 25.2 mm).
+        - {kind: box, op: remove, name: motor relief, position: [-80.76 mm, -5 mm, 1.5 mm], size: [38 mm, 52 mm, 3 mm]}
       provenance: {status: estimated, notes: "mass replaced by CAD mass properties after cad sync"}
+    interfaces:
+    # Interface frames in the plate frame (bottom center; top face z = 3 mm). Holes and slots of this
+    # fabricated plate are cut from these interfaces; joins in robot.yaml place every object on them.
+      gearbox: {kind: hole_pattern, origin: [-130 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[18 mm, 22 mm, 3.4 mm, clearance, 3 mm], [-18 mm, 22 mm, 3.4 mm, clearance, 3 mm], [18 mm, -22 mm, 3.4 mm, clearance, 3 mm], [-18 mm, -22 mm, 3.4 mm, clearance, 3 mm]]}}
+      hub_rl: {kind: hole_pattern, origin: [-130 mm, 53 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 6 mm, 3.4 mm, clearance, 3 mm], [-7 mm, 6 mm, 3.4 mm, clearance, 3 mm], [7 mm, -6 mm, 3.4 mm, clearance, 3 mm], [-7 mm, -6 mm, 3.4 mm, clearance, 3 mm]]}}
+      hub_rr: {kind: hole_pattern, origin: [-130 mm, -53 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 6 mm, 3.4 mm, clearance, 3 mm], [-7 mm, 6 mm, 3.4 mm, clearance, 3 mm], [7 mm, -6 mm, 3.4 mm, clearance, 3 mm], [-7 mm, -6 mm, 3.4 mm, clearance, 3 mm]]}}
+      so_rl: {kind: hole_pattern, origin: [-90 mm, 45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      so_rr: {kind: hole_pattern, origin: [-52 mm, -45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      so_fl: {kind: hole_pattern, origin: [65 mm, 28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      so_fr: {kind: hole_pattern, origin: [65 mm, -28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      arm_fl: {kind: hole_pattern, origin: [130 mm, 31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
+      arm_fr: {kind: hole_pattern, origin: [130 mm, -31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
+      post_a: {kind: hole_pattern, origin: [110.05 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
+      post_b: {kind: hole_pattern, origin: [159.55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
+      esc_pad: {kind: adhesive_pad, origin: [-60 mm, 42 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {area: 1408 mm^2}}
+      battery_seat: {kind: face_mount, origin: [28 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      strap_slots: {kind: strap_slot, origin: [28 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {width: 22 mm, slots: [[-11 mm, -25.5 mm, 11 mm, -23 mm], [-11 mm, 23 mm, 11 mm, 25.5 mm]]}, description: "Two 22 x 2.5 mm slots either side of the battery for the hook-and-loop strap"}
+      fuse_seat: {kind: face_mount, origin: [-55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      tie_slots: {kind: strap_slot, origin: [-55 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {width: 4 mm, slots: [[-7.5 mm, -2 mm, -5.5 mm, 2 mm], [5.5 mm, -2 mm, 7.5 mm, 2 mm]]}, description: "Cable-tie slots that retain the fuse holder"}
   - id: upper-deck-petg
     kind: structure
+    cad_name: Electronics deck
     name: Electronics deck, PETG 3D printed, 3 mm
     mechanical:
       shape: custom
@@ -33,8 +56,26 @@ components:
       fabricated: true
       solids:
         - {kind: prism, name: deck, position: [0, 0, 0], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 3 mm, profile: "@outline"}
+    interfaces:
+    # Deck frame: bottom center; top face z = 3 mm. PETG: hole clearances from the FDM print-fit table.
+      so_rl: {kind: hole_pattern, origin: [-80 mm, 45 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      so_rr: {kind: hole_pattern, origin: [-42 mm, -45 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      so_fl: {kind: hole_pattern, origin: [75 mm, 28 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      so_fr: {kind: hole_pattern, origin: [75 mm, -28 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_so_rl: {kind: adhesive_pad, origin: [-80 mm, 45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_so_rr: {kind: adhesive_pad, origin: [-42 mm, -45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_so_fl: {kind: adhesive_pad, origin: [75 mm, 28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_so_fr: {kind: adhesive_pad, origin: [75 mm, -28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      pi_1: {kind: hole_pattern, origin: [-49 mm, -24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
+      pi_2: {kind: hole_pattern, origin: [9 mm, -24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
+      pi_3: {kind: hole_pattern, origin: [-49 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
+      pi_4: {kind: hole_pattern, origin: [9 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
+      rx_pad: {kind: adhesive_pad, origin: [70 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      gps_pad: {kind: adhesive_pad, origin: [-65 mm, 30 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      mast: {kind: hole_pattern, origin: [55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
   - id: standoff-m3-47
     kind: structure
+    cad_name: Deck standoff M3x47
     name: M3 x 47 mm aluminum standoff, female-female
     mechanical:
       shape: cylinder
@@ -47,8 +88,13 @@ components:
         - {id: thread_bottom, kind: tapped_hole, position: [0, 0, 0], axis: [0, 0, 1], depth: 6 mm, thread: shcs-m3}
         - {id: thread_top, kind: tapped_hole, position: [0, 0, 47 mm], axis: [0, 0, -1], depth: 6 mm, thread: shcs-m3}
       provenance: {status: estimated, source: "Typical M3 F-F round standoff, 6 mm thread depth each end"}
+    interfaces:
+      bottom: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
+      top: {kind: hole_pattern, origin: [0, 0, 47 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
   - id: wheel-110x45
     kind: wheel
+    cad_name: Front wheel
+    cad_family: Wheels
     name: 1/10 scale wheel and foam-insert rubber tire, 110 x 45 mm, front (plain 6.05 mm hub bore)
     description: Component frame at the wheel center, axis +y toward the outer (nut) side; the hub recess faces -y.
     mechanical:
@@ -71,11 +117,15 @@ components:
         - {id: nut_face, kind: face, position: [0, 14.5 mm, 0], axis: [0, 1, 0]}
         - {id: hub_bore, kind: bore, position: [0, -8.5 mm, 0], axis: [0, 1, 0], diameter: 6.05 mm, depth: 23 mm,
            provenance: {status: estimated, source: "Plain nylon hub bore, H9-class running clearance on a 6 mm stub axle"}}
+    interfaces:
+      hub: {kind: bore, origin: [0, -8.5 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6.05 mm, depth: 23 mm}, description: "Plain nylon hub bore, opening on the inner hub face"}
     behavior:
       model: tire.linear
       params: {radius: 0.055, width: 0.045, friction: 0.9, rolling_resistance: 0.015, torsional_friction: 0.005}
   - id: wheel-110x45-d
     kind: wheel
+    cad_name: Rear wheel
+    cad_family: Wheels
     name: 1/10 scale wheel and foam-insert rubber tire, 110 x 45 mm, rear (6 mm D-bore drive hub)
     description: Component frame at the wheel center, axis +y toward the outer (nut) side; the hub recess faces -y.
     mechanical:
@@ -98,11 +148,14 @@ components:
         - {id: nut_face, kind: face, position: [0, 14.5 mm, 0], axis: [0, 1, 0]}
         - {id: hub_dbore, kind: d_bore, position: [0, -8.5 mm, 0], axis: [0, 1, 0], diameter: 6.02 mm, depth: 23 mm,
            flat_offset: 2.51 mm, flat_normal: [0, 0, 1], provenance: {status: estimated, source: "Molded 6 mm D-drive hub"}}
+    interfaces:
+      hub: {kind: bore, origin: [0, -8.5 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6.02 mm, depth: 23 mm, flat_offset: 2.51 mm}, description: "6 mm D-drive hub; flat on +x of the frame"}
     behavior:
       model: tire.linear
       params: {radius: 0.055, width: 0.045, friction: 0.9, rolling_resistance: 0.015, torsional_friction: 0.005}
   - id: steering-knuckle
     kind: structure
+    cad_name: Steering knuckle
     name: Steering knuckle with integral steering arm, PA12 SLS (left hand; mirror for right)
     description: >
       Frame on the kingpin axis at the knuckle's bottom (thrust) face. Kingpin boss, an upright that carries the
@@ -121,8 +174,13 @@ components:
         - {kind: box, name: upright, position: [0, 14 mm, 20.25 mm], size: [16 mm, 15 mm, 40.5 mm]}
         - {kind: prism, name: steering arm, position: [0, 0, 31.5 mm], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 9 mm,
            profile: [[-2.93 mm, 17.34 mm], [1.43 mm, 9.46 mm], [-26.76 mm, -6.12 mm], [-31.12 mm, 1.76 mm]]}
+    interfaces:
+      kingpin: {kind: bore, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {d: 3.2 mm, depth: 12 mm}, description: "Kingpin bore through the boss; thrust face on the arm"}
+      stub: {kind: bore, origin: [0, 21.5 mm, 19 mm], z: [0, 1, 0], x: [1, 0, 0], params: {d: 5.95 mm, depth: 10 mm}, description: "Stub-axle press bore in the upright (SLS press fit)"}
+      ball_stud: {kind: hole_pattern, origin: [-25 mm, 0, 40.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 9 mm]]}}
   - id: motor-540-brushed
     kind: motor
+    cad_name: Motor 540
     name: 540-size brushed DC motor, 20T
     description: Frame at the can center, axis y; the output face (shaft, mount holes) is at local y = -25 mm, terminals on the rear end bell.
     mechanical:
@@ -140,6 +198,9 @@ components:
            provenance: {status: datasheet, source: "540 can: 2x M3 face holes on 25 mm centers"}}
         - {id: mount_b, kind: tapped_hole, position: [-12.5 mm, -25 mm, 0], axis: [0, 1, 0], depth: 6 mm, thread: shcs-m3}
         - {id: face, kind: face, position: [0, -25 mm, 0], axis: [0, -1, 0]}
+    interfaces:
+      face: {kind: hole_pattern, origin: [0, -25 mm, 0], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[12.5 mm, 0, 3 mm, tapped, 6 mm], [-12.5 mm, 0, 3 mm, tapped, 6 mm]]}}
+      shaft: {kind: shaft, origin: [0, -25 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 3.17 mm, length: 12 mm, flat_offset: 1.385 mm}}
     pins:
       M_POS: {role: motor, voltage_max: 8.4, current_max: 70}
       M_NEG: {role: motor, voltage_max: 8.4, current_max: 70}
@@ -151,13 +212,16 @@ components:
       params: {kv_rpm_per_v: 2100, resistance: 0.11, inductance: 60 uH, no_load_current: 1.6, rotor_inertia: 1.2e-5, brush_drop: 0.2, max_rpm: 21000}
       provenance: {status: estimated, notes: "Typical 540 20T values; replace with dynamometer data"}
     thermal: {theta_ja_c_per_w: 2.5, max_temp_c: 100}
-  - id: gearbox-spur-diff-9.6
+  - id: gearbox-spur-diff
     kind: gearbox
-    name: Rear transmission, 17T/66T m0.6 spur + internal reduction + open differential, 9.6:1 total
+    cad_name: Rear transmission
+    name: Rear transmission, 18T/66T m0.6 spur + internal reduction + open differential, 9.07:1 total
     description: >
       Frame at the bottom center of the case. Case body, a motor plate on the -y side and a gear cover outboard of it
-      enclosing the 17T pinion and 66T m0.6 spur (center distance 24.9 mm). Internal reduction 2.473:1 so that
-      66/17 x 2.473 = 9.6. Outputs are 6 mm D-bores on the outer faces (right output through the motor plate).
+      enclosing the 18T pinion and 66T m0.6 spur (center distance 25.2 mm; the motor slides 0.3 mm along its mesh
+      slots from the 17T position). Internal reduction 2.4727:1, so 66/18 x 2.4727 = 9.066. Outputs are 6 mm D-bores
+      on the outer faces (right output through the motor plate). The spur shaft is extended 8 mm through the gear
+      cover for the encoder magnet carrier (senses the differential carrier at 2.4727 x carrier speed).
     mechanical:
       shape: custom
       size: [95 mm, 75 mm, 60 mm]
@@ -169,10 +233,10 @@ components:
         - {kind: box, name: case, position: [2.5 mm, -0.25 mm, 30 mm], size: [55 mm, 60.5 mm, 60 mm]}
         - {kind: box, name: motor plate, position: [22.5 mm, -31.5 mm, 23 mm], size: [95 mm, 3 mm, 46 mm]}
         - {kind: cylinder, name: spur cover, position: [29.93 mm, -32.5 mm, 34 mm], axis: [0, -1, 0], diameter: 43 mm, length: 12.5 mm}
-        - {kind: cylinder, name: pinion cover, position: [49 mm, -32.5 mm, 18 mm], axis: [0, -1, 0], diameter: 15 mm, length: 12.5 mm}
+        - {kind: cylinder, name: pinion cover, position: [49.24 mm, -32.5 mm, 17.8 mm], axis: [0, -1, 0], diameter: 15 mm, length: 12.5 mm}
       features:
-        - {id: motor_axis, kind: bore, position: [49 mm, -30 mm, 18 mm], axis: [0, -1, 0], diameter: 8 mm, depth: 14 mm}
-        - {id: motor_face, kind: face, position: [49 mm, -30 mm, 18 mm], axis: [0, 1, 0]}
+        - {id: motor_axis, kind: bore, position: [49.24 mm, -30 mm, 17.8 mm], axis: [0, -1, 0], diameter: 8 mm, depth: 14 mm}
+        - {id: motor_face, kind: face, position: [49.24 mm, -30 mm, 17.8 mm], axis: [0, 1, 0]}
         - {id: motor_slot_a, kind: slot, position: [57.0348 mm, -30 mm, 27.5756 mm], axis: [0, -1, 0], diameter: 3.4 mm, depth: 3 mm,
            length: 3 mm, slot_dir: [-0.766, 0, 0.643]}
         - {id: motor_slot_b, kind: slot, position: [40.9652 mm, -30 mm, 8.4244 mm], axis: [0, -1, 0], diameter: 3.4 mm, depth: 3 mm,
@@ -185,17 +249,28 @@ components:
         - {id: mount_2, kind: tapped_hole, position: [-18 mm, 22 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
         - {id: mount_3, kind: tapped_hole, position: [18 mm, -22 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
         - {id: mount_4, kind: tapped_hole, position: [18 mm, 22 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
-        - {id: encoder_a, kind: tapped_hole, position: [-3.5 mm, 30 mm, 13 mm], axis: [0, -1, 0], depth: 10 mm, thread: shcs-m2,
-           provenance: {status: derived, source: "R3 build drawing: drill and tap M2 x 10 in the case side for the encoder board"}}
-        - {id: encoder_b, kind: tapped_hole, position: [3.5 mm, 30 mm, 13 mm], axis: [0, -1, 0], depth: 10 mm, thread: shcs-m2,
-           provenance: {status: derived, source: "R3 build drawing: drill and tap M2 x 10 in the case side for the encoder board"}}
+        - {id: spur_output, kind: shaft, position: [29.93 mm, -45 mm, 34 mm], axis: [0, -1, 0], diameter: 5 mm, depth: 8 mm,
+           provenance: {status: derived, source: "R3 build drawing: 5 mm h6 spur-shaft extension through the gear cover"}}
+        - {id: encoder_a, kind: tapped_hole, position: [33.43 mm, -45 mm, 20 mm], axis: [0, 1, 0], depth: 10 mm, thread: shcs-m2,
+           provenance: {status: derived, source: "R3 build drawing: drill and tap M2 x 10 in the gear cover for the encoder board"}}
+        - {id: encoder_b, kind: tapped_hole, position: [26.43 mm, -45 mm, 20 mm], axis: [0, 1, 0], depth: 10 mm, thread: shcs-m2,
+           provenance: {status: derived, source: "R3 build drawing: drill and tap M2 x 10 in the gear cover for the encoder board"}}
       provenance: {status: estimated, source: "Envelope of a 1/10 2WD transmission with motor plate and gear cover"}
+    interfaces:
+      mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[18 mm, 22 mm, 3 mm, tapped, 8 mm], [-18 mm, 22 mm, 3 mm, tapped, 8 mm], [18 mm, -22 mm, 3 mm, tapped, 8 mm], [-18 mm, -22 mm, 3 mm, tapped, 8 mm]]}}
+      motor_mount: {kind: hole_pattern, origin: [49.24 mm, -30 mm, 17.8 mm], z: [0, 1, 0], x: [1, 0, 0], params: {holes: [[8.035 mm, -9.576 mm, 3.4 mm, clearance, 3 mm], [-8.035 mm, 9.576 mm, 3.4 mm, clearance, 3 mm]], slot_length: 3 mm}}
+      pinion: {kind: bore, origin: [49.24 mm, -30 mm, 17.8 mm], z: [0, 1, 0], x: [-0.766044443, 0, 0.642787610], params: {d: 3.175 mm, depth: 12 mm, flat_offset: 1.385 mm}, description: "18T pinion bore (internal; the case shows the 8 mm plate hole)"}
+      output_l: {kind: bore, origin: [0, 30 mm, 27 mm], z: [0, 1, 0], x: [0, 0, 1], params: {d: 6.02 mm, depth: 10 mm, flat_offset: 2.51 mm}}
+      output_r: {kind: bore, origin: [0, -33 mm, 27 mm], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6.02 mm, depth: 10 mm, flat_offset: 2.51 mm}}
+      spur_shaft: {kind: shaft, origin: [29.93 mm, -45 mm, 34 mm], z: [0, -1, 0], x: [1, 0, 0], params: {d: 5 mm, length: 8 mm}, description: "Spur-gear shaft extension through the gear cover: turns at 2.4727 x the differential carrier"}
+      encoder: {kind: hole_pattern, origin: [29.93 mm, -45 mm, 20 mm], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[3.5 mm, 0, 2 mm, tapped, 10 mm], [-3.5 mm, 0, 2 mm, tapped, 10 mm]]}}
     behavior:
       model: gearbox.differential
-      params: {ratio: 9.6, efficiency: 0.88, backlash: 0.02, output_inertia: 4.0e-5, pinion_teeth: 17, spur_teeth: 66, module: 0.6 mm,
-               center_distance: 24.9 mm, internal_ratio: 2.4727}
+      params: {ratio: 9.066, efficiency: 0.88, backlash: 0.02, output_inertia: 4.0e-5, pinion_teeth: 18, spur_teeth: 66, module: 0.6 mm,
+               center_distance: 25.2 mm, internal_ratio: 2.4727}
   - id: esc-brushed-60a
     kind: esc
+    cad_name: ESC QuicRun 1060
     name: Brushed ESC 60 A, 2-3S, 6 V / 2 A BEC
     manufacturer: Hobbywing
     part_number: QuicRun 1060
@@ -219,8 +294,12 @@ components:
                signal_timeout: 0.5, low_voltage_cutoff_per_cell: 3.0, reverse_delay: 0.1, quiescent_current: 0.04}
       provenance: {status: datasheet, source: "Hobbywing QuicRun 1060 manual: 60 A/360 A, BEC 6 V/2 A linear, 2-3S"}
     thermal: {theta_ja_c_per_w: 8.0, max_temp_c: 110}
+    interfaces:
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
   - id: servo-digital-20kg
     kind: servo
+    cad_name: Servo DS3218
+    cad_family: Servo DS3218
     name: 20 kg-cm digital steering servo
     part_number: DS3218
     description: Frame at the bottom center, long side along y; the 25T output spline is 10 mm off center toward +y.
@@ -233,14 +312,21 @@ components:
         - {kind: box, name: body, position: [0, 0, 20.25 mm], size: [20 mm, 40 mm, 40.5 mm]}
         - {kind: box, name: ears, position: [0, 0, 27.75 mm], size: [20 mm, 54 mm, 2.5 mm]}
       features:
-        - {id: spline, kind: spline, position: [0, 10 mm, 40.5 mm], axis: [0, 0, 1], diameter: 5.9 mm, depth: 5 mm,
-           provenance: {status: estimated, source: "25T servo spline, modeled at its 5.9 mm major diameter"}}
-        - {id: horn_screw, kind: tapped_hole, position: [0, 10 mm, 45.5 mm], axis: [0, 0, -1], depth: 8 mm, thread: shcs-m3}
+        - {id: output_bushing, kind: bore, position: [0, 10 mm, 40.5 mm], axis: [0, 0, -1], diameter: 6.0 mm, depth: 4 mm,
+           provenance: {status: estimated, source: "Output-shaft bushing; the splined output is the servo-output-25t object"}}
         - {id: ear_1, kind: clearance_hole, position: [5 mm, 24.75 mm, 29 mm], axis: [0, 0, -1], diameter: 3.6 mm, depth: 2.5 mm}
         - {id: ear_2, kind: clearance_hole, position: [-5 mm, 24.75 mm, 29 mm], axis: [0, 0, -1], diameter: 3.6 mm, depth: 2.5 mm}
         - {id: ear_3, kind: clearance_hole, position: [5 mm, -24.75 mm, 29 mm], axis: [0, 0, -1], diameter: 3.6 mm, depth: 2.5 mm}
         - {id: ear_4, kind: clearance_hole, position: [-5 mm, -24.75 mm, 29 mm], axis: [0, 0, -1], diameter: 3.6 mm, depth: 2.5 mm}
       provenance: {status: datasheet, source: "DS3218 datasheet: 40 x 20 x 40.5 mm body, 49.5 x 10 mm ear hole pattern; ear height estimated"}
+    interfaces:
+      ears_a: {kind: hole_pattern, origin: [0, 24.75 mm, 26.5 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[5 mm, 0, 3.6 mm, clearance, 2.5 mm], [-5 mm, 0, 3.6 mm, clearance, 2.5 mm]]}}
+      ears_b: {kind: hole_pattern, origin: [0, -24.75 mm, 26.5 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[5 mm, 0, 3.6 mm, clearance, 2.5 mm], [-5 mm, 0, 3.6 mm, clearance, 2.5 mm]]}}
+      cap_a1: {kind: adhesive_pad, origin: [5 mm, 24.75 mm, 29 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_a2: {kind: adhesive_pad, origin: [-5 mm, 24.75 mm, 29 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_b1: {kind: adhesive_pad, origin: [5 mm, -24.75 mm, 29 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_b2: {kind: adhesive_pad, origin: [-5 mm, -24.75 mm, 29 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      output: {kind: bore, origin: [0, 10 mm, 40.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {d: 6.0 mm, depth: 4 mm}, description: "Output-shaft bushing in the case top"}
     pins:
       SIG: {role: pwm_in, logic_level: 2.0, voltage_max: 7.2}
       VCC: {role: power_in, voltage_nominal: 6.0, voltage_min: 4.8, voltage_max: 6.8, current_max: 3.0}
@@ -254,6 +340,7 @@ components:
       provenance: {status: datasheet, source: "DS3218: 19.5 kg-cm @5V, 21.5 @6.8V, 0.16 s/60deg @5V; stall current estimated"}
   - id: lipo-2s-5000-25c
     kind: battery
+    cad_name: LiPo 2S 5000
     name: 2S 7.4 V 5000 mAh 25C LiPo, hard case
     mechanical: {shape: box, size: [138 mm, 46 mm, 25 mm], mass: 0.265, color: "#3a3a3a",
                  provenance: {status: datasheet, source: "Typical 2S 5000 mAh hard-case pack listing"}}
@@ -275,8 +362,12 @@ components:
         min_cell_voltage: 3.0
       provenance: {status: estimated, notes: "Generic LiPo OCV curve; IR from typical new 25C pack"}
     thermal: {theta_ja_c_per_w: 3.0, max_temp_c: 60, heat_capacity_j_per_k: 250}
+    interfaces:
+      bottom: {kind: face_mount, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      strap_path: {kind: strap_slot, origin: [0, 0, 25 mm], z: [0, 0, 1], x: [1, 0, 0], params: {width: 22 mm}}
   - id: raspberry-pi-5-8gb
     kind: computer
+    cad_name: Raspberry Pi 5
     name: Raspberry Pi 5 (8 GB)
     manufacturer: Raspberry Pi Ltd
     description: Frame at the bottom center of the PCB (1.6 mm). USB/Ethernet block overhangs the +x edge by 2 mm.
@@ -298,6 +389,17 @@ components:
         - {id: hole_3, kind: clearance_hole, position: [-39 mm, 24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.6 mm}
         - {id: hole_4, kind: clearance_hole, position: [19 mm, 24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.6 mm}
       provenance: {status: datasheet, source: "Raspberry Pi 5 mechanical drawing (85 x 56, 58 x 49 M2.5 pattern, 2x20 header); component heights estimated"}
+    interfaces:
+    # Mounting holes (58 x 49 mm M2.5 pattern) as single-hole seats on both board faces, and the 2x20 header.
+      h1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
+      h2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
+      h3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
+      h4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
+      t1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
+      t2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
+      t3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
+      t4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
+      J8: {kind: header, origin: [-10 mm, 24.5 mm, 4.1 mm], z: [0, 0, 1], x: [1, 0, 0], params: {pitch: 2.54 mm, rows: 2, cols: 20, pin1: [-24.13 mm, -1.27 mm]}, description: "Top of the header base; pin 1 at the -x end on the inner row"}
     pins:
       5V: {role: power_in, voltage_nominal: 5.1, voltage_min: 4.75, voltage_max: 5.5, current_max: 5.0}
       3V3: {role: power_out, voltage_nominal: 3.3, current_max: 0.5}
@@ -330,6 +432,7 @@ components:
     thermal: {theta_ja_c_per_w: 9.0, max_temp_c: 85}
   - id: r3-carrier-hat
     kind: pcb
+    cad_name: R3 carrier HAT
     name: R3 RC carrier HAT (custom KiCad board)
     description: >
       65 x 56.5 mm HAT. XT30 battery input -> 5.1 V / 5 A synchronous buck back-powering the Pi;
@@ -343,14 +446,26 @@ components:
       solids:
         - {kind: box, name: pcb, position: [0, 0, 0.8 mm], size: [65 mm, 56.5 mm, 1.6 mm]}
         - {kind: box, name: components, position: [0, 0, 6.8 mm], size: [52 mm, 43.5 mm, 10.4 mm]}
-        - {kind: box, name: gpio socket, position: [0, 24.5 mm, -4.25 mm], size: [51 mm, 5.1 mm, 8.5 mm]}
+        - {kind: box, name: gpio socket, position: [0, 24.75 mm, -4.25 mm], size: [51 mm, 5.1 mm, 8.5 mm]}
       features:
-        - {id: socket_cavity, kind: pocket, position: [0, 24.5 mm, -8.5 mm], axis: [0, 0, 1], size: [50.8 mm, 4.9 mm, 6.2 mm], slot_dir: [1, 0, 0]}
-        - {id: hole_1, kind: clearance_hole, position: [-29 mm, -24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
-        - {id: hole_2, kind: clearance_hole, position: [29 mm, -24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
-        - {id: hole_3, kind: clearance_hole, position: [-29 mm, 24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
-        - {id: hole_4, kind: clearance_hole, position: [29 mm, 24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
-      provenance: {status: derived, source: "Raspberry Pi HAT+ mechanical spec: 65 x 56.5 board, holes on the Pi's 58 x 49 pattern, header centered"}
+        - {id: socket_cavity, kind: pocket, position: [0, 24.75 mm, -8.5 mm], axis: [0, 0, 1], size: [50.8 mm, 4.9 mm, 6.2 mm], slot_dir: [1, 0, 0]}
+        - {id: hole_1, kind: clearance_hole, position: [-29 mm, 24.75 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
+        - {id: hole_2, kind: clearance_hole, position: [29 mm, 24.75 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
+        - {id: hole_3, kind: clearance_hole, position: [-29 mm, -24.25 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
+        - {id: hole_4, kind: clearance_hole, position: [29 mm, -24.25 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.75 mm, depth: 1.6 mm}
+      provenance: {status: derived, source: "Raspberry Pi HAT+ mechanical spec and the PCB stage's board.json (holes, GPIO socket)"}
+    interfaces:
+    # Hole and socket positions follow the PCB stage's board.json (mounting.holes, connector_geometry.J_GPIO):
+    # the 58 x 49 mm pattern sits 0.25 mm toward the GPIO edge of the 56.5 mm board (HAT+ mechanical spec).
+      h1: {kind: hole_pattern, origin: [-29 mm, 24.75 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      h2: {kind: hole_pattern, origin: [29 mm, 24.75 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      h3: {kind: hole_pattern, origin: [-29 mm, -24.25 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      h4: {kind: hole_pattern, origin: [29 mm, -24.25 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.75 mm, clearance, 1.6 mm]]}}
+      cap_1: {kind: adhesive_pad, origin: [-29 mm, 24.75 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_2: {kind: adhesive_pad, origin: [29 mm, 24.75 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_3: {kind: adhesive_pad, origin: [-29 mm, -24.25 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_4: {kind: adhesive_pad, origin: [29 mm, -24.25 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      socket: {kind: socket, origin: [0, 24.75 mm, -8.5 mm], z: [0, 0, -1], x: [1, 0, 0], params: {pitch: 2.54 mm, rows: 2, cols: 20, pin1: [-24.13 mm, 1.27 mm]}, description: "Bottom of the 2x20 stacking socket"}
     pins:
       VBAT: {role: power_in, voltage_nominal: 7.4, voltage_min: 6.0, voltage_max: 17.0, current_max: 3.0}
       GND: {role: ground}
@@ -401,6 +516,7 @@ components:
     thermal: {theta_ja_c_per_w: 35.0, max_temp_c: 105, notes: "buck regulator package to ambient"}
   - id: elrs-receiver-2g4
     kind: radio
+    cad_name: ELRS receiver RP1
     name: ExpressLRS 2.4 GHz receiver (CRSF)
     part_number: RadioMaster RP1
     mechanical: {shape: box, size: [13 mm, 11 mm, 3 mm], mass: 0.0015, color: "#7a2ba8"}
@@ -418,8 +534,11 @@ components:
       provenance: {status: datasheet, source: "ExpressLRS docs: 150 Hz LoRa sensitivity -108 dBm; RP1 power ~60 mA (estimated)"}
     software:
       - {bus: uart, protocol: crsf, params: {baud: 420000}}
+    interfaces:
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
   - id: gps-ublox-m10
     kind: sensor
+    cad_name: GPS u-blox M10
     name: u-blox M10 GNSS module
     mechanical: {shape: box, size: [20 mm, 20 mm, 7 mm], mass: 0.008, color: "#c9a227"}
     pins:
@@ -434,9 +553,12 @@ components:
       params: {update_rate: 10 Hz, baud: 115200, horizontal_cep: 1.5, velocity_noise: 0.05, cold_start: 30 s, current: 0.03}
     software:
       - {bus: uart, protocol: nmea-0183, params: {baud: 115200, sentences: [GGA, RMC, VTG]}}
+    interfaces:
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
   - id: hall-encoder-a1120
     kind: sensor
-    name: Hall-effect wheel encoder (Allegro A1120 + magnets on drive axle)
+    cad_name: Hall encoder board
+    name: Hall-effect drivetrain encoder (Allegro A1120 + magnets on the spur shaft)
     description: Frame at the board's bottom center; the sensor die faces +z, 0.5 mm below the top face.
     mechanical:
       shape: box
@@ -446,6 +568,8 @@ components:
         - {id: mount_a, kind: clearance_hole, position: [-3.5 mm, 4 mm, 3 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
         - {id: mount_b, kind: clearance_hole, position: [3.5 mm, 4 mm, 3 mm], axis: [0, -1, 0], diameter: 2.4 mm, depth: 8 mm}
         - {id: sensor_face, kind: face, position: [0, 0, 6 mm], axis: [0, 0, 1]}
+    interfaces:
+      mount: {kind: hole_pattern, origin: [0, -4 mm, 3 mm], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[3.5 mm, 0, 2.4 mm, clearance, 8 mm], [-3.5 mm, 0, 2.4 mm, clearance, 8 mm]]}}
     pins:
       VCC: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.0, voltage_max: 24.0, current_max: 0.004}
       OUT: {role: gpio, logic_level: 3.3}
@@ -455,11 +579,13 @@ components:
     behavior:
       model: encoder.hall
       params: {pulses_per_wheel_rev: 4, output: open_drain_active_low, jitter: 20 us, die_depth: 0.5 mm, b_op_max: 0.0175,
-               b_rp_min: 0.0025}   # tesla
+               b_rp_min: 0.0025,   # tesla
+               target: differential_carrier, target_ratio: 2.4727}   # magnets ride the spur shaft: 2.4727 rev per carrier rev
       provenance: {status: datasheet, source: "Allegro A1120: 3.0-24 V supply, open-drain, unipolar south-pole switch; B_OP 3.5-17.5 mT,
                                                 B_RP 2.5-16.5 mT as transcribed (verify against the current datasheet); die depth estimated"}
   - id: fuse-atc-10a
     kind: fuse
+    cad_name: Fuse holder ATC 10A
     name: Inline ATC/ATO blade fuse holder with 10 A fuse
     mechanical: {shape: box, size: [30 mm, 12 mm, 22 mm], mass: 0.008}
     pins:
@@ -474,14 +600,64 @@ components:
       model: fuse.blade
       params: {rating: 10, cold_resistance: 7 mohm, i2t_melt: 120}
       provenance: {status: datasheet, source: "Littelfuse ATO 10 A: ~7 mOhm cold resistance; I2t estimated"}
-  - id: axle-shaft-6mm
+    interfaces:
+      bottom: {kind: face_mount, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      tie_path: {kind: strap_slot, origin: [0, 0, 22 mm], z: [0, 0, 1], x: [1, 0, 0], params: {width: 4 mm}}
+  - id: rear-axle-6mm-l
     kind: structure
-    name: Rear drive axle, 6 mm 4140 steel, turned collar, D-flats and M6 threaded end
-    description: Profile and flats come from the instance params (left and right axles differ in length).
-    mechanical: {shape: cylinder, axis: y, size: [6 mm, 101.3 mm], mass: 0.0105, material: Steel 4140, density: 7850, color: "#9aa0a6",
-                 moving: true, fabricated: true}
+    cad_name: Rear axle L
+    cad_family: Rear axle
+    name: Rear drive axle (left), 6 mm 4140 steel, turned collar, D-flats and M6 threaded end
+    description: Frame on the vehicle center line, axis +y outboard. The right axle is longer at the inner end (mirrored instance).
+    mechanical:
+      shape: custom
+      size: [8 mm, 121.8 mm, 8 mm]
+      mass: 0.0105
+      material: Steel 4140
+      density: 7850
+      color: "#9aa0a6"
+      moving: true
+      fabricated: true
+      solids:
+        - {kind: revolve, name: axle, position: [0, 0, 0], axis: [0, 1, 0],
+           profile: [[0, 20.5 mm], [3 mm, 20.5 mm], [3 mm, 80 mm], [4 mm, 80 mm], [4 mm, 82 mm], [3 mm, 82 mm], [3 mm, 121.8 mm], [0, 121.8 mm]]}
+        - {kind: box, op: remove, name: output flat, position: [0, 25.5 mm, 3.5 mm], size: [10 mm, 10.2 mm, 2 mm]}
+        - {kind: box, op: remove, name: wheel flat, position: [0, 102.75 mm, 3.5 mm], size: [10 mm, 23.5 mm, 2 mm]}
+    interfaces:
+      output: {kind: shaft, origin: [0, 30 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 9.5 mm, flat_offset: 2.5 mm}}
+      bearing_seat: {kind: shaft, origin: [0, 82 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 3 mm}}
+      spacer_seat: {kind: shaft, origin: [0, 85 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 6.5 mm}}
+      wheel_drive: {kind: shaft, origin: [0, 91.5 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 23 mm, flat_offset: 2.5 mm}}
+      nut_thread: {kind: hole_pattern, origin: [0, 114.5 mm, 0], z: [0, 1, 0], x: [1, 0, 0], params: {holes: [[0, 0, 6 mm, thread, 7.3 mm]]}}
+  - id: rear-axle-6mm-r
+    kind: structure
+    cad_name: Rear axle R
+    cad_family: Rear axle
+    name: Rear drive axle (right), 6 mm 4140 steel, turned collar, D-flats and M6 threaded end
+    description: Modeled outboard along +y like the left axle; the instance is mirrored to the right side.
+    mechanical:
+      shape: custom
+      size: [8 mm, 121.8 mm, 8 mm]
+      mass: 0.0108
+      material: Steel 4140
+      density: 7850
+      color: "#9aa0a6"
+      moving: true
+      fabricated: true
+      solids:
+        - {kind: revolve, name: axle, position: [0, 0, 0], axis: [0, 1, 0],
+           profile: [[0, 23.5 mm], [3 mm, 23.5 mm], [3 mm, 80 mm], [4 mm, 80 mm], [4 mm, 82 mm], [3 mm, 82 mm], [3 mm, 121.8 mm], [0, 121.8 mm]]}
+        - {kind: box, op: remove, name: output flat, position: [0, 28.5 mm, 3.5 mm], size: [10 mm, 10.2 mm, 2 mm]}
+        - {kind: box, op: remove, name: wheel flat, position: [0, 102.75 mm, 3.5 mm], size: [10 mm, 23.5 mm, 2 mm]}
+    interfaces:
+      output: {kind: shaft, origin: [0, 33 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 9.5 mm, flat_offset: 2.5 mm}}
+      bearing_seat: {kind: shaft, origin: [0, 82 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 3 mm}}
+      spacer_seat: {kind: shaft, origin: [0, 85 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 6.5 mm}}
+      wheel_drive: {kind: shaft, origin: [0, 91.5 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 23 mm, flat_offset: 2.5 mm}}
+      nut_thread: {kind: hole_pattern, origin: [0, 114.5 mm, 0], z: [0, 1, 0], x: [1, 0, 0], params: {holes: [[0, 0, 6 mm, thread, 7.3 mm]]}}
   - id: suspension-arm-pa12
     kind: structure
+    cad_name: Front arm
     name: Front suspension arm, PA12 SLS, tapped M3 kingpin (left hand; mirror for right)
     description: Frame at the bottom center of the arm; the kingpin hole is 20 mm outboard of the frame.
     mechanical:
@@ -494,8 +670,12 @@ components:
       fabricated: true
       solids:
         - {kind: box, name: arm, position: [0, 0.75 mm, 4 mm], size: [16 mm, 52.5 mm, 8 mm]}
+    interfaces:
+      base: {kind: hole_pattern, origin: [0, -16.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3 mm, tapped, 8 mm], [0, -4 mm, 3 mm, tapped, 8 mm]]}}
+      kingpin: {kind: hole_pattern, origin: [0, 20 mm, 8 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 8 mm]]}}
   - id: steering-tie-rod
     kind: structure
+    cad_name: Tie rod
     name: Steering tie rod, PA12 SLS, 5 mm rod with ball-socket ends (left hand; mirror for right)
     description: Frame at the inner (horn) ball center; the outer socket is 61.5 mm along +y.
     mechanical:
@@ -512,8 +692,12 @@ components:
         - {kind: cylinder, name: rod, position: [0, 0, 0], axis: [0, 1, 0], diameter: 5 mm, length: 61.5 mm}
         - {kind: cylinder, name: outer socket, position: [0, 61.5 mm, -3.8 mm], axis: [0, 0, 1], diameter: 9 mm, length: 7.6 mm}
   # ------------------------------------------------------------------ mechanical redesign (direct CAD + fit checks)
+    interfaces:
+      inner: {kind: ball_socket, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {d: 5.85 mm, opening: 4.2 mm}}
+      outer: {kind: ball_socket, origin: [0, 61.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {d: 5.85 mm, opening: 4.2 mm}}
   - id: rear-hub-carrier-al6061
     kind: structure
+    cad_name: Rear hub carrier
     name: Rear axle carrier, 6061 aluminum L-bracket with bearing seat (left hand; mirror for right)
     description: Frame at the inner bottom corner of the foot; the web carries the MR106 bearing inside the wheel's hub recess.
     mechanical:
@@ -527,8 +711,12 @@ components:
       solids:
         - {kind: box, name: foot, position: [0, 22.5 mm, 3 mm], size: [24 mm, 45 mm, 6 mm]}
         - {kind: box, name: web, position: [0, 43.5 mm, 19 mm], size: [24 mm, 3 mm, 38 mm]}
+    interfaces:
+      foot: {kind: hole_pattern, origin: [0, 13 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[7 mm, 6 mm, 3 mm, tapped, 6 mm], [-7 mm, 6 mm, 3 mm, tapped, 6 mm], [7 mm, -6 mm, 3 mm, tapped, 6 mm], [-7 mm, -6 mm, 3 mm, tapped, 6 mm]]}}
+      bearing: {kind: bore, origin: [0, 42 mm, 27 mm], z: [0, -1, 0], x: [1, 0, 0], params: {d: 9.99 mm, depth: 3 mm}, description: "MR106 outer-race press bore through the web"}
   - id: bearing-mr106zz
     kind: structure
+    cad_name: Bearing MR106ZZ
     name: Deep-groove ball bearing MR106ZZ, 6 x 10 x 3 mm
     description: Inner and outer rings modeled as one annulus (the rotation is internal); frame at the center, axis y.
     mechanical:
@@ -542,8 +730,12 @@ components:
       features:
         - {id: bore, kind: bore, position: [0, -1.5 mm, 0], axis: [0, 1, 0], diameter: 6 mm, depth: 3 mm}
       provenance: {status: datasheet, source: "ISO 15 / MR106ZZ catalog: d 6, D 10, B 3 mm; mass ~0.9 g (estimated)"}
+    interfaces:
+      outer: {kind: shaft, origin: [0, -1.5 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 10 mm, length: 3 mm, short_engagement_ok: true}}
+      inner: {kind: bore, origin: [0, -1.5 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6 mm, depth: 3 mm, short_engagement_ok: true}}
   - id: wheel-spacer-6x9
     kind: structure
+    cad_name: Axle spacer
     name: Axle spacer tube, 6061 aluminum, 6.2 x 9 x 6.5 mm
     description: Frame at the center, axis y.
     mechanical:
@@ -559,8 +751,11 @@ components:
       solids:
         - {kind: cylinder, name: tube, position: [0, -3.25 mm, 0], axis: [0, 1, 0], diameter: 9 mm, length: 6.5 mm}
         - {kind: cylinder, op: remove, name: bore, position: [0, -3.25 mm, 0], axis: [0, 1, 0], diameter: 6.2 mm, length: 6.5 mm}
+    interfaces:
+      bore: {kind: bore, origin: [0, -3.25 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6.2 mm, depth: 6.5 mm}}
   - id: stub-axle-6mm
     kind: structure
+    cad_name: Front stub axle
     name: Front stub axle, 6 mm 4140 steel, turned collar and M6 threaded end (left hand; mirror for right)
     description: Frame on the axis at the inner (press-fit) end; +y points outboard.
     mechanical:
@@ -575,8 +770,13 @@ components:
       solids:
         - {kind: revolve, name: stub axle, position: [0, 0, 0], axis: [0, 1, 0],
            profile: [[0, 0], [3 mm, 0], [3 mm, 10 mm], [4 mm, 10 mm], [4 mm, 12.5 mm], [3 mm, 12.5 mm], [3 mm, 42.8 mm], [0, 42.8 mm]]}
+    interfaces:
+      press: {kind: shaft, origin: [0, 10 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 10 mm}}
+      journal: {kind: shaft, origin: [0, 12.5 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {d: 6 mm, length: 23 mm}}
+      nut_thread: {kind: hole_pattern, origin: [0, 35.6 mm, 0], z: [0, 1, 0], x: [0, 0, 1], params: {holes: [[0, 0, 6 mm, thread, 7.2 mm]]}}
   - id: encoder-magnet-ring
     kind: structure
+    cad_name: Encoder magnet carrier
     name: Encoder magnet carrier ring, 6061 aluminum, 20 mm OD x 6 mm
     description: Frame at the center, axis y. Bore (press fit) and magnet pockets come from its interfaces.
     mechanical:
@@ -591,8 +791,15 @@ components:
       fabricated: true
       solids:
         - {kind: cylinder, name: ring, position: [0, -3 mm, 0], axis: [0, 1, 0], diameter: 20 mm, length: 6 mm}
+    interfaces:
+      bore: {kind: bore, origin: [0, -3 mm, 0], z: [0, -1, 0], x: [0, 0, 1], params: {d: 4.98 mm, depth: 6 mm}, description: "Press fit on the spur shaft extension"}
+      pocket_1: {kind: bore, origin: [0, 0, -10 mm], z: [0, 0, -1], x: [1, 0, 0], params: {d: 2.05 mm, depth: 1 mm}}
+      pocket_2: {kind: bore, origin: [0, 0, 10 mm], z: [0, 0, 1], x: [1, 0, 0], params: {d: 2.05 mm, depth: 1 mm}}
+      pocket_3: {kind: bore, origin: [10 mm, 0, 0], z: [1, 0, 0], x: [0, 1, 0], params: {d: 2.05 mm, depth: 1 mm}}
+      pocket_4: {kind: bore, origin: [-10 mm, 0, 0], z: [-1, 0, 0], x: [0, 1, 0], params: {d: 2.05 mm, depth: 1 mm}}
   - id: magnet-n52-2x1
     kind: structure
+    cad_name: Magnet N52 2x1
     name: NdFeB N52 disc magnet, 2 mm x 1 mm, axially magnetized
     description: >
       Sized so the field halfway between magnets on the 20 mm ring drops below the A1120 release point
@@ -606,11 +813,14 @@ components:
       color: "#b0b0b8"
       moving: true
       provenance: {status: datasheet, source: "N52 grade: Br 1.42-1.47 T; mass = pi/4 x 2^2 x 1 mm^3 x 7.5 g/cm^3"}
+    interfaces:
+      body: {kind: shaft, origin: [0, 0, 0], z: [0, 0, 1], x: [1, 0, 0], params: {d: 2 mm, length: 1 mm, short_engagement_ok: true}, description: "Bottom face flush with the ring OD"}
     behavior:
       model: passive
       params: {remanence: 1.44, grade: N52}
   - id: servo-post-al6061
     kind: structure
+    cad_name: Servo post
     name: Servo mounting post, 6061 aluminum, 9 x 20 x 27.5 mm
     mechanical:
       shape: box
@@ -620,8 +830,12 @@ components:
       density: 2700
       color: "#a9b0b8"
       fabricated: true
+    interfaces:
+      base: {kind: hole_pattern, origin: [0.25 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
+      top: {kind: hole_pattern, origin: [0.25 mm, 0, 27.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
   - id: servo-horn-al7075
     kind: structure
+    cad_name: Servo horn
     name: Steering servo horn, 7075 aluminum, two ball-stud arms
     description: Frame on the spline axis at the hub bottom. Ball studs 19.8 mm behind the axis at y = +-6 mm.
     mechanical:
@@ -637,8 +851,14 @@ components:
         - {kind: prism, name: arms, position: [0, 0, 0], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 6 mm,
            profile: [[-24.3 mm, -10.5 mm], [-14.8 mm, -10.5 mm], [0, -5.5 mm], [0, 5.5 mm], [-14.8 mm, 10.5 mm], [-24.3 mm, 10.5 mm]]}
         - {kind: cylinder, name: hub, position: [0, 0, 0], axis: [0, 0, 1], diameter: 11 mm, length: 7.5 mm}
+    interfaces:
+      spline: {kind: spline, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {teeth: 25, d: 5.92 mm, gender: female, depth: 4 mm}}
+      screw: {kind: hole_pattern, origin: [0, 0, 4 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3.5 mm]]}}
+      ball_l: {kind: hole_pattern, origin: [-19.8 mm, 6 mm, 6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
+      ball_r: {kind: hole_pattern, origin: [-19.8 mm, -6 mm, 6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
   - id: spacer-m2.5-ff-10
     kind: structure
+    cad_name: Spacer M2.5 F-F 10
     name: Female-female round spacer M2.5 x 10 mm, aluminum
     mechanical:
       shape: cylinder
@@ -651,25 +871,64 @@ components:
       features:
         - {id: thread, kind: tapped_hole, position: [0, 0, 10 mm], axis: [0, 0, -1], depth: 0, thread: shcs-m2.5}  # threaded through
       provenance: {status: estimated, source: "Common M2.5 F-F spacer, threaded through"}
+    interfaces:
+      bottom: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 10 mm]]}}
+      top: {kind: hole_pattern, origin: [0, 0, 10 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 10 mm]], capacity: 2}}
   - id: strap-hook-loop-20
     kind: structure
+    cad_name: Battery strap
     name: Hook-and-loop battery strap, 20 mm x 1.5 mm
     description: Loop geometry comes from the instance params (solids); slots in the chassis come from its strap interface.
-    mechanical: {shape: custom, size: [20 mm, 50 mm, 31 mm], mass: 0.006, material: Nylon hook-and-loop, density: 600, color: "#202020",
-                 fabricated: true, provenance: {status: estimated, notes: "density of woven nylon hook-and-loop estimated"}}
+    description: Closed loop around the battery and the chassis plate (inner 47 x 28 mm); frame at the bottom band's inner face.
+    mechanical:
+      shape: custom
+      size: [20 mm, 50 mm, 31 mm]
+      mass: 0.006
+      material: Nylon hook-and-loop
+      density: 600
+      color: "#202020"
+      fabricated: true
+      solids:
+        - {kind: prism, name: strap loop, position: [-10 mm, 0, 0], axis: [1, 0, 0], u_axis: [0, 1, 0], depth: 20 mm,
+           profile: [[-25 mm, -1.5 mm], [25 mm, -1.5 mm], [25 mm, 29.5 mm], [-25 mm, 29.5 mm]],
+           inner: [[[-23.5 mm, 0], [23.5 mm, 0], [23.5 mm, 28 mm], [-23.5 mm, 28 mm]]]}
+      provenance: {status: estimated, notes: "density of woven nylon hook-and-loop estimated"}
+    interfaces:
+      bottom: {kind: strap_seat, origin: [0, 0, 0], z: [0, 0, 1], x: [1, 0, 0], params: {width: 20 mm}}
+      top: {kind: strap_seat, origin: [0, 0, 28 mm], z: [0, 0, -1], x: [1, 0, 0], params: {width: 20 mm}}
   - id: zip-tie-2.5
     kind: structure
+    cad_name: Fuse cable tie
     name: Nylon 6.6 cable tie, 2.5 mm x 1 mm
-    mechanical: {shape: custom, size: [2.5 mm, 14 mm, 27 mm], mass: 0.0005, material: Nylon 6.6, density: 1140, color: "#f0f0f0",
-                 fabricated: true}
+    description: Closed tie loop around the fuse holder and the chassis plate (inner 12 x 25 mm); frame at the bottom band's inner face.
+    mechanical:
+      shape: custom
+      size: [14 mm, 2.5 mm, 27 mm]
+      mass: 0.0005
+      material: Nylon 6.6
+      density: 1140
+      color: "#f0f0f0"
+      fabricated: true
+      solids:
+        - {kind: prism, name: tie loop, position: [0, -1.25 mm, 0], axis: [0, 1, 0], u_axis: [-1, 0, 0], depth: 2.5 mm,
+           profile: [[-7 mm, -1 mm], [7 mm, -1 mm], [7 mm, 26 mm], [-7 mm, 26 mm]],
+           inner: [[[-6 mm, 0], [6 mm, 0], [6 mm, 25 mm], [-6 mm, 25 mm]]]}
+    interfaces:
+      bottom: {kind: strap_seat, origin: [0, 0, 0], z: [0, 0, 1], x: [1, 0, 0], params: {width: 2.5 mm}}
+      top: {kind: strap_seat, origin: [0, 0, 25 mm], z: [0, 0, -1], x: [1, 0, 0], params: {width: 2.5 mm}}
   - id: foam-tape-3m-4026
     kind: structure
+    cad_name: Foam tape
     name: Double-sided urethane foam tape (3M 4026 class), 1.6 mm
     description: Box footprint from the instance params (size); frame at the bottom center.
     mechanical: {shape: box, size: [20 mm, 20 mm, 1.6 mm], mass: 0.0002, material: Urethane foam + acrylic adhesive, density: 320,
                  color: "#e8e2c8", fabricated: true, provenance: {status: estimated, notes: "density estimated for 3M 4026-class foam"}}
+    interfaces:
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      top: {kind: adhesive_pad, origin: [0, 0, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0]}
   - id: antenna-mast-petg
     kind: structure
+    cad_name: Antenna mast
     name: Antenna mast, PETG, 24 mm flange and 6/4 mm tube, 80 mm
     description: Frame at the flange bottom center; mounting holes come from its fasteners.
     mechanical:
@@ -684,8 +943,12 @@ components:
         - {kind: cylinder, name: flange, position: [0, 0, 0], axis: [0, 0, 1], diameter: 24 mm, length: 3 mm}
         - {kind: cylinder, name: tube, position: [0, 0, 3 mm], axis: [0, 0, 1], diameter: 6 mm, length: 80 mm}
         - {kind: cylinder, op: remove, name: coax bore, position: [0, 0, 0], axis: [0, 0, 1], diameter: 4 mm, length: 83 mm}
+    interfaces:
+      flange: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
+      antenna_seat: {kind: adhesive_pad, origin: [0, 0, 83 mm], z: [0, 0, 1], x: [1, 0, 0]}
   - id: elrs-t-antenna
     kind: antenna
+    cad_name: ELRS T-antenna
     name: ExpressLRS 2.4 GHz T-antenna (1.13 mm coax lead + half-wave dipole)
     description: Frame on the coax axis at the mast's flange top. Dipole arms along x; the feed point is the junction center.
     mechanical:
@@ -699,3 +962,178 @@ components:
         - {kind: cylinder, name: junction, position: [0, 0, 80 mm], axis: [0, 0, 1], diameter: 6 mm, length: 3 mm}
         - {kind: cylinder, name: dipole, position: [-31 mm, 0, 81.5 mm], axis: [1, 0, 0], diameter: 1.0 mm, length: 62 mm}
       provenance: {status: estimated, source: "RadioMaster/ELRS 2.4 GHz T antenna: two 31 mm arms (lambda/4 at 2.44 GHz is 30.7 mm)"}
+    interfaces:
+      seat: {kind: adhesive_pad, origin: [0, 0, 80 mm], z: [0, 0, -1], x: [1, 0, 0], description: "Bottom face of the feed junction on the mast top"}
+  # ------------------------------------------------------------------ phase B: hardware modeled as assembly objects
+  # Fasteners that carry a joint or a stack (kingpin pivots, ball studs, stacking standoffs, wheel nuts) are objects
+  # with interfaces, so the compiler places them and the CAD fit checks verify their threads. Plain clamping screws
+  # are join fasteners (robot.yaml assembly.joins[*].fasteners).
+  - id: kingpin-screw-m3x20
+    kind: structure
+    cad_name: Kingpin screw M3x20
+    name: Kingpin pivot, ISO 4762 M3 x 20 socket head cap screw (threadlocked, unclamped)
+    description: Frame at the screw tip, +z toward the head. The knuckle turns on the plain shank above the arm.
+    mechanical:
+      shape: custom
+      size: [5.5 mm, 5.5 mm, 23 mm]
+      mass: 0.00167
+      material: Steel 12.9
+      color: "#30343a"
+      solids:
+        - {kind: revolve, name: screw, position: [0, 0, 0], axis: [0, 0, 1],
+           profile: [[0, 0], [1.5 mm, 0], [1.5 mm, 20 mm], [2.75 mm, 20 mm], [2.75 mm, 23 mm], [0, 23 mm]]}
+      provenance: {status: datasheet, source: "ISO 4762 M3 x 20 (dk 5.5, k 3.0); mass = steel x modeled volume"}
+    interfaces:
+      thread: {kind: hole_pattern, origin: [0, 0, 7.85 mm], z: [0, 0, -1], x: [1, 0, 0],
+               params: {holes: [[0, 0, 3 mm, thread, 7.85 mm]], fastener: shcs-m3, preloaded: false}}
+      shank: {kind: shaft, origin: [0, 0, 7.85 mm], z: [0, 0, 1], x: [1, 0, 0], params: {d: 3 mm, length: 12.15 mm}}
+  - id: ball-stud-m3-5.8x6
+    kind: structure
+    cad_name: Ball stud M3x6
+    cad_family: Ball studs
+    name: Steel ball stud, M3 x 6 thread, 5.8 mm ball, hex collar
+    description: Frame at the thread tip, +z toward the ball (ball center 12.1 mm above the tip).
+    mechanical:
+      shape: custom
+      size: [5.8 mm, 5.8 mm, 15 mm]
+      mass: 0.00157
+      material: Steel
+      color: "#c0c4c8"
+      solids:
+        - {kind: revolve, name: thread collar neck, position: [0, 0, 0], axis: [0, 0, 1],
+           profile: [[0, 0], [1.5 mm, 0], [1.5 mm, 6 mm], [2.75 mm, 6 mm], [2.75 mm, 8 mm], [1.5 mm, 8 mm], [1.5 mm, 9.5 mm], [0, 9.5 mm]]}
+        - {kind: sphere, name: ball, position: [0, 0, 12.1 mm], diameter: 5.8 mm}
+      provenance: {status: estimated, source: "Typical 1/10 RC 5.8 mm ball stud (fasteners.yaml ball-stud-m3-5.8)"}
+    interfaces:
+      thread: {kind: hole_pattern, origin: [0, 0, 6 mm], z: [0, 0, -1], x: [1, 0, 0],
+               params: {holes: [[0, 0, 3 mm, thread, 6 mm]], fastener: ball-stud-m3-5.8}}
+      ball: {kind: ball_stud, origin: [0, 0, 12.1 mm], z: [0, 0, 1], x: [1, 0, 0], params: {d: 5.8 mm}}
+  - id: ball-stud-m3-5.8x8
+    kind: structure
+    cad_name: Ball stud M3x8
+    cad_family: Ball studs
+    name: Steel ball stud, M3 x 8 thread, 5.8 mm ball, hex collar
+    description: Frame at the thread tip, +z toward the ball (ball center 14.1 mm above the tip).
+    mechanical:
+      shape: custom
+      size: [5.8 mm, 5.8 mm, 17 mm]
+      mass: 0.00163
+      material: Steel
+      color: "#c0c4c8"
+      solids:
+        - {kind: revolve, name: thread collar neck, position: [0, 0, 0], axis: [0, 0, 1],
+           profile: [[0, 0], [1.5 mm, 0], [1.5 mm, 8 mm], [2.75 mm, 8 mm], [2.75 mm, 10 mm], [1.5 mm, 10 mm], [1.5 mm, 11.5 mm], [0, 11.5 mm]]}
+        - {kind: sphere, name: ball, position: [0, 0, 14.1 mm], diameter: 5.8 mm}
+      provenance: {status: estimated, source: "Typical 1/10 RC 5.8 mm ball stud (fasteners.yaml ball-stud-m3-5.8)"}
+    interfaces:
+      thread: {kind: hole_pattern, origin: [0, 0, 8 mm], z: [0, 0, -1], x: [1, 0, 0],
+               params: {holes: [[0, 0, 3 mm, thread, 8 mm]], fastener: ball-stud-m3-5.8}}
+      ball: {kind: ball_stud, origin: [0, 0, 14.1 mm], z: [0, 0, 1], x: [1, 0, 0], params: {d: 5.8 mm}}
+  - id: hat-standoff-mf-m2.5-11
+    kind: structure
+    cad_name: Standoff M-F M2.5x11
+    name: Male-female hex standoff M2.5, 11 mm body + 6 mm stud, brass (HAT stacking)
+    description: Frame at the stud tip, +z up; hex body from 6 to 17 mm, female thread from the top.
+    mechanical:
+      shape: custom
+      size: [5.8 mm, 5 mm, 17 mm]
+      mass: 0.0021
+      material: Brass CW614N
+      color: "#c9a227"
+      solids:
+        - {kind: cylinder, name: stud, position: [0, 0, 0], axis: [0, 0, 1], diameter: 2.5 mm, length: 6 mm}
+        - {kind: prism, name: hex body, position: [0, 0, 6 mm], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 11 mm,
+           profile: [[2.887 mm, 0], [1.443 mm, 2.5 mm], [-1.443 mm, 2.5 mm], [-2.887 mm, 0], [-1.443 mm, -2.5 mm], [1.443 mm, -2.5 mm]]}
+      features:
+        - {id: female_thread, kind: tapped_hole, position: [0, 0, 17 mm], axis: [0, 0, -1], depth: 5.5 mm, thread: shcs-m2.5}
+      provenance: {status: estimated, source: "fasteners.yaml standoff-mf-m2.5-11; 11 mm board-to-board per HAT guidance"}
+    interfaces:
+      stud: {kind: hole_pattern, origin: [0, 0, 6 mm], z: [0, 0, -1], x: [1, 0, 0],
+             params: {holes: [[0, 0, 2.5 mm, thread, 6 mm]], fastener: standoff-mf-m2.5-11, capacity: 2}}
+      top: {kind: hole_pattern, origin: [0, 0, 17 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.5 mm, tapped, 5.5 mm]]}}
+  - id: wheel-nut-m6-nyloc
+    kind: structure
+    cad_name: Nyloc nut M6
+    name: Prevailing-torque hex nut M6 with nylon insert (wheel retention)
+    description: Frame at the bearing face center, +z through the nut body.
+    mechanical:
+      shape: custom
+      size: [11.5 mm, 10 mm, 6 mm]
+      mass: 0.0032
+      material: Steel 8
+      color: "#30343a"
+      solids:
+        - {kind: prism, name: hex, position: [0, 0, 0], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 6 mm,
+           profile: [[5.774 mm, 0], [2.887 mm, 5 mm], [-2.887 mm, 5 mm], [-5.774 mm, 0], [-2.887 mm, -5 mm], [2.887 mm, -5 mm]]}
+        - {kind: cylinder, op: remove, name: thread bore, position: [0, 0, 0], axis: [0, 0, 1], diameter: 5 mm, length: 6 mm}
+      provenance: {status: datasheet, source: "DIN 985 M6 (s 10, h 6); thread modeled at the tap drill (fasteners.yaml nut-m6-nyloc)"}
+    interfaces:
+      seat: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
+             params: {holes: [[0, 0, 6 mm, tapped, 6 mm]], fastener: nut-m6-nyloc, through_thread: true}}
+  - id: servo-output-25t
+    kind: structure
+    cad_name: Servo output 25T
+    cad_family: Servo DS3218
+    name: Servo output shaft, 25T spline, M3 horn-screw thread (part of the DS3218)
+    description: Frame at the bottom of the 4 mm journal in the case bushing; the spline starts at the case top (z = 4 mm).
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [5.9 mm, 9 mm]
+      mass: 0.002
+      material: Steel
+      color: "#202020"
+      moving: true
+      features:
+        - {id: horn_screw, kind: tapped_hole, position: [0, 0, 9 mm], axis: [0, 0, -1], depth: 8 mm, thread: shcs-m3}
+      provenance: {status: estimated, source: "25T servo spline at its 5.9 mm major diameter; mass estimated (included in the servo's 60 g)"}
+    interfaces:
+      journal: {kind: shaft, origin: [0, 0, 4 mm], z: [0, 0, -1], x: [1, 0, 0], params: {d: 5.9 mm, length: 4 mm, short_engagement_ok: true}}
+      spline: {kind: spline, origin: [0, 0, 4 mm], z: [0, 0, 1], x: [1, 0, 0], params: {teeth: 25, d: 5.9 mm, gender: male, length: 5 mm}}
+      top: {kind: hole_pattern, origin: [0, 0, 9 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 8 mm]]}}
+  - id: screw-cap-m2.5-petg
+    kind: structure
+    cad_name: Screw cap M2.5
+    cad_family: Screw caps
+    name: Printed screw cap for an M2.5 socket head (FDM PETG), bonded over the head
+    description: >
+      Frame at the open rim's center, +z up. Inner diameter = head 4.5 mm + 2 x 0.3 mm FDM cap clearance (print_fits.yaml),
+      inner height = head 2.5 mm + 0.3 mm, 0.8 mm wall, 1.0 mm roof. Bonded to the board/deck by its rim.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [6.7 mm, 3.8 mm]
+      mass: 0.00008
+      material: PETG
+      density: 1270
+      color: "#2c6e9e"
+      fabricated: true
+      solids:
+        - {kind: cylinder, name: cap, position: [0, 0, 0], axis: [0, 0, 1], diameter: 6.7 mm, length: 3.8 mm}
+        - {kind: cylinder, op: remove, name: head pocket, position: [0, 0, 0], axis: [0, 0, 1], diameter: 5.1 mm, length: 2.8 mm}
+    interfaces:
+      seat: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
+             params: {cap_for: shcs-m2.5, inner_d: 5.1 mm, inner_h: 2.8 mm, process: fdm}}
+  - id: screw-cap-m3-petg
+    kind: structure
+    cad_name: Screw cap M3
+    cad_family: Screw caps
+    name: Printed screw cap for an M3 socket head (FDM PETG), bonded over the head
+    description: >
+      Frame at the open rim's center, +z up. Inner diameter = head 5.5 mm + 2 x 0.3 mm FDM cap clearance (print_fits.yaml),
+      inner height = head 3.0 mm + 0.3 mm, 0.8 mm wall, 1.0 mm roof.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [7.7 mm, 4.3 mm]
+      mass: 0.00011
+      material: PETG
+      density: 1270
+      color: "#2c6e9e"
+      fabricated: true
+      solids:
+        - {kind: cylinder, name: cap, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7.7 mm, length: 4.3 mm}
+        - {kind: cylinder, op: remove, name: head pocket, position: [0, 0, 0], axis: [0, 0, 1], diameter: 6.1 mm, length: 3.3 mm}
+    interfaces:
+      seat: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
+             params: {cap_for: shcs-m3, inner_d: 6.1 mm, inner_h: 3.3 mm, process: fdm}}

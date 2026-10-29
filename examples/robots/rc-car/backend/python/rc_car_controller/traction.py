@@ -46,8 +46,8 @@ class TractionConfig:
     vehicle_mass_kg: float = 1.58             # twin-reported assembled mass
     rear_axle_load_fraction: float = 0.54     # static CoM ahead of the rear axle (estimate)
     tire_friction: float = 0.9                # mu, grass/tire (robot.yaml ground_friction)
-    gear_ratio: float = 9.6                   # gearbox-spur-diff-9.6
-    gear_efficiency: float = 0.88             # gearbox-spur-diff-9.6
+    gear_ratio: float = 9.066                 # gearbox-spur-diff (18T pinion)
+    gear_efficiency: float = 0.88             # gearbox-spur-diff
     motor_kv_rpm_per_v: float = 2100.0        # motor-540-brushed (estimated)
     motor_resistance_ohm: float = 0.12        # 0.11 armature + 2 x 2 mOhm ESC r_on + leads (estimate)
     motor_no_load_current_a: float = 1.6      # motor-540-brushed

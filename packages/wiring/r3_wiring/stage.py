@@ -124,6 +124,12 @@ def run(project: Project, options: RouterOptions | None = None, drive_profile: D
 
     drive = run_drive(project, routes, obstacles, drive_profile)
     result.extend(_dynamic_diagnostics(drive, routing))
+    for cap, entry in sorted(drive.cap_clearance.items()):
+        if entry["min_gap"] < 0:
+            result.add(Diagnostic.error("cap_cable_interference",
+                                        f"cable {entry['wire']} touches printed cap {cap} ({entry['min_gap'] * 1e3:.2f} mm) at t = {entry['time']:.2f} s",
+                                        subjects=[cap, entry["wire"]], data=entry,
+                                        hint="Reroute the harness away from the cap (route.via) or move the cap's screw."))
     (out / "slack_sim.json").write_text(json.dumps(drive.summary(), indent=1, default=float))
     result.artifact("wiring/slack_sim.json", "json", "Cable slack simulation: per-wire minimum clearance to moving parts")
 
@@ -144,6 +150,7 @@ def run(project: Project, options: RouterOptions | None = None, drive_profile: D
         "worst_static_clearance": {"wire": worst_static[0], **worst_static[1]},
         "worst_dynamic_clearance": drive.worst,
         "cable_sags_into_moving_part": any(drive.sags_into_moving.values()),
+        "cap_cable_min_gap": {cap: round(v["min_gap"], 5) for cap, v in drive.cap_clearance.items()},
         "harness_mass": {h: v["mass"] for h, v in report.harness_mass.items()},
         "tie_points": sum(len(h.tie_points) for h in routing.harnesses.values()),
         "pass_throughs": len(routing.holes),
