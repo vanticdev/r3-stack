@@ -1,5 +1,6 @@
 import type { Diagnostic } from "../api/types.ts";
 import { diagnosticHeadline } from "../lib/labels.ts";
+import { Markdown } from "./Markdown.tsx";
 import { Icon } from "./icons.tsx";
 import { Details } from "./ui.tsx";
 
@@ -14,8 +15,8 @@ export function DiagnosticList({ items, onFocus, selected, empty = "No diagnosti
         <div key={`${d.code}${i}`} className={`diag ${d.severity}${onFocus ? " clickable" : ""}${selected === d ? " selected" : ""}`} onClick={() => onFocus?.(d)}>
           <span className="sev" aria-label={d.severity}><Icon name={d.severity === "error" ? "x" : d.severity === "warning" ? "alert" : "info"} size={12} /></span>
           <div className="stack" style={{ gap: 3, minWidth: 0 }}>
-            <span className="msg">{diagnosticHeadline(d)}</span>
-            {d.hint && <span className="hint">Fix: {d.hint}</span>}
+            <Markdown className="msg">{diagnosticHeadline(d)}</Markdown>
+            {d.hint && <Markdown className="hint">{`Fix: ${d.hint}`}</Markdown>}
             <Details rows={[["Code", d.code], ["Stage", d.stage], ["Subjects", d.subjects.join(", ")]]} />
           </div>
         </div>

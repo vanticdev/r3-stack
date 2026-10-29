@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { agentProviders, api } from "../api/client.ts";
 import { keys, useDoctor } from "../api/hooks.ts";
 import { Card, CheckRow, Details, ErrorBox } from "../components/ui.tsx";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { AGENT_NAMES, AGENT_SETUP, environmentCauses, optionalMissing } from "../lib/environment.ts";
 import { stageLabel } from "../lib/labels.ts";
@@ -50,9 +51,9 @@ export function EnvironmentPage() {
                 <div className="check-list" data-testid="environment-causes">
                   {causes.map((c) => (
                     <CheckRow key={c.missing} outcome={c.level === "unavailable" ? "failed" : "warning"} title={c.headline}>
-                      <span className="secondary">Fix: {c.fix}</span>
+                      <Markdown className="secondary">{`Fix: ${c.fix}`}</Markdown>
                       <span>Affects {c.stages.map((s) => stageLabel(s.stage)).join(", ")}</span>
-                      {c.tool?.detail && <span>Detected: {c.tool.detail}</span>}
+                      {c.tool?.detail && <Markdown>{`Detected: ${c.tool.detail}`}</Markdown>}
                     </CheckRow>
                   ))}
                 </div>
@@ -65,7 +66,7 @@ export function EnvironmentPage() {
                   {agents.map((a) => (
                     <CheckRow key={a.provider} outcome={a.available ? "passed" : "not_run"} title={AGENT_NAMES[a.provider] ?? a.provider}
                               result={a.available ? (a.version ?? "available") : "not available"}>
-                      {!a.available && <span>{mock ? "Agent sessions run through r3 serve; start it to use agents." : AGENT_SETUP[a.provider] ?? a.detail}</span>}
+                      {!a.available && <Markdown>{mock ? "Agent sessions run through r3 serve; start it to use agents." : AGENT_SETUP[a.provider] ?? a.detail}</Markdown>}
                     </CheckRow>
                   ))}
                   {!agents.length && <span className="muted">This server does not report agent CLIs.</span>}
@@ -93,7 +94,7 @@ export function EnvironmentPage() {
                         <td><strong>{stageLabel(s.stage)}</strong></td>
                         <td>{s.level === "full" ? "Full fidelity" : s.level === "degraded" ? <strong>Reduced fidelity</strong> : <strong style={{ color: "var(--critical)" }}>Cannot run</strong>}
                           {s.missing.length > 0 && <div className="muted small">missing {s.missing.join(", ")}</div>}</td>
-                        <td className="small muted">{s.note}</td>
+                        <td className="small muted"><Markdown>{s.note}</Markdown></td>
                       </tr>
                     ))}
                   </tbody>
@@ -111,7 +112,7 @@ export function EnvironmentPage() {
                         <td className="mono">{t.name}</td>
                         <td>{t.available ? "yes" : <strong>no</strong>}</td>
                         <td className="mono small">{t.version ?? "—"}</td>
-                        <td className="small muted">{t.detail}</td>
+                        <td className="small muted"><Markdown>{t.detail}</Markdown></td>
                       </tr>
                     ))}
                   </tbody>

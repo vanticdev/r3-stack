@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client.ts";
 import { useDoctor, useProject } from "../api/hooks.ts";
 import type { ProjectDetail, ReleaseItem } from "../api/types.ts";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { RunLog, StageList } from "../components/Layout.tsx";
 import { Card, CheckRow, Details, QueryView, type CheckOutcome } from "../components/ui.tsx";
@@ -22,6 +23,7 @@ function EvidenceDetails({ pid, item }: { pid: string; item: ReleaseItem }) {
   const artifact = item.evidence.find((e) => e.artifact)?.artifact;
   return (
     <Details rows={rows}>
+      {item.evidence.map((e, i) => e.detail ? <Markdown key={i} className="small">{e.detail}</Markdown> : null)}
       {artifact && <a href={api.artifactUrl(pid, artifact)} target="_blank" rel="noreferrer" className="small">Open {artifact.split("/").pop()}</a>}
     </Details>
   );
@@ -51,11 +53,11 @@ function ItemRow({ pid, item, label, onRerun, busy, children }: {
                 <button className="small" disabled={busy} onClick={() => onRerun(stage)}>{checked ? "Rerun" : "Run"} {stageLabel(stage)}</button>
               ) : stage ? <Link className="small" to={`/p/${encodeURIComponent(pid)}/${stagePage(stage)}`}>{stageLabel(stage)}</Link> : null}>
       {(outdated || item.status === "estimated" || note) && (
-        <span className="row" style={{ gap: 8 }}>
+        <div className="row" style={{ gap: 8 }}>
           {outdated && <span className="tag outdated"><Icon name="clock" size={11} />Inputs changed · rerun required</span>}
           {item.status === "estimated" && <span className="tag">Estimated inputs</span>}
-          {note && <span>{note}</span>}
-        </span>
+          {note && <Markdown>{note}</Markdown>}
+        </div>
       )}
       {children}
       {item.evidence.length > 0 && <EvidenceDetails pid={pid} item={item} />}
@@ -80,7 +82,7 @@ function Readiness({ p }: { p: ProjectDetail }) {
             return (
               <div key={item.id} className="failing-row">
                 <Icon name="x" size={13} />
-                <span><strong>{itemLabel(item)}: {value}</strong>, required {target}{itemNote(item) ? <span className="muted"> · {itemNote(item)}</span> : null}</span>
+                <span><strong>{itemLabel(item)}: {value}</strong>, required {target}{itemNote(item) ? <Markdown inline className="muted">{` · ${itemNote(item)}`}</Markdown> : null}</span>
                 {stage && <Link to={`/p/${encodeURIComponent(p.id)}/${stagePage(stage)}`}>Open {stageLabel(stage)}</Link>}
               </div>
             );
@@ -174,7 +176,7 @@ function ProjectFacts({ p }: { p: ProjectDetail }) {
   return (
     <Card title="Project">
       <div className="stack">
-        {p.robot.description && <p className="secondary small">{p.robot.description}</p>}
+        {p.robot.description && <Markdown className="secondary small">{p.robot.description}</Markdown>}
         <dl className="kv">
           <dt>Components</dt><dd>{s.components ?? "—"}</dd>
           <dt>Harnesses · wires</dt><dd>{s.harnesses ?? "—"} · {s.wires ?? "—"}</dd>

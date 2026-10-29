@@ -65,7 +65,9 @@ export function useRobotScene(pid: string) {
       maxSteer: quantity(ackermann.params?.max_steer ?? 0.45),
     } : null;
     // Moving joints: authored ones, plus those the assembly compiler derives from revolute/slider joins.
-    const joints = [...model.data.joints, ...(model.data.derived_joints ?? []).filter((d) => !model.data!.joints.some((j) => j.id === d.id))];
+    // Older/mock APIs omit derived_joints even when the compiled artifact contains them.
+    const derived = model.data.derived_joints?.length ? model.data.derived_joints : model.data.assembly?.joints ?? [];
+    const joints = [...model.data.joints, ...derived.filter((d) => !model.data!.joints.some((j) => j.id === d.id))];
     const massSource: Record<string, string> = {};
     for (const [id, m] of Object.entries(graph.mass?.by_component ?? {})) massSource[id] = m.source;
     // Pin-to-pin display paths: conductors of a bundle side by side, each ending on its pin.

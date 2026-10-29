@@ -5,6 +5,7 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError, api } from "../api/client.ts";
 import { keys, useElectrical, useProject, useScenario, useScenarios, useSpec } from "../api/hooks.ts";
 import type { Diagnostic, Vec3 } from "../api/types.ts";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { TimeChart } from "../components/TimeChart.tsx";
 import { Timeline } from "../components/Timeline.tsx";
@@ -177,7 +178,7 @@ export function WiringPage() {
           </div>
           {selected && (
             <div className="harness-detail">
-              {selected.description && <p className="secondary small">{selected.description}</p>}
+              {selected.description && <Markdown className="secondary small">{selected.description}</Markdown>}
               <dl className="kv">
                 <dt>Length</dt><dd>{fmt(selected.length, "m")}</dd>
                 <dt>Ties</dt><dd>{plural(selected.ties, "tie")}</dd>

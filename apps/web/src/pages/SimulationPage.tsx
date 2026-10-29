@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 
 import { useScenario, useScenarios, useSpec } from "../api/hooks.ts";
 import type { PlaybackRecording, ScenarioCheck, ScenarioListItem, ScenarioResponse } from "../api/types.ts";
+import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { TimeChart, type ChartSeries } from "../components/TimeChart.tsx";
 import { Timeline } from "../components/Timeline.tsx";
@@ -163,7 +164,7 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
         <div className="summary-line">
           <span className="lead">{last?.stale ? "Previous run: " : ""}{failed ? `${plural(failed, "check")} failed` : `${plural(passed, "check")} passed`}{failed && passed ? `, ${passed} passed` : ""}</span>
           {last?.stale && <span className="tag outdated"><Icon name="clock" size={11} />Inputs changed since this run</span>}
-          <span className="secondary">{item.description}</span>
+          <Markdown inline className="secondary">{item.description}</Markdown>
           <span className="spacer" style={{ flex: 1 }} />
           <button className={last?.stale || !last?.passed ? "primary" : ""} onClick={onRun} disabled={busy}><Icon name="play" size={12} />Rerun {name}</button>
         </div>
@@ -214,7 +215,7 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
                   <CheckRow key={c.key} outcome={c.pass ? "passed" : "failed"} title={text.label}
                             result={<>{text.value}<span className="muted"> · required {text.target}</span></>}
                             action={at !== null && recording ? <button className="small ghost" onClick={() => seek(at)} title="Move every view to this moment">t = {at.toFixed(2)} s</button> : null}>
-                    {(text.margin || c.detail) && <span>{text.margin ? `margin ${text.margin}` : ""}{text.margin && c.detail ? " · " : ""}{c.detail}</span>}
+                    {(text.margin || c.detail) && <Markdown>{[text.margin ? `margin ${text.margin}` : "", c.detail].filter(Boolean).join(" · ")}</Markdown>}
                   </CheckRow>
                 );
               })}
@@ -277,7 +278,7 @@ export function SimulationPage() {
       {error ? <ErrorBox error={error} /> : null}
       {selected && scenarios.data && !selectedItem?.last ? (
         <Card><Empty title={`${partLabel(selected)} has not been run`}>
-          {selectedItem?.description && <p>{selectedItem.description}</p>}
+          {selectedItem?.description && <Markdown>{selectedItem.description}</Markdown>}
           <button className="primary" onClick={() => run(selected)} disabled={!!active}><Icon name="play" size={12} />Run {partLabel(selected)}</button>
         </Empty></Card>
       ) : selected && selectedItem ? (

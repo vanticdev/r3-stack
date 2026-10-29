@@ -22,6 +22,7 @@ import { Popover } from "../components/ui.tsx";
 import { cssVar, useThemeVersion } from "../state/prefs.ts";
 import { ConnectorLayer, detailedComponents } from "./ConnectorLayer.tsx";
 import { RouteEditor, type RouteEditState } from "./RouteEditor.tsx";
+import { interfaceFrame } from "./interfaceFrame.ts";
 import type { RobotData } from "./useRobotScene.ts";
 
 Object3D.DEFAULT_UP.set(0, 0, 1); // robot frame: +z up
@@ -230,7 +231,10 @@ function InterfacesOverlay({ data, matrices }: { data: RobotData; matrices: Reco
     const quaternion = new Quaternion().setFromUnitVectors(new Vector3(0, 1, 0), direction.lengthSq() > 0 ? direction : new Vector3(0, 0, 1));
     return { id, type: e.type, component: e.owner_kind === "component", position, quaternion };
   }), [data.endpoints, matrices]);
-  const assembly = Object.entries(data.assembly?.interfaces ?? {});
+  const assembly = Object.entries(data.assembly?.interfaces ?? {}).flatMap(([id, value]) => {
+    const frame = interfaceFrame(value);
+    return frame ? [{ id, ...frame }] : [];
+  });
   return (
     <group>
       {items.map((it) => (
@@ -239,7 +243,7 @@ function InterfacesOverlay({ data, matrices }: { data: RobotData; matrices: Reco
           <meshBasicMaterial color={it.component ? "#3987e5" : "#199e70"} depthTest={false} transparent opacity={0.95} />
         </mesh>
       ))}
-      {assembly.map(([id, f]) => (
+      {assembly.map(({ id, ...f }) => (
         <Line key={id} points={[f.origin, [f.origin[0] + f.z[0] * 0.012, f.origin[1] + f.z[1] * 0.012, f.origin[2] + f.z[2] * 0.012]]}
               color="#9085e9" lineWidth={2} depthTest={false} />
       ))}
