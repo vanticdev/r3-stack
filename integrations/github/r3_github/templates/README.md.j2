@@ -1,0 +1,44 @@
+# @@NAME@@
+
+R3 robot project. `robot.yaml` describes the robot once; the R3 pipeline
+derives CAD, PCBs, 3D wiring and deployable software from it and validates the
+result in a multi-domain digital twin.
+
+## Quick start
+
+```bash
+python -m venv .venv && . .venv/bin/activate
+pip install "r3-platform[sim,mcp] @ @@PLATFORM_URL@@@@@PLATFORM_REF@@"
+r3 validate            # all stages, writes build/report/index.html
+r3 diagnose            # errors grouped by component / wire / binding with hints
+r3 sim run --scenario @@FIRST_SCENARIO@@
+```
+
+Open `build/report/index.html` for diagnostics, scenario results and plots.
+
+## Agents
+
+Codex and Claude Code read `AGENTS.md` / `CLAUDE.md`. The `r3` MCP server is
+registered in `.mcp.json` for Claude Code; for Codex add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.r3]
+command = "python"
+args = ["-m", "r3_orchestrator.mcp_server"]
+env = { R3_PROJECT = "/path/to/@@NAME@@" }
+```
+
+## CI
+
+`.github/workflows/r3.yml` validates every push and pull request, uploads
+`build/` as an artifact and posts a job summary. Optional secrets:
+`ONSHAPE_ACCESS_KEY` / `ONSHAPE_SECRET_KEY` (CAD sync) and `R3_PLATFORM_TOKEN`
+(private platform repository). KiCad steps run when `kicad-cli` is available.
+
+## Deploy
+
+`r3 deploy --target sim` runs the software against the twin.
+`r3 deploy --target fleet --yes` deploys to the robots through BLITZ
+(`backend/deploy.py`); it refuses unless the current `robot.yaml` validated
+without errors. Install the BLITZ development backend into this project first
+(see the BLITZ README) so `backend/deployment/` exists.

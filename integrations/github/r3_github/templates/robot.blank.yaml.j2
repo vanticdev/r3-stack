@@ -1,0 +1,16 @@
+schema: r3/robot@1
+robot:
+  name: @@NAME@@
+  description: New R3 robot. Add components from `r3 list-catalog` / MCP r3_list_catalog.
+  version: 0.1.0
+
+requirements:
+  max_mass: 2 kg
+
+# Robot frame: +x forward, +y left, +z up; origin on the ground.
+components:
+  pi: {type: raspberry-pi-5-8gb, pose: {xyz: [0, 0, 50 mm]}}
+
+software:
+  modules:
+    - {name: controller, language: python, runs_on: pi, entrypoint: main.py}

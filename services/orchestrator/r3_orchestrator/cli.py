@@ -123,7 +123,14 @@ def cmd_create(args: argparse.Namespace) -> dict[str, Any]:
                               confirm=args.github, platform_url=args.platform_url)
 
 
-PRINTERS: dict[str, Callable[[dict[str, Any]], None]] = {"status": _print_status, "diagnose": _print_diagnose}
+def _print_create(payload: dict[str, Any]) -> None:
+    print(f"created {payload['path']} ({len(payload['files'])} files)")
+    if payload.get("github"):
+        print(f"  GitHub: {payload['github'].get('url', '')}")
+    print(f"next: cd {payload['path']} && r3 validate")
+
+
+PRINTERS: dict[str, Callable[[dict[str, Any]], None]] = {"status": _print_status, "diagnose": _print_diagnose, "create": _print_create}
 
 
 def build_parser() -> argparse.ArgumentParser:
