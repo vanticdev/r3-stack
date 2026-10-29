@@ -35,6 +35,7 @@ exposed as `<package>.stage.run`. It writes artifacts under `build/<stage>/`, ad
 
 | # | Stage | Reads | Writes |
 | --- | --- | --- | --- |
+| 0 | `assembly` | `assembly:` joins, catalog `interfaces` | `build/model/assembly.json`, `build/model/assembly_graph.png`; derived poses, fits, hole patterns, loop residuals ([guide](assembly-model.md)) |
 | 1 | `model` | robot.yaml, catalog | `build/model/graph.json`; binding/connector-mate/pin-voltage/logic-level/I²C-address checks |
 | 2 | `cad` | spec, `cad/` | `build/cad/cad_model.json`, `build/cad/meshes/<component>.stl`, `build/cad/views/*.png` (REST shaded views) |
 | 3 | `pcb` | spec, `pcb/<board>/` | `build/pcb/<board>/board.json`, KiCad files, gerbers, ERC/DRC reports |
