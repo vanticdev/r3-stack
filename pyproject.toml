@@ -21,6 +21,8 @@ api = ["fastapi>=0.115", "uvicorn>=0.30", "mcp>=1.2", "ruamel.yaml>=0.18"]
 dev = ["pytest>=8", "httpx>=0.27"]
 # `r3 source`: product-brief/drawing text (pypdf) and agent-output schema validation (jsonschema).
 sourcing = ["pypdf>=4", "jsonschema>=4"]
+# `fabrication` stage (3D printing): meshes, booleans, ray casts, 3MF export and scikit-fem strength checks.
+fabrication = ["trimesh>=4", "manifold3d>=2.4", "rtree>=1.2", "networkx>=3", "lxml>=5", "scikit-fem>=10", "pyamg>=5"]
 
 [project.scripts]
 r3 = "r3_orchestrator.cli:main"

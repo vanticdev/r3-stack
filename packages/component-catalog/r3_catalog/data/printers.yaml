@@ -1,0 +1,109 @@
+# FDM printers for r3_fab: printable build volume [x, y, z], default nozzle, enclosure and
+# temperature limits, from the manufacturer specification pages cited per entry.
+# Nozzle material (stainless steel or hardened steel) is in the provenance notes: carbon-fibre
+# filaments need a hardened nozzle.
+printers:
+  - id: bambu-x1c
+    name: Bambu Lab X1 Carbon
+    manufacturer: Bambu Lab
+    build_volume: [256 mm, 256 mm, 256 mm]
+    nozzle: 0.4 mm
+    layer_height: 0.2 mm
+    enclosed: true
+    max_nozzle_temp_c: 300
+    max_bed_temp_c: 120
+    provenance:
+      status: vendor
+      source: "Bambu Lab X1C specification table, reproduced at https://3dprintbeginner.com/bambu-lab-x1-carbon-review (bambulab.com returns 403)"
+      notes: "Aluminium and glass enclosure with a chamber fan and no active heater. Ships with a hardened-steel 0.4 mm nozzle. Max bed 120 deg C at 110 V (110 deg C at 220 V per the X1E brochure for the same platform)."
+  - id: bambu-p1s
+    name: Bambu Lab P1S
+    manufacturer: Bambu Lab
+    build_volume: [256 mm, 256 mm, 256 mm]
+    nozzle: 0.4 mm
+    layer_height: 0.2 mm
+    enclosed: true
+    max_nozzle_temp_c: 300
+    max_bed_temp_c: 100
+    provenance:
+      status: datasheet
+      source: "https://us.store.bambulab.com/products/p1s (P1P/P1S comparison table)"
+      notes: "Plastic and glass enclosure with no active chamber heating. Ships with a stainless 0.4 mm nozzle (hardened nozzle optional)."
+  - id: bambu-a1
+    name: Bambu Lab A1
+    manufacturer: Bambu Lab
+    build_volume: [256 mm, 256 mm, 256 mm]
+    nozzle: 0.4 mm
+    layer_height: 0.2 mm
+    enclosed: false
+    max_nozzle_temp_c: 300
+    max_bed_temp_c: 100
+    provenance:
+      status: datasheet
+      source: "https://us.store.bambulab.com/products/a1"
+      notes: "Open bed-slinger. Bambu: \"We don't recommend enclosing the A1\". Ships with a stainless 0.4 mm nozzle."
+  - id: bambu-a1-mini
+    name: Bambu Lab A1 mini
+    manufacturer: Bambu Lab
+    build_volume: [180 mm, 180 mm, 180 mm]
+    nozzle: 0.4 mm
+    layer_height: 0.2 mm
+    enclosed: false
+    max_nozzle_temp_c: 300
+    max_bed_temp_c: 80
+    provenance:
+      status: datasheet
+      source: "https://us.store.bambulab.com/products/a1-mini"
+      notes: "Open frame. Ships with a stainless 0.4 mm nozzle."
+  - id: bambu-h2d
+    name: Bambu Lab H2D (single nozzle)
+    manufacturer: Bambu Lab
+    build_volume: [325 mm, 320 mm, 325 mm]
+    nozzle: 0.4 mm
+    layer_height: 0.2 mm
+    enclosed: true
+    max_nozzle_temp_c: 350
+    max_bed_temp_c: 120
+    provenance:
+      status: datasheet
+      source: "https://us.store.bambulab.com/products/h2d"
+      notes: "Single-nozzle volume. Dual nozzle: 300 x 320 x 325 mm. Active chamber heating to 65 deg C. Hardened-steel 0.4 mm nozzle."
+  - id: prusa-mk4s
+    name: Original Prusa MK4S
+    manufacturer: Prusa Research
+    build_volume: [250 mm, 210 mm, 220 mm]
+    nozzle: 0.4 mm
+    layer_height: 0.2 mm
+    enclosed: false
+    max_nozzle_temp_c: 290
+    max_bed_temp_c: 120
+    provenance:
+      status: datasheet
+      source: "https://www.prusa3d.com/product/original-prusa-mk4s-3d-printer-5/"
+      notes: "Open frame. An optional Enclosure add-on reaches 45 deg C inside. High-flow brass CHT 0.4 mm nozzle."
+  - id: prusa-core-one
+    name: Prusa CORE One
+    manufacturer: Prusa Research
+    build_volume: [250 mm, 220 mm, 270 mm]
+    nozzle: 0.4 mm
+    layer_height: 0.2 mm
+    enclosed: true
+    max_nozzle_temp_c: 290
+    max_bed_temp_c: 120
+    provenance:
+      status: datasheet
+      source: "https://www.prusa3d.com/product/prusa-core-one-kit/"
+      notes: "Enclosed CoreXY. Chamber heats to 55 deg C. 0.4 mm nozzle (nozzle material not confirmed on the kit page)."
+  - id: prusa-xl
+    name: Original Prusa XL (single toolhead)
+    manufacturer: Prusa Research
+    build_volume: [360 mm, 360 mm, 360 mm]
+    nozzle: 0.4 mm
+    layer_height: 0.2 mm
+    enclosed: false
+    max_nozzle_temp_c: 290
+    max_bed_temp_c: 115
+    provenance:
+      status: datasheet
+      source: "https://www.prusa3d.com/product/original-prusa-xl-assembled-single-toolhead-3d-printer/"
+      notes: "Open frame (optional enclosure up to 50 deg C). The 0.4 mm nozzle size is assumed; the page states only \"High-Flow Nozzles\"."

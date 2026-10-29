@@ -6,7 +6,7 @@
 print_fits:
   - process: fdm
     description: Fused-filament (PETG, PLA, ABS), 0.4 mm nozzle, 0.2 mm layers, holes printed vertically
-    materials: [petg, pla, abs, asa]
+    materials: [petg, pla, abs, asa, pla+, petg-cf, pa-cf, pa6-cf, paht-cf, pa12-cf]
     hole_clearance: [0.2 mm, 0.6 mm]      # an M3 screw passes a 3.2-3.6 mm printed hole
     sliding_clearance: [0.2 mm, 0.5 mm]   # running/sliding fit on a steel pin
     press_interference: [0.05 mm, 0.2 mm] # pin pressed into a printed bore

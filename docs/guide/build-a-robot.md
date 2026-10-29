@@ -210,7 +210,11 @@ following:
 - **Export.** It writes `build/fabrication/<part>/<part>.stl` and `.3mf` in print orientation, plus
   `plan.json`.
 
-Per-part overrides go in `fabrication.parts.<id>: {material, orientation, print: false}`.
+Per-part overrides go in `fabrication.parts.<id>: {material, orientation, print: false}`. The codes
+(`print_bed_exceeded`, `print_overhang`, `print_wall_thin`, `printed_tapped_hole`, `nut_trap_too_shallow`,
+`printed_hole_clearance`, `print_strength_margin_low`, ...) are listed in `packages/fabrication/README.md`.
+Material and print-fit lookup matches whole words: write `PETG`, `PLA+`, `ASA`, `PA6-CF` or `PAHT-CF` in
+`mechanical.material`.
 
 ## 7. Wiring and connectors
 

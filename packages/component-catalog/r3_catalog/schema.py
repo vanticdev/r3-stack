@@ -7,6 +7,7 @@ results depend on estimates.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -497,11 +498,11 @@ class Catalog(_Model):
         if text in self.materials:
             return self.materials[text]
         lowered = text.lower()
-        # Longest keyword first so "pa6-cf" wins over "pa".
+        # Whole words only ("plastic" is not PLA); the longest keyword wins ("pa6-cf" over "pa").
         best: tuple[int, Material] | None = None
         for material in self.materials.values():
             for word in material.keywords:
-                if word in lowered and (best is None or len(word) > best[0]):
+                if re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9+])", lowered) and (best is None or len(word) > best[0]):
                     best = (len(word), material)
         return best[1] if best else None
 
@@ -509,7 +510,7 @@ class Catalog(_Model):
         """The print-fit table entry for a printed material (None for machined parts)."""
         text = material.lower()
         for fit in self.print_fits.values():
-            if any(word in text for word in fit.materials):
+            if any(re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])", text) for word in fit.materials):
                 return fit
         return None
 
