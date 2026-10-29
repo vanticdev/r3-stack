@@ -203,11 +203,12 @@ function HardwarePart({ id, owner, url, matrix, state, register, onSelect }: {
 function WireTube({ w, state, onSelect, onHover }: {
   w: SceneWire; state: PartState; onSelect?: (s: Selection) => void; onHover: (id: string | null) => void;
 }) {
-  // The wires in focus are drawn thicker so a harness reads against the robot.
-  const emphasis = state === "highlight" || state === "selected" ? 1.8 : 1;
-  const geometry = useMemo(() => tubeGeometry(w.path, w.radius * emphasis), [w, emphasis]);
+  // True conductor diameter in every state: thickening focused wires made the conductors of
+  // one lead overlap again. Focus is a light glow that keeps the insulation colours legible.
+  const geometry = useMemo(() => tubeGeometry(w.path, w.radius), [w]);
   useEffect(() => () => geometry.dispose(), [geometry]);
   const material = useMaterial(w.color, state);
+  if (state === "highlight" || state === "selected") material.emissiveIntensity = 0.18;
   material.transparent = material.transparent || !w.routed;
   if (!w.routed && state !== "ghost") material.opacity = 0.55;
   return (
