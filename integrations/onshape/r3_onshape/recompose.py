@@ -362,7 +362,7 @@ def recompose(project: Project, result: StageResult | None = None) -> dict[str, 
                                   "note": "Part Studio geometry recorded from Onshape, moved to the compiled poses offline; "
                                           "pending_rebuild parts are built locally from their plans (exact booleans) and must be "
                                           "rebuilt in Onshape, and the Onshape assembly re-mated, at the next organized build."}})
-    model_json = {**previous, "source": source, "parts": imported,
+    model_json = {**previous, "inputs": project.fingerprint(), "source": source, "parts": imported,
                   "fastener_owner": {n: p.get("owner") for n, p in imported.items() if p.get("kind") == "fastener"},
                   "fit": fit.summary(), "kinematics": {"steering": kinematics}, "rf": rf,
                   "images": [i for i in previous.get("images", []) if i.startswith("views/")] + lock_report.images,
