@@ -38,7 +38,7 @@ def intent(module):
 def test_intent_is_consistent(intent):
     assert intent.validate() == []
     refs = {p.ref for p in intent.parts}
-    assert {"U2", "U3", "U4", "U1", "U5", "Q1", "R2"} <= refs
+    assert {"U2", "U3", "U4", "U1", "J9", "Q1", "R2"} <= refs
     nets = intent.nets()
     # Brief: dedicated servo rail (buck-boost output Q5) on J_SERVO.2, heartbeat on header pin 13.
     servo = intent.connectors()["J_SERVO"]

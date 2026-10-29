@@ -38,10 +38,10 @@ def stage_run():
 def test_board_json_contract(stage_run):
     project, result, board = stage_run
     assert board["board"] == "carrier-hat" and board["component"] == "hat"
-    assert board["outline"]["width"] == pytest.approx(0.065) and board["outline"]["height"] == pytest.approx(0.0565)
+    assert board["outline"]["width"] == pytest.approx(0.065) and board["outline"]["height"] == pytest.approx(0.070)
     assert board["erc"]["errors"] == 0
     assert board["drc"]["errors"] == 0 and board["drc"]["unconnected"] == 0
-    assert set(board["connectors"]) == {"J_GPIO", "J_BATT", "J_ESC", "J_SERVO", "J_RX", "J_GPS", "J_ENC"}
+    assert set(board["connectors"]) == {"J_GPIO", "J_BATT", "J_ESC", "J_SERVO", "J_RX", "J_GPS", "J_ENC", "J_IMU"}
     assert board["connectors"]["J_SERVO"]["2"] == "SERVO_6V"
     assert board["connectors"]["J_ESC"] == {"1": "ESC_PWM", "2": "ESC_BEC", "3": "ESC_GND"}   # isolator's ESC side
     assert board["connectors"]["J_GPIO"]["13"] == "HEARTBEAT"

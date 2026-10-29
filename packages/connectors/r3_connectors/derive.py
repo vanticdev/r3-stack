@@ -92,6 +92,11 @@ KICAD: dict[str, KicadSpec] = {
         "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x03_P2.54mm_Vertical.step",
         (0.0, -2.54, 2.54), (0, -1, 0), (0, 0, 1), True, 6.0, "square_post", 0.64,
         "mating face = top of the 2.54 mm insulator; posts reach 8.54 mm", "#151515"),
+    "header-1x3-2.54-ra": KicadSpec(
+        "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Horizontal",
+        "Connector_PinHeader_2.54mm.3dshapes/PinHeader_1x03_P2.54mm_Horizontal.step",
+        (4.04, -2.54, 1.27), (0, -1, 0), (1, 0, 0), True, 6.0, "square_post", 0.64,
+        "mating face = outer insulator face at x 4.04 mm; horizontal posts at z 1.27 mm", "#151515"),
     "jst-xh-3-header": KicadSpec(
         "Connector_JST:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical",
         "Connector_JST.3dshapes/JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical.step",
@@ -220,6 +225,9 @@ PROXIES: dict[str, ProxySpec] = {
         "listings; proxy)", "#d9a441", wire_entry=False),
 }
 
+
+# Same housing geometry with heavier crimp terminals; retain it when regenerating.
+PROXIES["servo-3-female-hd"] = PROXIES["servo-3-female"]
 
 def _round(v: float, nd: int = 4) -> float:
     r = round(float(v), nd)

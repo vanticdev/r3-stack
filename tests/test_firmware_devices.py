@@ -97,3 +97,13 @@ def test_estimator_fuses_gps_and_wheel_speed() -> None:
     assert est.speed == pytest.approx(2.0, abs=0.05)
     assert math.hypot(est.x - 2.0 * 9.99 * math.cos(math.pi / 4), est.y - 2.0 * 9.99 * math.sin(math.pi / 4)) < 0.3
     assert nmea_course_to_enu(90.0) == pytest.approx(0.0)  # due east
+
+
+def test_mpu_mount_rotation_transforms_specific_force_to_chassis():
+    hal = fake.FakeCarHal(lambda t: {}, params=fake.CarParams(gyro_noise=0.0, gyro_bias=0.0))
+    imu = Mpu6050(hal.i2c('/dev/i2c-1'), mounting_rpy_deg=(0, 90, 0))
+    imu.init()
+    # Synthetic sensor gravity +z with a 90 degree pitch mounting becomes chassis +x.
+    sample = imu.read()
+    assert sample.accel_mps2[0] == pytest.approx(9.80665, abs=.01)
+    assert sample.accel_mps2[2] == pytest.approx(0, abs=.01)

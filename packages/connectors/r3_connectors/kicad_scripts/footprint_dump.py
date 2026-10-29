@@ -71,6 +71,7 @@ def main(argv):
                     xs.append(p.x)
                     ys.append(p.y)
         origin = (min(xs), min(ys))
+        out["origin_page"] = [mm(origin[0]), mm(origin[1])]
         out["size"] = [mm(max(xs) - origin[0]), mm(max(ys) - origin[1])]
         out["thickness"] = mm(board.GetDesignSettings().GetBoardThickness())
         for fp in board.GetFootprints():

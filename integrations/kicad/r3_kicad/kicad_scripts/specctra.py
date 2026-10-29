@@ -23,6 +23,16 @@ def main(argv):
         if not ok:
             print("import failed", other)
             return 1
+        # Freerouting can leave 0.1 mm pad escape stubs despite automatic_neckdown=false.
+        # Apply Board Setup's fabrication minimum through pcbnew, then let KiCad DRC check
+        # clearance. This is a width edit, not a substitute router or clearance checker.
+        minimum = board.GetDesignSettings().m_TrackMinWidth
+        widened = 0
+        for track in board.GetTracks():
+            if not isinstance(track, pcbnew.PCB_VIA) and track.GetWidth() < minimum:
+                track.SetWidth(minimum)
+                widened += 1
+        print("widened", widened, "router stubs to the board minimum width")
         if "--fill" in argv:
             filler = pcbnew.ZONE_FILLER(board)
             filler.Fill(board.Zones())

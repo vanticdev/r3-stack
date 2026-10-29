@@ -80,7 +80,8 @@ class RcCarController:
 
         ina = cfg["ina226"]
         self.ina = Ina226(self.i2c, int(ina["address"]), float(ina["shunt_ohm"]), float(ina["max_current_a"]))
-        self.imu = Mpu6050(self.i2c, int(cfg["mpu6050"]["address"]))
+        self.imu = Mpu6050(self.i2c, int(cfg["mpu6050"]["address"]),
+                           mounting_rpy_deg=tuple(cfg["mpu6050"].get("mounting_rpy_deg", (0, 0, 0))))
         self.ina_ok = self._init_device("ina226", self.ina.init)
         self.imu_ok = self._init_device("mpu6050", self.imu.init)
 

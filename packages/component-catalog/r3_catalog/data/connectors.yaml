@@ -189,7 +189,7 @@ connectors:
   - id: servo-3-female
     family: Futaba J / 2.54 mm servo lead
     gender: female
-    mates_with: [header-1x3-2.54]
+    mates_with: [header-1x3-2.54, header-1x3-2.54-ra]
     pin_count: 3
     current_rating_per_pin: 3
     voltage_rating: 30
@@ -201,7 +201,7 @@ connectors:
   - id: servo-3-female-hd
     family: Futaba J / JR 2.54 mm servo lead, heavy-duty
     gender: female
-    mates_with: [header-1x3-2.54]
+    mates_with: [header-1x3-2.54, header-1x3-2.54-ra]
     pin_count: 3
     current_rating_per_pin: 3
     voltage_rating: 30
@@ -211,6 +211,18 @@ connectors:
     body_size: [7.6 mm, 2.6 mm, 14 mm]
     provenance: {status: vendor, source: "Heavy-duty 20 AWG servo leads with JR/Futaba plugs (vendor listings); rating and contact resistance as servo-3-female (estimated)"}
   - id: header-1x3-2.54
+    family: 2.54 mm pin header
+    gender: header
+    mates_with: [servo-3-female, servo-3-female-hd]
+    pin_count: 3
+    current_rating_per_pin: 3
+    voltage_rating: 30
+    contact_resistance: 15 mohm
+    awg_min: 22
+    awg_max: 26
+    body_size: [7.6 mm, 2.5 mm, 8.5 mm]
+    provenance: {status: estimated, source: "Typical 2.54 mm header rating"}
+  - id: header-1x3-2.54-ra
     family: 2.54 mm pin header
     gender: header
     mates_with: [servo-3-female, servo-3-female-hd]

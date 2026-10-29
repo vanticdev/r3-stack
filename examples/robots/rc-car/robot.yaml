@@ -125,6 +125,8 @@ components:
   pi_standoff_3: {type: hat-standoff-mf-m2.5-11}
   pi_standoff_4: {type: hat-standoff-mf-m2.5-11}
   hat:         {type: r3-carrier-hat}
+  imu:         {type: gy-521-mpu6050, owned: true}
+  imu_mount:   {type: imu-pedestal-petg}
   cap_hat_1:   {type: screw-cap-m2.5-petg}
   cap_hat_2:   {type: screw-cap-m2.5-petg}
   cap_hat_3:   {type: screw-cap-m2.5-petg}
@@ -237,6 +239,9 @@ assembly:
     - {id: cap_so_rr, a: deck.cap_so_rr, b: cap_so_rr.seat}
     - {id: cap_so_fl, a: deck.cap_so_fl, b: cap_so_fl.seat}
     - {id: cap_so_fr, a: deck.cap_so_fr, b: cap_so_fr.seat}
+    # Rigid provisional mount at (115, 40, 86) mm, axes aligned with the chassis; no soft foam.
+    - {id: imu_mount_bond, a: deck.imu_seat, b: imu_mount.bottom}
+    - {id: imu_screws, a: imu_mount.imu, b: imu.mount, fasteners: {type: M2.5x8}}
     # Pi stack: deck -> F-F spacers (screws from below), Pi on the spacers, M-F standoffs clamp the Pi into the
     # spacers' top threads, HAT screwed onto the standoffs, header into socket.
     - {id: pi_spacer_1, a: deck.pi_1, b: pi_spacer_1.bottom, fasteners: {type: M2.5x8}}
@@ -432,6 +437,17 @@ electrical:
       # The Hall board's lead leaves its lower corner along the plate, away from the spur cover, the magnet carrier
       # and the rear wheel, and wraps the deck's right edge behind the rear-right standoff (not the HAT lead slot).
       route: {slack: 25 mm, keep_away: [wheel_rr, gearbox, motor, lead_post]}
+    - id: imu_lead
+      description: Keyed HAT I2C lead to owned GY-521 solder pads; AD0 stays low (0x68), no added pull-ups.
+      connectors:
+        A: {type: jst-gh-4-housing, mates: hat.J_IMU}
+        B: {type: integral, mates: imu.J1}
+      wires:
+        - {id: W_IMU_VCC, from: A.1, to: B.1, awg: 28, color: red, signal: 3V3}
+        - {id: W_IMU_GND, from: A.2, to: B.2, awg: 28, color: black, signal: GND}
+        - {id: W_IMU_SDA, from: A.3, to: B.4, awg: 28, color: blue, signal: I2C_SDA}
+        - {id: W_IMU_SCL, from: A.4, to: B.3, awg: 28, color: yellow, signal: I2C_SCL}
+      route: {slack: 15 mm}
 
 pcb:
   boards:
@@ -465,12 +481,13 @@ software:
     servo_pwm: {interface: pwm, computer: pi, pins: [pi.J8.35], device: pwmchip0, channel: 3, frequency: 50 Hz, expects: [servo.J1.1]}
     crsf:      {interface: uart, computer: pi, pins: [pi.J8.8, pi.J8.10], device: /dev/ttyAMA0, baud: 420000, expects: [receiver.J1.3, receiver.J1.2]}
     gps:       {interface: uart, computer: pi, pins: [pi.J8.7, pi.J8.29], device: /dev/ttyAMA2, baud: 115200, expects: [gps.J1.2, gps.J1.3]}
-    i2c:       {interface: i2c, computer: pi, pins: [pi.J8.3, pi.J8.5], device: /dev/i2c-1, expects: [hat.I2C_SDA, hat.I2C_SCL]}
+    i2c:       {interface: i2c, computer: pi, pins: [pi.J8.3, pi.J8.5], device: /dev/i2c-1, expects: [imu.SDA, imu.SCL]}
     encoder:   {interface: gpio, computer: pi, pins: [pi.J8.11], device: gpiochip0, channel: 17, expects: [encoder.J1.2]}
     # Failsafe heartbeat to the HAT's ATtiny412 arbiter: toggled every control cycle (100 Hz); after 100 ms
     # without an edge the arbiter replaces the Pi's ESC PWM with 1500 us neutral.
     heartbeat: {interface: gpio, computer: pi, pins: [pi.J8.13], device: gpiochip0, channel: 27, expects: [hat.HEARTBEAT]}
   config:
+    mpu6050: {address: 0x68, component: imu, mounting_rpy_deg: [0, 0, 0]}
     control_rate_hz: 100
     mode: autonomous            # autonomous | manual
     radio_failsafe_timeout_s: 0.25
