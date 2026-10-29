@@ -126,3 +126,27 @@ def test_run_scenario_without_sim_package(project, monkeypatch):
 
 def test_project_not_found(tmp_path):
     assert m.r3_status(project=str(tmp_path))["code"] == "project_not_found"
+
+
+def test_stdio_round_trip(project):
+    """Start the real server over stdio, list tools and call one, as Claude Code / Codex would."""
+    import json
+    import os
+    import sys
+
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    async def session_calls():
+        params = StdioServerParameters(command=sys.executable, args=["-m", "r3_orchestrator.mcp_server"],
+                                       env={**os.environ, "R3_PROJECT": project, "PYTHONPATH": os.pathsep.join(sys.path)})
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                names = {t.name for t in (await session.list_tools()).tools}
+                result = await session.call_tool("r3_get_spec", {"section": "robot"})
+                return names, result.structured_content or json.loads(result.content[0].text)
+
+    names, spec = asyncio.run(asyncio.wait_for(session_calls(), timeout=60))
+    assert EXPECTED_TOOLS <= names
+    assert spec["ok"] and spec["spec"]["name"] == "r3-rc-car" and len(spec["sha256"]) == 64
