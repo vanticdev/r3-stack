@@ -1,0 +1,186 @@
+"""Firmware configuration: defaults, config-file loading and bindings.
+
+Sources, highest priority first:
+
+1. ``--config PATH`` on the command line;
+2. ``R3_FIRMWARE_CONFIG`` (path to a JSON file; used by the twin runner);
+3. ``BLITZ_CONFIG_PATH`` (the watchdog's config file; the deploy supplier writes
+   base64-encoded JSON, plain JSON is accepted too);
+4. built-in defaults, equal to ``robot.yaml`` ``software.config`` at the time of writing.
+
+A config document is either a bare ``software.config`` mapping or
+``{"config": {...}, "bindings": {...}, "mission": {...}, "geodetic_origin": {...}}``.
+Hardware bindings come from ``hal.bindings()`` when the HAL provides them (virtual
+backend), else from the document, else from the defaults.
+"""
+
+from __future__ import annotations
+
+import base64
+import binascii
+import copy
+import json
+import os
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Mapping
+
+MODULE_NAME = "rc_car_controller"
+
+DEFAULT_CONFIG: dict[str, Any] = {
+    # robot.yaml software.config
+    "control_rate_hz": 100,
+    "mode": "autonomous",
+    "radio_failsafe_timeout_s": 0.25,
+    "failsafe_action": "brake",
+    "low_voltage_cutoff_v": 6.6,
+    "low_voltage_limit_v": 7.0,
+    "max_cruise_speed_mps": 4.0,
+    "esc_pulse_us": {"reverse": 1000, "neutral": 1500, "forward": 2000},
+    "steering_pulse_us": {"left": 1878, "center": 1500, "right": 1122},
+    "max_steer_rad": 0.45,
+    "wheelbase_m": 0.26,
+    "wheel_radius_m": 0.055,
+    "encoder_pulses_per_rev": 4,
+    "arm_channel": 5,
+    # Firmware-level defaults (not in robot.yaml).
+    "steering_channel": 1,
+    "throttle_channel": 2,
+    "telemetry_rate_hz": 5,
+    "imu_calibration_s": 0.5,
+    "require_gps_fix_to_arm": True,
+    "initial_heading_deg": 0.0,          # ENU, CCW from east; car faces +x at start
+    "link_degraded_lq": 70,              # uplink LQ (%) below which autonomy slows down
+    "link_degraded_speed_mps": 2.0,
+    "ina226": {"address": 0x40, "shunt_ohm": 0.002, "max_current_a": 10.0},
+    "mpu6050": {"address": 0x68},
+}
+
+DEFAULT_BINDINGS: dict[str, dict[str, Any]] = {
+    "esc_pwm": {"interface": "pwm", "device": "pwmchip0", "channel": 2, "frequency": 50.0},
+    "servo_pwm": {"interface": "pwm", "device": "pwmchip0", "channel": 3, "frequency": 50.0},
+    "crsf": {"interface": "uart", "device": "/dev/ttyAMA0", "baud": 420000},
+    "gps": {"interface": "uart", "device": "/dev/ttyAMA2", "baud": 115200},
+    "i2c": {"interface": "i2c", "device": "/dev/i2c-1"},
+    "encoder": {"interface": "gpio", "device": "gpiochip0", "channel": 17},
+}
+
+_SI_PREFIX = {"": 1.0, "k": 1e3, "M": 1e6, "G": 1e9, "m": 1e-3, "u": 1e-6, "µ": 1e-6}
+
+
+def quantity(value: Any) -> float:
+    """Parse ``50``, ``"50 Hz"``, ``"1 kHz"`` or ``"420000"`` to a float in SI base units."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    match = re.fullmatch(r"\s*([-+0-9.eE]+)\s*([kMGmuµ]?)[A-Za-zΩ]*\s*", str(value))
+    if not match:
+        raise ValueError(f"not a quantity: {value!r}")
+    return float(match.group(1)) * _SI_PREFIX[match.group(2)]
+
+
+def deep_merge(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
+    result = copy.deepcopy(dict(base))
+    for key, value in override.items():
+        if isinstance(value, Mapping) and isinstance(result.get(key), Mapping):
+            result[key] = deep_merge(result[key], value)
+        else:
+            result[key] = copy.deepcopy(value)
+    return result
+
+
+@dataclass
+class FirmwareSettings:
+    config: dict[str, Any]
+    bindings: dict[str, dict[str, Any]]
+    mission: dict[str, Any] | None = None
+    geodetic_origin: dict[str, float] | None = None
+    sources: list[str] = field(default_factory=list)
+
+
+def decode_document(text: str) -> dict[str, Any]:
+    """Parse JSON, or base64-encoded JSON as written by the BLITZ config supplier."""
+    text = text.strip()
+    if not text:
+        return {}
+    if not text.startswith("{"):
+        try:
+            text = base64.b64decode(text, validate=True).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError) as error:
+            raise ValueError("config is neither JSON nor base64 JSON") from error
+    document = json.loads(text)
+    if not isinstance(document, dict):
+        raise ValueError("config document must be a JSON object")
+    return document
+
+
+def _config_path(argv_config: str | None, environ: Mapping[str, str]) -> tuple[str | None, str]:
+    if argv_config:
+        return argv_config, "argv"
+    for variable in ("R3_FIRMWARE_CONFIG", "BLITZ_CONFIG_PATH"):
+        if environ.get(variable):
+            return environ[variable], variable
+    return None, "defaults"
+
+
+def load_settings(argv_config: str | None = None, environ: Mapping[str, str] | None = None,
+                  hal_bindings: Mapping[str, Mapping[str, Any]] | None = None,
+                  hal_document: Mapping[str, Any] | None = None) -> FirmwareSettings:
+    """``hal_document`` is a config document offered by the HAL (a future ``hello``
+    field); it is used only when no config file is given."""
+    environ = os.environ if environ is None else environ
+    path, source = _config_path(argv_config, environ)
+    document: dict[str, Any] = {}
+    sources = ["defaults"]
+    if path is not None:
+        file = Path(path)
+        if file.is_file() and file.stat().st_size > 0:
+            document = decode_document(file.read_text())
+            sources.append(f"{source}:{path}")
+    elif hal_document:
+        document = dict(hal_document)
+        sources.append("hal_config")
+    structured = isinstance(document.get("config"), dict)
+    config = deep_merge(DEFAULT_CONFIG, document["config"] if structured else document)
+    bindings = copy.deepcopy(DEFAULT_BINDINGS)
+    if structured and isinstance(document.get("bindings"), dict):
+        bindings = deep_merge(bindings, document["bindings"])
+        sources.append("document_bindings")
+    if hal_bindings:
+        bindings = deep_merge(bindings, {k: dict(v) for k, v in hal_bindings.items()})
+        sources.append("hal_bindings")
+    return FirmwareSettings(config, bindings, document.get("mission") if structured else None,
+                            document.get("geodetic_origin") if structured else None, sources)
+
+
+def document_from_robot_yaml(robot_yaml: str | Path, scenario: str | None = None,
+                             geodetic_origin: Mapping[str, float] | None = None) -> dict[str, Any]:
+    """Build a firmware config document from ``robot.yaml`` (host-side; needs PyYAML).
+
+    ``scenario`` adds that scenario's ``mission`` and its ``initial.mode`` override.
+    """
+    import yaml  # host tooling only; the firmware itself never imports yaml
+
+    spec = yaml.safe_load(Path(robot_yaml).read_text())
+    software = spec.get("software", {})
+    config = dict(software.get("config", {}))
+    bindings = {}
+    for name, binding in software.get("bindings", {}).items():
+        entry = {k: v for k, v in binding.items() if k in ("interface", "device", "channel", "baud", "frequency", "address")}
+        if "frequency" in entry:
+            entry["frequency"] = quantity(entry["frequency"])
+        bindings[name] = entry
+    document: dict[str, Any] = {"module": MODULE_NAME, "config": config, "bindings": bindings}
+    if scenario is not None:
+        matches = [s for s in spec.get("simulation", {}).get("scenarios", []) if s.get("id") == scenario]
+        if not matches:
+            raise KeyError(f"scenario {scenario!r} not in {robot_yaml}")
+        chosen = matches[0]
+        if "mode" in chosen.get("initial", {}):
+            config["mode"] = chosen["initial"]["mode"]
+        if chosen.get("mission"):
+            document["mission"] = chosen["mission"]
+        document["scenario"] = scenario
+    if geodetic_origin is not None:
+        document["geodetic_origin"] = dict(geodetic_origin)
+    return document
