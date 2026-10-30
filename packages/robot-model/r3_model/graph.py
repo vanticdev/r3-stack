@@ -25,7 +25,7 @@ from .diagnostics import Diagnostic
 from .spec import RobotSpec
 
 if TYPE_CHECKING:  # catalog depends on r3_model, not the other way around at import time
-    from r3_catalog.schema import Catalog
+    from r3_catalog.schema import Catalog, ConnectionSite
 
 
 #: Internal-link kinds that carry a logic signal from ``a`` to ``b`` (signal continuity, like a wire).
@@ -96,6 +96,9 @@ class RobotGraph:
         self._nets = _UnionFind()
         self._reach = _UnionFind()
         self.endpoints: dict[str, ConnectorEndpoint] = {}
+        self.mating_sites: dict[str, ConnectionSite] = {}  # harness ref -> selected site
+        self.occupied_sites: dict[str, dict[str, str]] = {}  # component connector -> site id -> occupant
+        self._site_options: dict[str, list[ConnectionSite]] = {}
         self._build()
 
     # ------------------------------------------------------------------ poses
@@ -144,7 +147,30 @@ class RobotGraph:
                 return hconn.type, {str(n): f"H:{owner}.{connector}.{n}" for n in range(1, count + 1)}
         return None
 
-    def _mate(self, a: str, b: str, context: str) -> None:
+    def connection_sites(self, ref: str) -> list["ConnectionSite"]:
+        """Lazily derive component-local options for this immutable graph build."""
+        if ref not in self._site_options:
+            owner, _, name = ref.partition(".")
+            inst = self.catalog.component(self.spec.components[owner].type).connectors[name]
+            self._site_options[ref] = self.catalog.connection_sites(inst)
+        return self._site_options[ref]
+
+    def _occupy(self, ref: str, site: "ConnectionSite", occupant: str, *, apply: bool = True) -> bool:
+        occupied = self.occupied_sites.get(ref, {})
+        if occupied.get(site.id) == occupant:
+            return True  # reciprocal declaration of the same mate
+        conflicts = {sid: who for sid, who in occupied.items() if sid == site.id or sid in site.blocks}
+        if conflicts:
+            code = "connection_site_occupied" if site.id in conflicts else "connection_site_blocked"
+            self.diagnostics.append(Diagnostic.error(
+                code, f"{occupant}: {ref} site {site.id} conflicts with {conflicts}",
+                subjects=[occupant, ref, *conflicts.values()], data={"site": site.id, "blocked_by": conflicts}))
+            return False
+        if apply:
+            self.occupied_sites.setdefault(ref, {})[site.id] = occupant
+        return True
+
+    def _mate(self, a: str, b: str, context: str, at: str | None = None) -> None:
         left, right = self._connector_pins(a), self._connector_pins(b)
         for side, ref in ((left, a), (right, b)):
             owner = ref.partition(".")[0]
@@ -157,11 +183,39 @@ class RobotGraph:
             return
         (ltype, lpins), (rtype, rpins) = left, right
         lt, rt = self.catalog.connector(ltype), self.catalog.connector(rtype)
-        if rtype not in lt.mates_with:
-            self.diagnostics.append(Diagnostic.error(
-                "connector_mate_mismatch", f"{a} ({ltype}) cannot mate with {b} ({rtype})",
-                subjects=[a, b], data={"left_type": ltype, "right_type": rtype, "left_mates_with": lt.mates_with}))
-            return
+        if at is not None:
+            from r3_catalog.sites import SiteError, select_site
+
+            owner, _, name = b.partition(".")
+            if owner not in self.spec.components:
+                self.diagnostics.append(Diagnostic.error(
+                    "connection_site_incompatible_type", "at requires a component header", subjects=[a, b]))
+                return
+            inst = self.catalog.component(self.spec.components[owner].type).connectors[name]
+            try:
+                site = select_site(self.catalog, inst, ltype, at, self.connection_sites(b))
+            except SiteError as error:
+                self.diagnostics.append(Diagnostic.error(error.code, str(error), subjects=[a, b], data={"at": at}))
+                return
+            if not self._occupy(b, site, a):
+                return
+            self.mating_sites[a] = site
+            rpins = {n: rpins[target] for n, target in site.pin_map.items() if target in rpins}
+        elif rtype not in lt.mates_with:
+            compatible = b.partition(".")[0] in self.spec.components and ltype in self.connection_sites(b)[0].compatible_types
+            if not compatible:
+                self.diagnostics.append(Diagnostic.error(
+                    "connector_mate_mismatch", f"{a} ({ltype}) cannot mate with {b} ({rtype})",
+                    subjects=[a, b], data={"left_type": ltype, "right_type": rtype, "left_mates_with": lt.mates_with}))
+                return
+        if at is None:
+            reservations = [(ref, self.connection_sites(ref)[0], occupant) for ref, occupant in ((a, b), (b, a))
+                            if ref.partition(".")[0] in self.spec.components]
+            if not all(self._occupy(ref, site, occupant, apply=False) for ref, site, occupant in reservations):
+                return
+            for ref, site, occupant in reservations:
+                self._occupy(ref, site, occupant)
+                self.mating_sites[occupant] = site
         for number, node in lpins.items():
             if number in rpins:
                 self._edge(node, rpins[number], "mate", f"{a}|{b}", contact_resistance=lt.contact_resistance,
@@ -224,7 +278,7 @@ class RobotGraph:
                     self._edge(ends[0], ends[1], "wire", wire.id, harness=harness.id, awg=wire.awg)
             for name, hconn in harness.connectors.items():
                 if hconn.mates:
-                    self._mate(f"{harness.id}.{name}", hconn.mates, f"harness {harness.id}")
+                    self._mate(f"{harness.id}.{name}", hconn.mates, f"harness {harness.id}", hconn.at)
 
         for mate in spec.electrical.direct_mates:
             self._mate(mate.a, mate.b, "direct mate")

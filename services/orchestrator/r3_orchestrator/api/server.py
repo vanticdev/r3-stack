@@ -399,6 +399,12 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
     async def get_catalog(pid: str, kind: str | None = None, query: str | None = None) -> dict[str, Any]:
         return await call(api.list_catalog, project(pid).root, kind, query)
 
+    @app.get("/api/projects/{pid}/connection-points", tags=["domains"], responses=ERRORS,
+             summary="Read all mating sites with pin maps, frames, occupancy, blocking and free-access reach")
+    async def get_connection_points(pid: str, component: str = "", free_only: bool = False,
+                                    fits_type: str = "") -> dict[str, Any]:
+        return await call(api.connection_points, project(pid).root, component, free_only, fits_type)
+
     for name, view, text in (("model", views.model_view, "graph.json, assembly.json, compiled poses and joints"),
                              ("cad", views.cad_view, "cad_model.json, mesh URLs, Onshape URLs and views"),
                              ("wiring", views.wiring_view, "routes, routing detail, BOM, clearances, slack simulation"),

@@ -213,7 +213,14 @@ class HarnessConnector(_Model):
 
     type: str
     mates: str | None = Field(default=None, description="<component|harness>.<connector> this plugs into.")
+    at: str | None = Field(default=None, description="Partial header mate: component pin receiving housing pin 1; row axis unchanged.")
     position: Vector | None = Field(default=None, description="Free-end position when not mated (robot frame).")
+
+    @model_validator(mode="after")
+    def _check_site(self) -> "HarnessConnector":
+        if self.at is not None and self.mates is None:
+            raise ValueError("at requires mates")
+        return self
 
 
 class Splice(_Model):

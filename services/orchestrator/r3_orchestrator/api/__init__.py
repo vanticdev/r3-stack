@@ -44,6 +44,21 @@ def load_project(path: str | Path | None = None) -> Project:
     return Project.load(resolve_project(path))
 
 
+def connection_points(project_path: str | Path | None = None, component: str = "", free_only: bool = False,
+                      fits_type: str = "") -> dict[str, Any]:
+    """Read fresh mating options without writing artifacts or invoking a stage."""
+    from r3_connectors.connection_points import connection_points as inventory
+
+    project = load_project(project_path)
+    payload = inventory(project)
+    points = payload["connection_points"]
+    payload["connection_points"] = [p for p in points
+                                    if (not component or p["component"] == component)
+                                    and (not free_only or p["status"] == "free")
+                                    and (not fits_type or fits_type in p["compatible_types"])]
+    return {"ok": not any(d["severity"] == "error" for d in payload["diagnostics"]), **payload}
+
+
 def _diag(d: Diagnostic) -> dict[str, Any]:
     data = d.model_dump(mode="json")
     data["hint"] = hint_for(d.code, d.hint)

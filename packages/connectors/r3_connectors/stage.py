@@ -32,7 +32,7 @@ from r3_model.project import Project
 from .display import display_paths, overlaps
 from .frames import Frame
 from .models import ModelUnavailable, component_scene, connector_scene, export_glb, glb_digest
-from .pins import component_connector_frame, instance_frame
+from .pins import component_connector_frame, instance_frame, mating_site_frame
 
 STAGE = "connectors"
 PIN_TOLERANCE = 1e-4  # wire endpoint to pin, m
@@ -185,7 +185,7 @@ class ConnectorStage:
 
     def _harness_frame(self, harness_id: str, name: str, conn: Any) -> tuple[Frame | None, str]:
         if conn.mates and conn.mates in self.graph.endpoints and self.graph.endpoints[conn.mates].owner_kind == "component":
-            board = component_connector_frame(self.project, conn.mates)
+            board = mating_site_frame(self.project, f"{harness_id}.{name}", conn)
             return (board, "pigtail") if conn.type == "integral" else (board.mated(), "component")
         node = (self.detail or {}).get("nodes", {}).get(f"{harness_id}.{name}")
         if node and node.get("frame"):
@@ -220,6 +220,9 @@ class ConnectorStage:
                 self.data["connectors"][ref] = {"owner": "harness", "harness": harness.id, "name": name, "type": conn.type,
                                                 "mates": conn.mates, "placement": kind, "frame": frame.to_json(),
                                                 "pins": pins, "glb": self.data["types"].get(conn.type, {}).get("glb")}
+                if conn.at is not None:
+                    site = self.graph.mating_sites[ref]
+                    self.data["connectors"][ref].update({"at": conn.at, "site": site.id, "pin_map": site.pin_map})
 
     # ------------------------------------------------------------- checks
     def _frame(self, ref: str) -> Frame | None:
@@ -237,17 +240,26 @@ class ConnectorStage:
         ga, gb = self.catalog.connector(ta).geometry, self.catalog.connector(tb).geometry
         if ga is None or gb is None:
             return
+        site = self.graph.mating_sites.get(b)
+        partial = site is not None and site.id != "full"
+        mapping = site.pin_map if partial else {n: n for n in gb.pins}
+        if partial:
+            position, rotation = self.graph.component_pose(a.partition(".")[0])
+            fa = Frame(rotation, position) @ Frame.from_placement(site.frame)
         d = fb.origin - fa.origin
         axial = float(d @ fa.z)
         lateral = float(np.linalg.norm(d - axial * fa.z))
         tilt = math.acos(float(np.clip(-fa.z @ fb.z, -1.0, 1.0)))
         clock = math.acos(float(np.clip(fa.x @ fb.x, -1.0, 1.0)))
         pin_errors = {}
-        for number in sorted(set(ga.pins) & set(gb.pins), key=int):
-            pa, pb = fa.point(ga.pins[number].position), fb.point(gb.pins[number].position)
+        for number in sorted((n for n in gb.pins if mapping.get(n) in ga.pins), key=int):
+            # Header contacts remain in the complete connector frame; the
+            # selected housing is centred on its partial site.
+            board_frame = self._frame(a) if partial else fa
+            pa, pb = board_frame.point(ga.pins[mapping[number]].position), fb.point(gb.pins[number].position)
             delta = pb - pa
             pin_errors[number] = float(np.linalg.norm(delta - (delta @ fa.z) * fa.z))
-        missing = sorted(set(ga.pins) ^ set(gb.pins))
+        missing = [] if partial else sorted(set(ga.pins) ^ set(gb.pins))
         # Insertion of the deeper-reaching contacts past the partner's mating face.
         insertion = max(ga.pins[n].tip for n in ga.pins) + max(gb.pins[n].tip for n in gb.pins) - axial
         entry = {"a": a, "b": b, "kind": kind, "types": [ta, tb], "axial_gap": _r(axial), "lateral_offset": _r(lateral),
@@ -255,6 +267,8 @@ class ConnectorStage:
                  "max_pin_lateral_error": _r(max(pin_errors.values(), default=0.0)), "contact_overlap": _r(insertion),
                  "pin_count_mismatch": missing, "center": _r(fa.origin)}
         self.data["mated_pairs"].append(entry)
+        if partial:
+            entry.update({"site": site.id, "pin_map": site.pin_map})
         data = {"lateral_offset": lateral, "axial_gap": axial, "tilt": tilt, "clocking": clock,
                 "max_pin_lateral_error": entry["max_pin_lateral_error"], "limit_lateral": MATE_LATERAL_LIMIT,
                 "limit_angle": MATE_ANGLE_LIMIT, "units": "m, rad"}
@@ -440,6 +454,10 @@ class ConnectorStage:
         self.wire_endpoints()
         self.verify_pi_header()
         self.verify_board_poses()
+        from .connection_points import connection_points
+
+        (self.out / "connection_points.json").write_text(json.dumps(connection_points(self.project), indent=1))
+        self.result.artifact("connectors/connection_points.json", "json", "All component mating sites and floating pairs")
         (self.out / "connectors.json").write_text(json.dumps(self.data, indent=1, default=float))
         self.result.artifact("connectors/connectors.json", "json", "Connector frames, pins, mated pairs, wire ends")
         if render:
