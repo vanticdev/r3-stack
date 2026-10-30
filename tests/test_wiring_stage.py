@@ -56,14 +56,16 @@ def test_rc_car_findings_are_structured(stage):
     required = Project.load(root).spec.requirements.min_wire_clearance_moving
     clearance = [d for d in result.diagnostics if d.code in ("wire_clearance_violation", "connector_clearance_violation")]
     assert all(d.data["required"] == pytest.approx(required) and d.data["min_distance"] < required for d in clearance)
-    # Every measured connector clearance below the requirement is reported, and only those (e.g. the motor bullets).
+    # Every measured connector clearance below the requirement is reported, and only those.
     detail = json.loads((root / "build" / "wiring" / "routing_detail.json").read_text())
     measured = {(c["connector"], c["component"]) for c in detail["connector_clearances"] if c["min_distance"] < required}
     reported = {(d.subjects[1], d.data["component"]) for d in clearance if d.code == "connector_clearance_violation"}
     assert reported == measured
-    assert any(c["connector"].startswith("esc_motor.B") for c in detail["connector_clearances"])
-    # Connector bodies are measured against moving parts (the motor's bullets no longer face the
-    # right rear wheel since the motor moved inboard); any violation carries its numbers and witnesses.
+    expected_bodies = {f"{h.id}.{name}" for h in Project.load(root).spec.electrical.harnesses
+                       for name, connector in h.connectors.items() if connector.type != "integral"}
+    assert expected_bodies <= {c["connector"] for c in detail["connector_clearances"]}
+    # All declared connector bodies are measured against moving parts; any
+    # violation carries its numbers and witnesses, regardless of part choice.
     for d in result.diagnostics:
         if d.code == "connector_clearance_violation":
             assert d.data["min_distance"] < d.data["required"] and "witness_part" in d.data

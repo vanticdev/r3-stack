@@ -528,10 +528,17 @@ class HarnessRouter:
             node.lead_end = None if node.exit is None else node.exit.copy()
             return
         r = node.od / 2
-        jacketed = next(h.jacket != "none" for h in self.spec.electrical.harnesses if h.id == node.harness)
-        r_min = bundle_bend_radius(self.catalog, awgs or [22], node.od, jacketed)
+        harness = next(h for h in self.spec.electrical.harnesses if h.id == node.harness)
+        by_pin = {ref.split(".", 1)[1]: self._wire_od(w.awg)
+                  for w in harness.wires for ref in (w.from_, w.to)
+                  if ref.startswith(node.name + ".")}
+        self._fan_length(node, by_pin)
+        r_min = bundle_bend_radius(self.catalog, awgs or [22], node.od, harness.jacket != "none")
         r_pref = self.opt.bend_margin * r_min
-        target = r_pref + node.od
+        # Keep the pin fan-out straight before the first bundle turn. A loose
+        # bundle can bend more tightly than a jacketed one, but that must not
+        # shorten the conductor convergence region into the corner fillet.
+        target = r_pref + max(node.od, node.fan_length)
         ts = np.arange(0.0005, target + 1e-9, 0.0005)
         points = node.exit + node.direction[None] * ts[:, None]
         static, _ = self.obstacles.min_distance(points, self.obstacles.static, keepout=True, exclude=node.exempt)
