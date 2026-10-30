@@ -33,16 +33,14 @@ components:
     params:
       # Plate outline in the chassis frame: 130 mm wide rear, tapering to 80 mm ahead of
       # the battery so the steered front wheels sweep clear of the plate.
-      outline: [[-170 mm, -65 mm], [40 mm, -65 mm], [70 mm, -40 mm], [170 mm, -40 mm],
-                [170 mm, 40 mm], [70 mm, 40 mm], [40 mm, 65 mm], [-170 mm, 65 mm]]
+      outline: [[-170 mm, -65 mm], [-86 mm, -65 mm], [-86 mm, -70 mm], [-70 mm, -70 mm], [-70 mm, -65 mm], [40 mm, -65 mm], [70 mm, -40 mm], [170 mm, -40 mm], [170 mm, 40 mm], [70 mm, 40 mm], [40 mm, 65 mm], [-170 mm, 65 mm]]
   deck:
     type: upper-deck-petg
     params:
       # Rear-right notch clears the transmission's gear cover.
       # Rear-left tab carries the so_rl standoff behind the motor terminals (3 mm clear of the gear case at y < 30 mm);
       # the right-edge tab carries the lead post's screw (edge distance) beside the lead slot.
-      outline: [[-66 mm, -55 mm], [-28 mm, -55 mm], [-28 mm, -59 mm], [-16 mm, -59 mm], [-16 mm, -55 mm], [85 mm, -55 mm],
-                [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
+      outline: [[-66 mm, -55 mm], [-49 mm, -55 mm], [-49 mm, -120 mm], [5 mm, -120 mm], [5 mm, -80 mm], [55 mm, -80 mm], [55 mm, -55 mm], [85 mm, -55 mm], [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
   standoff_rl: {type: standoff-m3-47}
   standoff_rr: {type: standoff-m3-47}
   standoff_fl: {type: standoff-m3-47}
@@ -111,13 +109,17 @@ components:
   battery:     {type: lipo-2s-5000-25c}
   battery_strap: {type: strap-hook-loop-20}
   # The fuse holder hangs in the Y harness at the splice (its input lead is the splice), tied to the plate.
-  fuse:        {type: fuse-atc-5a}
+  fuse:        {type: fuse-atc-7.5a}
   fuse_tie:    {type: zip-tie-2.5}
   pi_spacer_1: {type: spacer-m2.5-ff-10}
   pi_spacer_2: {type: spacer-m2.5-ff-10}
   pi_spacer_3: {type: spacer-m2.5-ff-10}
   pi_spacer_4: {type: spacer-m2.5-ff-10}
   pi:          {type: raspberry-pi-5-4gb, owned: true}
+  pi_shim_1: {type: shim-din988-3x6x0.3}
+  pi_shim_2: {type: shim-din988-3x6x0.3}
+  pi_shim_3: {type: shim-din988-3x6x0.3}
+  pi_shim_4: {type: shim-din988-3x6x0.3}
   pi_standoff_1: {type: hat-standoff-mf-m2.5-11}
   pi_standoff_2: {type: hat-standoff-mf-m2.5-11}
   pi_standoff_3: {type: hat-standoff-mf-m2.5-11}
@@ -125,10 +127,21 @@ components:
   hat:         {type: r3-carrier-hat}
   imu:         {type: gy-521-mpu6050, owned: true}
   imu_mount:   {type: imu-pedestal-petg}
+  imu_outboard_post: {type: imu-lead-post-petg}
+  cap_imu_outboard_post: {type: screw-cap-m3-petg}
+  imu_south_post: {type: servo-south-post-petg}
+  servo_approach_post: {type: servo-approach-post-petg}
+  cap_servo_approach_post: {type: screw-cap-m3-petg}
+  cap_imu_south_post: {type: screw-cap-m3-petg}
+  cap_imu_1: {type: imu-screw-cap-1-petg}
+  cap_imu_2: {type: imu-screw-cap-2-petg}
+  imu_corner_post: {type: imu-lead-post-petg}
+  cap_imu_corner_post: {type: screw-cap-m3-petg}
   cap_hat_1:   {type: screw-cap-m2.5-petg}
   cap_hat_2:   {type: screw-cap-m2.5-petg}
   cap_hat_3:   {type: screw-cap-m2.5-petg}
   cap_hat_4:   {type: screw-cap-m2.5-petg}
+  receiver_riser: {type: receiver-riser-petg}
   tape_rx:     {type: foam-tape-3m-4026, params: {size: [11 mm, 9 mm, 1.6 mm]}}
   receiver:    {type: elrs-receiver-2g4, source: {requires: {kind: radio, protocol: crsf, band: 2.4 GHz, supply: [4.5 V, 5.5 V]}}}
   antenna_mast: {type: antenna-mast-petg}
@@ -139,14 +152,60 @@ components:
   gps:         {type: gnss-rtk-zed-f9p}
   tape_rtk_radio: {type: foam-tape-3m-4026, params: {size: [50 mm, 10 mm, 1.6 mm]}}
   rtk_radio:   {type: telemetry-sik-915-100mw}
+  motor_lead_post: {type: motor-lead-post-petg}
+  power_lead_post: {type: power-lead-post-petg}
+  cap_motor_lead_post: {type: screw-cap-m3-petg}
+  cap_power_lead_post: {type: screw-cap-m3-petg}
+  gnss_riser: {type: gnss-riser-petg}
+  encoder_lead_post: {type: encoder-lead-post-petg}
+  sensor_lead_post: {type: sensor-rtk-mast-petg}
+  cap_encoder_lead_post: {type: screw-cap-m3-petg}
+  cap_sensor_lead_post: {type: screw-cap-m3-petg}
+  cap_lead_post: {type: screw-cap-m3-petg}
   lead_post:   {type: lead-post-petg}   # tie post for the leads climbing to the HAT's top-entry headers
 
 # Join ids name the derived fasteners (<id> or <id>_<n>) and fit interfaces; `verify` holds the exact-geometry limits
 # the CAD fit checks apply (radial clearances/interferences, engagement lengths, retainers).
+  front_camera:
+    type: arducam-b0445-imx296
+    owned: true
+  camera_mount:
+    type: rc-camera-mount-petg
+  camera_fpc:
+    type: arducam-fpc-22-22-150mm
+  cap_camera_1:
+    type: screw-cap-m2-petg
+  cap_camera_2:
+    type: screw-cap-m2-petg
+  cap_camera_3:
+    type: screw-cap-m2-petg
+  cap_camera_4:
+    type: screw-cap-m2-petg
+  cap_camera_mount_1:
+    type: screw-cap-m3-petg
+  cap_camera_mount_2:
+    type: screw-cap-m3-petg
+  camera_tape:
+    type: foam-tape-3m-4026
+    params:
+      size:
+      - 11.5 mm
+      - 4 mm
+      - 1.6 mm
+  servo_climb_post:
+    type: servo-climb-post-petg
+  cap_servo_climb_post:
+    type: screw-cap-m3-petg
+  servo_upper_post:
+    type: servo-upper-post-petg
+  cap_servo_upper_post:
+    type: screw-cap-m3-petg
 assembly:
   root: chassis
   tolerance: {position: 0.05 mm, angle: 0.1 deg}
   joins:
+    - {a: deck.servo_approach_post, b: servo_approach_post.base, clock: 0 deg, fasteners: {type: M3x10}, id: servo_approach_post}
+    - {a: deck.cap_servo_approach_post, b: cap_servo_approach_post.seat, id: cap_servo_approach_post}
     # ---- rear drivetrain
     - {id: gb_mount, a: chassis.gearbox, b: gearbox.mount, clock: 0 deg, fasteners: {type: M3x10}}
     - {id: motor_mount, a: gearbox.motor_mount, b: motor.face, clock: -50 deg, fasteners: {type: M3x8}}
@@ -237,11 +296,23 @@ assembly:
     - {id: cap_so_rr, a: deck.cap_so_rr, b: cap_so_rr.seat}
     - {id: cap_so_fl, a: deck.cap_so_fl, b: cap_so_fl.seat}
     - {id: cap_so_fr, a: deck.cap_so_fr, b: cap_so_fr.seat}
-    # Rigid provisional mount at (115, 40, 86) mm, axes aligned with the chassis; no soft foam.
+    # Rigid mount at (155, 40, 113) mm, axes aligned with the chassis; no soft foam.
     - {id: imu_mount_bond, a: deck.imu_seat, b: imu_mount.bottom}
     - {id: imu_screws, a: imu_mount.imu, b: imu.mount, fasteners: {type: M2.5x8}}
+    - {id: imu_outboard_post_mount, a: deck.imu_outboard_post, b: imu_outboard_post.base, fasteners: {type: M3x10}}
+    - {id: cap_imu_outboard_post, a: deck.cap_imu_outboard_post, b: cap_imu_outboard_post.seat}
+    - {id: imu_south_post_mount, a: deck.imu_south_post, b: imu_south_post.base, fasteners: {type: M3x10}}
+    - {id: cap_imu_south_post, a: deck.cap_imu_south_post, b: cap_imu_south_post.seat}
+    - {id: cap_imu_1, a: imu.cap_1, b: cap_imu_1.seat}
+    - {id: cap_imu_2, a: imu.cap_2, b: cap_imu_2.seat}
+    - {id: imu_corner_post_mount, a: deck.imu_corner_post, b: imu_corner_post.base, fasteners: {type: M3x10}}
+    - {id: cap_imu_corner_post, a: deck.cap_imu_corner_post, b: cap_imu_corner_post.seat}
     # Pi stack: deck -> F-F spacers (screws from below), Pi on the spacers, M-F standoffs clamp the Pi into the
     # spacers' top threads, HAT screwed onto the standoffs, header into socket.
+    # Official Pi laminate: 1.276 mm. Four purchased DIN 988 0.3 mm shims plus 11 mm standoffs put
+    # the HAT underside 12.576 mm above the Pi underside. The 8.5 mm socket mouth is at 4.076 mm:
+    # The vendor datum is 0.030 mm below the laminate: 0.226 mm plastic clearance, 5.774 mm insertion,
+    # and 2.364 mm beyond the Harwin M20-783 contact point (3.41 mm from the socket mouth).
     - {id: pi_spacer_1, a: deck.pi_1, b: pi_spacer_1.bottom, fasteners: {type: M2.5x8}}
     - {id: pi_spacer_2, a: deck.pi_2, b: pi_spacer_2.bottom, fasteners: {type: M2.5x8}}
     - {id: pi_spacer_3, a: deck.pi_3, b: pi_spacer_3.bottom, fasteners: {type: M2.5x8}}
@@ -250,30 +321,45 @@ assembly:
     - {id: pi_seat_2, a: pi_spacer_2.top, b: pi.h2}
     - {id: pi_seat_3, a: pi_spacer_3.top, b: pi.h3}
     - {id: pi_seat_4, a: pi_spacer_4.top, b: pi.h4}
-    - {id: pi_standoff_1, a: pi.t1, b: pi_standoff_1.stud}
-    - {id: pi_standoff_2, a: pi.t2, b: pi_standoff_2.stud}
-    - {id: pi_standoff_3, a: pi.t3, b: pi_standoff_3.stud}
-    - {id: pi_standoff_4, a: pi.t4, b: pi_standoff_4.stud}
-    - {id: pi_s1, a: pi_spacer_1.top, b: pi_standoff_1.stud, offset: 1.6 mm, fasteners: {type: M2.5x6, clamps: [pi]}}
-    - {id: pi_s2, a: pi_spacer_2.top, b: pi_standoff_2.stud, offset: 1.6 mm, fasteners: {type: M2.5x6, clamps: [pi]}}
-    - {id: pi_s3, a: pi_spacer_3.top, b: pi_standoff_3.stud, offset: 1.6 mm, fasteners: {type: M2.5x6, clamps: [pi]}}
-    - {id: pi_s4, a: pi_spacer_4.top, b: pi_standoff_4.stud, offset: 1.6 mm, fasteners: {type: M2.5x6, clamps: [pi]}}
+    - {id: pi_shim_1, a: pi.t1, b: pi_shim_1.bottom}
+    - {id: pi_standoff_1, a: pi_shim_1.top, b: pi_standoff_1.stud}
+    - {id: pi_shim_2, a: pi.t2, b: pi_shim_2.bottom}
+    - {id: pi_standoff_2, a: pi_shim_2.top, b: pi_standoff_2.stud}
+    - {id: pi_shim_3, a: pi.t3, b: pi_shim_3.bottom}
+    - {id: pi_standoff_3, a: pi_shim_3.top, b: pi_standoff_3.stud}
+    - {id: pi_shim_4, a: pi.t4, b: pi_shim_4.bottom}
+    - {id: pi_standoff_4, a: pi_shim_4.top, b: pi_standoff_4.stud}
+    - {id: pi_s1, a: pi_spacer_1.top, b: pi_standoff_1.stud, offset: 1.576 mm, fasteners: {type: M2.5x6, clamps: [pi_shim_1, pi]}}
+    - {id: pi_s2, a: pi_spacer_2.top, b: pi_standoff_2.stud, offset: 1.576 mm, fasteners: {type: M2.5x6, clamps: [pi_shim_2, pi]}}
+    - {id: pi_s3, a: pi_spacer_3.top, b: pi_standoff_3.stud, offset: 1.576 mm, fasteners: {type: M2.5x6, clamps: [pi_shim_3, pi]}}
+    - {id: pi_s4, a: pi_spacer_4.top, b: pi_standoff_4.stud, offset: 1.576 mm, fasteners: {type: M2.5x6, clamps: [pi_shim_4, pi]}}
     - {id: hat_1, a: pi_standoff_1.top, b: hat.h3, fasteners: {type: M2.5x6}}
     - {id: hat_2, a: pi_standoff_2.top, b: hat.h4, fasteners: {type: M2.5x6}}
     - {id: hat_3, a: pi_standoff_3.top, b: hat.h1, fasteners: {type: M2.5x6}}
     - {id: hat_4, a: pi_standoff_4.top, b: hat.h2, fasteners: {type: M2.5x6}}
-    - {id: gpio_header, a: pi.J8, b: hat.socket, verify: {min_insertion: 5.5 mm, lateral_tolerance: 0.2 mm}}
+    - {id: gpio_header, a: pi.J8, b: hat.socket, offset: 0.230 mm, verify: {min_insertion: 5.5 mm, lateral_tolerance: 0.2 mm}}
     - {id: cap_hat_1, a: hat.cap_1, b: cap_hat_1.seat}
     - {id: cap_hat_2, a: hat.cap_2, b: cap_hat_2.seat}
     - {id: cap_hat_3, a: hat.cap_3, b: cap_hat_3.seat}
     - {id: cap_hat_4, a: hat.cap_4, b: cap_hat_4.seat}
-    - {id: rx_tape_bottom, a: deck.rx_pad, b: tape_rx.bottom}
+    - {id: receiver_riser_bond, a: deck.rx_pad, b: receiver_riser.bottom}
+    - {id: rx_tape_bottom, a: receiver_riser.top, b: tape_rx.bottom}
     - {id: rx_tape_top, a: tape_rx.top, b: receiver.bottom}
-    - {id: gps_tape_bottom, a: gearbox.lid_pad, b: tape_gps.bottom}
+    - {id: gnss_riser_bond, a: gearbox.lid_pad, b: gnss_riser.bottom}
+    - {id: gps_tape_bottom, a: gnss_riser.top, b: tape_gps.bottom}
     - {id: gps_tape_top, a: tape_gps.top, b: gps.bottom}
-    - {id: rtk_radio_tape_bottom, a: deck.rtk_radio_pad, b: tape_rtk_radio.bottom}
+    - {id: rtk_radio_tape_bottom, a: sensor_lead_post.radio_pad, b: tape_rtk_radio.bottom}
     - {id: rtk_radio_tape_top, a: tape_rtk_radio.top, b: rtk_radio.side}
     - {id: lead_post_mount, a: deck.lead_post, b: lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: motor_lead_post_mount, a: chassis.motor_lead_post, b: motor_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: cap_motor_lead_post, a: chassis.cap_motor_lead_post, b: cap_motor_lead_post.seat}
+    - {id: power_lead_post_mount, a: chassis.power_lead_post, b: power_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: cap_power_lead_post, a: chassis.cap_power_lead_post, b: cap_power_lead_post.seat}
+    - {id: encoder_lead_post_mount, a: chassis.encoder_lead_post, b: encoder_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: sensor_lead_post_mount, a: deck.sensor_lead_post, b: sensor_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: cap_encoder_lead_post, a: chassis.cap_encoder_lead_post, b: cap_encoder_lead_post.seat}
+    - {id: cap_sensor_lead_post, a: deck.cap_sensor_lead_post, b: cap_sensor_lead_post.seat}
+    - {id: cap_lead_post, a: deck.cap_lead_post, b: cap_lead_post.seat}
     # Antenna mast through-bolted to the PETG deck with nylocs underneath; antenna bonded to the mast top.
     - {id: mast_mount, a: deck.mast, b: antenna_mast.flange, clock: 0 deg, fasteners: {type: M3x12, nut: nut-m3-nyloc, head: b}}
     - {id: antenna_bond, a: antenna_mast.antenna_seat, b: rx_antenna.seat}
@@ -288,6 +374,63 @@ assembly:
     - {id: fuse_tie_loop, a: fuse.tie_path, b: fuse_tie.top, clock: 90 deg, verify: {strap: fuse_tie, around: fuse, through: [chassis]}}
     - {id: fuse_tie_slots, a: chassis.tie_slots, b: fuse_tie.bottom}
 
+    - id: camera_bracket_mount
+      a: deck.camera_mount
+      b: camera_mount.base
+      clock: 0 deg
+      fasteners:
+        type: M3x10
+    - id: camera_screws
+      a: camera_mount.camera
+      b: front_camera.mount
+      clock: 0 deg
+      fasteners:
+        type: M2x8
+    - id: camera_fpc_insert
+      a: front_camera.csi
+      b: camera_fpc.end_a
+    - id: cap_camera_1
+      a: front_camera.cap_1
+      b: cap_camera_1.seat
+    - id: cap_camera_2
+      a: front_camera.cap_2
+      b: cap_camera_2.seat
+    - id: cap_camera_3
+      a: front_camera.cap_3
+      b: cap_camera_3.seat
+    - id: cap_camera_4
+      a: front_camera.cap_4
+      b: cap_camera_4.seat
+    - id: cap_camera_mount_1
+      a: deck.cap_camera_mount_1
+      b: cap_camera_mount_1.seat
+    - id: cap_camera_mount_2
+      a: deck.cap_camera_mount_2
+      b: cap_camera_mount_2.seat
+    - id: camera_strain_tape_base
+      a: camera_mount.cable_pad
+      b: camera_tape.bottom
+    - id: camera_strain_tape_cable
+      a: camera_tape.top
+      b: camera_fpc.strain_pad
+    - id: servo_climb_post
+      a: deck.servo_climb_post
+      b: servo_climb_post.base
+      clock: 0 deg
+      fasteners:
+        type: M3x10
+    - id: cap_servo_climb_post
+      a: deck.cap_servo_climb_post
+      b: cap_servo_climb_post.seat
+    - id: servo_upper_post
+      a: deck.servo_upper_post
+      b: servo_upper_post.base
+      clock: 0 deg
+      fasteners:
+        type: M3x10
+    - id: cap_servo_upper_post
+      a: deck.cap_servo_upper_post
+      b: cap_servo_upper_post.seat
 mechanical:
   transmissions:
     - id: drivetrain
@@ -313,21 +456,25 @@ electrical:
   ground_net: GND
   direct_mates:
     - {a: hat.J_GPIO, b: pi.J8}
+    - a: front_camera.J1
+      b: camera_fpc.A
+    - a: camera_fpc.B
+      b: pi.CAM0
   harnesses:
     - id: battery_lead
       description: Battery 12 AWG pigtail reterminated with XT90H female (45 A continuous / 90 A burst).
       connectors:
         A: {type: integral, mates: battery.J1}
-        B: {type: xt90h-female}
+        B: {type: xt90h-female, position: [228 mm, 27 mm, 60 mm]}
       wires:
         - {id: W_BAT_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
         - {id: W_BAT_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
       route: {slack: 20 mm}
     - id: power_y
       # Gauges from the installed (bundle- and enclosure-derated) ampacity of the wiring stage: the HAT branch is 14 AWG
-      # (7.03 A installed in the integrated layout); a 5 A fuse protects it with 35% margin over the 3.70 A HAT load; the
+      # (13.44 A installed in the current layout); a 7.5 A fuse also supplies the owned camera; the
       # fuse holder's input pigtail is 12 AWG like the trunk, so no thinner conductor sits upstream of the fuse.
-      description: XT90H battery input splitting to the XT60 ESC branch (12 AWG) and, through a 5 A fuse, the XT30 HAT branch (14 AWG).
+      description: XT90H battery input splitting to the XT60 ESC branch (12 AWG) and, through a 7.5 A fuse, the XT30 HAT branch (14 AWG).
       connectors:
         P1: {type: xt90h-male, mates: battery_lead.B}
         P2: {type: xt60-female}
@@ -335,10 +482,10 @@ electrical:
         F1: {type: integral, mates: fuse.J1}
         F2: {type: integral, mates: fuse.J2}
       splices:
-        # SP 7 mm off the fuse holder input (J1, its front end on the right of the battery, 15 mm aft of the front
-        # wheels' steering sweep): the fuse sits at the splice. The fused output (J2, aft) turns back under the deck to the deck's power slot below the HAT's XT30.
-        SP: {position: [178 mm, -37 mm, 40 mm]}
-        SN: {position: [178 mm, -25 mm, 47 mm]}
+        # SP is 28 mm beyond the fuse input: its 18 AWG strain-relief run ends before the splice.
+        # The 12 AWG branches split in the open corner ahead of the battery.
+        SP: {position: [199 mm, -37 mm, 40 mm]}
+        SN: {position: [199 mm, -30 mm, 54 mm]}
       wires:
         - {id: W_Y_P_IN, from: P1.1, to: SP, awg: 12, color: red, signal: VBAT}
         - {id: W_Y_P_ESC, from: SP, to: P2.1, awg: 12, color: red, signal: VBAT}
@@ -352,21 +499,27 @@ electrical:
       connectors:
         A: {type: integral, mates: esc.J_PWR}
         # The mated XT60 pair stays beside the battery ahead of the ESC, clear of the front wheels' steering sweep.
-        B: {type: xt60-male, mates: power_y.P2, position: [170 mm, 40 mm, 48 mm]}
+        B: {type: xt60-male, mates: power_y.P2, position: [180 mm, 40 mm, 60 mm]}
       wires:
         - {id: W_ESC_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
         - {id: W_ESC_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
       route: {slack: 20 mm}
     - id: esc_motor
+      description: Individually routed 18 AWG silicone motor lead, directly soldered to motor tab.
       connectors:
-        A: {type: integral, mates: esc.J_MOT}
-        BP: {type: bullet-3.5-female, mates: motor.J_POS}
-        BN: {type: bullet-3.5-female, mates: motor.J_NEG}
+        A: {type: integral, mates: esc.J_MOT_B}
+        BN: {type: integral, mates: motor.J_NEG}
       wires:
-        # The ESC's own 14 AWG leads: a 2 s, 58 A stall heats them by a few kelvin (electrical stage, transient R(T)
-        # model), well within the silicone rating; the stall drop above 3 % is a burst warning.
-        - {id: W_MOT_A, from: A.1, to: BP.1, awg: 14, color: blue, signal: MOTOR_A}
-        - {id: W_MOT_B, from: A.2, to: BN.1, awg: 14, color: yellow, signal: MOTOR_B}
+        # Electrical: 58.81 A for 2 s reaches 45.24 C; continuous operating points pass the installed ampacity.
+        - {id: W_MOT_B, from: A.1, to: BN.1, awg: 18, color: yellow, signal: MOTOR_B}
+      route: {slack: 15 mm, keep_away: [wheel_rl, wheel_rr, gearbox]}
+    - id: esc_motor_upper
+      description: Individually routed 18 AWG silicone motor lead, directly soldered to motor tab.
+      connectors:
+        A: {type: integral, mates: esc.J_MOT_A}
+        BP: {type: integral, mates: motor.J_POS}
+      wires:
+        - {id: W_MOT_A, from: A.1, to: BP.1, awg: 18, color: blue, signal: MOTOR_A}
       route: {slack: 15 mm, keep_away: [wheel_rl, wheel_rr, gearbox]}
     - id: esc_signal
       connectors:
@@ -389,10 +542,9 @@ electrical:
         - {id: W_SRV_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: SERVO_PWM}
         - {id: W_SRV_VCC, from: A.2, to: B.2, awg: 20, color: red, signal: SERVO_6V}
         - {id: W_SRV_GND, from: A.3, to: B.3, awg: 20, color: black, signal: GND}
-      # Through servo post B's lead pocket, aft along the plate under the linkage, under the deck and up through
-      # the deck's lead slot beside the HAT.
-      route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr],
-              via: [[150 mm, -42 mm, 68 mm], [98 mm, -42 mm, 76.5 mm]]}
+      # The forward shelf restrains the pigtail turn; collared posts carry the climb outside the deck
+      # and above the receiver to the HAT's south-facing connector.
+      route: {keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr], slack: 30 mm, tie_points: [[325 mm, -10 mm, 41.87 mm], [185.21 mm, -49.21 mm, 62 mm], [135 mm, -79.347 mm, 113 mm], [85.5 mm, -100 mm, 128 mm], [159.6546 mm, -67.412733 mm, 84.586 mm], [117.4532 mm, -104.542333 mm, 135.4386 mm]], via: [[320 mm, -30 mm, 42 mm], [170 mm, -63 mm, 85 mm], [110 mm, -100 mm, 140 mm]]}
     - id: rx_lead
       connectors:
         A: {type: integral, mates: receiver.J1}
@@ -412,7 +564,7 @@ electrical:
         - {id: W_GPS_PI_TX, from: A.2, to: B.2, awg: 28, color: white, signal: GPS_TX}
         - {id: W_GPS_PI_RX, from: A.3, to: B.3, awg: 28, color: green, signal: GPS_RX}
         - {id: W_GPS_GND, from: A.4, to: B.4, awg: 28, color: black, signal: GND}
-      route: {slack: 20 mm}
+      route: {slack: 20 mm, tie_points: [[44 mm, 5.5 mm, 102.453 mm]]}
     # RTCM3 corrections: correction radio TX -> rover UART2 RX; the radio is powered from the rover's 5 V input.
     - id: rtk_radio_lead
       connectors:
@@ -423,7 +575,7 @@ electrical:
         - {id: W_RTK_RTCM, from: B.3, to: A.2, awg: 28, color: white, signal: RTCM}
         - {id: W_RTK_TX2, from: A.3, to: B.2, awg: 28, color: green, signal: GPS_TX2}
         - {id: W_RTK_GND, from: A.4, to: B.6, awg: 28, color: black, signal: GND}
-      route: {slack: 30 mm}
+      route: {slack: 30 mm, tie_points: []}
     - id: encoder_lead
       connectors:
         A: {type: integral, mates: encoder.J1}
@@ -434,18 +586,19 @@ electrical:
         - {id: W_ENC_GND, from: A.3, to: B.3, awg: 26, color: black, signal: GND}
       # The Hall board's lead leaves its lower corner along the plate, away from the spur cover, the magnet carrier
       # and the rear wheel, and wraps the deck's right edge behind the rear-right standoff (not the HAT lead slot).
-      route: {slack: 25 mm, keep_away: [wheel_rr, gearbox, motor, lead_post]}
+      route: {keep_away: [wheel_rr, gearbox, motor, lead_post], slack: 25 mm, tie_points: [[51.79282 mm, -55.20718 mm, 58 mm], [45 mm, -62 mm, 104 mm], [45 mm, -25 mm, 120 mm]], via: [[44 mm, -43 mm, 120 mm]]}
     - id: imu_lead
       description: Keyed HAT I2C lead to owned GY-521 solder pads; AD0 stays low (0x68), no added pull-ups.
       connectors:
         A: {type: jst-gh-4-housing, mates: hat.J_IMU}
-        B: {type: integral, mates: imu.J1}
+        B: {type: solder-wire-1x8-2.54, mates: imu.J1}
       wires:
         - {id: W_IMU_VCC, from: A.1, to: B.1, awg: 28, color: red, signal: 3V3}
         - {id: W_IMU_GND, from: A.2, to: B.2, awg: 28, color: black, signal: GND}
         - {id: W_IMU_SDA, from: A.3, to: B.4, awg: 28, color: blue, signal: I2C_SDA}
         - {id: W_IMU_SCL, from: A.4, to: B.3, awg: 28, color: yellow, signal: I2C_SCL}
-      route: {slack: 15 mm}
+      # Three capped posts hold the lead above the Pi IO block and clear of the drivetrain.
+      route: {slack: 15 mm, tie_points: [[135 mm, -65.293 mm, 105 mm], [159.293 mm, -40 mm, 114.9 mm], [153.293 mm, -8 mm, 114.6 mm]], via: [[155 mm, -65 mm, 114 mm]]}
 
 pcb:
   boards:
@@ -460,17 +613,29 @@ cad:
   subassemblies:
     Rear drivetrain: [gearbox, motor, hub_rl, hub_rr, bearing_rl, bearing_rr, axle_rl, axle_rr, spacer_rl, spacer_rr,
                       wheel_rl, wheel_rr, nut_rl, nut_rr, encoder, enc_ring, enc_magnet_1, enc_magnet_2, enc_magnet_3, enc_magnet_4,
-                      tape_gps, gps]
+                      gnss_riser, tape_gps, gps, encoder_lead_post, cap_encoder_lead_post, motor_lead_post, cap_motor_lead_post]
     Front steering L: [arm_fl, kp_fl, knuckle_fl, stub_fl, wheel_fl, nut_fl, bs_kl]
     Front steering R: [arm_fr, kp_fr, knuckle_fr, stub_fr, wheel_fr, nut_fr, bs_kr]
     Steering linkage: [servo_post_a, servo_post_b, servo, servo_output, servo_horn, bs_hl, bs_hr, tie_rod, tie_rod_r,
                        cap_ear_a1, cap_ear_a2, cap_ear_b1, cap_ear_b2]
     Deck and electronics stack: [standoff_rl, standoff_rr, standoff_fl, standoff_fr, deck, cap_so_rl, cap_so_rr, cap_so_fl, cap_so_fr,
                                  pi_spacer_1, pi_spacer_2, pi_spacer_3, pi_spacer_4, pi, pi_standoff_1, pi_standoff_2, pi_standoff_3,
-                                 pi_standoff_4, hat, cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, tape_rx, receiver, antenna_mast,
-                                 rx_antenna, tape_rtk_radio, rtk_radio, lead_post]
-    Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc]
+                                 pi_standoff_4, pi_shim_1, pi_shim_2, pi_shim_3, pi_shim_4, hat, cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, receiver_riser, tape_rx, receiver, antenna_mast,
+                                 rx_antenna, imu, imu_mount, imu_outboard_post, cap_imu_outboard_post, imu_south_post, cap_imu_south_post, cap_imu_1, cap_imu_2, imu_corner_post, cap_imu_corner_post,
+                                 tape_rtk_radio, rtk_radio, lead_post, sensor_lead_post, cap_sensor_lead_post, cap_lead_post]
+    Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc, power_lead_post, cap_power_lead_post]
 
+    Front camera:
+    - front_camera
+    - camera_mount
+    - camera_fpc
+    - cap_camera_1
+    - cap_camera_2
+    - cap_camera_3
+    - cap_camera_4
+    - cap_camera_mount_1
+    - cap_camera_mount_2
+    - camera_tape
 software:
   modules:
     - {name: rc_car_controller, language: python, runs_on: pi, entrypoint: main.py}
@@ -484,6 +649,16 @@ software:
     # Failsafe heartbeat to the HAT's ATtiny412 arbiter: toggled every control cycle (100 Hz); after 60 ms
     # without an edge the arbiter modulates the ESC brake, then sends 1500 us neutral.
     heartbeat: {interface: gpio, computer: pi, pins: [pi.J8.13], device: gpiochip0, channel: 27, expects: [hat.HEARTBEAT]}
+    front_camera:
+      interface: csi
+      computer: pi
+      device: cam0
+      pins:
+      - pi.CAM0.21
+      - pi.CAM0.20
+      expects:
+      - front_camera.J1.21
+      - front_camera.J1.20
   config:
     mpu6050: {address: 0x68, component: imu, mounting_rpy_deg: [0, 0, 0]}
     control_rate_hz: 100

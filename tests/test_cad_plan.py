@@ -41,6 +41,10 @@ def test_every_add_operation_keeps_one_body(catalog):
     """Onshape creates a second part when an ADD does not touch the body."""
     parts, _ = catalog
     for key, part in parts.items():
+        if part.bank_model:
+            # The builder imports these purchased parts; it never executes their
+            # offline proxy ADD operations. Real PCB assemblies can contain gaps.
+            continue
         solid = None
         for op in part.plan.ops:
             if isinstance(op, Hole) or getattr(op, "op", "add") == "remove":
@@ -64,14 +68,19 @@ def test_purchased_parts_get_no_interface_holes(project, catalog):
     parts, _ = catalog
     for part in parts.values():
         if part.plan.kind == "purchased":
-            assert not any(":" in (op.name or "") for op in part.plan.ops), part.name  # interface ops are named '<iface>: ...'
+            # Only explicitly documented holes in a missing-model proxy may
+            # follow a shared pattern. An imported purchased body is untouched.
+            allowed = set(project.catalog.component(part.type).mechanical.proxy_holes_from) if not part.bank_model else set()
+            interface_ops = [op for op in part.plan.ops if ":" in (op.name or "")]
+            assert all(isinstance(op, Hole) and op.name.partition(":")[0] in allowed
+                       for op in interface_ops), part.name
 
 
 def test_fabricated_holes_come_from_interfaces(catalog):
     parts, _ = catalog
     chassis = next(p for p in parts.values() if p.name == "Chassis plate")
     holes = [op for op in chassis.plan.ops if isinstance(op, Hole)]
-    assert len(holes) == 4 + 8 + 4 + 4 + 4  # gearbox, hub carriers, standoffs, arms, servo posts
+    assert len(holes) == 4 + 8 + 4 + 4 + 4 + 3  # gearbox, hubs, standoffs, arms, servo and cable posts
     assert all(op.style == "clearance" and op.diameter == pytest.approx(3.4e-3) for op in holes)
     slots = [op for op in chassis.plan.ops if isinstance(op, Prism) and "slot" in op.name]
     assert len(slots) == 4

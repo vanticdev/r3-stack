@@ -2,8 +2,8 @@
 
     python -m r3_connectors <project dir> [--no-render]
 
-Reads the catalog connector geometry, the component models (official Raspberry
-Pi 5 STEP, the KiCad stage's ``board.step``) and, when present, the wiring
+Reads catalog connector geometry, sourced component models and board exports,
+and, when present, the wiring
 stage's ``routes.json``/``routing_detail.json``. Writes ``build/connectors/``:
 
 * ``models/connectors/<type>.glb``: every used connector type in its connector frame;
@@ -11,13 +11,14 @@ stage's ``routes.json``/``routing_detail.json``. Writes ``build/connectors/``:
 * ``connectors.json``: robot-frame frames of every component connector and harness
   half, every pin (contact, tip, wire entry, signal, net, bindings), mated pairs
   with their alignment, and the wire endpoints checked against their pins;
-* ``*_closeup.png``: reviewer renders (Pi header, XT60 pair, JST GH, servo plug);
+* ``*_closeup.png``: reviewer renders of available connector geometry;
 * ``result.json``.
 """
 
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import time
 from pathlib import Path
@@ -66,6 +67,8 @@ class ConnectorStage:
         self.scenes: dict[str, trimesh.Scene] = {}
         self.display: dict[str, np.ndarray] = {}
         self.component_scenes: dict[str, trimesh.Scene] = {}
+        self._mesh_bodies: dict[str, list[trimesh.Trimesh]] = {}
+        self.cad_meshes = _load(project.build_dir("cad") / "cad_model.json") or {}
         self.data: dict[str, Any] = {"units": "SI (m), robot frame", "types": {}, "components": {}, "connectors": {},
                                      "mated_pairs": [], "wires": {}, "checks": {}}
 
@@ -233,6 +236,7 @@ class ConnectorStage:
         return Frame.from_axes(f["origin"], f["x"], f["z"])
 
     def _pair(self, a: str, b: str, kind: str) -> None:
+        self.mesh_pair(a, b, kind)
         fa, fb = self._frame(a), self._frame(b)
         ta, tb = self.data["connectors"][a]["type"], self.data["connectors"][b]["type"]
         if fa is None or fb is None or "integral" in (ta, tb):
@@ -306,6 +310,143 @@ class ConnectorStage:
                 "axial_gap_mm": pair["axial_gap"] * 1e3, "lateral_offset_mm": pair["lateral_offset"] * 1e3,
                 "contact_overlap_mm": pair["contact_overlap"] * 1e3}
 
+    def mesh_pair(self, a: str, b: str, kind: str) -> None:
+        """Check owner geometry plus the placed model of non-embedded connectors.
+
+        Embedded connectors must exist in the owner mesh. Non-embedded ones
+        have a separate model supplier; proxies cannot verify real contacts.
+        """
+        from .mesh_mates import check_pair, check_side, detect_supplied, scene_bodies
+
+        checks = self.data["checks"].setdefault("mesh_mates", {})
+        key = f"{a}|{b}"
+        record: dict[str, Any] = {"a": a, "b": b, "kind": kind, "sides": {}}
+        checks[key] = record
+        detections = []
+        diagnostics = []
+        geometries = {t: c.geometry for t, c in self.catalog.connectors.items() if c.geometry is not None}
+        for ref in (a, b):
+            info = self.data["connectors"][ref]
+            geometry = geometries.get(info["type"])
+            frame = self._frame(ref)
+            scene = None
+            transform = np.eye(4)
+            source = ""
+            if info["owner"] == "component":
+                cid = info["component"]
+                component = self.catalog.component(self.spec.components[cid].type)
+                scene = self.component_scenes.get(component.id)
+                position, rotation = self.graph.component_pose(cid)
+                transform = Frame(rotation, position).matrix()
+                source = component.model.url or component.model.path if component.model else ""
+                if scene is None:
+                    # CAD exports are already placed in robot coordinates.
+                    # A local-plan envelope is not evidence of a bought part.
+                    cad = self.cad_meshes.get("parts", {}).get(cid, {})
+                    current = self.project.fingerprint()
+                    fresh = all(self.cad_meshes.get("inputs", {}).get(key) == value
+                                for key, value in current.items() if key != "git_commit")
+                    if fresh and cad.get("geometry_source") == "onshape" and cad.get("mesh"):
+                        root = self.project.build_dir("cad").resolve()
+                        path = (root / cad["mesh"]).resolve()
+                        if path.is_relative_to(root) and path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == cad.get("mesh_sha256"):
+                            scene = trimesh.load(path, force="scene")
+                            transform = np.eye(4)
+                            source = f"cad/{cad['mesh']} (Onshape export, SHA-256 {cad['mesh_sha256']})"
+            else:
+                scene = self.scenes.get(info["type"])
+                transform = frame.matrix() if frame else transform
+                source = geometry.model.url or geometry.model.path if geometry else ""
+                if geometry is not None and geometry.model.source == "proxy":
+                    scene = None  # invented contacts cannot verify a bought plug
+            # Cache owner meshes separately from connector instances: two ports
+            # on the same component have different placed supplemental models.
+            bodies = []
+            if scene is not None:
+                owner_key = info.get("component", ref)
+                if owner_key not in self._mesh_bodies:
+                    self._mesh_bodies[owner_key] = scene_bodies(scene, transform)
+                bodies = self._mesh_bodies[owner_key]
+            supplied = []
+            proxy_bodies = []
+            supplier_missing = False
+            if info["owner"] == "component" and not info.get("embedded", False):
+                connector = self.scenes.get(info["type"])
+                if geometry is not None and frame is not None and connector is not None:
+                    supplier_key = f"connector:{ref}"
+                    if supplier_key not in self._mesh_bodies:
+                        self._mesh_bodies[supplier_key] = scene_bodies(connector, frame.matrix())
+                    if geometry.model.source != "proxy":
+                        supplied = self._mesh_bodies[supplier_key]
+                        source += f"; placed connector: {geometry.model.url or geometry.model.path}"
+                    else:
+                        proxy_bodies = self._mesh_bodies[supplier_key]
+                        source += "; placed connector is an unverified proxy"
+                else:
+                    supplier_missing = True
+            if (scene is None and not supplied and not proxy_bodies) or geometry is None or frame is None:
+                reason = "No sourced owner/connector contact geometry available; physical measurement required."
+                record["sides"][ref] = {"declared_type": info["type"], "status": "unverifiable", "reason": reason,
+                                       "source": source}
+                diagnostics.append(Diagnostic.warning("connector_unverifiable", f"{ref}: {reason}", subjects=[a, b, ref]))
+                detections.append(None)
+                continue
+            detection = detect_supplied(bodies, supplied, frame, geometry, source, supplier_missing, proxy_bodies)
+            record["sides"][ref] = detection.json()
+            detections.append(detection)
+        # Bare conductors are fabricated from the routed wire, not a sourced
+        # plug. Verify each occupied pad against the actual route endpoint.
+        for index, ref in enumerate((a, b)):
+            info = self.data["connectors"][ref]
+            geometry = geometries.get(info["type"])
+            if geometry and geometry.pin_shape == "pad" and detections[index] is not None:
+                partner = (a, b)[1-index]
+                partner_info = self.data["connectors"][partner]
+                partner_type = self.catalog.connectors[partner_info["type"]]
+                if partner_info["owner"] == "harness" and partner_type.gender == "none":
+                    from .mesh_mates import check_solder
+                    measured, solder_diagnostics = check_solder(
+                        ref, partner, self._frame(ref), detections[index], self.routes)
+                    measured.update(kind=kind)
+                    checks[key] = measured
+                    self.result.extend(solder_diagnostics)
+                    return
+        if any(d is None for d in detections):
+            # Still check an available part even if its partner has no source.
+            for ref, detection in zip((a, b), detections):
+                if detection is not None:
+                    declared = self.data["connectors"][ref]["type"]
+                    side, issues = check_side(ref, detection, geometries[declared], declared, geometries)
+                    record["sides"][ref] = side
+                    diagnostics.extend(issues)
+            record["status"] = "failed" if any(d.severity.value == "error" for d in diagnostics) else "unverifiable"
+            record["diagnostics"] = [d.model_dump(mode="json") for d in diagnostics]
+            self.result.extend(diagnostics)
+            return
+        ta, tb = (self.data["connectors"][ref]["type"] for ref in (a, b))
+        ga, gb = geometries[ta], geometries[tb]
+        required = max(0., max(p.tip for p in ga.pins.values()) + max(p.tip for p in gb.pins.values()))
+        from r3_model.units import to_si
+        # Mechanical interfaces may be named differently from electrical ones.
+        # Match both owners and the mating plane, not arbitrary owner joins.
+        if self.spec.assembly:
+            for join in self.spec.assembly.joins:
+                if {join.a.split(".")[0], join.b.split(".")[0]} != {a.split(".")[0], b.split(".")[0]}:
+                    continue
+                if "min_insertion" in join.verify:
+                    pairs = [(join.a, a), (join.b, b)] if join.a.split(".")[0] == a.split(".")[0] else [(join.a, b), (join.b, a)]
+                    if all(np.linalg.norm(self.project.assembly.interface_world(interface)[:3, 3] -
+                                          self._frame(connector).origin) <= MATE_LATERAL_LIMIT
+                           for interface, connector in pairs):
+                        required = to_si(join.verify["min_insertion"])
+        measured, diagnostics = check_pair(a, b, self._frame(a), self._frame(b), *detections, ga, gb,
+                                           (ta, tb), geometries, required)
+        measured.update(kind=kind, status="failed" if any(d.severity.value == "error" for d in diagnostics) else
+                        "unverifiable" if diagnostics else "passed")
+        measured["diagnostics"] = [d.model_dump(mode="json") for d in diagnostics]
+        checks[key] = measured
+        self.result.extend(diagnostics)
+
     def wire_endpoints(self) -> None:
         if self.routes is None:
             self.result.add(Diagnostic.warning(
@@ -360,58 +501,56 @@ class ConnectorStage:
                     hint="Display geometry only (checks use the bundle radius); a sharp bend or a crossover "
                          "inside the core keeps the cross-section from spreading there."))
 
-    def verify_pi_header(self) -> None:
-        """The catalog J8 pin map against the posts in the official Raspberry Pi 5 STEP."""
+    def verify_embedded_posts(self) -> None:
+        """Compare every embedded post array to its owner mesh using the pair detector.
+
+        Keep the existing evidence keys for readers of connectors.json. This is
+        independent of whether a particular header is connected in this robot.
+        """
+        from scipy.optimize import linear_sum_assignment
+        from scipy.spatial.distance import cdist
+        from .mesh_mates import detect, scene_bodies
+
         for cid, comp in self.spec.components.items():
             ctype = self.catalog.component(comp.type)
             scene = self.component_scenes.get(comp.type)
-            if scene is None or ctype.kind != "computer":
+            if scene is None:
                 continue
+            bodies = None
             for name, inst in ctype.connectors.items():
                 g = self.catalog.connector(inst.type).geometry
-                if g is None or g.pin_shape != "square_post" or not inst.embedded:
+                if g is None or g.pin_shape != "square_post" or not inst.embedded or max(p.tip for p in g.pins.values()) <= 0:
                     continue
+                if bodies is None:
+                    bodies = scene_bodies(scene)
                 frame = instance_frame(inst)
-                expected = {n: frame.point(p.position) for n, p in g.pins.items()}
-                posts = []
-                for node in scene.graph.nodes_geometry:
-                    transform, geom = scene.graph[node]
-                    lo, hi = trimesh.transform_points(scene.geometry[geom].bounds, transform)
-                    lo, hi = np.minimum(lo, hi), np.maximum(lo, hi)
-                    ext = hi - lo
-                    local = frame.inverse().point((lo + hi) / 2)
-                    inside = g.envelope is None or (abs(local[0]) <= g.envelope[0] / 2 and abs(local[1]) <= g.envelope[1] / 2)
-                    if inside and abs(ext[0] - g.pin_size) < 2e-4 and abs(ext[1] - g.pin_size) < 2e-4 and ext[2] > 0.005:
-                        posts.append(((lo + hi) / 2, hi[2]))
-                if not posts:
-                    continue
-                centres = np.array([p[0][:2] for p in posts])
-                errors = {}
-                for number, point in expected.items():
-                    errors[number] = float(np.min(np.linalg.norm(centres - point[:2], axis=1)))
-                worst = max(errors.values())
-                tips = [p[1] for p in posts]
-                tip_expected = float(frame.point(np.asarray(g.pins["1"].position) + np.asarray(g.pins["1"].axis) * g.pins["1"].tip)[2])
-                self.data["checks"][f"{cid}.{name}_model"] = {"posts_found": len(posts), "max_pin_error": worst,
-                                                               "post_tip_z": _r(float(np.median(tips))),
-                                                               "pin_map_tip_z": _r(tip_expected)}
-                self.result.metrics[f"{cid}.{name}_model_max_pin_error_m"] = worst
-                if worst > 5e-5 or len(posts) != len(expected):
-                    self.result.add(Diagnostic.error(
-                        "connector_model_pin_mismatch", f"{cid}.{name}: catalog pin map is {worst * 1e3:.3f} mm from the "
-                                                        f"posts of the vendor model ({len(posts)} posts found)",
-                        subjects=[cid, f"{cid}.{name}"], data={"max_error": worst, "posts": len(posts), "units": "m"}))
-                # PCB thickness: the vendor board against the catalog envelope.
-                pcb = next((s for s in ctype.mechanical.solids if s.name == "pcb"), None)
-                board = max((scene.geometry[scene.graph[n][1]] for n in scene.graph.nodes_geometry),
-                            key=lambda m: float(np.prod(np.ptp(m.bounds, axis=0)[:2])))
-                thickness = float(np.ptp(board.bounds[:, 2]))
-                self.data["checks"][f"{cid}_pcb_thickness"] = {"model": thickness, "catalog": pcb.size[2] if pcb else None}
-                if pcb is not None and pcb.size and abs(pcb.size[2] - thickness) > 1e-4:
-                    self.result.add(Diagnostic.warning(
-                        "component_model_dimension_mismatch",
-                        f"{cid}: the vendor model's PCB is {thickness * 1e3:.2f} mm thick, the catalog solid "
-                        f"{pcb.size[2] * 1e3:.2f} mm (connector poses follow the vendor model)",
+                detection = detect(bodies, frame, g)
+                expected = np.asarray([p.position[:2] for p in g.pins.values()])
+                found = np.asarray([c.centre[:2] for c in detection.contacts])
+                worst = None
+                if len(found):
+                    distances = cdist(expected, found)
+                    rows, cols = linear_sum_assignment(distances)
+                    worst = float(distances[rows, cols].max())
+                tips = [frame.point(c.centre + [0, 0, c.high])[2] for c in detection.contacts]
+                first_pin = next(iter(g.pins.values()))
+                self.data["checks"][f"{cid}.{name}_model"] = {
+                    "posts_found": len(found), "max_pin_error": worst,
+                    "post_tip_z": float(np.median(tips)) if tips else None,
+                    "pin_map_tip_z": float(frame.point(np.asarray(first_pin.position) +
+                                                   np.asarray(first_pin.axis)*first_pin.tip)[2])}
+                if worst is None or worst > 5e-5 or len(found) != len(expected):
+                    self.result.add(Diagnostic.error("connector_model_pin_mismatch",
+                        f"{cid}.{name}: embedded contact array differs from the owner model",
+                        subjects=[cid, f"{cid}.{name}"], data={"max_error": worst, "posts": len(found), "limit": 5e-5}))
+            pcb = next((solid for solid in ctype.mechanical.solids if solid.name == "pcb"), None)
+            if pcb is not None:
+                board = max(scene.geometry.values(), key=lambda mesh: float(np.prod(mesh.extents[:2])))
+                thickness = float(board.extents[2])
+                self.data["checks"][f"{cid}_pcb_thickness"] = {"model": thickness, "catalog": pcb.size[2]}
+                if abs(pcb.size[2] - thickness) > 1e-4:
+                    self.result.add(Diagnostic.warning("component_model_dimension_mismatch",
+                        f"{cid}: vendor PCB thickness {thickness*1000:.3f} mm differs from catalog {pcb.size[2]*1000:.3f} mm",
                         subjects=[cid], data={"model": thickness, "catalog": pcb.size[2], "units": "m"}))
 
     def verify_board_poses(self) -> None:
@@ -452,7 +591,7 @@ class ConnectorStage:
         self.harness_connectors()
         self.mated_pairs()
         self.wire_endpoints()
-        self.verify_pi_header()
+        self.verify_embedded_posts()
         self.verify_board_poses()
         from .connection_points import connection_points
 
@@ -480,11 +619,10 @@ def run(project: Project, render: bool = True) -> StageResult:
     stage.run(render)
     result.assume("geometry", "Connector frame: origin at the centre of the contact array on the mating face, z toward "
                               "the mating half, x from pin 1; mated halves share origin and x with opposite z.")
-    result.assume("geometry", "Board-side pin maps and bodies come from the KiCad library (footprints via pcbnew, STEP "
-                              "models via cascadio); mating faces were measured on those models. Cable-side housings "
-                              "without free vendor CAD are datasheet proxies.")
-    result.assume("geometry", "The Raspberry Pi 5 is the official Raspberry Pi Ltd STEP (MIT); the HAT is the KiCad "
-                              "stage's board.step. Their connector poses are taken from those models.")
+    result.assume("geometry", "Model sources, transforms and provenance come from the catalog and build artifacts. "
+                              "Proxy geometry records occupancy but cannot verify purchased contacts.")
+    result.assume("geometry", "Embedded connectors use their component model; non-embedded connectors also use "
+                              "their separately placed catalog model. Sources and verification limits are recorded per pair.")
     result.duration_s = time.time() - started
     result.write(stage.out / "result.json")
     return result

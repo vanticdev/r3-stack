@@ -501,37 +501,196 @@ components:
     kind: sensor
     cad_name: GY-521 MPU-6050
     name: GY-521 MPU-6050 6-axis IMU breakout (3.3-5 V regulator on board), I2C 0x68
-    description: >
-      Generic breakout, about 21 x 16 mm with two 3 mm holes along the edge opposite the 8-pin header. Frame at the
-      bottom centre; sensor axes (silkscreen X/Y) along the component x/y. Hole spacing varies by maker: MEASURE.
+    description: Downloaded GY-521 model, not an R3 sculpt. Eight bare through-hole pads accept soldered wires or
+      a loose 1x8 2.54 mm straight/right-angle header. Frame at PCB bottom centre. Model geometry is measured; maker,
+      hole pattern and sensor orientation on the owned board remain unverified. See docs/guide/part-accuracy.md.
     mechanical:
       shape: custom
-      size: [21 mm, 16 mm, 3.2 mm]
+      size:
+      - 20.35 mm
+      - 15.65 mm
+      - 2.5 mm
       mass: 0.0018
-      color: "#14549a"
-      solids:
-        - {kind: box, name: PCB, position: [0, 0, 0.8 mm], size: [21 mm, 16 mm, 1.6 mm]}
-        - {kind: box, name: populated area, position: [0, 0, 2.4 mm], size: [10 mm, 6 mm, 1.6 mm]}
+      color: '#14549a'
+      solids: []
       features:
-        - {id: hole_1, kind: clearance_hole, position: [7.6 mm, 5.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 3.0 mm, depth: 1.6 mm,
-           provenance: {status: estimated, source: "Typical GY-521 layout (vendor listings give 2 x 3 mm holes; spacing unpublished)"}}
-        - {id: hole_2, kind: clearance_hole, position: [-7.6 mm, 5.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 3.0 mm, depth: 1.6 mm}
-      provenance: {status: vendor, source: "https://openelab.io/products/wheeltec-gy-521-mpu-6050 (about 20.5 x 15.5 mm, 2 x 3.2 mm holes, 1.8 g)"}
+      - id: hole_1
+        kind: clearance_hole
+        position:
+        - 8.175 mm
+        - 5.825 mm
+        - 1 mm
+        axis:
+        - 0
+        - 0
+        - -1
+        diameter: 3.0 mm
+        depth: 1 mm
+        provenance:
+          status: estimated
+          source: https://fluxworkshop.com/products/bdaa100044-gy-521-mpu-6050
+          notes: 'Generic vendor variant: Flux Workshop 15.5 mm mounting pitch; downloaded STEP 16.35 mm; JK EMC GY-521
+            V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Use the downloaded STEP centres at +/-8.175 mm for this build, not a fabrication-certified
+            pattern.'
+      - id: hole_2
+        kind: clearance_hole
+        position:
+        - -8.175 mm
+        - 5.825 mm
+        - 1 mm
+        axis:
+        - 0
+        - 0
+        - -1
+        diameter: 3.0 mm
+        depth: 1 mm
+        provenance:
+          status: estimated
+          source: https://fluxworkshop.com/products/bdaa100044-gy-521-mpu-6050
+          notes: 'Generic vendor variant: Flux Workshop 15.5 mm mounting pitch; downloaded STEP 16.35 mm; JK EMC GY-521
+            V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Use the downloaded STEP centres at +/-8.175 mm for this build, not a fabrication-certified
+            pattern.'
+      provenance:
+        status: vendor
+        source: https://openelab.io/products/wheeltec-gy-521-mpu-6050 (about 20.5 x 15.5 mm, 2 x 3.2 mm holes, 1.8
+          g)
+      board_outline:
+      - 20.35 mm
+      - 15.65 mm
     interfaces:
-      mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
-              params: {holes: [[7.6 mm, -5.5 mm, 3.0 mm, clearance, 1.6 mm], [-7.6 mm, -5.5 mm, 3.0 mm, clearance, 1.6 mm]]}}
-      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      mount:
+        kind: hole_pattern
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 8.175 mm
+            - -5.825 mm
+            - 3 mm
+            - clearance
+            - 1 mm
+          - - -8.175 mm
+            - -5.825 mm
+            - 3 mm
+            - clearance
+            - 1 mm
+        description: 'Generic vendor variant: Flux Workshop 15.5 mm mounting pitch; downloaded STEP 16.35 mm; JK EMC
+          GY-521 V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Use the downloaded STEP centres at +/-8.175 mm for this build, not a
+          fabrication-certified pattern.'
+      cap_1: {kind: adhesive_pad, params: {hole_seat: {interface: mount, index: 1}}}
+      cap_2: {kind: adhesive_pad, params: {hole_seat: {interface: mount, index: 0}}}
+      bottom:
+        kind: adhesive_pad
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
     pins:
-      VCC: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.0, voltage_max: 5.5, current_max: 0.01}
-      GND: {role: ground}
-      SCL: {role: i2c_scl, logic_level: 3.3, voltage_max: 3.6}
-      SDA: {role: i2c_sda, logic_level: 3.3, voltage_max: 3.6}
-      INT: {role: gpio, logic_level: 3.3}
+      VCC:
+        role: power_in
+        voltage_nominal: 3.3
+        voltage_min: 3.0
+        voltage_max: 5.5
+        current_max: 0.01
+      GND:
+        role: ground
+      SCL:
+        role: i2c_scl
+        logic_level: 3.3
+        voltage_max: 3.6
+      SDA:
+        role: i2c_sda
+        logic_level: 3.3
+        voltage_max: 3.6
+      INT:
+        role: gpio
+        logic_level: 3.3
+      XDA:
+        role: i2c_sda
+        logic_level: 3.3
+        functions:
+        - aux_sda
+      XCL:
+        role: i2c_scl
+        logic_level: 3.3
+        functions:
+        - aux_scl
+      AD0:
+        role: gpio
+        logic_level: 3.3
+        functions:
+        - i2c_address_select
     connectors:
-      J1: {type: integral, position: [0, -8 mm, 1.6 mm], direction: [0, -1, 0], pins: {"1": VCC, "2": GND, "3": SCL, "4": SDA, "8": INT}}
+      J1:
+        type: solder-pads-1x8-2.54
+        position:
+        - 0
+        - -6.555 mm
+        - 1 mm
+        direction:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        embedded: true
+        source: https://raw.githubusercontent.com/adam-kabbara/RSX-CANSAT-2026/6e7b39f8cbd07e0290e0925f2fbab3cb3e0e376f/electrical/DO_NOT_EDIT__KICAD_LIBRARIES/Custom_3D_Models.3dshapes/GY-521_%28MPU-6050%29.step
+        provenance:
+          status: estimated
+          source: https://raw.githubusercontent.com/adam-kabbara/RSX-CANSAT-2026/6e7b39f8cbd07e0290e0925f2fbab3cb3e0e376f/electrical/DO_NOT_EDIT__KICAD_LIBRARIES/Custom_3D_Models.3dshapes/GY-521_%28MPU-6050%29.step
+          notes: 'STEP measured: source centres X=1.285+2.54*i, Y=-14.38, board top Z=1 mm. Owned-board row/first-pin
+            offsets unverified; measure before fitting.'
+        pins:
+          '1': VCC
+          '2': GND
+          '3': SCL
+          '4': SDA
+          '5': XDA
+          '6': XCL
+          '7': AD0
+          '8': INT
     behavior:
       model: imu.mpu6050
-      params: {current: 0.0039, i2c_pullups: 4.7 kohm, pullup_provenance: "Typical GY-521 fitted pull-ups; verify owned board", ad0: grounded}
-      provenance: {status: datasheet, source: "InvenSense PS-MPU-6000A-00: 3.9 mA gyro + accelerometer; board regulator/LED extra"}
+      params:
+        current: 0.0039
+        i2c_pullups: 4.7 kohm
+        pullup_provenance: Typical GY-521 fitted pull-ups; verify owned board
+        ad0: grounded
+        header_options:
+        - bare solder pads
+        - loose straight 1x8 2.54 mm
+        - loose right-angle 1x8 2.54 mm
+        sensor_package_centre:
+        - 0.425 mm
+        - 1.075 mm
+        - 1.125 mm
+        sensor_axes_provenance: 'ESTIMATED: downloaded model QFN at source (10.6,-6.75), no pin-1 marker/silkscreen.
+          Verify package dot and printed X/Y arrows on owned board; do not claim axis certification.'
+      provenance:
+        status: datasheet
+        source: 'InvenSense PS-MPU-6000A-00: 3.9 mA gyro + accelerometer; board regulator/LED extra'
     software:
-      - {bus: i2c, address: 0x68, protocol: mpu6050, params: {}}
+    - bus: i2c
+      address: 104
+      protocol: mpu6050
+      params: {}

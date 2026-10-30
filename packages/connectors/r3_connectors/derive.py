@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import yaml
 
 from r3_catalog import DATA_DIR
 
@@ -151,83 +152,13 @@ KICAD: dict[str, KicadSpec] = {
         "footprint origin, contact axis at mid-height 1.28 mm; contacts start about 1.5 mm inside", "#e8e4c9"),
 }
 
-XT30_FEMALE = dict(insert=[8.2, 4.2, 5.6], body=[10.2, 5.2, 5.0], contact_d=2.0)
-PROXIES: dict[str, ProxySpec] = {
-    "xt30pw-male": ProxySpec(
-        [("1", -2.5, 0.0), ("2", 2.5, 0.0)], "xt_male_pcb_ra",
-        {"shell": [10.2, 5.2, 10.6], "cavity": [8.4, 4.4, 5.8], "contact_d": 1.0, "height": 3.1, "pad_row": 13.4,
-         "pegs": [[-5.5, -10.0], [5.5, -10.0]]},
-        13.4, 0.0, (10.2, 5.2, 13.4), -1.0, "bullet", 1.0,
-        "Amass XT30PW-M datasheet outline (10.2 x 5.2 mm shell, 5.0 mm contact pitch) on the KiCad "
-        "AMASS_XT30PW-M footprint (pads, pegs, courtyard); no KiCad or vendor 3D model exists (proxy)",
-        "#d9a21b", footprint="Connector_AMASS:AMASS_XT30PW-M_1x02_P2.50mm_Horizontal", wire_entry=False),
-    "xt30-female": ProxySpec(
-        [("1", -2.5, 0.0), ("2", 2.5, 0.0)], "xt_female", {**XT30_FEMALE, "cup": 3.0},
-        8.0, 5.6, (10.2, 5.2, 13.6), 5.0, "socket", 2.0,
-        "Amass XT30U-F datasheet: 10.2 x 5.2 mm body, 5.0 mm pitch, insert 5.6 mm (proxy)", "#d9a21b"),
-    "xt30-male": ProxySpec(
-        [("1", -2.5, 0.0), ("2", 2.5, 0.0)], "xt_male", {"shell": [10.2, 5.2, 10.6], "cavity": [8.4, 4.4, 5.8],
-                                                          "contact_d": 1.0, "cup": 3.0},
-        13.6, 0.0, (10.2, 5.2, 13.6), -1.0, "bullet", 1.0,
-        "Amass XT30U-M datasheet: 10.2 x 5.2 x 10.6 mm shell, 5.0 mm pitch (proxy)", "#d9a21b"),
-    "bullet-3.5-male": ProxySpec(
-        [("1", 0.0, 0.0)], "bullet_male", {"pin_d": 3.5, "pin_length": 9.0, "cup_d": 4.4, "cup_length": 5.0},
-        5.0, 9.0, (4.4, 4.4, 14.0), 9.0, "bullet", 3.5,
-        "3.5 mm gold bullet: 9 mm split pin, 5 mm solder cup (hobby vendor drawings; proxy)", "#d9b54a"),
-    "bullet-3.5-female": ProxySpec(
-        [("1", 0.0, 0.0)], "bullet_female", {"od": 5.0, "socket_depth": 9.5, "length": 16.0},
-        16.0, 0.0, (5.0, 5.0, 16.0), -0.5, "socket", 3.5,
-        "3.5 mm gold bullet socket: 5 mm OD, 16 mm long incl. solder cup (hobby vendor drawings; proxy)",
-        "#d9b54a"),
-    "jst-xh-3-housing": ProxySpec(
-        [("1", -2.5, 0.0), ("2", 0.0, 0.0), ("3", 2.5, 0.0)], "housing",
-        {"width": 9.9, "thickness": 5.75, "length": 7.0, "cavity": 1.6},
-        7.0, 0.0, (9.9, 5.75, 7.0), 0.0, "crimp", 1.0,
-        "JST XH datasheet (eXH.pdf) XHP-3: 2.50 mm pitch, 9.9 mm wide (2.5(n-1)+4.9); SXH-001T-P0.6 crimps "
-        "(proxy)", "#f2efdc"),
-    "jst-gh-4-housing": ProxySpec(
-        [("1", -1.875, 0.0), ("2", -0.625, 0.0), ("3", 0.625, 0.0), ("4", 1.875, 0.0)], "housing",
-        {"width": 6.25, "thickness": 4.25, "length": 4.5, "cavity": 0.8},
-        4.5, 0.0, (6.25, 4.25, 4.5), 0.0, "crimp", 0.6,
-        "JST GH datasheet (eGH.pdf) GHR-04V-S: 1.25 mm pitch, 6.25 mm wide; SSHL-002T-P0.2 crimps (proxy)",
-        "#f2efdc"),
-    "xt90h-male": ProxySpec(
-        [("1", -4.95, 0.0), ("2", 4.95, 0.0)], "housing",
-        {"width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5},
-        29.7, 0.0, (20.8, 11.7, 29.7), 0.0, "solder_cup", 4.5,
-        "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; "
-        "conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf",
-        "#d9a21b"),
-    "xt90h-female": ProxySpec(
-        [("1", -4.95, 0.0), ("2", 4.95, 0.0)], "housing",
-        {"width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5},
-        29.7, 0.0, (20.8, 11.7, 29.7), 0.0, "solder_cup", 4.5,
-        "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; "
-        "conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf",
-        "#d9a21b"),
-    "servo-3-female": ProxySpec(
-        [("1", -2.54, 0.0), ("2", 0.0, 0.0), ("3", 2.54, 0.0)], "housing",
-        {"width": 7.6, "thickness": 2.6, "length": 14.0, "cavity": 1.0},
-        14.0, 0.0, (7.6, 2.6, 14.0), 0.0, "socket", 1.0,
-        "Futaba J / 2.54 mm 1x3 crimp housing: 7.6 x 2.6 x 14 mm (vendor listings; proxy)", "#1d1d1d"),
-    # Flat-cable ends: the stiffened FFC end with exposed contacts on one face; no wires (the cable is the conductor).
-    "fpc-22p-0.5mm-cable": ProxySpec(
-        [(str(n), -5.25 + 0.5 * (n - 1), 0.0) for n in range(1, 23)], "ffc_end",
-        {"width": 11.5, "thickness": 0.3, "stiffener": 4.0, "contact_width": 0.3},
-        4.0, 0.0, (11.5, 0.3, 4.0), 0.0, "blade", 0.3,
-        "Raspberry Pi 22-way 0.5 mm camera FFC: 11.5 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable "
-        "listings; proxy)", "#d9a441", wire_entry=False),
-    "fpc-15p-1.0mm-cable": ProxySpec(
-        [(str(n), -7.0 + 1.0 * (n - 1), 0.0) for n in range(1, 16)], "ffc_end",
-        {"width": 16.0, "thickness": 0.3, "stiffener": 4.0, "contact_width": 0.6},
-        4.0, 0.0, (16.0, 0.3, 4.0), 0.0, "blade", 0.6,
-        "Raspberry Pi 15-way 1.0 mm camera FFC: 16 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable "
-        "listings; proxy)", "#d9a441", wire_entry=False),
-}
+def load_proxy_specs(path: Path = DATA_DIR / "connector_proxies.yaml") -> dict[str, ProxySpec]:
+    """Read part-specific dimensions and provenance from the component catalog."""
+    raw = yaml.safe_load(path.read_text())
+    return {name: ProxySpec(**values) for name, values in raw["proxies"].items()}
 
 
-# Same housing geometry with heavier crimp terminals; retain it when regenerating.
-PROXIES["servo-3-female-hd"] = PROXIES["servo-3-female"]
+PROXIES = load_proxy_specs()
 
 # Crimp housing dimensions are used for occupancy, independently of display CAD.
 # Harwin's downloadable CAD requires TraceParts registration. Use the existing

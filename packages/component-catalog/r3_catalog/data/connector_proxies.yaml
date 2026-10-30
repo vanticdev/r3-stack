@@ -1,0 +1,526 @@
+# Connector proxy derivation inputs. All dimensions are millimetres.
+# Vendor dimensions and estimates are recorded in each source field.
+proxies:
+  xt30pw-male:
+    pins:
+    - - '1'
+      - -2.5
+      - 0.0
+    - - '2'
+      - 2.5
+      - 0.0
+    builder: xt_male_pcb_ra
+    params:
+      shell:
+      - 10.2
+      - 5.2
+      - 10.6
+      cavity:
+      - 8.4
+      - 4.4
+      - 5.8
+      contact_d: 1.0
+      height: 3.1
+      pad_row: 13.4
+      pegs:
+      - - -5.5
+        - -10.0
+      - - 5.5
+        - -10.0
+    depth: 13.4
+    reach: 0.0
+    envelope:
+    - 10.2
+    - 5.2
+    - 13.4
+    tip: -1.0
+    pin_shape: bullet
+    pin_size: 1.0
+    source: Amass XT30PW-M datasheet outline (10.2 x 5.2 mm shell, 5.0 mm contact pitch)
+      on the KiCad AMASS_XT30PW-M footprint (pads, pegs, courtyard); no KiCad or vendor
+      3D model exists (proxy)
+    color: '#d9a21b'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: Connector_AMASS:AMASS_XT30PW-M_1x02_P2.50mm_Horizontal
+    wire_entry: false
+  xt30-female:
+    pins:
+    - - '1'
+      - -2.5
+      - 0.0
+    - - '2'
+      - 2.5
+      - 0.0
+    builder: xt_female
+    params:
+      insert:
+      - 8.2
+      - 4.2
+      - 5.6
+      body:
+      - 10.2
+      - 5.2
+      - 5.0
+      contact_d: 2.0
+      cup: 3.0
+    depth: 8.0
+    reach: 5.6
+    envelope:
+    - 10.2
+    - 5.2
+    - 13.6
+    tip: 5.0
+    pin_shape: socket
+    pin_size: 2.0
+    source: 'Amass XT30U-F datasheet: 10.2 x 5.2 mm body, 5.0 mm pitch, insert 5.6 mm
+      (proxy)'
+    color: '#d9a21b'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true
+  xt30-male:
+    pins:
+    - - '1'
+      - -2.5
+      - 0.0
+    - - '2'
+      - 2.5
+      - 0.0
+    builder: xt_male
+    params:
+      shell:
+      - 10.2
+      - 5.2
+      - 10.6
+      cavity:
+      - 8.4
+      - 4.4
+      - 5.8
+      contact_d: 1.0
+      cup: 3.0
+    depth: 13.6
+    reach: 0.0
+    envelope:
+    - 10.2
+    - 5.2
+    - 13.6
+    tip: -1.0
+    pin_shape: bullet
+    pin_size: 1.0
+    source: 'Amass XT30U-M datasheet: 10.2 x 5.2 x 10.6 mm shell, 5.0 mm pitch (proxy)'
+    color: '#d9a21b'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true
+  bullet-3.5-male:
+    pins:
+    - - '1'
+      - 0.0
+      - 0.0
+    builder: bullet_male
+    params:
+      pin_d: 3.5
+      pin_length: 9.0
+      cup_d: 4.4
+      cup_length: 5.0
+    depth: 5.0
+    reach: 9.0
+    envelope:
+    - 4.4
+    - 4.4
+    - 14.0
+    tip: 9.0
+    pin_shape: bullet
+    pin_size: 3.5
+    source: '3.5 mm gold bullet: 9 mm split pin, 5 mm solder cup (hobby vendor drawings;
+      proxy)'
+    color: '#d9b54a'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true
+  bullet-3.5-female:
+    pins:
+    - - '1'
+      - 0.0
+      - 0.0
+    builder: bullet_female
+    params:
+      od: 5.0
+      socket_depth: 9.5
+      length: 16.0
+    depth: 16.0
+    reach: 0.0
+    envelope:
+    - 5.0
+    - 5.0
+    - 16.0
+    tip: -0.5
+    pin_shape: socket
+    pin_size: 3.5
+    source: '3.5 mm gold bullet socket: 5 mm OD, 16 mm long incl. solder cup (hobby
+      vendor drawings; proxy)'
+    color: '#d9b54a'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true
+  jst-xh-3-housing:
+    pins:
+    - - '1'
+      - -2.5
+      - 0.0
+    - - '2'
+      - 0.0
+      - 0.0
+    - - '3'
+      - 2.5
+      - 0.0
+    builder: housing
+    params:
+      width: 9.9
+      thickness: 5.75
+      length: 7.0
+      cavity: 1.6
+    depth: 7.0
+    reach: 0.0
+    envelope:
+    - 9.9
+    - 5.75
+    - 7.0
+    tip: 0.0
+    pin_shape: crimp
+    pin_size: 1.0
+    source: 'JST XH datasheet (eXH.pdf) XHP-3: 2.50 mm pitch, 9.9 mm wide (2.5(n-1)+4.9);
+      SXH-001T-P0.6 crimps (proxy)'
+    color: '#f2efdc'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true
+  jst-gh-4-housing:
+    pins:
+    - - '1'
+      - -1.875
+      - 0.0
+    - - '2'
+      - -0.625
+      - 0.0
+    - - '3'
+      - 0.625
+      - 0.0
+    - - '4'
+      - 1.875
+      - 0.0
+    builder: housing
+    params:
+      width: 6.25
+      thickness: 4.25
+      length: 4.5
+      cavity: 0.8
+    depth: 4.5
+    reach: 0.0
+    envelope:
+    - 6.25
+    - 4.25
+    - 4.5
+    tip: 0.0
+    pin_shape: crimp
+    pin_size: 0.6
+    source: 'JST GH datasheet (eGH.pdf) GHR-04V-S: 1.25 mm pitch, 6.25 mm wide; SSHL-002T-P0.2
+      crimps (proxy)'
+    color: '#f2efdc'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true
+  xt90h-male:
+    pins:
+    - - '1'
+      - -5.5
+      - 0.0
+    - - '2'
+      - 5.5
+      - 0.0
+    builder: housing
+    params:
+      width: 20.8
+      thickness: 11.7
+      length: 30.7
+      cavity: 4.5
+    depth: 30.7
+    reach: 0.0
+    envelope:
+    - 20.8
+    - 11.7
+    - 30.7
+    tip: 0.0
+    pin_shape: solder_cup
+    pin_size: 4.5
+    source: 'AMASS XT90H V1.2 drawing: 11.00 mm pitch, 20.8 x 11.7 x 30.7 mm capped
+      envelope; conservative envelope proxy, mating recess and wire exit estimated;
+      https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf'
+    color: '#d9a21b'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true
+  xt90h-female:
+    pins:
+    - - '1'
+      - -5.5
+      - 0.0
+    - - '2'
+      - 5.5
+      - 0.0
+    builder: housing
+    params:
+      width: 20.8
+      thickness: 11.7
+      length: 29.7
+      cavity: 4.5
+    depth: 29.7
+    reach: 0.0
+    envelope:
+    - 20.8
+    - 11.7
+    - 29.7
+    tip: 0.0
+    pin_shape: solder_cup
+    pin_size: 4.5
+    source: 'AMASS XT90H V1.2 drawing: 11.00 mm pitch, 20.8 x 11.7 x 29.7 mm capped
+      envelope; conservative envelope proxy, mating recess and wire exit estimated;
+      https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf'
+    color: '#d9a21b'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true
+  servo-3-female:
+    pins:
+    - - '1'
+      - -2.54
+      - 0.0
+    - - '2'
+      - 0.0
+      - 0.0
+    - - '3'
+      - 2.54
+      - 0.0
+    builder: housing
+    params:
+      width: 7.6
+      thickness: 2.6
+      length: 14.0
+      cavity: 1.0
+    depth: 14.0
+    reach: 0.0
+    envelope:
+    - 7.6
+    - 2.6
+    - 14.0
+    tip: 0.0
+    pin_shape: socket
+    pin_size: 1.0
+    source: 'Futaba J / 2.54 mm 1x3 crimp housing: 7.6 x 2.6 x 14 mm (vendor listings;
+      proxy)'
+    color: '#1d1d1d'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true
+  fpc-22p-0.5mm-cable:
+    pins:
+    - - '1'
+      - -5.25
+      - 0.0
+    - - '2'
+      - -4.75
+      - 0.0
+    - - '3'
+      - -4.25
+      - 0.0
+    - - '4'
+      - -3.75
+      - 0.0
+    - - '5'
+      - -3.25
+      - 0.0
+    - - '6'
+      - -2.75
+      - 0.0
+    - - '7'
+      - -2.25
+      - 0.0
+    - - '8'
+      - -1.75
+      - 0.0
+    - - '9'
+      - -1.25
+      - 0.0
+    - - '10'
+      - -0.75
+      - 0.0
+    - - '11'
+      - -0.25
+      - 0.0
+    - - '12'
+      - 0.25
+      - 0.0
+    - - '13'
+      - 0.75
+      - 0.0
+    - - '14'
+      - 1.25
+      - 0.0
+    - - '15'
+      - 1.75
+      - 0.0
+    - - '16'
+      - 2.25
+      - 0.0
+    - - '17'
+      - 2.75
+      - 0.0
+    - - '18'
+      - 3.25
+      - 0.0
+    - - '19'
+      - 3.75
+      - 0.0
+    - - '20'
+      - 4.25
+      - 0.0
+    - - '21'
+      - 4.75
+      - 0.0
+    - - '22'
+      - 5.25
+      - 0.0
+    builder: ffc_end
+    params:
+      width: 11.5
+      thickness: 0.3
+      stiffener: 4.0
+      contact_width: 0.3
+    depth: 4.0
+    reach: 0.0
+    envelope:
+    - 11.5
+    - 0.3
+    - 4.0
+    tip: 0.0
+    pin_shape: blade
+    pin_size: 0.3
+    source: 'Raspberry Pi 22-way 0.5 mm camera FFC: 11.5 mm wide, 0.3 mm thick, 4 mm
+      stiffener (Raspberry Pi cable listings; proxy)'
+    color: '#d9a441'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: false
+  fpc-15p-1.0mm-cable:
+    pins:
+    - - '1'
+      - -7.0
+      - 0.0
+    - - '2'
+      - -6.0
+      - 0.0
+    - - '3'
+      - -5.0
+      - 0.0
+    - - '4'
+      - -4.0
+      - 0.0
+    - - '5'
+      - -3.0
+      - 0.0
+    - - '6'
+      - -2.0
+      - 0.0
+    - - '7'
+      - -1.0
+      - 0.0
+    - - '8'
+      - 0.0
+      - 0.0
+    - - '9'
+      - 1.0
+      - 0.0
+    - - '10'
+      - 2.0
+      - 0.0
+    - - '11'
+      - 3.0
+      - 0.0
+    - - '12'
+      - 4.0
+      - 0.0
+    - - '13'
+      - 5.0
+      - 0.0
+    - - '14'
+      - 6.0
+      - 0.0
+    - - '15'
+      - 7.0
+      - 0.0
+    builder: ffc_end
+    params:
+      width: 16.0
+      thickness: 0.3
+      stiffener: 4.0
+      contact_width: 0.6
+    depth: 4.0
+    reach: 0.0
+    envelope:
+    - 16.0
+    - 0.3
+    - 4.0
+    tip: 0.0
+    pin_shape: blade
+    pin_size: 0.6
+    source: 'Raspberry Pi 15-way 1.0 mm camera FFC: 16 mm wide, 0.3 mm thick, 4 mm stiffener
+      (Raspberry Pi cable listings; proxy)'
+    color: '#d9a441'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: false
+  servo-3-female-hd:
+    pins:
+    - - '1'
+      - -2.54
+      - 0.0
+    - - '2'
+      - 0.0
+      - 0.0
+    - - '3'
+      - 2.54
+      - 0.0
+    builder: housing
+    params:
+      width: 7.6
+      thickness: 2.6
+      length: 14.0
+      cavity: 1.0
+    depth: 14.0
+    reach: 0.0
+    envelope:
+    - 7.6
+    - 2.6
+    - 14.0
+    tip: 0.0
+    pin_shape: socket
+    pin_size: 1.0
+    source: 'Futaba J / 2.54 mm 1x3 crimp housing: 7.6 x 2.6 x 14 mm (vendor listings;
+      proxy)'
+    color: '#1d1d1d'
+    contact_color: '#d4a640'
+    pads: {}
+    footprint: ''
+    wire_entry: true

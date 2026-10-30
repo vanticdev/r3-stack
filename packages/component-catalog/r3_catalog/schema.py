@@ -57,13 +57,15 @@ class ConnectorInstance(_Model):
     (pin 1 toward the last pin). See :class:`ConnectorGeometry`."""
 
     type: str
+    flexible_end: bool = Field(default=False, description="Free end of a flexible cable; its installed frame is derived "
+                                                        "from its direct mate, independently of the cable's retained end.")
     position: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
     direction: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0], description="Unit vector of cable exit.")
     x: Vector | None = Field(default=None, description="Pin-row axis of the connector frame (perpendicular to direction).")
     pins: dict[str, str] = Field(description="connector pin number -> component pin name.")
     embedded: bool = Field(default=False, description="The connector body is part of the component's own 3D model.")
     source: str = Field(default="", description="Where the pose comes from, e.g. 'kicad:J5' or 'step:J8 pin 1'.")
-    provenance: Provenance | None = None
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 
 FeatureKind = Literal["bore", "d_bore", "shaft", "d_shaft", "tapped_hole", "clearance_hole", "spline", "face", "slot",
@@ -150,6 +152,8 @@ class Mechanical(_Model):
                                                         "derived from the fasteners and interfaces that use it.")
     solids: list[Solid] = Field(default_factory=list, description="Custom geometry; empty means the box/cylinder envelope.")
     features: list[Feature] = Field(default_factory=list, description="Datasheet interfaces realized on the envelope.")
+    proxy_holes_from: list[str] = Field(default_factory=list, description="Explicit hole-pattern interfaces used by a "
+                                      "missing-model proxy. Never modifies an imported purchased model.")
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 
@@ -328,7 +332,7 @@ class ConnectorGeometry(_Model):
     footprint: str = ""
     footprint_placement: Placement | None = None
     pins: dict[str, ConnectorPin]
-    pin_shape: Literal["square_post", "socket", "blade", "crimp", "bullet", "solder_cup", "coax"] = "square_post"
+    pin_shape: Literal["square_post", "socket", "blade", "crimp", "bullet", "solder_cup", "coax", "pad"] = "square_post"
     pin_size: Quantity = 0.00064
     envelope: Vector | None = None
     depth: Quantity = 0.0

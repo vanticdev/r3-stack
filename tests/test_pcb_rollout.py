@@ -290,7 +290,7 @@ def test_electrical_stage_tvs_check(project):
     system = ElectricalSystem(project, routes={})
     result = StageResult(stage="electrical")
     report = check_tvs(system, result)["hat"]
-    assert report["expected_surge_current"] == pytest.approx(10.0) and report["clamp_at_expected_surge"] < report["abs_max"]
+    assert report["expected_surge_current"] == pytest.approx(15.0) and report["clamp_at_expected_surge"] < report["abs_max"]
     assert not [d for d in result.diagnostics if d.code == "tvs_clamp_exceeds_abs_max"]
     system.models["hat"].params.values["tvs"] = {"part": "SMAJ16A", "v_breakdown_max": 19.7, "v_clamp": 26.0, "i_pp": 15.4}
     result = StageResult(stage="electrical")

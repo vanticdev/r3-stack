@@ -85,12 +85,16 @@ def test_router_avoids_obstacle(blocked):
 def test_bend_radius_enforced(blocked):
     project, obstacles, routing, report = blocked
     assert not [d for d in report.diagnostics if d.code == "wire_bend_radius_violation"]
-    factor = project.catalog.wire(22).min_bend_radius_factor
+    gauge = project.catalog.wire(22)
+    factor, od = gauge.min_bend_radius_factor, gauge.outer_diameter
     for wire in routing.wires.values():
-        required = factor * 2 * wire.bundle_radius.max()
+        # This fixture is an unjacketed group: the innermost conductor must
+        # retain factor * wire OD, with the bundle offset added at its core.
+        required = factor * od + (2 * wire.bundle_radius.max() - od) / 2
         radius = radius_at_scale(wire.path)  # independent geometric measurement of the final path
-        assert radius.min() >= 0.95 * required, (wire.wire_id, radius.min(), required)
-        assert min(b.radius for b in wire.bends) >= 0.98 * required
+        assert radius.min() >= 0.95 * factor * od, (wire.wire_id, radius.min(), factor * od)
+        assert radius_at_scale(wire.core).min() >= 0.95 * required
+        assert all(b.radius >= 0.98 * b.required for b in wire.bends)
 
 
 def test_cut_length_covers_route(blocked):

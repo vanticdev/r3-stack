@@ -159,8 +159,11 @@ def _interface_for_join(join: Join, a: "ResolvedInterface", b: "ResolvedInterfac
     if kinds == {"header", "socket"}:
         header, socket = (a, b) if a.kind == "header" else (b, a)
         wh = _world(result, header)
+        ws = _world(result, socket)
+        # Insertion starts at the socket mouth, including a deliberate axial
+        # seating gap; measuring from the header plastic overstates engagement.
         return Interface(id=join.join_id, kind="connector_retention", parts=[header.obj, socket.obj],
-                         axis_point=wh[:3, 3].tolist(), axis_dir=wh[:3, 2].tolist(), params=params, join=join.join_id)
+                         axis_point=ws[:3, 3].tolist(), axis_dir=wh[:3, 2].tolist(), params=params, join=join.join_id)
     if kinds == {"strap_seat", "strap_slot"}:
         if not params.get("strap"):
             return None  # only the join that names the strap carries the strap check
