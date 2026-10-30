@@ -419,11 +419,23 @@ class HarnessRouter:
         # planned. Include the permitted support-placement match distance;
         # placement/access checks still have to find real hardware there.
         from .supports import HINT_MATCH
+        from .bundles import SEPARATION, category
+        from .planner import CROSSING_GAP
+
+        current_categories = {category(w.signal, w.awg) for h in self.spec.electrical.harnesses
+                              if h.id in harnesses for w in h.wires}
 
         for harness in self.spec.electrical.harnesses:
             if harness.id in harnesses or not harness.route.tie_points:
                 continue
-            radius = bundle_diameter(self._wire_od(w.awg) for w in harness.wires) / 2 + HINT_MATCH
+            future_categories = {category(w.signal, w.awg) for w in harness.wires}
+            separation = max((SEPARATION.get(frozenset({a, b}), 0.0)
+                              for a in current_categories for b in future_categories), default=0.0)
+            # Reserve the same margin that occupancy_field will later require
+            # at this fixed support. Reserving only the wire radius lets an
+            # earlier bundle make the later harness infeasible at its own tie.
+            radius = (bundle_diameter(self._wire_od(w.awg) for w in harness.wires) / 2
+                      + HINT_MATCH + separation + CROSSING_GAP)
             for number, point in enumerate(harness.route.tie_points):
                 key = ("required_support", harness.id, number, tuple(point), radius)
                 if key not in self._cable_fields:

@@ -35,3 +35,24 @@ def test_required_tie_destination_is_reserved_before_its_harness_is_planned(tmp_
     assert router.grid.sample(own, query) == pytest.approx([.05, .05])
     assert router.grid.sample(earlier, query)[0] < -.003
     assert router.grid.sample(earlier, query)[1] == pytest.approx(.05)
+
+
+def test_future_tie_reserves_the_later_emc_margin(tmp_path):
+    from r3_wiring.bundles import SEPARATION
+
+    project = Project.load(write_project(tmp_path, block=False))
+    lead = project.spec.electrical.harnesses[0]
+    lead.route.tie_points = [[.1, 0, .04]]
+    supply = lead.model_copy(deep=True)
+    supply.id = "supply"
+    supply.route.tie_points = []
+    for wire in supply.wires:
+        wire.signal, wire.awg = "VBAT", 18
+    project.spec.electrical.harnesses.append(supply)
+    obstacles, _ = build_obstacles(project)
+    router = HarnessRouter(project, obstacles, RouterOptions(plan=False))
+    ordinary = router.cable_field({}, {"unspecified"})
+    power = router.cable_field({}, {"supply"})
+    query = np.array([[.1, .008, .04]])
+    difference = router.grid.sample(ordinary, query) - router.grid.sample(power, query)
+    assert difference == pytest.approx([SEPARATION[frozenset({"power", "signal"})]])
