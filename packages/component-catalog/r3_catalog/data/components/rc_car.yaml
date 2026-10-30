@@ -1769,23 +1769,23 @@ components:
   - id: gnss-riser-petg
     kind: structure
     cad_name: GNSS riser
-    name: Printed GNSS riser with GPS saddle shelf and RTK lead collar
-    description: Bonded lid riser keeps the GNSS pigtails above the gearbox and supports
-      both outgoing leads.
+    name: Printed GNSS riser with GPS saddle shelf
+    description: Bonded lid riser supports the GPS lead; the nearby radio has a short
+      direct pigtail.
     mechanical:
       shape: custom
       size:
-      - 66 mm
-      - 53 mm
-      - 37 mm
-      mass: 0.022
+      - 68 mm
+      - 44 mm
+      - 8.946 mm
+      mass: 0.02
       material: PETG
       density: 1270
       color: '#2c6e9e'
       fabricated: true
       envelope_offset:
-      - 16 mm
-      - -4.5 mm
+      - 17 mm
+      - 0
       - 0
       solids:
       - kind: box
@@ -1808,40 +1808,6 @@ components:
         - 36 mm
         - 18 mm
         - 4 mm
-      - kind: box
-        name: RTK post foot
-        position:
-        - 24 mm
-        - -22 mm
-        - 6.946 mm
-        size:
-        - 18 mm
-        - 18 mm
-        - 4 mm
-      - kind: cylinder
-        name: RTK tie post
-        position:
-        - 27.5 mm
-        - -24.457 mm
-        - 8 mm
-        axis:
-        - 0
-        - 0
-        - 1
-        diameter: 7 mm
-        length: 27 mm
-      - kind: cylinder
-        name: RTK tie collar
-        position:
-        - 27.5 mm
-        - -24.457 mm
-        - 24.4 mm
-        axis:
-        - 0
-        - 0
-        - 1
-        diameter: 11 mm
-        length: 1.2 mm
     interfaces:
       bottom:
         kind: adhesive_pad
@@ -1871,6 +1837,7 @@ components:
         - 1
         - 0
         - 0
+
   - id: motor-lead-post-petg
     extends: lead-post-petg
     cad_name: Motor cable post
@@ -2026,7 +1993,7 @@ components:
       - 48 mm
       - 52 mm
       - 110 mm
-      mass: 0.015
+      mass: 0.014658
       solids:
       - kind: cylinder
         name: mast
@@ -2051,11 +2018,11 @@ components:
         - 0
         - 0
         diameter: 7 mm
-        length: 44.1 mm
+        length: 37.1 mm
       - kind: cylinder
         name: side arm
         position:
-        - -44.1 mm
+        - -37.1 mm
         - 0
         - 83.5 mm
         axis:
@@ -2067,7 +2034,7 @@ components:
       - kind: box
         name: radio tape seat
         position:
-        - -44.1 mm
+        - -37.1 mm
         - 36.75 mm
         - 83.5 mm
         size:
@@ -2083,7 +2050,7 @@ components:
       radio_pad:
         kind: adhesive_pad
         origin:
-        - -40.6 mm
+        - -33.6 mm
         - 36.75 mm
         - 83.5 mm
         z:
@@ -2094,6 +2061,7 @@ components:
         - 0
         - 0
         - 1
+
   - id: rc-camera-mount-petg
     kind: structure
     cad_name: Front camera bracket

@@ -575,7 +575,7 @@ electrical:
         - {id: W_RTK_RTCM, from: B.3, to: A.2, awg: 28, color: white, signal: RTCM}
         - {id: W_RTK_TX2, from: A.3, to: B.2, awg: 28, color: green, signal: GPS_TX2}
         - {id: W_RTK_GND, from: A.4, to: B.6, awg: 28, color: black, signal: GND}
-      route: {slack: 30 mm, tie_points: [[30 mm, -18 mm, 113 mm]]}
+      route: {slack: 30 mm, tie_points: []}
     - id: encoder_lead
       connectors:
         A: {type: integral, mates: encoder.J1}
@@ -586,7 +586,7 @@ electrical:
         - {id: W_ENC_GND, from: A.3, to: B.3, awg: 26, color: black, signal: GND}
       # The Hall board's lead leaves its lower corner along the plate, away from the spur cover, the magnet carrier
       # and the rear wheel, and wraps the deck's right edge behind the rear-right standoff (not the HAT lead slot).
-      route: {keep_away: [wheel_rr, gearbox, motor, lead_post], slack: 25 mm, tie_points: [[45 mm, -62 mm, 58 mm], [45 mm, -62 mm, 104 mm], [45 mm, -25 mm, 120 mm]], via: [[44 mm, -43 mm, 120 mm]]}
+      route: {keep_away: [wheel_rr, gearbox, motor, lead_post], slack: 25 mm, tie_points: [[51.79282 mm, -55.20718 mm, 58 mm], [45 mm, -62 mm, 104 mm], [45 mm, -25 mm, 120 mm]], via: [[44 mm, -43 mm, 120 mm]]}
     - id: imu_lead
       description: Keyed HAT I2C lead to owned GY-521 solder pads; AD0 stays low (0x68), no added pull-ups.
       connectors:

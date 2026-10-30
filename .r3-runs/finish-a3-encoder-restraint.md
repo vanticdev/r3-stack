@@ -7,3 +7,5 @@ The earlier z=100 mm return rail allowed its span to sag toward the gearbox lid:
 Isolated encoder validation on the merged 13dc2ff simulation: **0 errors, valid=true**, 112.81 seconds. Offline CAD recomposition, assembly, model and connectors each report **0 errors** after promotion. Combined harness occupancy and the real-firmware steering sweep remain required.
 
 Rebuild CAD types: chassis-plate-al6061, encoder-lead-post-petg. The Hall board's pigtail exit direction changed; its purchased board and mounting geometry did not.
+
+Measured-model follow-up: the lower required tie now uses the collar's inboard face, (51.79282,-55.20718,58) mm. The combined encoder/GPS/RTK subset has zero errors, all three valid, and a minimum measured moving-part clearance of 8.970975 mm. The tower geometry is unchanged in this follow-up.
