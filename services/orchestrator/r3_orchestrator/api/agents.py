@@ -49,12 +49,12 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Iterable
 
 from .errors import ApiError
 from .events import EventLog
+from ..environment import r3_pythonpath
 
 PROVIDERS = ("claude", "codex")
 MCP_SERVER = "r3"
@@ -62,18 +62,25 @@ MCP_SERVER = "r3"
 CLAUDE_READ_TOOLS = ("Read", "Glob", "Grep")
 #: Tools that start pipeline work inside the MCP server.
 RUN_TOOLS = ("r3_validate", "r3_run_stage", "r3_run_scenario")
-#: Packages the MCP server imports; their source roots go on its PYTHONPATH.
-R3_PACKAGES = ("r3_model", "r3_catalog", "r3_wiring", "r3_sim", "r3_hal", "r3_onshape", "r3_kicad", "r3_github",
-               "r3_orchestrator", "r3_sim_worker")
 MAX_CONTENT = 20_000  # characters of a tool result kept in an event
 MCP_TOOL_TIMEOUT_S = 3600  # a full validation with every scenario takes many minutes
 
-SYSTEM_PROMPT = """You are working on an R3 robot project (robot.yaml is the single source of truth), launched headless
-from the R3 web app. Edit the robot only through the `r3` MCP tools: r3_get_spec -> r3_patch_spec (pass the sha256 you
-read; on spec_conflict re-read and re-apply) -> r3_validate or r3_run_stage -> r3_get_diagnostics / r3_diagnose /
-r3_release_status -> fix -> repeat. Do not edit files directly. Fleet deployment and GitHub repository creation are
-not available in this session; tell the human to use the Deploy page or the project dialog instead.
-Finish with a short summary of what you changed and the remaining diagnostics."""
+SYSTEM_PROMPT = """You are independently building an R3 robot project, launched headless from the R3 web app.
+Read r3_guide first. robot.yaml is the robot specification: change it through r3_get_spec -> r3_patch_spec
+(pass the sha256 you read; on spec_conflict re-read and re-apply). Firmware and other authored project files
+may be edited directly. Use the catalog and sourcing tools for parts and the pipeline tools to validate.
+CAD changes must happen only in a real Onshape document, using standard editable features and assemblies.
+No FeatureScript, locally fabricated CAD, hand-written external tool formats, or sculpted purchased parts.
+Catalog envelopes and offline previews are estimates, never completed CAD. Use real MuJoCo, ngspice and Sionna.
+Use gh and normal git for GitHub repository creation and pushing when the user explicitly requests them;
+that request supplies authorization. Never deploy to physical hardware without an explicit request.
+Work only in this project; you may read the R3 platform source and public technical references.
+Do not read other local projects, worktrees, old robot git history or other agents' session files.
+There is no human available for routine engineering choices: choose sensible conservative assumptions
+for unspecified fasteners, process settings, printer envelope and similar details, label them, validate
+against them and list them at the end. Unknown physical measurements remain explicit release blockers.
+Never weaken requirements, limits or checks. Iterate using diagnostics and r3_release_status.
+Finish with stage and scenario results, remaining diagnostics, assumptions and required measurements."""
 
 
 # ------------------------------------------------------------------ detection
@@ -92,19 +99,6 @@ def detect(provider: str, executable: str | None = None) -> dict[str, Any]:
         return {"provider": provider, "available": False, "path": path, "version": None, "detail": f"`{path} --version` failed: {error}"}
     return {"provider": provider, "available": ok, "path": path, "version": version,
             "detail": "" if ok else f"`{path} --version` exited with {proc.returncode}"}
-
-
-def r3_pythonpath() -> str:
-    """Source roots of the R3 packages, so the MCP server imports the same code as this server."""
-    roots: list[str] = []
-    for package in R3_PACKAGES:
-        spec = find_spec(package)
-        if spec and spec.origin:
-            root = str(Path(spec.origin).resolve().parents[1])
-            if root not in roots:
-                roots.append(root)
-    existing = os.environ.get("PYTHONPATH")
-    return os.pathsep.join(roots + ([existing] if existing else []))
 
 
 def mcp_config(project_root: Path, python: str = sys.executable) -> dict[str, Any]:
@@ -146,6 +140,8 @@ def codex_command(executable: str, project_root: Path, config: dict[str, Any], m
     prefix = f"mcp_servers.{MCP_SERVER}"
     command = [executable, "exec", "--json", "--skip-git-repo-check", "--color", "never", "-C", str(project_root),
                "--sandbox", "workspace-write", "-c", 'approval_policy="never"',
+               "-c", "sandbox_workspace_write.network_access=true",
+               "-c", f"developer_instructions={_toml(SYSTEM_PROMPT)}",
                "-c", f"{prefix}.command={_toml(server['command'])}", "-c", f"{prefix}.args={_toml(server['args'])}",
                "-c", f"{prefix}.env={_toml(server['env'])}", "-c", f"{prefix}.disabled_tools={_toml(gated)}",
                "-c", f"{prefix}.startup_timeout_sec=120", "-c", f"{prefix}.tool_timeout_sec={MCP_TOOL_TIMEOUT_S}"]
@@ -360,7 +356,7 @@ class AgentManager:
             stdin = prompt
         else:
             session.command = codex_command(info["path"], Path(root), config, model)
-            stdin = f"{SYSTEM_PROMPT}\n\n---\n\n{prompt}"
+            stdin = prompt
         spec = Path(root) / "robot.yaml"
         session._spec_start = session._spec_last = spec.read_text() if spec.exists() else ""
         env = {**os.environ, **self.extra_env, "R3_PROJECT": str(root), "PYTHONPATH": r3_pythonpath(),

@@ -29,6 +29,14 @@ and measurable success conditions. Requirements belong in `requirements`; dimens
 poses belong in components and their catalog entries. Select `robot.mobility: stationary`
 for a fixed instrument or arm. Mobile robots must declare their actual joints and drives.
 
+When no human is available, make routine engineering choices independently. Choose
+conservative, clearly labelled assumptions for unspecified screw lengths, printer build
+volume, nozzle, material and process settings. Validate the design against those settings
+and include an assumptions list in the final report. Unknown physical dimensions and
+unconfirmed purchased-part interfaces remain measurement blockers; never label them verified.
+Keep work inside the project and R3 platform sources; do not consult other local robot
+projects, old robot git history, worktrees or other agents' session files.
+
 A minimal specification can contain one fabricated base:
 
 ```yaml
@@ -202,3 +210,11 @@ and stages with `verified`, `estimated`, `failed`, `stale` or `not_run` evidence
 `fabrication_ready` requires current verified evidence for every applicable item. Review
 assumptions and unresolved diagnostics before manufacturing or deployment. Physical
 fleet deployment and GitHub publication are separate actions requiring an explicit request.
+
+Custom numeric requirements can bind to a metric that a pipeline stage actually produces:
+`requirements.extra.payload_limit: {stage: model, metric: total_mass, op: "<=", value: 2.0}`.
+The metric path is relative to that stage's `result.json` metrics, values use SI, and
+supported comparisons are `<`, `<=`, `==`, `>=` and `>`. Choose a metric the stage documents
+and reports; an absent metric stays `not_run`. Failed, stale or estimated stage evidence
+cannot become verified custom evidence. Free-text requirements remain visible and pending
+until they have an automatic check; never replace one with a hand-authored passing flag.

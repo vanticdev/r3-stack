@@ -21,8 +21,7 @@ MCP tool `r3_guide`. It explains the following topics:
 ## Policies (non-negotiable)
 
 - Fix the design, not the check. Never weaken a requirement, threshold or check. Change a requirement
-  only when physics makes it impossible. Do that explicitly, with a comment giving the physics and the
-  twin's evidence.
+  only with a new explicit user instruction; report impossible constraints with the twin's evidence.
 - Record provenance for every catalog number (`datasheet`, `vendor`, `measured`, `estimated`). Label
   estimates.
 - Build CAD only from standard Onshape features: sketch, extrude, revolve, hole, fillet, pattern,
@@ -42,8 +41,8 @@ MCP tool `r3_guide`. It explains the following topics:
 
 1. `r3 status --json` (MCP: `r3_status`).
 2. `r3_get_spec`, which returns `sha256`, then `r3_patch_spec` with `expected_sha256` (an RFC 7386 merge
-   patch). If you get `spec_conflict`, re-read the spec and re-apply your change. Direct file edits are
-   fine; keep the comments.
+   patch). If you get `spec_conflict`, re-read the spec and re-apply your change. Firmware and other
+   authored project files may be edited directly; preserve comments.
 3. Find parts with `r3_list_catalog` / `r3_get_catalog_component`. Source unknown parts with
    `r3_source_search` + `r3_source_choose`. Write your own printed parts with `r3_put_catalog_component`,
    which writes `catalog/components/<id>.yaml`.
@@ -70,6 +69,11 @@ MCP tool `r3_guide`. It explains the following topics:
 
 ## Rules
 
+- With no human available, choose conservative routine engineering assumptions and continue.
+  Label unspecified fastener and printing choices, validate against them and list assumptions
+  at the end. Unknown physical measurements remain explicit release blockers.
+- Stay inside this project and the R3 platform sources. Do not read other local projects,
+  worktrees, old robot git history or other agents' session files.
 - Do not hand-edit generated files (`build/`, generated KiCad projects).
 - A passing validation is not proof that the robot works. Read the `assumptions` in
   `build/report/summary.json` and the release gate before claiming success.

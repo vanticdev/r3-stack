@@ -233,13 +233,30 @@ def _failsafe_stop_top_speed(ctx: _Context, limit: float) -> list[Evidence]:
 
 def _voltage_drop(ctx: _Context, limit: float) -> list[Evidence]:
     electrical = ctx.result("electrical")
-    if electrical is None or stage_runner.status_of(electrical) == "unavailable":
+    if electrical is None or stage_runner.status_of(electrical) in ("unavailable", "not_configured", "not_applicable"):
         return []
     drops = [d for d in electrical.diagnostics if d.code == "voltage_drop_exceeded"]
-    worst = max((_finite(d.data.get("fraction")) or 0.0 for d in drops), default=None)
     points = _read_json(ctx.build / "electrical" / "operating_points.json") or {}
-    estimated_lengths = [w for w, info in (points.get("wire_lengths") or {}).items() if (info or {}).get("source") != "routed"]
-    return [ctx.stage_evidence("electrical", "voltage_drop_fraction", not drops, worst, limit, "electrical/operating_points.json",
+    measured = (points.get("worst_case") or {}).get("harness_voltage_drop") or {}
+    values = []
+    for info in measured.values():
+        if not isinstance(info, dict):
+            return []
+        # Current artifacts split continuous/burst operating points. Older
+        # artifacts recorded the single worst fraction directly.
+        samples = [info] if "fraction" in info else list(info.values())
+        if not samples or any(not isinstance(sample, dict) for sample in samples):
+            return []
+        values.extend(_finite(sample.get("fraction")) for sample in samples)
+    # Absence of violations is not proof that any conductor was evaluated.
+    if not values or any(value is None or value < 0 for value in values):
+        return []
+    worst = max(values)
+    lengths = points.get("wire_lengths") or {}
+    estimated_lengths = [w for w, info in lengths.items() if (info or {}).get("source") != "routed"]
+    if not lengths:
+        estimated_lengths.append("unrecorded wire lengths")
+    return [ctx.stage_evidence("electrical", "voltage_drop_fraction", not electrical.errors and not drops and worst <= limit, worst, limit, "electrical/operating_points.json",
                                bool(estimated_lengths),
                                f"{len(drops)} harness(es) exceed the limit" if drops
                                else (f"{len(estimated_lengths)} wire length(s) estimated" if estimated_lengths else "no harness exceeds the limit"))]
@@ -311,6 +328,33 @@ REQUIREMENT_CHECKS: dict[str, Callable[[_Context, float], list[Evidence]]] = {
 }
 
 
+def _custom_requirement(ctx: _Context, definition: Any) -> list[Evidence]:
+    """Declarative comparisons against stage-produced metrics, never authored pass flags."""
+    import operator
+
+    if not isinstance(definition, dict):
+        return []
+    stage, metric = definition.get("stage"), definition.get("metric")
+    op = definition.get("op")
+    compare = {"<=": operator.le, ">=": operator.ge, "==": operator.eq, "<": operator.lt, ">": operator.gt}.get(op) if isinstance(op, str) else None
+    limit = _finite(definition.get("value"))
+    result = ctx.result(stage) if isinstance(stage, str) else None
+    if result is None or not isinstance(metric, str) or compare is None or limit is None:
+        return []
+    if stage_runner.status_of(result) in ("unavailable", "not_configured", "not_applicable"):
+        return []
+    value: Any = result.metrics
+    for key in metric.split("."):
+        value = value.get(key) if isinstance(value, dict) else None
+    value = _finite(value)
+    if value is None:
+        return []
+    estimated = bool(result.assumptions) or any("estimated" in d.code or "fallback" in d.code for d in result.diagnostics)
+    return [ctx.stage_evidence(stage, metric, compare(value, limit) and not result.errors, value, limit,
+                               f"{stage}/result.json", estimated,
+                               f"stage metric {metric} {definition['op']} {limit}")]
+
+
 # --------------------------------------------------------------------- gate
 def _requirement_items(ctx: _Context) -> list[Item]:
     requirements = ctx.project.spec.requirements
@@ -328,8 +372,9 @@ def _requirement_items(ctx: _Context) -> list[Item]:
     vibration.evidence = _mechanical_requirement(ctx, "vibration_")
     items.append(vibration)
     for name, value in (requirements.extra or {}).items():
-        items.append(Item(f"requirement.extra.{name}", "requirement", name, value,
-                          message="custom requirement: no stage checks it automatically"))
+        evidence = _custom_requirement(ctx, value)
+        items.append(Item(f"requirement.extra.{name}", "requirement", name, value, evidence=evidence,
+                          message="" if evidence else "custom requirement needs current stage evidence: {stage, metric, op, value}"))
     return items
 
 

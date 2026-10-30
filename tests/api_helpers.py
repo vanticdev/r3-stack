@@ -96,6 +96,7 @@ def write_stage_outputs(root: Path) -> None:
         "worst_case": {"wires": {"W_BAT_P": {"continuous_current": 4.5, "ampacity": 35.0, "burst_current": 59.0, "burst_ratio": 1.69}},
                        "connectors": {"distribution.P1": {"continuous_current": 4.5, "rating": 30.0, "burst_current": 59.0, "burst_rating": 60.0}},
                        "harness_voltage_drop": {"distribution": {"fraction": 0.02}}},
+        "wire_lengths": {"W_BAT_P": {"source": "routed", "length": 0.05}},
         "runtime": {"runtime": 1800.0}, "thermal": {"esc": {"temperature_c": 60.0}}, "fuses": {}, "brownout": {}}))
     board = root / "build" / "pcb" / "test-board"
     board.mkdir(parents=True, exist_ok=True)

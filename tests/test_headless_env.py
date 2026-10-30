@@ -81,13 +81,15 @@ def _fake_tools(monkeypatch, **available: bool) -> None:
     monkeypatch.setattr(doctor, "probe_onshape", lambda: tool("onshape", flags["keys"], **keys))
     monkeypatch.setattr(doctor, "probe_sionna", lambda: tool("sionna-rt", flags["sionna"]))
     monkeypatch.setattr(doctor, "probe_simple", lambda name, *args: tool(name))
+    monkeypatch.setattr(doctor, "probe_stage_imports", lambda: {
+        name: {"available": True, "module": stage.module, "detail": ""} for name, stage in doctor.ALL_STAGES.items()})
 
 
 def test_doctor_stage_matrix(monkeypatch):
     _fake_tools(monkeypatch)
     payload = doctor.run_doctor()
     stages = {s["stage"]: s for s in payload["stages"]}
-    assert payload["ok"] and set(stages) == {"model", "cad", "pcb", "wiring", "electrical", "software", "sim", "report"}
+    assert payload["ok"] and set(stages) == set(doctor.ALL_STAGES) | {"software"}
     assert stages["cad"]["level"] == "full" and stages["pcb"]["level"] == "full"
     assert stages["sim"]["level"] == "degraded" and stages["sim"]["missing"] == ["sionna-rt"]
 

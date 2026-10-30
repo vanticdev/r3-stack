@@ -18,10 +18,14 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+
+from .environment import r3_pythonpath
+from .stages import ALL_STAGES
 
 PROBE_TIMEOUT = 60.0
 
@@ -279,6 +283,39 @@ def probe_simple(name: str, executable: str, args: list[str], pattern: str) -> T
 
 
 # ---------------------------------------------------------- stage readiness
+def probe_stage_imports() -> dict[str, dict[str, Any]]:
+    """Actually import every stage in a child with the agent session environment.
+
+    A foreign cwd prevents the checkout or pytest's sys.path from masking missing
+    package roots. Import failures include transitive dependencies, not just specs.
+    """
+    modules = {name: stage.module for name, stage in ALL_STAGES.items()}
+    script = """
+import importlib, json
+results = {}
+for name, module in MODULES.items():
+    try:
+        loaded = importlib.import_module(module)
+        if not callable(getattr(loaded, 'run', None)):
+            raise ImportError(f'{module} has no callable run')
+        results[name] = {'available': True, 'module': module, 'detail': ''}
+    except Exception as error:
+        results[name] = {'available': False, 'module': module, 'detail': f'{type(error).__name__}: {error}'}
+print(json.dumps(results))
+""".replace("MODULES", repr(modules))
+    try:
+        with tempfile.TemporaryDirectory(prefix="r3-doctor-") as directory:
+            process = subprocess.run([sys.executable, "-c", script], cwd=directory,
+                                     env={**os.environ, "PYTHONPATH": r3_pythonpath()},
+                                     capture_output=True, text=True, timeout=PROBE_TIMEOUT)
+        if process.returncode == 0:
+            return json.loads(process.stdout.splitlines()[-1])
+        detail = (process.stderr or process.stdout)[-2000:]
+    except (OSError, ValueError, IndexError, subprocess.TimeoutExpired) as error:
+        detail = str(error)
+    return {name: {"available": False, "module": module, "detail": detail} for name, module in modules.items()}
+
+
 @dataclass
 class StageReadiness:
     stage: str
@@ -293,7 +330,8 @@ def _stages(tools: dict[str, Tool]) -> list[StageReadiness]:
         return tools[name].available
 
     gl = bool(tools["mujoco"].data.get("gl_backend"))
-    out = [StageReadiness("model", True, "full", [], "Python only; plots use matplotlib Agg.")]
+    out = [StageReadiness("assembly", True, "full", [], "Python assembly compiler."),
+           StageReadiness("model", True, "full", [], "Python only; plots use matplotlib Agg.")]
     onshape = tools["onshape"].data or {}
     if onshape.get("headless"):
         out.append(StageReadiness("cad", True, "full", [], "Onshape API keys; views from the REST shaded-view endpoint."))
@@ -310,6 +348,8 @@ def _stages(tools: dict[str, Tool]) -> list[StageReadiness]:
                               pcb_missing + extras, "kicad-cli for ERC/DRC/exports, KiCad's pcbnew module for board edits, "
                               "Freerouting CLI for autorouting. KiCad never opens a window."))
     out.append(StageReadiness("wiring", True, "full", [], "Python + MuJoCo cable physics (no GL); plots use Agg."))
+    out.append(StageReadiness("connectors", True, "full", [], "Connector models and pin geometry."))
+    out.append(StageReadiness("fabrication", True, "full", [], "Mesh printability and finite-element strength checks."))
     out.append(StageReadiness("electrical", True, "full" if ok("ngspice") or ok("libngspice") else "degraded",
                               [] if ok("ngspice") or ok("libngspice") else ["ngspice"], "ngspice cross-check runs when available."))
     out.append(StageReadiness("software", ok("docker"), "full" if ok("docker") else "unavailable", [] if ok("docker") else ["docker daemon"],
@@ -333,6 +373,13 @@ def run_doctor(only: list[str] | None = None) -> dict[str, Any]:
             tools[tool.name] = tool
     tools["freerouting"] = probe_freerouting(tools["java"])
     stages = _stages(tools)
+    imports = probe_stage_imports()
+    for stage in stages:
+        imported = imports.get(stage.stage)
+        if imported is not None and not imported["available"]:
+            stage.headless, stage.level = False, "unavailable"
+            stage.missing.append(imported["module"])
+            stage.note += " Import failed: " + imported["detail"]
     try:
         from r3_sim.headless import has_display
     except ImportError:
@@ -346,6 +393,7 @@ def run_doctor(only: list[str] | None = None) -> dict[str, Any]:
                         "ci": os.environ.get("CI") == "true"},
         "tools": {name: asdict(tool) for name, tool in tools.items()},
         "stages": [asdict(s) for s in stages],
+        "stage_imports": imports,
     }
     if only:
         blocked = [s.stage for s in stages if s.stage in only and not s.headless]
@@ -355,6 +403,9 @@ def run_doctor(only: list[str] | None = None) -> dict[str, Any]:
         payload["required"] = only
         if blocked:
             payload.update(ok=False, code="stage_not_headless", message=f"cannot run headless here: {', '.join(blocked)}")
+    failed_imports = [name for name, imported in imports.items() if not imported["available"] and (not only or name in only)]
+    if failed_imports:
+        payload.update(ok=False, code="stage_not_importable", message=f"cannot import pipeline stages: {', '.join(failed_imports)}")
     return payload
 
 

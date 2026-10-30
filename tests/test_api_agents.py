@@ -109,10 +109,12 @@ def test_codex_session(env):
     assert argv[:2] == ["exec", "--json"] and argv[argv.index("-C") + 1] == str(root) and argv[-1] == "-"
     overrides = [argv[i + 1] for i, a in enumerate(argv) if a == "-c"]
     assert 'approval_policy="never"' in overrides
+    assert 'sandbox_workspace_write.network_access=true' in overrides
+    assert any(o.startswith("developer_instructions=") for o in overrides)
     assert 'mcp_servers.r3.args=["-m", "r3_orchestrator.mcp_server"]' in overrides
     disabled = next(o for o in overrides if o.startswith("mcp_servers.r3.disabled_tools="))
     assert set(json.loads(disabled.split("=", 1)[1])) == GATED
-    assert "design a robot" in json.loads(log.read_text())["stdin"]
+    assert json.loads(log.read_text())["stdin"] == "design a robot"
     calls = [e for e in events if e["type"] == "tool_call"]
     assert [c["name"] for c in calls] == ["r3_patch_spec", "r3_run_scenario"]
     (run_started,) = [e for e in events if e["type"] == "run_started"]

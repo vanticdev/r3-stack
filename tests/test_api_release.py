@@ -105,3 +105,34 @@ def test_mcp_release_tool(root):
     payload = mcp_server.r3_release_status(project=str(root))
     assert payload["schema"] == "r3/release@1" and mcp_server.TOOL_TIERS["r3_release_status"] == "read"
     assert mcp_server.r3_release_status(project=str(root.parent / "nowhere"))["code"] == "project_not_found"
+
+
+@pytest.mark.parametrize("drops,expected", [({}, "not_run"),
+    ({"supply": {"continuous": {"fraction": 0.02}, "burst": {"fraction": 0.025}}}, "verified"),
+    ({"supply": {"continuous": {"fraction": 0.04}}}, "failed"),
+    ({"supply": {"continuous": {"fraction": None}}}, "not_run")])
+def test_voltage_drop_requires_measured_fraction(root, drops, expected):
+    write_stage_outputs(root)
+    points = root / "build/electrical/operating_points.json"
+    data = json.loads(points.read_text())
+    data["worst_case"]["harness_voltage_drop"] = drops
+    points.write_text(json.dumps(data))
+    StageResult(stage="electrical", inputs=api.load_project(root).fingerprint()).write(root / "build/electrical/result.json")
+    assert items(api.release(root))["requirement.max_wire_voltage_drop_fraction"]["status"] == expected
+
+
+def test_custom_requirement_uses_fresh_stage_metric(root):
+    data = yaml.safe_load((root / "robot.yaml").read_text())
+    data["requirements"]["extra"] = {"capacity": {"stage": "model", "metric": "qualified.capacity", "op": ">=", "value": 12}}
+    (root / "robot.yaml").write_text(yaml.safe_dump(data))
+    fingerprint = api.load_project(root).fingerprint()
+    result = StageResult(stage="model", inputs=fingerprint, metrics={"qualified": {"capacity": 13}})
+    result.write(root / "build/model/result.json")
+    assert items(api.release(root))["requirement.extra.capacity"]["status"] == "verified"
+    result.metrics["qualified"]["capacity"] = 11
+    result.write(root / "build/model/result.json")
+    assert items(api.release(root))["requirement.extra.capacity"]["status"] == "failed"
+    result.metrics["qualified"]["capacity"] = 13
+    result.inputs = {**fingerprint, "robot_yaml_sha256": "old"}
+    result.write(root / "build/model/result.json")
+    assert items(api.release(root))["requirement.extra.capacity"]["status"] == "stale"
