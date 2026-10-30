@@ -28,6 +28,7 @@ from mcp.types import ToolAnnotations, CallToolResult, ImageContent, TextContent
 
 from . import api, spec_ops
 from .cli import configure_headless
+from r3_catalog.modelbank.schema import Category
 
 INSTRUCTIONS = """R3 robot project tools. robot.yaml is the single source of truth.
 New robot: r3_guide (read it first), r3_create_project(template="blank"), then grow the spec component by component.
@@ -227,6 +228,16 @@ def r3_cad_plan(project: str = "") -> dict[str, Any]:
 
 
 @_tool(_DESIGN)
+def r3_cad_recover(project: str = "", expected_sha256: str = "", dry_run: bool = False) -> dict[str, Any]:
+    """Inspect failed new-build state (no expected_sha256), then pass that sha256 to restart with current inputs.
+    Archives pending library/robot build references; preserves native documents, completed pins and request journals.
+    Refuses recovery while CAD is active. No Onshape calls. Never hand-edit generated lock records."""
+    from r3_onshape.recovery import recover
+
+    return _guard(lambda: recover(api.load_project(project or None), expected_sha256, dry_run))
+
+
+@_tool(_DESIGN)
 def r3_run_project_tests(project: str = "") -> dict[str, Any]:
     """Run this project's tests/test_*.py with pytest, store logs/JUnit under build/tests, and preserve all standard checks."""
     return _guard(lambda: api.run_stage(project or None, "tests"))
@@ -350,7 +361,7 @@ def create_github_repo(name: str, directory: str, private: bool = True, confirm:
 
 
 @_tool(_READ)
-def r3_models_search(query: str = "", category: str | None = None, manufacturer: str | None = None,
+def r3_models_search(query: str = "", category: Category | None = None, manufacturer: str | None = None,
                      specs: dict[str, list[float | None]] | None = None, limit: int = 30) -> dict[str, Any]:
     """Search the bank FIRST for bought parts; spec ranges use SI. On a miss, find a public model and add it."""
     from r3_catalog.modelbank import service
@@ -358,7 +369,7 @@ def r3_models_search(query: str = "", category: str | None = None, manufacturer:
 
 
 @_tool(_SEARCH)
-def r3_models_add(name: str, category: str, mpn: str = "", manufacturer: str = "", url: str = "", onshape: str = "",
+def r3_models_add(name: str, category: Category, mpn: str = "", manufacturer: str = "", url: str = "", onshape: str = "",
                   model_id: str = "", license: str = "unspecified; verify redistribution terms", format: str = "step",
                   member: str = "", catalog_component: str | None = None) -> dict[str, Any]:
     """Download/convert a public model, pin its checksum and add a human-editable provenance record.

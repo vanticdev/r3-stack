@@ -131,3 +131,31 @@ def test_diagnostics_distinguish_missing_and_mismatched(tmp_path):
     result=StageResult(stage='cad');purchased.diagnostics(project,result,bank)
     assert result.diagnostics[0].code=='model_datasheet_mismatch'
     assert result.diagnostics[0].data['model_bank_id']=='vendor-motor'
+
+
+def test_translated_import_includes_every_native_transform_default(tmp_path, monkeypatch):
+    import json
+    defaults = json.loads((Path(__file__).parent / 'fixtures/onshape/transform-defaults.json').read_text())
+    expected = {p['parameterId'] for p in defaults}
+
+    class NativeTransformAPI(ImportAPI):
+        def json(self, method, path, body=None, query=None):
+            if method == 'POST' and path.endswith('/features') and body['feature']['featureType'] == 'transform':
+                params = {p['parameterId']: p for p in body['feature']['parameters']}
+                assert set(params) == expected
+                assert params['makeCopy']['value'] is False
+                assert params['entities']['queries'][0]['deterministicIds'] == ['real-vendor-body']
+                assert params['dx']['expression'] == '1.000000 mm'
+                assert params['dy']['expression'] == '-2.000000 mm'
+                assert params['dz']['expression'] == '3.000000 mm'
+            return super().json(method, path, body=body, query=query)
+
+    step = tmp_path / 'synthetic.step'
+    step.write_text('ISO-10303-21; synthetic transport fixture')
+    monkeypatch.setattr(purchased, 'acquire', lambda source: (step, source))
+    p = part()
+    p.bank_model['placement']['origin'] = [.001, -.002, .003]
+    api = NativeTransformAPI()
+    built = purchased.import_studio(api, 'doc', 'workspace', p)
+    assert built.part_ids[p.key] == 'real-vendor-body'
+    assert [body['feature']['featureType'] for method, path, body in api.calls if method == 'POST' and path.endswith('/features')] == ['transform', 'mateConnector']

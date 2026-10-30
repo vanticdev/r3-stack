@@ -53,7 +53,7 @@ from .model import Face, GeometryModel, PartGeometry, part_from_onshape, CHORD_T
 from .parts import LocalPart, build_part_catalog
 from .studio import BuiltStudio, Variable, build_studio, connector_frame
 
-ORGANIZER_VERSION = "phase-b-1.0"
+ORGANIZER_VERSION = "phase-b-1.1"
 DEFAULT_NAME = re.compile(r"^(Sketch|Extrude|Revolve|Fillet|Chamfer|Hole|Mate connector|Plane|Fastened|Revolute|Mirror|Ball|Slider)\s*\d+$")
 TOP_LEVEL = "Top-level assembly"
 TAB_FOLDERS = ("01 Variables", "02 Fabricated parts", "04 Subassemblies", "05 Top-level assembly")

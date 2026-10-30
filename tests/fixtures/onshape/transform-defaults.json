@@ -1,0 +1,201 @@
+[
+  {
+    "btType": "BTMParameterQueryList-148",
+    "queries": [],
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "filter": null,
+    "parameterId": "entities"
+  },
+  {
+    "btType": "BTMParameterEnum-145",
+    "namespace": "",
+    "enumName": "TransformType",
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": "TRANSLATION_ENTITY",
+    "parameterId": "transformType"
+  },
+  {
+    "btType": "BTMParameterBoolean-144",
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": false,
+    "parameterId": "oppositeDirectionEntity"
+  },
+  {
+    "btType": "BTMParameterQueryList-148",
+    "queries": [],
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "filter": null,
+    "parameterId": "transformLine"
+  },
+  {
+    "btType": "BTMParameterQueryList-148",
+    "queries": [],
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "filter": null,
+    "parameterId": "transformAxis"
+  },
+  {
+    "btType": "BTMParameterQueryList-148",
+    "queries": [],
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "filter": null,
+    "parameterId": "transformDirection"
+  },
+  {
+    "btType": "BTMParameterQuantity-147",
+    "isInteger": false,
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": 0.025,
+    "units": "meter",
+    "expression": "",
+    "parameterId": "distance"
+  },
+  {
+    "btType": "BTMParameterBoolean-144",
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": true,
+    "parameterId": "uniform"
+  },
+  {
+    "btType": "BTMParameterQuantity-147",
+    "isInteger": false,
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": 1,
+    "units": "",
+    "expression": "",
+    "parameterId": "scale"
+  },
+  {
+    "btType": "BTMParameterQuantity-147",
+    "isInteger": false,
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": 1,
+    "units": "",
+    "expression": "",
+    "parameterId": "scaleX"
+  },
+  {
+    "btType": "BTMParameterQuantity-147",
+    "isInteger": false,
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": 1,
+    "units": "",
+    "expression": "",
+    "parameterId": "scaleY"
+  },
+  {
+    "btType": "BTMParameterQuantity-147",
+    "isInteger": false,
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": 1,
+    "units": "",
+    "expression": "",
+    "parameterId": "scaleZ"
+  },
+  {
+    "btType": "BTMParameterQueryList-148",
+    "queries": [],
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "filter": null,
+    "parameterId": "baseConnector"
+  },
+  {
+    "btType": "BTMParameterQueryList-148",
+    "queries": [],
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "filter": null,
+    "parameterId": "destinationConnector"
+  },
+  {
+    "btType": "BTMParameterBoolean-144",
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": false,
+    "parameterId": "oppositeDirectionMateAxis"
+  },
+  {
+    "btType": "BTMParameterEnum-145",
+    "namespace": "",
+    "enumName": "MateConnectorAxisType",
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": "PLUS_X",
+    "parameterId": "secondaryAxisType"
+  },
+  {
+    "btType": "BTMParameterQuantity-147",
+    "isInteger": false,
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": 30,
+    "units": "degree",
+    "expression": "",
+    "parameterId": "angle"
+  },
+  {
+    "btType": "BTMParameterBoolean-144",
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": false,
+    "parameterId": "oppositeDirection"
+  },
+  {
+    "btType": "BTMParameterQuantity-147",
+    "isInteger": false,
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": 0,
+    "units": "meter",
+    "expression": "",
+    "parameterId": "dx"
+  },
+  {
+    "btType": "BTMParameterQuantity-147",
+    "isInteger": false,
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": 0,
+    "units": "meter",
+    "expression": "",
+    "parameterId": "dy"
+  },
+  {
+    "btType": "BTMParameterQuantity-147",
+    "isInteger": false,
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": 0,
+    "units": "meter",
+    "expression": "",
+    "parameterId": "dz"
+  },
+  {
+    "btType": "BTMParameterQueryList-148",
+    "queries": [],
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "filter": null,
+    "parameterId": "scalePoint"
+  },
+  {
+    "btType": "BTMParameterBoolean-144",
+    "parameterName": "",
+    "libraryRelationType": "DEFAULT",
+    "value": false,
+    "parameterId": "makeCopy"
+  }
+]

@@ -361,3 +361,28 @@ def test_catalog_authoring_rejects_invalid_and_escaping_entries(project, tmp_pat
     path.symlink_to(outside)
     assert not m.r3_put_catalog_entry('fastener', entry, project=str(project))['ok']
     assert outside.read_bytes() == before
+
+
+@pytest.mark.skipif(__import__('sys').platform != 'darwin', reason='macOS worker versus shell rendering regression')
+def test_session_mcp_worker_runs_project_native_rendering(project):
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    from r3_orchestrator.api.agents import mcp_config
+
+    suite = project / 'tests'
+    suite.mkdir()
+    shutil.copyfile(FIXTURES / 'project-capabilities/native_render_case.py', suite / 'test_native_render.py')
+    server = mcp_config(project)['mcpServers']['r3']
+
+    async def check():
+        params = StdioServerParameters(command=server['command'], args=server['args'], env=server['env'], cwd=str(project))
+        async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
+            await session.initialize()
+            response = await session.call_tool('r3_run_project_tests', {})
+            assert not response.is_error
+            result = json.loads(response.content[0].text)
+            assert result['ok'], result
+            metrics = result['stages'][0]['metrics']
+            assert metrics['executed'] == 1 and metrics['failed'] == metrics['skipped'] == 0
+
+    asyncio.run(asyncio.wait_for(check(), 90))

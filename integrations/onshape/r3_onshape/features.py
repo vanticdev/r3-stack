@@ -60,6 +60,27 @@ def feature(feature_type: str, name: str, params: list[dict[str, Any]]) -> dict[
     return {"btType": "BTMFeature-134", "featureType": feature_type, "name": name, "namespace": "", "parameters": params}
 
 
+def translate(name: str, part_id: str, delta: Iterable[float]) -> dict[str, Any]:
+    """Standard Transform -> Translate by XYZ, retaining its native dialog defaults.
+
+    Onshape regenerates the entire feature definition, including inactive
+    parameter branches. Omitting those defaults can create an ERROR feature.
+    Values follow the native Transform /featurespecs metadata, not part data.
+    """
+    dx, dy, dz = delta
+    params = [qlist("entities", [det(part_id)]), enum("transformType", "TransformType", "TRANSLATION_3D"),
+              boolean("oppositeDirectionEntity", False),
+              *[qlist(key, []) for key in ("transformLine", "transformAxis", "transformDirection")],
+              qty("distance", "25 mm"), boolean("uniform", True),
+              *[qty(key, "1") for key in ("scale", "scaleX", "scaleY", "scaleZ")],
+              qlist("baseConnector", []), qlist("destinationConnector", []),
+              boolean("oppositeDirectionMateAxis", False), enum("secondaryAxisType", "MateConnectorAxisType", "PLUS_X"),
+              qty("angle", "30 deg"), boolean("oppositeDirection", False),
+              qty("dx", mm(dx)), qty("dy", mm(dy)), qty("dz", mm(dz)),
+              qlist("scalePoint", []), boolean("makeCopy", False)]
+    return feature("transform", name, params)
+
+
 # --------------------------------------------------------------------- sketches
 def _segment_entity(eid: str, seg: Segment) -> tuple[dict[str, Any], tuple[np.ndarray, np.ndarray]]:
     if seg.kind == "line":

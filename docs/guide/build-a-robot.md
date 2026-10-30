@@ -26,6 +26,13 @@ typed authoring reference, including field descriptions and nested definitions
 Use these tools and this guide; reading platform source is not required.
 The session exposes R3's permitted tools directly and excludes unrelated account
 plugins and skills, so another project's context is not needed or inherited.
+Run native pipeline stages, scenarios and project tests with the R3 MCP tools;
+they execute in the worker's probed environment. On macOS, the Codex shell sandbox
+can deny CoreGraphics access even when native offscreen MuJoCo rendering works in
+the worker. Put independent simulator experiments under `tests/` and use
+`r3_run_project_tests`. Keep camera and perception requirements enabled.
+For a source checkout without an installed `r3` executable, the CLI entry point is
+`python -m r3_orchestrator` using the platform environment.
 
 When the user explicitly requests GitHub publication, initialize a repository
 inside the project (`git init -b main`) before staging files, then use `gh repo
@@ -149,6 +156,9 @@ datasheet specs, model placement and interface frames. Never invent a passing
 validation status: measured geometry must support the review. Unverified or
 mismatched models remain explicit in CAD diagnostics.
 
+Model-bank categories are exposed in the tools' enum/schema. Use `other` for a
+category absent from that list; a component's catalog `kind` is a separate field.
+
 ## 4. Join the assembly
 
 Treat assembly as a geometric puzzle: pair compatible connection sites, declare each join, and let the compiler derive poses and check the fit.
@@ -206,6 +216,14 @@ on a file under `cad/views/` to see the actual server-rendered image. Read the
 numeric diagnostics, edit the design through the tools, and run CAD again; pinned
 documents update incrementally. Never edit generated meshes or use an offline
 preview as the real model.
+
+If an unfinished new build no longer matches edited inputs, call
+`r3_cad_recover()` to inspect its pending attempts and lock `sha256`. Pass that
+value as `expected_sha256` to explicitly restart. This archives the old document
+references locally and clears only unfinished new-build state. Existing native
+documents, completed pins and request journals are retained; recovery makes no
+Onshape calls and refuses to run while CAD is active. Then plan and run CAD with
+the current inputs. Never hand-edit the generated lock or claim old geometry is current.
 
 Run `r3 validate --stage fabrication` for printable parts. Review wall thickness, overhangs,
 loads, strength margins, material orientation and manufacturing artifacts. Tests and

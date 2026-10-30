@@ -167,9 +167,7 @@ def import_studio(api: Any, did: str, wid: str, part: Any) -> Any:
         delta = placement[:3, 3]
         length = float(np.linalg.norm(delta))
         if length:
-            parameters = [fx.qlist('entities', [fx.det(pid)]), fx.enum('transformType', 'TransformType', 'TRANSLATION_3D'),
-                          fx.qty('dx', fx.mm(delta[0])), fx.qty('dy', fx.mm(delta[1])), fx.qty('dz', fx.mm(delta[2]))]
-            builder._add(fx.feature('transform', 'Align vendor model to component frame', parameters), part.name, 'Reference geometry')
+            builder._add(fx.translate('Align vendor model to component frame', pid, delta), part.name, 'Reference geometry')
     box = api.json('GET', builder.base + '/boundingboxes')
     bbox = [box['high' + axis] - box['low' + axis] for axis in ('X', 'Y', 'Z')]
     verdict = validate(entry, bbox)

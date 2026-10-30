@@ -28,6 +28,18 @@ from .client import OnshapeError, Transport, default_transport
 
 
 def run(project: Project) -> StageResult:
+    from .recovery import CadBusy, build_lock
+
+    try:
+        with build_lock(project):
+            return _run(project)
+    except CadBusy as error:
+        result = StageResult(stage="cad", inputs=project.fingerprint())
+        result.add(Diagnostic.error("cad_busy", str(error)))
+        return result
+
+
+def _run(project: Project) -> StageResult:
     result = StageResult(stage="cad", inputs=project.fingerprint())
     started = time.time()
     if os.environ.get("R3_CAD_DRY_RUN") == "1":
@@ -107,7 +119,8 @@ def run(project: Project) -> StageResult:
         result.duration_s = time.time() - started
         return result
     except ValueError as error:
-        result.add(Diagnostic.error("cad_resume_inputs_changed", str(error), subjects=["cad"]))
+        result.add(Diagnostic.error("cad_resume_inputs_changed", str(error), subjects=["cad"],
+                                    hint="Use r3_cad_recover to inspect and explicitly restart an unfinished new build; native documents are preserved."))
         result.duration_s = time.time() - started
         return result
     if result.ok and report.get("robot") is not None:
