@@ -703,6 +703,19 @@ class _Problem:
         g, _, _ = self.constraints(x)
         return float(max(0.0, np.max(-g - self.tolerance, initial=0.0)))
 
+    def fixed_clearance_lower_bound(self) -> float:
+        """Residual that no decision variable can change at a fixed point.
+
+        Inspect the affine point layout, not a zero local gradient: a movable
+        point at the centre of an obstacle may also have a zero gradient.
+        """
+        fixed = (self.p_var < 0) & (self.p_pos < 0)
+        axis_points = np.flatnonzero(self.p_axis >= 0)
+        fixed[axis_points] &= self.a_off[self.p_axis[axis_points]] < 0
+        rows = self.clear["row"][fixed[self.clear["point"]]]
+        g, _, _ = self.constraints(self.x0_array)
+        return float(max(0.0, np.max(-g[rows] - self.tolerance[rows], initial=0.0)))
+
 
 # ------------------------------------------------------------------ solve
 def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields: ClearanceField,
@@ -754,6 +767,18 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     if violation(x1) > v0:
         x1 = x0
     stats.update(initial_violation=v0, penalty_iterations=iterations1, penalty_violation=violation(x1))
+
+    # A blocked fixed exit/via is a layout failure. Once the best possible
+    # maximum residual is reached, dense elastic/polish iterations cannot make
+    # this group feasible. Return the full audit and keep every failure.
+    fixed_bound = problem.fixed_clearance_lower_bound()
+    if fixed_bound > 0.0 and violation(x1) <= fixed_bound + 1e-10:
+        stats.update(best_phase="penalty", fixed_clearance_lower_bound=fixed_bound,
+                     slsqp_iterations=0, slsqp_message="Skipped: fixed clearance lower bound reached",
+                     final_violation=violation(x1),
+                     initial_length=float(sum(polyline_length(p) for p in problem.points(x0))),
+                     planned_length=float(sum(polyline_length(p) for p in problem.points(x1))))
+        return _result(problem, x1, segments, junctions, stats, obstacles)
 
     # The routing objective is a buildable cable. Once the bounded penalty
     # solve satisfies every constraint, a dense elastic solve cannot improve
