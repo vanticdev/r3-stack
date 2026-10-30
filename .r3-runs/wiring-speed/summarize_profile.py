@@ -26,9 +26,15 @@ if not render_time and timing_path.exists():
     timing=json.loads(timing_path.read_text())
     # Some thread-heavy cProfile runs lose the still-active renderer/parent
     # frames. Independent stage wall time bounds this small output remainder.
-    render_time=max(0.,timing['stage_s']-cumulative('stage.py','route_and_check')
-                    -cumulative('driver.py','run_drive')-cumulative('manufacturing.py','write_package'))
-    render_note='wall-time remainder after route/check, drive, manufacturing; includes JSON/output overhead'
+    routing=cumulative('stage.py','route_and_check')
+    disjoint_children=cumulative('planner.py','plan_routing')+cumulative('supports.py','place_supports')
+    if routing < disjoint_children:
+        render_time=None
+        render_note='unavailable: incomplete route/check parent frame prevents a valid wall-time remainder'
+    else:
+        render_time=max(0.,timing['stage_s']-routing
+                        -cumulative('driver.py','run_drive')-cumulative('manufacturing.py','write_package'))
+        render_note='wall-time remainder after route/check, drive, manufacturing; includes JSON/output overhead'
 report={
     'nested_cumulative_seconds':{
         'voxel_fields':cumulative('grid.py','compute_fields'),

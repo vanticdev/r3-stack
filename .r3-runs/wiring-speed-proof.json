@@ -127,6 +127,27 @@
     },
     "load_observations": 4813
   },
+  "before_tests": {
+    "wall_s": 4771.869408333994,
+    "user_s": 3321.378262,
+    "system_s": 152.756802,
+    "cpu_s": 3474.135064,
+    "cpu_method": "wait4 cumulative process-tree user + system",
+    "observed_peak_processes": 4,
+    "logical_cpus": 16,
+    "exit_code": 0,
+    "load_1m": {
+      "min": 12.423828125,
+      "max": 272.3681640625,
+      "mean": 133.02019838095762
+    },
+    "machine_processes": {
+      "min": 924,
+      "max": 1010,
+      "mean": 955.2623565754634
+    },
+    "load_observations": 4532
+  },
   "after_tests": {
     "wall_s": 2235.8430197499983,
     "user_s": 3208.994511,

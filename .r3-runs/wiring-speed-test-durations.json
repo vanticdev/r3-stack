@@ -1,0 +1,412 @@
+{
+  "before": {
+    "summary": "867 passed, 3 skipped, 8 warnings in 4769.72s",
+    "slowest_40": [
+      {
+        "seconds": 2528.07,
+        "phase": "setup",
+        "test": "tests/test_connectors_geometry.py::test_every_wire_ends_on_its_pins"
+      },
+      {
+        "seconds": 83.27,
+        "phase": "call",
+        "test": "tests/test_electrical_stage.py::test_electrical_stage_uses_routed_wire_lengths"
+      },
+      {
+        "seconds": 79.16,
+        "phase": "call",
+        "test": "tests/test_blank_flow_mcp.py::test_grow_a_printed_frame_robot"
+      },
+      {
+        "seconds": 75.02,
+        "phase": "setup",
+        "test": "tests/test_connectors_onshape.py::test_plan_places_models_with_rigid_transforms"
+      },
+      {
+        "seconds": 71.77,
+        "phase": "call",
+        "test": "tests/test_electrical_stage.py::test_electrical_stage_on_rc_car"
+      },
+      {
+        "seconds": 64.05,
+        "phase": "setup",
+        "test": "tests/test_connectors_stage.py::test_connectors_json"
+      },
+      {
+        "seconds": 60.85,
+        "phase": "call",
+        "test": "tests/test_sim_scenario.py::test_full_throttle_end_to_end_with_test_controller"
+      },
+      {
+        "seconds": 58.75,
+        "phase": "call",
+        "test": "tests/test_connectors_connection_sites.py::test_rc_car_stage_writes_every_site"
+      },
+      {
+        "seconds": 56.27,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_overlapped_stepping_is_bit_identical"
+      },
+      {
+        "seconds": 55.21,
+        "phase": "call",
+        "test": "tests/test_api_release.py::test_evidence_from_results"
+      },
+      {
+        "seconds": 53.03,
+        "phase": "call",
+        "test": "tests/test_sim_vehicle.py::test_top_speed_consistent_with_motor_limit"
+      },
+      {
+        "seconds": 51.82,
+        "phase": "setup",
+        "test": "tests/test_connectors_geometry.py::test_branch_project_wires_end_on_their_pins"
+      },
+      {
+        "seconds": 48.91,
+        "phase": "call",
+        "test": "tests/test_cad_phaseb.py::test_exact_interference_and_seats_are_clean"
+      },
+      {
+        "seconds": 48.51,
+        "phase": "setup",
+        "test": "tests/test_api_server.py::test_openapi_lists_the_contract"
+      },
+      {
+        "seconds": 46.03,
+        "phase": "call",
+        "test": "tests/test_offtheshelf_drivetrain.py::test_bought_driveline_drives_with_real_firmware"
+      },
+      {
+        "seconds": 44.62,
+        "phase": "call",
+        "test": "tests/test_headless_env.py::test_doctor_real_probes_run"
+      },
+      {
+        "seconds": 36.75,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_rc_car_sources_wheel_receiver_and_pi_and_passes_the_model_stage"
+      },
+      {
+        "seconds": 31.63,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_cli_source"
+      },
+      {
+        "seconds": 30.98,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_catalog_entry_provenance_per_field"
+      },
+      {
+        "seconds": 29.74,
+        "phase": "call",
+        "test": "tests/test_connectors_geometry.py::test_pin_maps_match_kicad_footprint_pads"
+      },
+      {
+        "seconds": 26.5,
+        "phase": "setup",
+        "test": "tests/test_pcb_stage.py::test_board_json_contract"
+      },
+      {
+        "seconds": 26.5,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_import_vendor_step_and_add_mate_connectors"
+      },
+      {
+        "seconds": 26.13,
+        "phase": "call",
+        "test": "tests/test_pcb_intent.py::test_every_part_is_an_official_library_part"
+      },
+      {
+        "seconds": 26.01,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_vehicle_step_halves_equal_mj_step"
+      },
+      {
+        "seconds": 25.3,
+        "phase": "call",
+        "test": "tests/test_electrical_system.py::test_pwm_switched_bridge_resolves_ripple_and_matches_the_averaged_mean"
+      },
+      {
+        "seconds": 23.7,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_source_only_slot_uses_a_template_by_connectors"
+      },
+      {
+        "seconds": 22.91,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_clearance_branch_and_bound_equals_every_pair"
+      },
+      {
+        "seconds": 22.33,
+        "phase": "call",
+        "test": "tests/test_blank_flow_mcp.py::test_source_a_catalog_part_by_requirements"
+      },
+      {
+        "seconds": 21.82,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_kernel_clearance_is_a_physical_surface_distance"
+      },
+      {
+        "seconds": 18.8,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_pins_are_reproducible_and_guarded"
+      },
+      {
+        "seconds": 18.73,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_cables_are_in_the_vehicle_world"
+      },
+      {
+        "seconds": 16.8,
+        "phase": "call",
+        "test": "tests/test_wiring_sim.py::test_rc_car_steering_sweep"
+      },
+      {
+        "seconds": 15.81,
+        "phase": "call",
+        "test": "tests/test_camera_twin.py::test_capture_is_deterministic"
+      },
+      {
+        "seconds": 15.78,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_http_api_search_job_and_choose"
+      },
+      {
+        "seconds": 12.21,
+        "phase": "call",
+        "test": "tests/test_cad_shared_mount_pattern.py::test_one_source_pattern_updates_fixture_and_cap_seat"
+      },
+      {
+        "seconds": 11.02,
+        "phase": "call",
+        "test": "tests/test_api_robustness.py::test_api_serves_edits_and_fixes_without_restart"
+      },
+      {
+        "seconds": 10.99,
+        "phase": "call",
+        "test": "tests/test_camera_twin.py::test_cameras_do_not_change_the_physics"
+      },
+      {
+        "seconds": 10.64,
+        "phase": "call",
+        "test": "tests/test_sim_radio_sionna.py::test_scene_from_rc_car_spec"
+      },
+      {
+        "seconds": 10.17,
+        "phase": "call",
+        "test": "tests/test_api_server.py::test_spec_read_and_patch_keeps_comments"
+      },
+      {
+        "seconds": 9.61,
+        "phase": "call",
+        "test": "tests/test_api_robustness.py::test_project_cache_is_keyed_on_code_version_and_inputs"
+      }
+    ]
+  },
+  "after": {
+    "summary": "888 passed, 3 skipped, 8 warnings in 2235.56s",
+    "slowest_40": [
+      {
+        "seconds": 1545.84,
+        "phase": "setup",
+        "test": "tests/test_connectors_geometry.py::test_every_wire_ends_on_its_pins@full_wiring"
+      },
+      {
+        "seconds": 135.54,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_overlapped_stepping_is_bit_identical@full_wiring"
+      },
+      {
+        "seconds": 131.94,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_rc_car_sources_wheel_receiver_and_pi_and_passes_the_model_stage"
+      },
+      {
+        "seconds": 125.73,
+        "phase": "call",
+        "test": "tests/test_electrical_stage.py::test_electrical_stage_uses_routed_wire_lengths@full_wiring"
+      },
+      {
+        "seconds": 118.19,
+        "phase": "call",
+        "test": "tests/test_sim_scenario.py::test_full_throttle_end_to_end_with_test_controller"
+      },
+      {
+        "seconds": 99.8,
+        "phase": "call",
+        "test": "tests/test_sim_vehicle.py::test_top_speed_consistent_with_motor_limit"
+      },
+      {
+        "seconds": 87.5,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_catalog_entry_provenance_per_field"
+      },
+      {
+        "seconds": 86.73,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_cli_source"
+      },
+      {
+        "seconds": 83.14,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_import_vendor_step_and_add_mate_connectors"
+      },
+      {
+        "seconds": 74.84,
+        "phase": "call",
+        "test": "tests/test_blank_flow_mcp.py::test_grow_a_printed_frame_robot"
+      },
+      {
+        "seconds": 74.84,
+        "phase": "call",
+        "test": "tests/test_electrical_stage.py::test_electrical_stage_on_rc_car"
+      },
+      {
+        "seconds": 72.89,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_vehicle_step_halves_equal_mj_step@full_wiring"
+      },
+      {
+        "seconds": 68.86,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_clearance_branch_and_bound_equals_every_pair@full_wiring"
+      },
+      {
+        "seconds": 64.84,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_source_only_slot_uses_a_template_by_connectors"
+      },
+      {
+        "seconds": 61.23,
+        "phase": "call",
+        "test": "tests/test_connectors_connection_sites.py::test_rc_car_stage_writes_every_site"
+      },
+      {
+        "seconds": 60.39,
+        "phase": "setup",
+        "test": "tests/test_connectors_stage.py::test_connectors_json"
+      },
+      {
+        "seconds": 59.69,
+        "phase": "setup",
+        "test": "tests/test_connectors_onshape.py::test_plan_places_models_with_rigid_transforms"
+      },
+      {
+        "seconds": 57.1,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_kernel_clearance_is_a_physical_surface_distance@full_wiring"
+      },
+      {
+        "seconds": 55.19,
+        "phase": "call",
+        "test": "tests/test_api_release.py::test_evidence_from_results"
+      },
+      {
+        "seconds": 54.01,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_pins_are_reproducible_and_guarded"
+      },
+      {
+        "seconds": 53.15,
+        "phase": "call",
+        "test": "tests/test_wiring_sim.py::test_rc_car_steering_sweep@full_wiring"
+      },
+      {
+        "seconds": 50.91,
+        "phase": "setup",
+        "test": "tests/test_api_server.py::test_doctor_includes_agent_clis"
+      },
+      {
+        "seconds": 50.64,
+        "phase": "setup",
+        "test": "tests/test_api_server.py::test_openapi_lists_the_contract"
+      },
+      {
+        "seconds": 49.13,
+        "phase": "call",
+        "test": "tests/test_pcb_intent.py::test_schematic_plan_has_no_overlaps_or_shorts"
+      },
+      {
+        "seconds": 48.49,
+        "phase": "call",
+        "test": "tests/test_pcb_intent.py::test_every_part_is_an_official_library_part"
+      },
+      {
+        "seconds": 48.39,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_http_api_search_job_and_choose"
+      },
+      {
+        "seconds": 48.06,
+        "phase": "call",
+        "test": "tests/test_sim_cables.py::test_cables_are_in_the_vehicle_world@full_wiring"
+      },
+      {
+        "seconds": 46.98,
+        "phase": "setup",
+        "test": "tests/test_api_server.py::test_project_detail_with_release_matrix"
+      },
+      {
+        "seconds": 46.67,
+        "phase": "call",
+        "test": "tests/test_offtheshelf_drivetrain.py::test_bought_driveline_drives_with_real_firmware"
+      },
+      {
+        "seconds": 45.81,
+        "phase": "call",
+        "test": "tests/test_headless_env.py::test_doctor_real_probes_run"
+      },
+      {
+        "seconds": 43.61,
+        "phase": "setup",
+        "test": "tests/test_pcb_stage.py::test_catalog_matches_the_board"
+      },
+      {
+        "seconds": 43.45,
+        "phase": "call",
+        "test": "tests/test_cad_phaseb.py::test_exact_interference_and_seats_are_clean"
+      },
+      {
+        "seconds": 41.32,
+        "phase": "setup",
+        "test": "tests/test_connectors_geometry.py::test_branch_project_wires_end_on_their_pins"
+      },
+      {
+        "seconds": 38.81,
+        "phase": "setup",
+        "test": "tests/test_pcb_stage.py::test_board_json_contract"
+      },
+      {
+        "seconds": 35.56,
+        "phase": "call",
+        "test": "tests/test_electrical_system.py::test_pwm_switched_bridge_resolves_ripple_and_matches_the_averaged_mean@full_wiring"
+      },
+      {
+        "seconds": 28.92,
+        "phase": "call",
+        "test": "tests/test_connectors_geometry.py::test_pin_maps_match_kicad_footprint_pads"
+      },
+      {
+        "seconds": 26.93,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_mcp_tools"
+      },
+      {
+        "seconds": 23.86,
+        "phase": "call",
+        "test": "tests/test_blank_flow_mcp.py::test_source_a_catalog_part_by_requirements"
+      },
+      {
+        "seconds": 22.67,
+        "phase": "call",
+        "test": "tests/test_sourcing_pipeline.py::test_import_without_transport_is_skipped"
+      },
+      {
+        "seconds": 13.21,
+        "phase": "call",
+        "test": "tests/test_orchestrator_mcp.py::test_catalog_and_artifacts"
+      }
+    ]
+  }
+}

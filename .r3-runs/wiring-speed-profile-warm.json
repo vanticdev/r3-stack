@@ -1,0 +1,17 @@
+{
+  "nested_cumulative_seconds": {
+    "voxel_fields": 1.3130258750000001,
+    "voxel_routing_including_fields_excluding_planner": 27.826894208000002,
+    "constrained_planning": 59.596478959,
+    "native_slsqp": 0,
+    "collision_queries": 70.83382664700001,
+    "support_placement": 55.741436875000005,
+    "slack_simulation": 36.694770083,
+    "png_rendering_and_output": null,
+    "manufacturing_including_wireviz": 6.332671292000001
+  },
+  "function_calls": 153017810,
+  "primitive_calls": 151831273,
+  "render_measurement": "unavailable: incomplete route/check parent frame prevents a valid wall-time remainder",
+  "note": "Phase costs are nested; collision queries and native SLSQP are included in their calling phases."
+}
