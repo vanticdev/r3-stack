@@ -118,7 +118,8 @@ def test_analytic_fallback_is_labeled(monkeypatch):
 def test_scene_from_bench_spec(tmp_path):
     root = tmp_path / "bench"
     shutil.copytree(BENCH, root, ignore=shutil.ignore_patterns("build", "__pycache__"))
-    project = Project.load(root)
+    from pulled_fixture import instrumentation_pull
+    project = instrumentation_pull(root)
     params = dict(project.catalog.component("elrs-receiver-2g4").behavior.params)
     scene = scene_for_project(project, "receiver", params)
     assert scene.ground_material == "medium_dry_ground" and scene.ground_custom is None
@@ -129,22 +130,16 @@ def test_scene_from_bench_spec(tmp_path):
     assert "base" in materials["metal"].parts and "pi" in materials["metal"].parts and "rotor" not in materials["metal"].parts
     body_parts = sum((m.parts for m in scene.body), [])
     assert "receiver" not in body_parts and "rx_antenna" not in body_parts  # the radiator does not shadow itself
-    # Without CAD the feed point is the middle of the antenna's catalog dipole, placed by its pose.
-    dipole = next(s for s in project.catalog.component(project.spec.components["rx_antenna"].type).mechanical.solids
-                  if s.name == "dipole")
-    position, rotation = project.graph.component_pose("rx_antenna")
-    expected = position + rotation @ (np.asarray(dipole.position, dtype=float)
-                                      + np.asarray(dipole.axis, dtype=float) * dipole.length / 2.0)
-    assert np.allclose(scene.antenna_offset, expected) and scene.antenna_offset_source == "catalog"
-    built = Project.load(BENCH).read_build_json("cad/cad_model.json") or {}
-    if (built.get("rf") or {}).get("antenna_position"):  # the CAD-derived feed point agrees with the catalog geometry
-        assert np.allclose(scene.antenna_offset, built["rf"]["antenna_position"], atol=1e-4)
-    # The antenna must sit outside (above) every body part.
+    # The native feed connector is the authoritative phase centre.
+    from r3_model.pulled import load_pulled
+    pulled = load_pulled(root)
+    expected = (pulled.poses["rx_antenna"] @ pulled.parts["rx_antenna"].mate_connectors["feed"])[:3, 3]
+    assert np.allclose(scene.antenna_offset, expected) and scene.antenna_offset_source == "pulled"
     assert all(m.vertices[:, 2].max() < scene.antenna_offset[2] for m in scene.body)
-    (root / "build" / "cad").mkdir(parents=True)
-    (root / "build" / "cad" / "cad_model.json").write_text(json.dumps({"parts": {}, "rf": {"antenna_position": [0.2, 0.05, 0.21]}}))
+    # A retired build artifact cannot override the native phase centre.
+    (root / "build/cad/cad_model.json").write_text(json.dumps({"parts": {}, "rf": {"antenna_position": [0.2, 0.05, 0.21]}}))
     cad_scene = scene_for_project(Project.load(root), "receiver", params)
-    assert np.allclose(cad_scene.antenna_offset, [0.2, 0.05, 0.21]) and cad_scene.antenna_offset_source == "cad"
+    assert np.allclose(cad_scene.antenna_offset, expected) and cad_scene.antenna_offset_source == "pulled"
     assert material_for("Aluminum 6061-T6") == "metal" and material_for("PETG") == "plastic"
     assert material_for("", "battery") == "metal" and material_for("itu_concrete") == "concrete"
 

@@ -3,6 +3,8 @@ single/float/fixed solution, kernel wiring, firmware use of the fix quality, and
 
 from __future__ import annotations
 
+from pulled_fixture import instrumentation_pull
+
 import math
 import yaml
 import shutil
@@ -123,7 +125,7 @@ def test_fsk_ber_and_packet_error_at_sensitivity():
 def project(tmp_path_factory) -> Project:
     root = tmp_path_factory.mktemp("rtk") / "bench"
     shutil.copytree(ROOT / "tests" / "fixtures" / "bench", root, ignore=shutil.ignore_patterns("build", "__pycache__"))
-    return Project.load(root)
+    return instrumentation_pull(root)
 
 
 def test_link_budget_loses_corrections_far_from_the_base(project):
