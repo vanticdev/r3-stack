@@ -91,10 +91,10 @@ components:
       pi_3: {kind: hole_pattern, origin: [-49 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       pi_4: {kind: hole_pattern, origin: [9 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       imu_seat: {kind: adhesive_pad, origin: [29 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], description: "Rigid IMU pedestal outside the Pi IO block; board axes remain chassis aligned"}
-      imu_south_post: {kind: hole_pattern, origin: [15 mm, -67 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      imu_south_post: {kind: hole_pattern, origin: [15 mm, -72 mm, 3 mm], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}, x: [1, 0, 0], z: [0, 0, 1]}
       imu_outboard_post: {kind: hole_pattern, origin: [40 mm, -8 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       imu_corner_post: {kind: hole_pattern, origin: [46 mm, -40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
-      cap_imu_south_post: {kind: adhesive_pad, origin: [15 mm, -67 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      cap_imu_south_post: {kind: adhesive_pad, origin: [15 mm, -72 mm, 0], x: [1, 0, 0], z: [0, 0, -1]}
       cap_imu_outboard_post: {kind: adhesive_pad, origin: [40 mm, -8 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       cap_imu_corner_post: {kind: adhesive_pad, origin: [46 mm, -40 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       rx_pad: {kind: adhesive_pad, origin: [-24.5 mm, -85 mm, 3 mm], z: [0, 0, 1], x: [0, -1, 0]}
@@ -160,6 +160,8 @@ components:
         - 1
         - 0
         - 0
+      servo_approach_post: {kind: hole_pattern, origin: [-41.87017 mm, -100 mm, 3 mm], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_servo_approach_post: {kind: adhesive_pad, origin: [-41.87017 mm, -100 mm, 0], z: [0, 0, -1]}
   - id: standoff-m3-47
     kind: structure
     cad_name: Deck standoff M3x47
@@ -1174,25 +1176,114 @@ components:
     kind: structure
     cad_name: Servo post B
     name: Servo mounting post with servo-lead pocket, 6061 aluminum, 9 x 20 x 27.5 mm
-    description: >
-      Front servo post. The DS3218 lead leaves the case end 0.5 mm in front of this post, so an 11 mm pocket between the
-      bottom and top threads runs through the post and opens on its +y side: the lead turns inside the post's
-      footprint and runs aft below the linkage. The 5 x 8 mm web left beside the pocket carries the ear load
-      (~40 N per ear at servo stall: ~25 MPa bending). Base threads 5 mm (M3 x 8 through the 3 mm plate engages 5 mm).
+    description: 'Front servo post. The DS3218 lead leaves the case end 0.5 mm in front
+      of this post, so an 11 mm pocket between the bottom and top threads runs through
+      the post and opens on its +y side: the lead turns inside the post''s footprint
+      and runs aft below the linkage. The 5 x 8 mm web left beside the pocket carries
+      the ear load (~40 N per ear at servo stall: ~25 MPa bending). Base threads 5 mm
+      (M3 x 8 through the 3 mm plate engages 5 mm).
+  
+      '
     mechanical:
       shape: custom
-      size: [9 mm, 20 mm, 27.5 mm]
-      mass: 0.011
+      size:
+      - 34.5 mm
+      - 36 mm
+      - 27.5 mm
+      mass: 0.0165
       material: Aluminum 6061-T6
       density: 2700
-      color: "#a9b0b8"
+      color: '#a9b0b8'
       fabricated: true
       solids:
-        - {kind: box, name: post, position: [0, 0, 13.75 mm], size: [9 mm, 20 mm, 27.5 mm]}
-        - {kind: box, op: remove, name: lead pocket, position: [0, 3 mm, 12 mm], size: [10 mm, 16 mm, 11 mm]}
+      - kind: box
+        name: post
+        position:
+        - 0
+        - 0
+        - 13.75 mm
+        size:
+        - 9 mm
+        - 20 mm
+        - 27.5 mm
+      - kind: box
+        name: front lead saddle shelf
+        position:
+        - -15 mm
+        - 9 mm
+        - 1 mm
+        size:
+        - 30 mm
+        - 34 mm
+        - 2 mm
+      - kind: box
+        op: remove
+        name: lead pocket
+        position:
+        - 0
+        - 3 mm
+        - 12 mm
+        size:
+        - 10 mm
+        - 16 mm
+        - 11 mm
+      envelope_offset:
+      - -12.75 mm
+      - 8 mm
+      - 0
     interfaces:
-      base: {kind: hole_pattern, origin: [0.25 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 5 mm], [0, -5 mm, 3 mm, tapped, 5 mm]]}}
-      top: {kind: hole_pattern, origin: [0.25 mm, 0, 27.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
+      base:
+        kind: hole_pattern
+        origin:
+        - 0.25 mm
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 5 mm
+            - 3 mm
+            - tapped
+            - 5 mm
+          - - 0
+            - -5 mm
+            - 3 mm
+            - tapped
+            - 5 mm
+      top:
+        kind: hole_pattern
+        origin:
+        - 0.25 mm
+        - 0
+        - 27.5 mm
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 5 mm
+            - 3 mm
+            - tapped
+            - 8 mm
+          - - 0
+            - -5 mm
+            - 3 mm
+            - tapped
+            - 8 mm
   - id: lead-post-petg
     kind: structure
     cad_name: Lead post
@@ -1592,11 +1683,35 @@ components:
     name: Printed power cable tie post, PETG, 7 x 35 mm
     description: Chassis-mounted cable tie post with a capped underside mounting screw.
     mechanical:
-      size: [7 mm, 35 mm]
+      size:
+      - 7 mm
+      - 35 mm
       mass: 0.001715
       solids:
-        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 35 mm}
-
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 35 mm
+      - kind: cylinder
+        name: tie stand-off collar
+        position:
+        - 0
+        - 0
+        - 33.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
   - id: receiver-riser-petg
     kind: structure
     cad_name: Receiver riser
@@ -2063,3 +2178,89 @@ components:
           width: 4 mm
     manufacturer: Littelfuse
     part_number: '028707.5'
+
+  - id: servo-south-post-petg
+    extends: lead-post-petg
+    name: South servo lead tie post with stand-off collar
+    cad_name: IMU lead post
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 7 mm
+      - 40 mm
+      mass: 0.002
+      solids:
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 40 mm
+      - kind: cylinder
+        name: tie stand-off collar
+        position:
+        - 0
+        - 0
+        - 34.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+      - kind: cylinder
+        name: IMU tie stand-off collar
+        position:
+        - 0
+        - 0
+        - 26.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+
+  - id: servo-approach-post-petg
+    extends: lead-post-petg
+    name: Servo HAT approach tie post
+    cad_name: IMU lead post
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 11 mm
+      - 60 mm
+      mass: 0.0032
+      solids:
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 60 mm
+      - kind: cylinder
+        name: tie stand-off collar
+        position:
+        - 0
+        - 0
+        - 49.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm

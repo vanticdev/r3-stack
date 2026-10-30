@@ -41,7 +41,7 @@ components:
       # Rear-right notch clears the transmission's gear cover.
       # Rear-left tab carries the so_rl standoff behind the motor terminals (3 mm clear of the gear case at y < 30 mm);
       # the right-edge tab carries the lead post's screw (edge distance) beside the lead slot.
-      outline: [[-66 mm, -55 mm], [-34 mm, -55 mm], [-34 mm, -94 mm], [-15 mm, -94 mm], [-15 mm, -55 mm], [5 mm, -55 mm], [5 mm, -74 mm], [35 mm, -74 mm], [35 mm, -55 mm], [85 mm, -55 mm],
+      outline: [[-66 mm, -55 mm], [-49 mm, -55 mm], [-49 mm, -108 mm], [-15 mm, -108 mm], [-15 mm, -55 mm], [5 mm, -55 mm], [5 mm, -80 mm], [35 mm, -80 mm], [35 mm, -55 mm], [85 mm, -55 mm],
                 [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
   standoff_rl: {type: standoff-m3-47}
   standoff_rr: {type: standoff-m3-47}
@@ -131,7 +131,9 @@ components:
   imu_mount:   {type: imu-pedestal-petg}
   imu_outboard_post: {type: imu-lead-post-petg}
   cap_imu_outboard_post: {type: screw-cap-m3-petg}
-  imu_south_post: {type: imu-lead-post-petg}
+  imu_south_post: {type: servo-south-post-petg}
+  servo_approach_post: {type: servo-approach-post-petg}
+  cap_servo_approach_post: {type: screw-cap-m3-petg}
   cap_imu_south_post: {type: screw-cap-m3-petg}
   cap_imu_1: {type: imu-screw-cap-1-petg}
   cap_imu_2: {type: imu-screw-cap-2-petg}
@@ -196,6 +198,8 @@ assembly:
   root: chassis
   tolerance: {position: 0.05 mm, angle: 0.1 deg}
   joins:
+    - {a: deck.servo_approach_post, b: servo_approach_post.base, clock: 0 deg, fasteners: {type: M3x10}, id: servo_approach_post}
+    - {a: deck.cap_servo_approach_post, b: cap_servo_approach_post.seat, id: cap_servo_approach_post}
     # ---- rear drivetrain
     - {id: gb_mount, a: chassis.gearbox, b: gearbox.mount, clock: 0 deg, fasteners: {type: M3x10}}
     - {id: motor_mount, a: gearbox.motor_mount, b: motor.face, clock: -50 deg, fasteners: {type: M3x8}}
@@ -508,9 +512,9 @@ electrical:
         - {id: W_SRV_SIG, from: A.1, to: B.1, awg: 22, color: white, signal: SERVO_PWM}
         - {id: W_SRV_VCC, from: A.2, to: B.2, awg: 20, color: red, signal: SERVO_6V}
         - {id: W_SRV_GND, from: A.3, to: B.3, awg: 20, color: black, signal: GND}
-      # Through servo post B's lead pocket, aft along the plate under the linkage, under the deck and up through
-      # the deck's lead slot beside the HAT.
-      route: {slack: 30 mm, keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr]}
+      # The forward shelf restrains the pigtail turn; collared posts carry the climb outside the deck
+      # and above the receiver to the HAT's south-facing connector.
+      route: {keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr], slack: 30 mm, tie_points: [[311 mm, -10 mm, 41.87 mm], [185.21 mm, -49.21 mm, 62 mm], [135 mm, -79.347 mm, 113 mm], [85.5 mm, -100 mm, 128 mm]], via: [[303 mm, -25 mm, 42 mm], [170 mm, -63 mm, 78 mm], [115 mm, -105 mm, 135 mm]]}
     - id: rx_lead
       connectors:
         A: {type: integral, mates: receiver.J1}
@@ -564,7 +568,7 @@ electrical:
         - {id: W_IMU_SDA, from: A.3, to: B.4, awg: 28, color: blue, signal: I2C_SDA}
         - {id: W_IMU_SCL, from: A.4, to: B.3, awg: 28, color: yellow, signal: I2C_SCL}
       # Three capped posts hold the lead above the Pi IO block and clear of the drivetrain.
-      route: {slack: 15 mm, tie_points: [[135 mm, -71.7071 mm, 109.5 mm], [161.2929 mm, -40 mm, 114.9 mm], [155.2929 mm, -8 mm, 114.6 mm]], via: [[155 mm, -65 mm, 114 mm]]}
+      route: {slack: 15 mm, tie_points: [[135 mm, -65.293 mm, 105 mm], [161.2929 mm, -40 mm, 114.9 mm], [155.2929 mm, -8 mm, 114.6 mm]], via: [[155 mm, -65 mm, 114 mm]]}
 
 pcb:
   boards:
