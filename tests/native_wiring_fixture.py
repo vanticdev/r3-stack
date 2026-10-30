@@ -88,20 +88,81 @@ def _hardware(node: Any):
     return shape, frame
 
 
+def _fixture_nodes(project: Any) -> dict[str, dict[str, Any]]:
+    """Explicit installed fixture frames; never call the production auto-placer."""
+    from r3_connectors.frames import Frame, any_perpendicular
+    from r3_connectors.pins import mating_site_frame
+    from r3_wiring.geometry import bundle_diameter
+    from r3_wiring.router import NodePoint
+    from r3_wiring.terminations import exit_offset
+
+    harnesses = {h.id: h for h in project.spec.electrical.harnesses}
+    reciprocal = {connector.mates: f"{h.id}.{name}" for h in harnesses.values()
+                  for name, connector in h.connectors.items() if connector.mates}
+    pairs: dict[tuple[str, str], tuple[str, Frame]] = {}
+    out = {}
+    for harness in harnesses.values():
+        nodes = {}
+        for name, connector in harness.connectors.items():
+            if connector.type == "integral":
+                continue
+            ref = f"{harness.id}.{name}"
+            mate_ref = connector.mates or reciprocal.get(ref, "")
+            owner, _, _ = mate_ref.partition(".")
+            component = None
+            if owner in project.spec.components:
+                frame = mating_site_frame(project, ref, connector).mated()
+                component, kind = owner, "connector"
+            elif owner in harnesses:
+                key = tuple(sorted((ref, mate_ref)))
+                if key not in pairs:
+                    # The synthetic inline pair is installed 100 mm from the
+                    # datum, 25 mm above it, along X. Further test pairs have
+                    # explicitly separated Y stations; no space search occurs.
+                    face = [.1, .03 * len(pairs), .025]
+                    wire_axis = np.array([-1., 0., 0.])
+                    if connector.position is not None:
+                        face = connector.position
+                    if connector.direction is not None:
+                        wire_axis = np.asarray(connector.direction, float)
+                    pairs[key] = ref, Frame.from_axes(face, any_perpendicular(wire_axis), -wire_axis)
+                first, base = pairs[key]
+                frame, kind = (base if first == ref else base.mated()), "floating"
+            else:
+                wire_axis = np.array([0., 0., 1.])
+                if connector.direction is not None:
+                    wire_axis = np.asarray(connector.direction, float)
+                exit_point = np.asarray(connector.position, float)
+                face = exit_point - wire_axis * exit_offset(project.catalog, connector.type)
+                frame, kind = Frame.from_axes(face, any_perpendicular(wire_axis), -wire_axis), "free"
+            awgs = [wire.awg for wire in harness.wires for end in (wire.from_, wire.to)
+                    if end.partition(".")[0] == name]
+            od = bundle_diameter(float(project.catalog.wire(awg).outer_diameter) for awg in awgs) if awgs else 0.
+            nodes[name] = NodePoint(harness.id, name, kind,
+                exit=frame.origin - frame.z * exit_offset(project.catalog, connector.type),
+                direction=-frame.z, connector_type=connector.type, mates=connector.mates,
+                component=component, face=frame.origin, frame=frame, od=od)
+        for name, splice in harness.splices.items():
+            awgs = [wire.awg for wire in harness.wires for end in (wire.from_, wire.to) if end == name]
+            od = bundle_diameter(float(project.catalog.wire(awg).outer_diameter) for awg in awgs) if awgs else .002
+            axis = np.asarray(splice.direction if splice.direction is not None else [1., 0., 0.], float)
+            axis /= np.linalg.norm(axis)
+            nodes[name] = NodePoint(harness.id, name, "splice", exit=np.asarray(splice.position, float), direction=axis, od=od)
+        out[harness.id] = nodes
+    return out
+
+
 def publish_wiring_pull(root: Path, nodes: dict[str, dict[str, Any]] | None = None,
                         *, primary_shapes: dict[str, Any] | None = None) -> None:
     """Publish all fixture components and every nonintegral cable-side part.
 
-    Pass hand-made nodes for collision unit tests. Otherwise resolve fixture
-    connectors; the floating-pair fixture is placed once before publishing its
-    native hardware, using the same primary routing field as the test.
+    Pass hand-made nodes for collision unit tests. Otherwise use explicitly
+    installed fixture mating frames, including the inline pair. Publishing
+    does not resolve nodes or place hardware through the production router.
     """
     from pulled_fixture import write_pull
     from r3_model.project import Project
     from r3_model.spec import RobotSpec
-    from r3_wiring.bodies import Kinematics
-    from r3_wiring.obstacles import build_obstacles
-    from r3_wiring.router import HarnessRouter, RouterOptions
 
     root = Path(root)
     path = root / "robot.yaml"
@@ -115,20 +176,9 @@ def publish_wiring_pull(root: Path, nodes: dict[str, dict[str, Any]] | None = No
     shapes = {name: _box(PART_SIZES[component.type]) for name, component in spec.components.items()}
     shapes.update(primary_shapes or {})
     poses = {name: _pose(component) for name, component in spec.components.items()}
-    connectors, mates = _topology(spec, poses)
-    write_pull(root, shapes, poses=poses, connectors=connectors, mates=mates)
-    project = Project.load(root)
+    project = Project(root, spec)
     if nodes is None:
-        router = object.__new__(HarnessRouter)
-        router.project, router.spec, router.catalog = project, project.spec, project.catalog
-        router.graph, router.kin, router.diagnostics = project.graph, Kinematics(project.spec), []
-        router._lead = lambda node, awgs: setattr(node, "lead_end", node.exit.copy())
-        nodes = router._resolve_nodes()
-        if any(node.kind == "floating" for group in nodes.values() for node in group.values()):
-            obstacles, _ = build_obstacles(project)
-            router = HarnessRouter(project, obstacles, RouterOptions(plan=False))
-            nodes = router._resolve_nodes()
-            router._place_floating(nodes)
+        nodes = _fixture_nodes(project)
     owners = {}
     for group in nodes.values():
         for node in group.values():
@@ -145,4 +195,4 @@ def publish_wiring_pull(root: Path, nodes: dict[str, dict[str, Any]] | None = No
         "name": "Synthetic cable hardware", "mechanical": {"mass": .002, "size": ["16 mm", "8 mm", "12.5 mm"]}}]}))
     path.write_text(yaml.safe_dump(data, sort_keys=False))
     connectors, mates = _topology(spec, poses, owners)
-    write_pull(root, shapes, poses=poses, connectors=connectors, mates=mates)
+    write_pull(root, shapes, poses=poses, connectors=connectors, mates=mates, mass=.02)
