@@ -29,7 +29,7 @@ from .client import OnshapeError, Transport
 from .dry_run import FeaturePlanner, studio_plan
 from .journal import RequestJournal, save_json
 from .organized import (AssemblyBuilder, AssemblyPlan, DocumentInfo, MatePlan, StudioRef,
-                        _load_state, _save_state, build_part_catalog, input_digest,
+                        TOP_LEVEL, _load_state, _save_state, build_part_catalog, input_digest,
                         library_digest, locked_library_document, plan_assembly, robot_variables)
 from .parts import LocalPart
 from .quota import quota_diagnostic, update_features
@@ -195,6 +195,27 @@ class IncrementalStudioBuilder(PartStudioBuilder):
         self.flush()
         super().properties(part, metadata_ids)
 
+    def mirror_part(self, part: LocalPart, source_key: str) -> str:
+        from . import features as fx
+        from .geometry import PLANE_IDS
+
+        before = set(self._parts())
+        params = [fx.enum("patternType", "MirrorType", "PART"),
+                  fx.qlist("entities", [fx.det(self.out.part_ids[source_key])]),
+                  fx.qlist("mirrorPlane", [fx.det(PLANE_IDS["FRONT"])]),
+                  fx.enum("operationType", "NewBodyOperationType", "NEW")]
+        self._add(fx.feature("mirror", f"{part.name} (mirror of {source_key.split('#')[0]} about Front)", params),
+                  part.name, "Mirror")
+        current = set(self._parts())  # flush changed source queries before resolving bodies
+        pid = self.ref.part_ids.get(part.key)
+        if pid not in current:
+            added = current - before
+            if len(added) != 1:
+                raise ValueError(f"{part.key}: changed mirror did not resolve exactly one new body")
+            pid = added.pop()
+        self.out.part_ids[part.key] = pid
+        return pid
+
     def finish(self) -> StudioRef:
         self.flush()
         # Preserve user-authored/unknown feature membership in every folder.
@@ -216,15 +237,18 @@ def _state(project: Project) -> dict[str, Any]:
 
 
 def _work(project: Project, parts: dict[str, LocalPart], state: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
-    from .aliases import reusable_alias_parts
+    from .aliases import part_signature, reusable_alias_parts
+    from .purchased import public_source
     pending = ((project.read_build_json("cad/cad_model.json") or {}).get("source", {}).get("recomposed", {}).get("pending_rebuild") or {})
     reused = reusable_alias_parts(project, parts)
     robot_refs, library_refs = state["robot"]["studios"], (project.lock.get("cad_library") or {}).get("studios", {})
     known = {key for ref in [*robot_refs.values(), *library_refs.values()] for key in ref["part_ids"]}
-    wanted = (set(pending) & set(parts)) | (set(parts) - known - reused)
     signatures = (project.lock.get("cad_incremental") or {}).get("part_signatures", {})
+    # Public parts have no local studio entry; a matching signature still
+    # proves their pinned source/frames unchanged after a completed rebuild.
+    known.update(key for key, part in parts.items() if public_source(part) and signatures.get(key) == part_signature(part))
+    wanted = (set(pending) & set(parts)) | (set(parts) - known - reused)
     if signatures:
-        from .aliases import part_signature
         wanted.update(key for key, part in parts.items() if signatures.get(key) != part_signature(part))
     if not pending and not signatures:
         # Legacy builds have recorded plan solids, not full feature signatures.
@@ -236,7 +260,6 @@ def _work(project: Project, parts: dict[str, LocalPart], state: dict[str, Any]) 
             recorded = json.load(handle)["parts"]
         wanted.update(key for key, part in parts.items() if key not in reused and
                       (key not in recorded or not same_solid(part.plan, recorded[key])[0]))
-    from .purchased import public_source
     work = []
     grouped: dict[tuple[str, str, str | None], list[str]] = {}
     for key in sorted(wanted - reused):
@@ -268,8 +291,6 @@ def _work(project: Project, parts: dict[str, LocalPart], state: dict[str, Any]) 
         members = list(keys)
         if ref:
             members = sorted(set(keys) | {key for key in set(ref["part_ids"]) & set(parts) if not parts[key].bank_model})
-            if any(parts[key].mirror_of for key in members):
-                raise ValueError(f"{name}: mirrored family topology needs --full")
         work.append({"document": doc, "name": name, "parts": members, "pending": keys,
                      "existing": copy.deepcopy(ref), "action": "update" if ref else "create"})
     return work, sorted(reused)
@@ -313,8 +334,8 @@ def _replacement_iids(work: list[dict[str, Any]], plan: AssemblyPlan, state: dic
                 eid, pid, _ = doc.part_ref(key)
                 if (eid, pid) != (ref["element_id"], old_pid):
                     keys.add(key)
-    old_iids = {iid for ids in state["instance_ids"].values() for iid in ids}
-    return {iid for iid, p in plan.placements.items() if p.key in keys or iid not in old_iids}
+    old_levels = {iid: level for level, ids in state["instance_ids"].items() for iid in ids}
+    return {iid for iid, p in plan.placements.items() if p.key in keys or old_levels.get(iid) != p.level}
 
 
 def incremental_plan(project: Project) -> dict[str, Any]:
@@ -345,11 +366,17 @@ def incremental_plan(project: Project) -> dict[str, Any]:
         calls += estimate
         candidates += count
         studios.append({**{k: v for k, v in item.items() if k != "existing"}, **detail,
-                        "element_id": (item["existing"] or {}).get("element_id"),
+                        "element_id": (item["existing"] or {}).get("element_id") if item["action"] == "update" else None,
+                        "retired_element_id": (item["existing"] or {}).get("element_id") if item["action"] in ("import", "public") else None,
                         "estimated_feature_calls": estimate})
     checkpoint = project.lock.get("cad_incremental_pending") or {}
     return {"mode": "incremental", "dry_run": True, "part_studios": studios,
             "reused_parts": reused, "instances_to_insert_or_replace": sorted(replaced),
+            "assemblies_to_create": sorted(set(plan.levels) - set(state["robot"]["assemblies"])),
+            "assemblies_to_retire": sorted(set(state["robot"]["assemblies"]) - set(plan.levels)),
+            "instances_to_move": {iid: {"from": level, "to": plan.placements[iid].level}
+                                  for level, ids in state["instance_ids"].items() for iid in ids
+                                  if iid in plan.placements and plan.placements[iid].level != level},
             "assembly_features": [asdict(m) for m in mates], "mates_to_delete": deletes,
             "summary": {"parts": sum(len(i["pending"]) for i in work), "part_studios": len(studios),
                         "part_studio_feature_writes": candidates, "feature_candidates": candidates, "assembly_feature_writes": len(mates),
@@ -359,6 +386,7 @@ def incremental_plan(project: Project) -> dict[str, Any]:
             "notes": ["Conservative estimate before feature diff; unchanged features are skipped and solid parameter edits batch.",
                       "Sketch geometry uses individual standard feature updates; it cannot use the parameter-only batch endpoint.",
                       "Existing folder membership and connector IDs survive edits; new folder membership needs the native organizer.",
+                      "Imports use native translation in the pinned document; replaced sources are labelled Retired and removed from active lookup/assemblies.",
                       "Estimate covers headless REST only; native folder-organization tree reads require a separate organize --dry-run.",
                       "No transport discovery or live /features calls occur in this dry-run."]}
 
@@ -449,6 +477,32 @@ def _edit_assembly(api: Transport, builder: AssemblyBuilder, state: dict[str, An
                                                                     "editDescription": "R3 incremental replacement"})
         for iid in drop:
             del ids[iid]
+    # Move occurrences by deleting/inserting only those instances. Assembly
+    # tabs and top-level occurrences use the same native calls as a full build.
+    for level in list(builder.robot.assemblies):
+        if level in builder.plan.levels:
+            continue
+        instance_id = builder.sub_instances.pop(level)
+        api.json("POST", builder.base(TOP_LEVEL) + "/modify", body={"deleteInstances": [instance_id],
+                 "editDescription": "R3 incremental subassembly retirement"})
+        eid = builder.robot.assemblies.pop(level)
+        api.json("POST", f"/elements/d/{builder.robot.did}/w/{builder.robot.wid}/e/{eid}",
+                 body={"name": f"Retired {level} ({eid})"})
+        builder.instance_ids.pop(level, None)
+        builder.mate_ids.pop(level, None)
+    for level in builder.plan.levels:
+        if level in builder.robot.assemblies:
+            continue
+        eid = api.json("POST", f"/assemblies/d/{builder.robot.did}/w/{builder.robot.wid}", body={"name": level})["id"]
+        builder.robot.assemblies[level] = eid
+        api.json("POST", builder.base(TOP_LEVEL) + "/instances",
+                 body={"documentId": builder.robot.did, "elementId": eid, "isAssembly": True})
+        definition = api.json("GET", builder.base(TOP_LEVEL))
+        inserted = [i["id"] for i in definition["rootAssembly"]["instances"] if i.get("elementId") == eid]
+        if len(inserted) != 1:
+            raise ValueError(f"{level}: insertion did not resolve exactly one subassembly instance")
+        builder.sub_instances[level] = inserted[0]
+        builder.instance_ids[level], builder.mate_ids[level] = {}, []
     for level in builder.plan.levels:
         members = sorted(iid for iid in replaced if builder.plan.placements[iid].level == level)
         # _insert_parts resolves an entire source pool; preserve existing IDs and
@@ -494,11 +548,6 @@ def sync_incremental(project: Project, api: Transport, result: StageResult) -> d
     else:
         state = _state(project)
         work, _ = _work(project, parts, state)
-        if set(plan.levels) != set(state["robot"]["assemblies"]):
-            raise ValueError("subassembly topology changed; use --full")
-        if any(iid in state["instance_ids"].get(level, {}) and plan.placements[iid].level != level
-               for level, ids in state["instance_ids"].items() for iid in ids if iid in plan.placements):
-            raise ValueError("instance moved between subassemblies; use --full")
         cp = {"digest": digest, "attempt": uuid.uuid4().hex[:12], "base": state, "work": work, "done": [], "writes": {},
               "robot": {**state["robot"], "digest": "", "vid": ""},
               "library": asdict(locked_library_document(project)), "assembly_complete": False}
@@ -559,6 +608,7 @@ def sync_incremental(project: Project, api: Transport, result: StageResult) -> d
             _edit_assembly(journal, builder, cp["base"], replaced)
             _save_state(output, robot, builder)
             cp["assembly_complete"] = True
+            cp["robot"] = asdict(robot)
             save_json(path, cp)
         result.metrics["onshape_document"] = robot.url()
         report["feature_writes"] = cp["writes"]

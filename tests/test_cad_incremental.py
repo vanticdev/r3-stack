@@ -514,7 +514,6 @@ def test_import_resume_does_not_repeat_acknowledged_writes(tmp_path, monkeypatch
         # Nothing, including cleanup, follows the failing request.
         last = api.calls[-1]
         assert (last[1].endswith(api.fail_path) if api.fail_path else "/e/IMPORT101/features" in last[1])
-    first = len(api.calls)
     api.fail_eid, api.fail_path = None, None
     if phase == "checkpoint": monkeypatch.setattr(inc, "save_json", save)
     result = StageResult(stage="cad")
@@ -531,3 +530,213 @@ def test_import_resume_does_not_repeat_acknowledged_writes(tmp_path, monkeypatch
     assert api.calls[after_resume:] == []
     inc.finish_incremental(project, report)
     assert project.lock["cad_incremental_pending"] == {}
+
+
+class FamilyFake(Fake):
+    def __init__(self, eid, features, body_ids):
+        super().__init__({eid: features})
+        self.body_ids = body_ids
+
+    def request(self, method, path, query=None, body=None, accept="application/json", timeout=120.0):
+        if method == "GET" and path.startswith("/parts/"):
+            self.calls.append((method, path, copy.deepcopy(body)))
+            eid = path.split("/e/")[-1].split("/")[0]
+            return json.dumps([{"partId": self.body_ids.get(f["featureId"], "BODY-" + f["featureId"]), "name": "block"}
+                               for f in self.features[eid] if f.get("featureType") in ("extrude", "mirror")]).encode()
+        return super().request(method, path, query, body, accept, timeout)
+
+
+def family_recorded(members):
+    planner = FeaturePlanner("Family")
+    populate_studio(planner, members)
+    mapping = {d["id"]: f"F{i}" for i, d in enumerate(planner.definitions)}
+    mapping.update({pid: f"P{i}" for i, pid in enumerate(planner.out.part_ids.values())})
+    features = [{**replace_ids(d["feature"], mapping), "featureId": mapping[d["id"]]} for d in planner.definitions]
+    ref = StudioRef("Family", "FAMILY", replace_ids(planner.out.part_ids, mapping),
+                    replace_ids(planner.out.connectors, mapping), replace_ids(planner.out.folders, mapping))
+    body_features = [f for f in features if f["featureType"] in ("extrude", "mirror")]
+    api = FamilyFake("FAMILY", features, {f["featureId"]: f"P{i}" for i, f in enumerate(body_features)})
+    return ref, api
+
+
+@pytest.mark.parametrize("old_mirrored,new_mirrored", [(True, True), (False, True), (True, False)])
+def test_mirrored_family_edits_retain_or_resolve_bodies(old_mirrored, new_mirrored):
+    left, right = part("left"), part("right")
+    left.studio = right.studio = "Family"
+    right.mirror_of = left.key if old_mirrored else None
+    ref, api = family_recorded([left, right])
+    original_connectors = copy.deepcopy(ref.connectors)
+    right.mirror_of = left.key if new_mirrored else None
+    left.plan.ops[0].depth = .02
+    builder = inc.IncrementalStudioBuilder(api, DocumentInfo("D", "W", "Robot"), ref, [left, right])
+    populate_studio(builder, [left, right])
+    out = builder.finish()
+    assert out.part_ids["left"] == "P0"
+    assert out.connectors["left"] == original_connectors["left"]
+    assert len(api.json("GET", "/parts/d/D/w/W/e/FAMILY")) == 2
+    if old_mirrored == new_mirrored:
+        assert out.part_ids == ref.part_ids and out.connectors == ref.connectors
+        assert len(edits(api)) == 1
+    else:
+        assert out.part_ids["right"].startswith("BODY-")
+    assert sum(f["featureType"] == "mirror" for f in api.features["FAMILY"]) == int(new_mirrored)
+
+
+def test_import_from_shared_family_does_not_edit_sibling(tmp_path, monkeypatch, vendor_step):
+    project, native, parts, plan = setup_project(tmp_path, monkeypatch)
+    a, sibling = part("a"), part("sibling")
+    a.studio = sibling.studio = "Family"
+    ref, family_api = family_recorded([a, sibling])
+    parts["a"] = bank_part("a")
+    parts["sibling"] = sibling
+    state = inc._state(project)
+    del state["robot"]["studios"]["a"]
+    state["robot"]["studios"]["Family"] = asdict(ref)
+    inc.save_json(project.build_dir("cad") / "build_state.json", state)
+    project.model["source"]["recomposed"]["pending_rebuild"] = {"a": {}}
+    plan.placements["sibling"] = Placement("sibling", "sibling", TOP_LEVEL, np.eye(4), "Structure")
+    state["instance_ids"][TOP_LEVEL]["sibling"] = "IS"
+    inc.save_json(project.build_dir("cad") / "build_state.json", state)
+    native.features["FAMILY"] = family_api.features["FAMILY"]
+    native.instances[TOP_LEVEL] = [i for i in native.instances[TOP_LEVEL] if i["id"] != "IA"] + [
+        {"id": "IA", "elementId": "FAMILY", "partId": "P0"},
+        {"id": "IS", "elementId": "FAMILY", "partId": "P1"}]
+    api = ImportFake(native)
+    report = inc.sync_incremental(project, api, StageResult(stage="cad"))
+    assert report["robot"].studios["Family"].part_ids == {"sibling": "P1"}
+    assert report["robot"].studios["Family"].connectors == {"sibling": ref.connectors["sibling"]}
+    assert not any("/e/FAMILY/features" in p or "/e/FAMILY/p/P1" in p for _, p, _ in api.calls)
+    assert api.features["FAMILY"] == native.features["FAMILY"]
+    assert {i["id"] for i in api.instances[TOP_LEVEL] if i["elementId"] != report["robot"].part_ref("a")[0]} == {"IB", "IU", "IS"}
+
+
+def test_public_replacement_uses_version_and_keeps_unchanged_source_on_next_run(tmp_path, monkeypatch):
+    project, api, parts, plan = setup_project(tmp_path, monkeypatch, library=True)
+    p = bank_part("a", library=True)
+    p.bank_model["sources"] = [{"kind": "onshape_public", "url": "https://cad.onshape.com/documents/public/v/PUBV/e/PUBE",
+                                 "did": "public", "vid": "PUBV", "eid": "PUBE", "part_id": "PUBP"}]
+    p.bank_model["onshape_connectors"] = {"mc_mount": "PUBMC"}
+    p.bank_model["validation"]["key_features"]["datasheet_mass"] = True
+    parts["a"] = p
+    request = api.request
+    def public_request(method, path, *args, **kwargs):
+        if method == "GET" and path == "/documents/public":
+            api.calls.append((method, path, None))
+            return b'{"isPublic":true}'
+        return request(method, path, *args, **kwargs)
+    monkeypatch.setattr(api, "request", public_request)
+    report = inc.sync_incremental(project, api, StageResult(stage="cad"))
+    inserted = [b for m, path, b in api.calls if m == "POST" and path.endswith("/instances")]
+    assert inserted == [{"documentId": "public", "elementId": "PUBE", "partId": "PUBP",
+                         "isAssembly": False, "isWholePartStudio": False, "versionId": "PUBV"}]
+    assert not any(p == "/documents" or p.startswith("/translations/") for _, p, _ in api.calls)
+    assert report["library_doc"].studios["Retired a (EA)"].part_ids == {}
+    inc.finish_incremental(project, report)
+    project.model["source"]["recomposed"]["pending_rebuild"] = {}
+    assert inc._work(project, parts, inc._state(project))[0] == []
+
+
+class AssemblyFake(Fake):
+    def __init__(self, api):
+        super().__init__(api.features)
+        self.assembly_instances = {"A": api.instances[TOP_LEVEL]}
+        self.created_assemblies = []
+
+    def request(self, method, path, query=None, body=None, accept="application/json", timeout=120.0):
+        eid = path.split("/e/")[-1].split("/")[0] if "/e/" in path else ""
+        create = method == "POST" and path.startswith("/assemblies/") and "/e/" not in path
+        definition = method == "GET" and path.startswith("/assemblies/") and path.endswith("/e/" + eid)
+        instances = path.startswith("/assemblies/") and method == "POST" and path.endswith(("/instances", "/modify"))
+        if not (create or definition or instances):
+            return super().request(method, path, query, body, accept, timeout)
+        self.calls.append((method, path, copy.deepcopy(body)))
+        if self.fail_path and path.endswith(self.fail_path):
+            raise OnshapeError(429, "quota", {"Retry-After": "60"})
+        result = {}
+        if create:
+            self.serial += 1
+            eid = f"ASSEMBLY{self.serial}"
+            self.created_assemblies.append(eid)
+            self.assembly_instances[eid] = []
+            self.features[eid] = []
+            result = {"id": eid}
+        elif definition:
+            result = {"rootAssembly": {"instances": copy.deepcopy(self.assembly_instances[eid])}}
+        elif path.endswith("/modify"):
+            self.assembly_instances[eid] = [i for i in self.assembly_instances[eid] if i["id"] not in body["deleteInstances"]]
+        else:
+            self.serial += 1
+            self.assembly_instances[eid].append({**body, "id": f"I{self.serial}"})
+        return json.dumps(result).encode()
+
+
+@pytest.mark.parametrize("phase", [None, "create", "subassembly", "part", "mate", "checkpoint"])
+def test_subassembly_add_retire_and_instance_moves_resume(tmp_path, monkeypatch, phase):
+    project, native, parts, plan = setup_project(tmp_path, monkeypatch)
+    state = inc._state(project)
+    state["robot"]["assemblies"]["Old module"] = "OLD"
+    state["instance_ids"] = {TOP_LEVEL: {"untouched": "IU"}, "Old module": {"a": "IA", "b": "IB"}}
+    state["sub_instances"] = {"Old module": "ISOLD"}
+    mate = MatePlan("mount", "FASTENED", ("a", "mc_mount"), ("b", "mc_mount"), 0, 0,
+                    "Old module", "Mounting mates", "mount")
+    state["mate_ids"] = {TOP_LEVEL: [], "Old module": [["MA", asdict(mate)]]}
+    inc.save_json(project.build_dir("cad") / "build_state.json", state)
+    project.model["source"]["recomposed"]["pending_rebuild"] = {"a": {}}
+    plan.levels = ["New module", TOP_LEVEL]
+    plan.placements["a"].level = "New module"
+    plan.mates = [inc.MatePlan(**{**asdict(mate), "level": TOP_LEVEL})]
+    api = AssemblyFake(native)
+    api.assembly_instances = {"A": [{"id": "IU", "elementId": "EU", "partId": "P"},
+                                     {"id": "ISOLD", "elementId": "OLD", "isAssembly": True}],
+                              "OLD": [{"id": "IA", "elementId": "EA", "partId": "P"},
+                                      {"id": "IB", "elementId": "EB", "partId": "P"}]}
+    api.features["OLD"] = [{"featureId": "MA"}]
+    api.fail_path = {"create": "/assemblies/d/D/w/W", "subassembly": "/e/A/instances",
+                     "part": "/e/ASSEMBLY101/instances", "mate": "/e/A/features"}.get(phase)
+    if phase == "checkpoint":
+        save = inc.save_json
+        def crash(path, value):
+            if path.name == "incremental_state.json" and value.get("assembly_complete"):
+                raise RuntimeError("crash before assembly checkpoint")
+            save(path, value)
+        monkeypatch.setattr(inc, "save_json", crash)
+    dry = inc.incremental_plan(project)
+    assert dry["assemblies_to_create"] == ["New module"]
+    assert dry["assemblies_to_retire"] == ["Old module"]
+    assert dry["instances_to_move"] == {"a": {"from": "Old module", "to": "New module"},
+                                        "b": {"from": "Old module", "to": TOP_LEVEL}}
+    assert api.calls == []
+    result = StageResult(stage="cad")
+    report = inc.sync_incremental(project, api, result)
+    if phase:
+        assert not result.ok
+        if phase != "checkpoint":
+            assert result.diagnostics[-1].code == "onshape_quota_blocked"
+            assert api.calls[-1][1].endswith(api.fail_path)
+        else:
+            monkeypatch.setattr(inc, "save_json", save)
+        api.fail_path = None
+        result = StageResult(stage="cad")
+        report = inc.sync_incremental(project, api, result)
+    assert result.ok
+    assert api.created_assemblies == ["ASSEMBLY101"]
+    assert report["robot"].assemblies == {TOP_LEVEL: "A", "New module": "ASSEMBLY101"}
+    assert api.assembly_instances["OLD"] == []
+    top = api.assembly_instances["A"]
+    assert {i["id"] for i in top} == {"IU", "I102", "I104"}
+    assert next(i for i in top if i["id"] == "I102")["elementId"] == "ASSEMBLY101"
+    assert len(api.assembly_instances["ASSEMBLY101"]) == 1
+    assert api.assembly_instances["ASSEMBLY101"][0]["elementId"] == "EA"
+    assert len(api.features["A"]) == 1 and api.features["OLD"] == []
+    assert not any("/e/EU/" in p or "/e/EB/" in p for _, p, _ in api.calls)
+    assert sum(m == "POST" and p == "/elements/d/D/w/W/e/OLD" for m, p, _ in api.calls) == 1
+    # The recreated mate uses the new nested occurrence, with its sibling at top level.
+    queries = api.features["A"][0]["parameters"][1]["queries"]
+    assert [q["path"] for q in queries] == [["I102", "I103"], ["I104"]]
+    after = len(api.calls)
+    inc.sync_incremental(project, api, StageResult(stage="cad"))
+    assert len(api.calls) == after
+    inc.finish_incremental(project, report)
+    saved = inc._state(project)
+    assert saved["sub_instances"] == {"New module": "I102"}
+    assert saved["instance_ids"][TOP_LEVEL] == {"untouched": "IU", "b": "I104"}
