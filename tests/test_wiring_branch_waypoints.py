@@ -10,6 +10,7 @@ from r3_wiring.geometry import project_to_polyline
 from r3_wiring.obstacles import build_obstacles
 from r3_wiring.router import HarnessRouter, RouterOptions
 from test_wiring_support import write_project
+from native_wiring_fixture import publish_wiring_pull
 
 
 def test_each_branch_uses_its_own_corridor_in_wire_direction(tmp_path):
@@ -25,6 +26,7 @@ def test_each_branch_uses_its_own_corridor_in_wire_direction(tmp_path):
     harness['route']['wire_via'] = {'north': [[.1, .06, .03]],
                                    'south': [[.15, -.06, .03], [.1, -.06, .03]]}
     file.write_text(yaml.safe_dump(spec, sort_keys=False))
+    publish_wiring_pull(root)
     project = Project.load(root)
     obstacles, _ = build_obstacles(project)
     routing = HarnessRouter(project, obstacles, RouterOptions(plan=False)).route()
@@ -59,6 +61,7 @@ def test_waypoint_behind_a_connector_does_not_retrace_the_arrival_path(tmp_path)
     # and duplicate graph edges instead of a loop around the body.
     spec['electrical']['harnesses'][0]['route']['via'] = [[.24, 0., .013]]
     file.write_text(yaml.safe_dump(spec, sort_keys=False))
+    publish_wiring_pull(root)
     project = Project.load(root)
     obstacles, _ = build_obstacles(project)
     router = HarnessRouter(project, obstacles, RouterOptions(plan=False))

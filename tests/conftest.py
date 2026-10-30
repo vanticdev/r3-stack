@@ -1,7 +1,7 @@
 """Shared, session-scoped fixtures: expensive stages run once into temporary projects.
 
 * ``bench_wiring``: the full wiring stage on a fresh copy of the reference bench's
-  ``robot.yaml`` (catalog geometry; nothing read from ``tests/fixtures/bench/build``).
+  ``robot.yaml`` (explicit synthetic pulled CAD; nothing read from ``tests/fixtures/bench/build``).
   Every test that uses it is marked ``slow`` automatically.
 * ``bench_fresh``: a copy of the bench's sources without ``build/`` (module scope), so
   simulation tests never pick up stale CAD exports or ``routes.json`` from earlier runs.
@@ -112,6 +112,8 @@ def bench_wiring(tmp_path_factory: pytest.TempPathFactory) -> WiringRun:
 
     root = tmp_path_factory.mktemp("bench-wiring")
     shutil.copytree(EXAMPLES / "wiring", root, dirs_exist_ok=True, ignore=_SOURCE_ONLY)
+    from native_wiring_fixture import publish_wiring_pull
+    publish_wiring_pull(root)
     project = Project.load(root)
     result, bundle = run_stage(project)
     print("\n" + format_diagnostics(result))

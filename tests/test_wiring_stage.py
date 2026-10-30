@@ -50,7 +50,7 @@ def test_artifacts_written(stage):
 def test_bench_findings_are_structured(stage):
     root, result = stage
     codes = {d.code for d in result.diagnostics}
-    assert "cad_geometry_estimated" in codes and "harness_mass" in codes
+    assert "cad_geometry_estimated" not in codes and "harness_mass" in codes
     for d in result.diagnostics:
         assert d.stage == "wiring" and d.data, d.code
     required = Project.load(root).spec.requirements.min_wire_clearance_moving

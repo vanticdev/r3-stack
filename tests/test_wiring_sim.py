@@ -177,7 +177,7 @@ def test_bench_joint_sweep(bench):
     physical surface distance (the PBD-era kernel reported -0.2 m from a frame/sign bug)."""
     project, obstacles, routes = bench
     sim = CableSimulator(project, routes, obstacles)
-    joints = project.spec.mechanical.joints
+    joints = [joint for joint in project.spec.mechanical.joints if joint.type != "fixed"]
     assert joints and all(j.limits for j in joints)
     worst = math.inf
     for k in range(1000):

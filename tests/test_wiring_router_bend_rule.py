@@ -5,6 +5,7 @@ from r3_model.project import Project
 from r3_wiring.obstacles import build_obstacles
 from r3_wiring.router import HarnessRouter, RouterOptions
 from test_wiring_support import write_project
+from native_wiring_fixture import publish_wiring_pull
 
 
 @pytest.mark.parametrize('jacket, radius, lead', [('none', .018, .04612), ('heat-shrink', .032, .06362)])
@@ -18,6 +19,7 @@ def test_loose_and_jacketed_pairs_use_the_same_rule_in_both_routing_phases(tmp_p
         wire['awg'] = 12
     harness['jacket'] = jacket
     file.write_text(yaml.safe_dump(spec, sort_keys=False))
+    publish_wiring_pull(root)
     project = Project.load(root)
     obstacles, _ = build_obstacles(project)
     routing = HarnessRouter(project, obstacles, RouterOptions(plan=False)).route()

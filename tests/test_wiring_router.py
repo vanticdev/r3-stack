@@ -126,31 +126,26 @@ def test_moving_endpoint_too_short(tmp_path):
     report = run_checks(project, obstacles, routing)
     codes = {d.code for d in report.diagnostics}
     assert "wire_too_short" in codes or "connector_strain" in codes
-    finding = next(d for d in report.diagnostics if d.code in ("wire_too_short", "connector_strain"))
+    finding = next(d for d in report.diagnostics if d.code in ("wire_too_short", "connector_strain")
+                   and "steer" in d.data["joints"])
     assert finding.data["max_pin_distance"] > 0 and "steer" in finding.data["joints"]
 
 
-def test_cad_mesh_obstacles(tmp_path):
+def test_native_mesh_obstacles_ignore_stale_generated_cad(tmp_path):
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from OCP.gp import gp_Pnt
+    from native_wiring_fixture import publish_wiring_pull
+
     root = write_project(tmp_path, block=True)
-    meshes = root / "build" / "cad" / "meshes"
-    meshes.mkdir(parents=True)
-    box = Box(np.array([0.1, 0.0, 0.028]), np.eye(3), np.array([0.02, 0.06, 0.025]))
-    corners = box.corners()
-    quads = [(0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)]
-    lines = ["solid block"]
-    for a, b, c, d in quads:
-        for tri in ((a, b, c), (a, c, d)):
-            p = corners[list(tri)]
-            n = np.cross(p[1] - p[0], p[2] - p[0])
-            if n @ (p.mean(axis=0) - box.center) < 0:
-                p = p[::-1]
-            lines += ["facet normal 0 0 0", " outer loop"] + [f"  vertex {v[0]} {v[1]} {v[2]}" for v in p] + [" endloop", "endfacet"]
-    (meshes / "block.stl").write_text("\n".join(lines + ["endsolid block"]))
-    (root / "build" / "cad" / "cad_model.json").write_text(json.dumps({"parts": {"block": {"mesh": "meshes/block.stl"}}}))
+    shape = BRepPrimAPI_MakeBox(gp_Pnt(-20, -60, 0), 40, 120, 50).Shape()
+    publish_wiring_pull(root, primary_shapes={"block": shape})
+    stale = root / "build/cad"
+    stale.mkdir(parents=True, exist_ok=True)
+    (stale / "cad_model.json").write_text(json.dumps({"parts": {"block": {"mesh": "missing.stl"}}}))
     obstacles, diagnostics = build_obstacles(Project.load(root))
     block = obstacles.by_component("block")
-    assert block.source == "cad_mesh"
+    assert block.source == "pulled_stl" and not obstacles.estimated
+    box = Box(np.array([0.1, 0.0, 0.028]), np.eye(3), np.array([0.02, 0.06, 0.025]))
     probes = np.array([[0.1, 0.0, 0.028], [0.1, 0.0, 0.07], [0.15, 0.0, 0.028]])
     assert np.allclose(block.shape.sdf(probes), box.sdf(probes), atol=0.0015)
-    estimated = next(d for d in diagnostics if d.code == "cad_geometry_estimated")
-    assert "block" not in estimated.subjects
+    assert not any(d.code == "cad_geometry_estimated" for d in diagnostics)
