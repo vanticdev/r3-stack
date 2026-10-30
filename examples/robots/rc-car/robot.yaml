@@ -33,7 +33,7 @@ components:
     params:
       # Plate outline in the chassis frame: 130 mm wide rear, tapering to 80 mm ahead of
       # the battery so the steered front wheels sweep clear of the plate.
-      outline: [[-170 mm, -65 mm], [-86 mm, -65 mm], [-86 mm, -70 mm], [-70 mm, -70 mm], [-70 mm, -65 mm], [40 mm, -65 mm], [70 mm, -40 mm], [170 mm, -40 mm], [170 mm, 40 mm], [70 mm, 40 mm], [40 mm, 65 mm], [-170 mm, 65 mm]]
+      outline: [[-170 mm, -65 mm], [-86 mm, -65 mm], [-86 mm, -70 mm], [-70 mm, -70 mm], [-70 mm, -65 mm], [40 mm, -65 mm], [70 mm, -40 mm], [330 mm, -40 mm], [330 mm, 40 mm], [150 mm, 40 mm], [150 mm, 65 mm], [94 mm, 65 mm], [94 mm, 40 mm], [70 mm, 40 mm], [40 mm, 65 mm], [-170 mm, 65 mm]]
   deck:
     type: upper-deck-petg
     params:
@@ -66,19 +66,17 @@ components:
   bs_kl:       {type: ball-stud-m3-5.8x8}
   bs_kr:       {type: ball-stud-m3-5.8x8}
   # Steering linkage: servo on two posts, splined output, horn with two ball studs, tie rods.
-  servo_post_a: {type: servo-post-al6061}
-  servo_post_b: {type: servo-post-al6061-cable}   # lead pocket: the servo lead exits into this post
+  servo_post_a: {type: servo-post-al6061-cable}
+  servo_post_b: {type: servo-post-al6061}
   servo:       {type: servo-digital-20kg}
+  servo_clamp_a: {type: servo-ear-clamp-pa12}
+  servo_clamp_b: {type: servo-ear-clamp-pa12}
   servo_output: {type: servo-output-25t}
   servo_horn:  {type: servo-horn-al7075}
   bs_hl:       {type: ball-stud-m3-5.8x6}
   bs_hr:       {type: ball-stud-m3-5.8x6}
   tie_rod:     {type: steering-tie-rod}
   tie_rod_r:   {type: steering-tie-rod, params: {mirror: [1, -1, 1]}}
-  cap_ear_a1:  {type: screw-cap-m3-petg}
-  cap_ear_a2:  {type: screw-cap-m3-petg}
-  cap_ear_b1:  {type: screw-cap-m3-petg}
-  cap_ear_b2:  {type: screw-cap-m3-petg}
   # Rear drivetrain: transmission outputs drive D-flat axles running in MR106 bearings in the hub carriers.
   gearbox:     {type: gearbox-spur-diff}
   motor:       {type: motor-540-brushed}
@@ -154,6 +152,10 @@ components:
   rtk_radio:   {type: telemetry-sik-915-100mw}
   motor_lead_post: {type: motor-lead-post-petg}
   power_lead_post: {type: power-lead-post-petg}
+  power_front_post: {type: power-lead-post-petg}
+  power_mid_post: {type: power-lead-post-petg}
+  cap_power_front_post: {type: screw-cap-m3-petg}
+  cap_power_mid_post: {type: screw-cap-m3-petg}
   cap_motor_lead_post: {type: screw-cap-m3-petg}
   cap_power_lead_post: {type: screw-cap-m3-petg}
   gnss_riser: {type: gnss-riser-petg}
@@ -265,24 +267,21 @@ assembly:
     # ---- steering linkage
     - {id: post_a_mount, a: chassis.post_a, b: servo_post_a.base, clock: 0 deg, fasteners: {type: M3x8}}
     - {id: post_b_mount, a: chassis.post_b, b: servo_post_b.base, clock: 180 deg, fasteners: {type: M3x8}}
-    - {id: servo_ears_a, a: servo_post_a.top, b: servo.ears_a, clock: 90 deg, fasteners: {type: M3x8}}
-    - {id: servo_ears_b, a: servo_post_b.top, b: servo.ears_b, clock: -90 deg, fasteners: {type: M3x8}}
+    - {id: servo_ears_a, a: servo_post_a.ear_seat, b: servo.ear_seat_a, clock: 90 deg}
+    - {id: servo_ears_b, a: servo_post_b.ear_seat, b: servo.ear_seat_b, clock: -90 deg}
+    - {id: servo_clamp_a, a: servo_post_a.top, b: servo_clamp_a.bottom, clock: 0 deg, offset: 3.1494159081042383 mm, fasteners: {type: M3x16, clamps: [servo]}}
+    - {id: servo_clamp_b, a: servo_post_b.top, b: servo_clamp_b.bottom, clock: 0 deg, offset: 3.1494159081042383 mm, fasteners: {type: M3x16, clamps: [servo]}}
     - {id: servo_output, a: servo.output, b: servo_output.journal, kind: revolute, joint: steer_servo, limits: [-0.5236, 0.5236],
        verify: {clearance: [0.0, 0.1 mm], min_engagement: 3.5 mm}}
-    - {id: horn_spline, a: servo_output.spline, b: servo_horn.spline, offset: 1 mm, clock: -90 deg,
+    - {id: horn_spline, a: servo_output.spline, b: servo_horn.spline, offset: -0.4 mm, clock: -90 deg,
        verify: {clearance: [-0.005 mm, 0.02 mm], min_engagement: 3.5 mm}}
-    - {id: horn_screw, a: servo_output.top, b: servo_horn.screw, fasteners: {type: M3x10}}
+    - {id: horn_screw, a: servo_output.top, b: servo_horn.screw, fasteners: {type: M3x12}}
     - {id: bs_hl, a: servo_horn.ball_l, b: bs_hl.thread}
     - {id: bs_hr, a: servo_horn.ball_r, b: bs_hr.thread}
     - {id: bj_hl, a: bs_hl.ball, b: tie_rod.inner, kind: ball, verify: {clearance: [0.0, 0.05 mm]}}
     - {id: bj_kl, a: bs_kl.ball, b: tie_rod.outer, kind: ball, verify: {clearance: [0.0, 0.05 mm]}}
     - {id: bj_hr, a: bs_hr.ball, b: tie_rod_r.inner, kind: ball, verify: {clearance: [0.0, 0.05 mm]}}
     - {id: bj_kr, a: bs_kr.ball, b: tie_rod_r.outer, kind: ball, verify: {clearance: [0.0, 0.05 mm]}}
-    # Ear caps overhang the 7 mm ear end by 1.6 mm: 73 % of the rim (12.6 mm^2) is bonded, ample for a dust cap.
-    - {id: cap_ear_a1, a: servo.cap_a1, b: cap_ear_a1.seat, verify: {min_fraction: 0.7}}
-    - {id: cap_ear_a2, a: servo.cap_a2, b: cap_ear_a2.seat, verify: {min_fraction: 0.7}}
-    - {id: cap_ear_b1, a: servo.cap_b1, b: cap_ear_b1.seat, verify: {min_fraction: 0.7}}
-    - {id: cap_ear_b2, a: servo.cap_b2, b: cap_ear_b2.seat, verify: {min_fraction: 0.7}}
     # ---- deck and electronics stack
     - {id: so_rl_bottom, a: chassis.so_rl, b: standoff_rl.bottom, fasteners: {type: M3x8}}
     - {id: so_rr_bottom, a: chassis.so_rr, b: standoff_rr.bottom, fasteners: {type: M3x8}}
@@ -353,6 +352,10 @@ assembly:
     - {id: lead_post_mount, a: deck.lead_post, b: lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
     - {id: motor_lead_post_mount, a: chassis.motor_lead_post, b: motor_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
     - {id: cap_motor_lead_post, a: chassis.cap_motor_lead_post, b: cap_motor_lead_post.seat}
+    - {id: power_front_post_mount, a: chassis.power_front_post, b: power_front_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: cap_power_front_post, a: chassis.cap_power_front_post, b: cap_power_front_post.seat}
+    - {id: power_mid_post_mount, a: chassis.power_mid_post, b: power_mid_post.base, clock: 0 deg, fasteners: {type: M3x10}}
+    - {id: cap_power_mid_post, a: chassis.cap_power_mid_post, b: cap_power_mid_post.seat}
     - {id: power_lead_post_mount, a: chassis.power_lead_post, b: power_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
     - {id: cap_power_lead_post, a: chassis.cap_power_lead_post, b: cap_power_lead_post.seat}
     - {id: encoder_lead_post_mount, a: chassis.encoder_lead_post, b: encoder_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
@@ -465,27 +468,27 @@ electrical:
       description: Battery 12 AWG pigtail reterminated with XT90H female (45 A continuous / 90 A burst).
       connectors:
         A: {type: integral, mates: battery.J1}
-        B: {type: xt90h-female, position: [228 mm, 27 mm, 60 mm]}
+        B: {type: xt90h-female, position: [290 mm, 25 mm, 40 mm], direction: [-1, 0, 0]}
       wires:
         - {id: W_BAT_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
         - {id: W_BAT_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
-      route: {slack: 20 mm}
+      route: {slack: 20 mm, independent_branches: true}
     - id: power_y
       # Gauges from the installed (bundle- and enclosure-derated) ampacity of the wiring stage: the HAT branch is 14 AWG
       # (13.44 A installed in the current layout); a 7.5 A fuse also supplies the owned camera; the
       # fuse holder's input pigtail is 12 AWG like the trunk, so no thinner conductor sits upstream of the fuse.
-      description: XT90H battery input splitting to the XT60 ESC branch (12 AWG) and, through a 7.5 A fuse, the XT30 HAT branch (14 AWG).
+      description: XT90H battery input soldered directly to the ESC leads (12 AWG) and, through a 7.5 A fuse, the XT30 HAT branch (14 AWG).
       connectors:
         P1: {type: xt90h-male, mates: battery_lead.B}
-        P2: {type: xt60-female}
+        P2: {type: integral, mates: esc.J_PWR}
         P3: {type: xt30-female, mates: hat.J_BATT}
         F1: {type: integral, mates: fuse.J1}
         F2: {type: integral, mates: fuse.J2}
       splices:
-        # SP is 28 mm beyond the fuse input: its 18 AWG strain-relief run ends before the splice.
-        # The 12 AWG branches split in the open corner ahead of the battery.
-        SP: {position: [199 mm, -37 mm, 40 mm]}
-        SN: {position: [199 mm, -30 mm, 54 mm]}
+        # The inputs run straight from the XT90 pins to two separated solder splices.
+        # The longer front bay leaves room for 16 mm-radius return bends to ESC and fuse.
+        SP: {position: [350 mm, 18.5 mm, 43 mm], direction: [1, 0, 0]}
+        SN: {position: [350 mm, 29.5 mm, 43 mm], direction: [1, 0, 0]}
       wires:
         - {id: W_Y_P_IN, from: P1.1, to: SP, awg: 12, color: red, signal: VBAT}
         - {id: W_Y_P_ESC, from: SP, to: P2.1, awg: 12, color: red, signal: VBAT}
@@ -494,16 +497,15 @@ electrical:
         - {id: W_Y_N_IN, from: P1.2, to: SN, awg: 12, color: black, signal: GND}
         - {id: W_Y_N_ESC, from: SN, to: P2.2, awg: 12, color: black, signal: GND}
         - {id: W_Y_N_HAT, from: SN, to: P3.2, awg: 14, color: black, signal: GND}
-      route: {slack: 25 mm, keep_away: [motor, gearbox]}
-    - id: esc_power
-      connectors:
-        A: {type: integral, mates: esc.J_PWR}
-        # The mated XT60 pair stays beside the battery ahead of the ESC, clear of the front wheels' steering sweep.
-        B: {type: xt60-male, mates: power_y.P2, position: [180 mm, 40 mm, 60 mm]}
-      wires:
-        - {id: W_ESC_P, from: A.1, to: B.1, awg: 12, color: red, signal: VBAT}
-        - {id: W_ESC_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
-      route: {slack: 20 mm}
+      route:
+        slack: 25 mm
+        keep_away: [motor, gearbox]
+        independent_branches: true
+        tie_points: [[300 mm, 40.75 mm, 62 mm], [230 mm, 49.75 mm, 62 mm]]
+        wire_via:
+          W_Y_P_ESC: [[300 mm, 40.75 mm, 62 mm], [230 mm, 49.75 mm, 62 mm]]
+          W_Y_N_ESC: [[330 mm, 5 mm, 40 mm], [235 mm, 5 mm, 40 mm], [215 mm, 29 mm, 40 mm]]
+          W_Y_P_HAT: [[160 mm, -85 mm, 116 mm], [116.5 mm, -100 mm, 105.276 mm]]
     - id: esc_motor
       description: Individually routed 18 AWG silicone motor lead, directly soldered to motor tab.
       connectors:
@@ -617,13 +619,13 @@ cad:
     Front steering L: [arm_fl, kp_fl, knuckle_fl, stub_fl, wheel_fl, nut_fl, bs_kl]
     Front steering R: [arm_fr, kp_fr, knuckle_fr, stub_fr, wheel_fr, nut_fr, bs_kr]
     Steering linkage: [servo_post_a, servo_post_b, servo, servo_output, servo_horn, bs_hl, bs_hr, tie_rod, tie_rod_r,
-                       cap_ear_a1, cap_ear_a2, cap_ear_b1, cap_ear_b2]
+                       servo_clamp_a, servo_clamp_b]
     Deck and electronics stack: [standoff_rl, standoff_rr, standoff_fl, standoff_fr, deck, cap_so_rl, cap_so_rr, cap_so_fl, cap_so_fr,
                                  pi_spacer_1, pi_spacer_2, pi_spacer_3, pi_spacer_4, pi, pi_standoff_1, pi_standoff_2, pi_standoff_3,
                                  pi_standoff_4, pi_shim_1, pi_shim_2, pi_shim_3, pi_shim_4, hat, cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, receiver_riser, tape_rx, receiver, antenna_mast,
                                  rx_antenna, imu, imu_mount, imu_outboard_post, cap_imu_outboard_post, imu_south_post, cap_imu_south_post, cap_imu_1, cap_imu_2, imu_corner_post, cap_imu_corner_post,
                                  tape_rtk_radio, rtk_radio, lead_post, sensor_lead_post, cap_sensor_lead_post, cap_lead_post]
-    Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc, power_lead_post, cap_power_lead_post]
+    Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc, power_lead_post, cap_power_lead_post, power_front_post, cap_power_front_post, power_mid_post, cap_power_mid_post]
 
     Front camera:
     - front_camera

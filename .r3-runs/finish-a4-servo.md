@@ -60,5 +60,11 @@ continues independently.
 
 The isolated external-mount fixture now has **0 fit errors**: two aluminum posts
 with drafted seats, two raised PA12 clamps with relief around the ear ribs,
-and four M4x25 clamp screws. This is a fixture result, not a full assembly pass.
+and four M3x16 clamp screws. This is a fixture result, not a full assembly pass.
 The model-bank/selection/interface tests report **19 passed**.
+
+The final external horn trial raises its hub 0.5 mm clear of the housing, keeps
+the ball-stud centers fixed, and adds 0.5 mm local underside bosses for the
+6 mm stud threads. Its M3x12 retaining screw has 4.700 mm material-equivalent
+engagement versus 4.500 mm required. CAD-plan and assembly regression tests:
+22 passed. Hidden factory internals remain diagnosed separately.
