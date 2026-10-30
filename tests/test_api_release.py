@@ -7,7 +7,7 @@ import yaml
 
 import pytest
 
-from api_helpers import copy_bench, write_sim_scenario, write_stage_outputs
+from api_helpers import copy_bench, write_sim_scenario, write_stage_outputs, write_bench_pull
 from r3_model.diagnostics import StageResult
 from r3_orchestrator import api, cli, mcp_server, release
 
@@ -21,6 +21,7 @@ def root(tmp_path):
     data["simulation"]["scenarios"][2]["expect"]["laps_completed"] = 1
     data["components"]["overlap"] = dict(type="test-base", mount="base", pose={"xyz": [0, 0, .02]})
     (root / "robot.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    write_bench_pull(root)
     return root
 
 
@@ -71,7 +72,7 @@ def test_evidence_from_results(root):
 
     gate = items(api.release(root))
     mass = gate["requirement.max_mass"]
-    assert mass["status"] == "estimated" and mass["evidence"][0]["artifact"] == "model/graph.json"
+    assert mass["status"] == "verified" and mass["evidence"][0]["artifact"] == "model/graph.json"
     assert mass["evidence"][0]["value"] < mass["target"] and mass["evidence"][0]["inputs"]["robot_yaml_sha256"]
     speed = gate["requirement.top_speed"]
     assert speed["status"] == "failed" and speed["evidence"][0]["value"] == 7.4 and speed["evidence"][0]["check"] == "full_throttle.min_top_speed_mps"
@@ -84,7 +85,7 @@ def test_evidence_from_results(root):
     assert gate["stage.model"]["status"] == "failed" and gate["stage.cad"]["status"] == "not_run"
     assert gate["stage.model"]["evidence"][0]["value"] > 0
     model_result = json.loads((root / "build/model/result.json").read_text())
-    assert any(d["code"] == "component_interference" for d in model_result["diagnostics"])
+    assert any(d["code"] == "cad_interference" for d in model_result["diagnostics"])
     temperature = gate["requirement.max_component_temperature_c"]
     assert temperature["status"] == "verified" and temperature["evidence"][0]["value"] == 60.0
     assert gate["requirement.min_runtime"]["status"] == "verified" and gate["requirement.min_runtime"]["evidence"][0]["value"] == 1800.0

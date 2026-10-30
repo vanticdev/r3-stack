@@ -25,7 +25,8 @@ def bench_spec() -> dict[str, Any]:
 
 
 def make_project(tmp_path: Path, mutate: Callable[[dict[str, Any]], None] | None = None,
-                 catalog_components: list[dict[str, Any]] | None = None, name: str = "bench") -> Path:
+                 catalog_components: list[dict[str, Any]] | None = None, name: str = "bench",
+                 with_pull: bool = False) -> Path:
     """Write a copy of the bench robot.yaml (optionally mutated) and a project-local catalog."""
     root = tmp_path / name
     root.mkdir(parents=True)
@@ -43,7 +44,37 @@ def make_project(tmp_path: Path, mutate: Callable[[dict[str, Any]], None] | None
     if catalog_components:
         (root / "catalog" / "components").mkdir(parents=True, exist_ok=True)
         (root / "catalog" / "components" / "overrides.yaml").write_text(yaml.safe_dump({"components": catalog_components}))
+    if with_pull:
+        write_bench_pull(root)
     return root
+
+
+def write_bench_pull(root: Path) -> None:
+    """Publish explicit synthetic solids, never reconstructed catalog geometry.
+
+    The plate is a 90 x 90 x 4 mm test coupon; all other parts are 4 mm cubes.
+    Each has an independently assigned 100 g mass. Spec poses locate these
+    test assets only: the stages subsequently read the pinned solved poses.
+    """
+    import numpy as np
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from OCP.gp import gp_Pnt
+    from pulled_fixture import write_pull
+    from r3_model.graph import rpy_matrix
+    from r3_model.spec_files import load_spec_files
+
+    spec = load_spec_files(root).validate()
+    shapes, poses = {}, {}
+    for name, component in spec.components.items():
+        if component.type == "test-panel":
+            shapes[name] = BRepPrimAPI_MakeBox(gp_Pnt(-45, -45, 0), 90, 90, 4).Shape()
+        else:
+            shapes[name] = BRepPrimAPI_MakeBox(gp_Pnt(-2, -2, 0), 4, 4, 4).Shape()
+        frame = np.eye(4)
+        frame[:3, :3] = rpy_matrix(component.pose.rpy)
+        frame[:3, 3] = component.pose.xyz
+        poses[name] = frame
+    write_pull(root, shapes, poses=poses, mass=0.1)
 
 
 def catalog_entry(type_id: str) -> dict[str, Any]:
