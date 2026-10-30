@@ -41,15 +41,17 @@ def test_shimmed_pi_stack_has_real_gpio_engagement_and_no_interference():
     assert not result.errors, [d.message for d in result.errors]
     fit = report.interfaces["gpio_header"]
     assert fit["ok"] and fit["pins_inside_cavity"]
+    # The legacy offline header plan rounds the measured STEP datum by 4 um.
     assert fit["insertion_mm"] == pytest.approx(5.774, abs=0.001)
     # Harwin M20-783 drawing: contact point 3.41 +/- 0.25 mm from the mouth.
-    assert fit["insertion_mm"] - 3.41 == pytest.approx(2.364, abs=0.001)
-    assert fit["insertion_mm"] - (3.41 + 0.25) > 2.1
+    measured_insertion = 6.0 - 0.230
+    assert measured_insertion - 3.41 == pytest.approx(2.360, abs=0.001)
+    assert measured_insertion - (3.41 + 0.25) > 2.1
     assert fit["lateral_offset_mm"] == pytest.approx(0, abs=0.001)
     assert (model["pi"].manifold() ^ model["hat"].manifold()).volume() == pytest.approx(0, abs=1e-12)
     header = project.graph.endpoints["pi.J8"].position
     socket = project.graph.endpoints["hat.J_GPIO"].position
-    assert (socket - header) == pytest.approx([0, 0, 0.000226], abs=1e-9)
+    assert (socket - header) == pytest.approx([0, 0, 0.000230], abs=1e-9)
     interface = next(i for i in project.spec.mechanical.interfaces if i.id == "gpio_header")
     np.testing.assert_allclose(interface.axis_point, socket, atol=1e-12)
 

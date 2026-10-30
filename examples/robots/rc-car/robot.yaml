@@ -337,7 +337,7 @@ assembly:
     - {id: hat_2, a: pi_standoff_2.top, b: hat.h4, fasteners: {type: M2.5x6}}
     - {id: hat_3, a: pi_standoff_3.top, b: hat.h1, fasteners: {type: M2.5x6}}
     - {id: hat_4, a: pi_standoff_4.top, b: hat.h2, fasteners: {type: M2.5x6}}
-    - {id: gpio_header, a: pi.J8, b: hat.socket, offset: 0.226 mm, verify: {min_insertion: 5.5 mm, lateral_tolerance: 0.2 mm}}
+    - {id: gpio_header, a: pi.J8, b: hat.socket, offset: 0.230 mm, verify: {min_insertion: 5.5 mm, lateral_tolerance: 0.2 mm}}
     - {id: cap_hat_1, a: hat.cap_1, b: cap_hat_1.seat}
     - {id: cap_hat_2, a: hat.cap_2, b: cap_hat_2.seat}
     - {id: cap_hat_3, a: hat.cap_3, b: cap_hat_3.seat}
