@@ -91,6 +91,8 @@ from purchasing and sourcing; see [owned parts](owned-parts.md).
 
 ## 4. Join the assembly
 
+Treat assembly as a geometric puzzle: pair compatible connection sites, declare each join, and let the compiler derive poses and check the fit.
+
 Only the root needs an authored pose. Other poses follow joins between catalog interfaces:
 hole patterns, shafts and bores, headers and sockets, face mounts, or adhesive pads. An
 interface's `origin` lies on the physical seating surface, `z` points outward and `x`
