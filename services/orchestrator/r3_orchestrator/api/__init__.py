@@ -302,11 +302,15 @@ def create_project(name: str, parent: str | Path = ".", template: str = "blank",
 GUIDE = Path(__file__).resolve().parents[4] / "docs" / "guide" / "build-a-robot.md"
 
 
-def guide() -> dict[str, Any]:
+def guide(topic: str = "build") -> dict[str, Any]:
     """The agent-facing guide (docs/guide/build-a-robot.md): spec, sourcing, joins, CAD, wiring, firmware, sim, release."""
-    if not GUIDE.exists():
-        return {"ok": False, "code": "file_not_found", "message": f"{GUIDE} is missing"}
-    return {"ok": True, "path": str(GUIDE), "content": GUIDE.read_text()}
+    guides = {"build": GUIDE, "project_code": GUIDE.with_name("project-code.md")}
+    if topic not in guides:
+        return {"ok": False, "code": "usage_error", "message": f"guide topic must be one of {', '.join(guides)}"}
+    path = guides[topic]
+    if not path.exists():
+        return {"ok": False, "code": "file_not_found", "message": f"{path} is missing"}
+    return {"ok": True, "path": str(path), "content": path.read_text(), "topics": list(guides)}
 
 
 def get_catalog_component(project_path: str | Path | None, component_id: str) -> dict[str, Any]:

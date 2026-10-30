@@ -1,7 +1,8 @@
 # Build a robot from nothing
 
-R3 describes a robot in `robot.yaml` and derives its assembly, CAD, wiring, electronics,
-software bindings, simulation and release evidence from that specification. A robot may
+Model the parts and real assembly in Onshape. R3 pulls an immutable local copy and checks
+its geometry, wiring, electronics, software bindings, simulation and release evidence.
+`robot.yaml` is the complete local description and index into the split description files. A robot may
 be a stationary instrument, arm, drone, legged mechanism or mobile platform. Start with
 an empty project and add only the components and capabilities your robot needs.
 
@@ -24,8 +25,8 @@ normal git and the R3 MCP tools. The user message is passed unchanged. Use
 typed authoring reference, including field descriptions and nested definitions
 (also `connector` and `wire` for project catalog additions).
 Use these tools and this guide; reading platform source is not required.
-The session exposes R3's permitted tools directly and excludes unrelated account
-plugins and skills, so another project's context is not needed or inherited.
+The session exposes R3 and onshape-native tools directly and excludes unrelated account
+plugins and skills. Use the native editor tools for CAD; no other project context is needed.
 Run native pipeline stages, scenarios and project tests with the R3 MCP tools;
 they execute in the worker's probed environment. On macOS, the Codex shell sandbox
 can deny CoreGraphics access even when native offscreen MuJoCo rendering works in
@@ -50,8 +51,8 @@ The MCP equivalent is `r3_create_project(name="sensor-rig", template="blank")`.
 ## 2. Describe the task and choose a base
 
 Write down the robot's purpose, workspace, loads, power source, environmental constraints
-and measurable success conditions. Requirements belong in `requirements`; dimensions and
-poses belong in components and their catalog entries. Select `robot.mobility: stationary`
+and measurable success conditions. Requirements belong in `requirements`; shapes, dimensions, attachment frames and
+assembly placements are authored only in Onshape. Select `robot.mobility: stationary`
 for a fixed instrument or arm. Mobile robots must declare their actual joints and drives.
 
 When no human is available, make routine engineering choices independently. Choose
@@ -66,41 +67,18 @@ device is a project research/authoring task, using the capabilities below.
 Keep work inside the project and R3 platform sources; do not consult other local robot
 projects, old robot git history, worktrees or other agents' session files.
 
-A minimal specification can contain one fabricated base:
+The scaffold starts empty. Add objects and catalog metadata for the components you choose.
+Create fabricated parts directly in a Part Studio; author sketches, dimensions, standard
+features, material and mate connectors there. Never put shape programs, solids, features,
+connector frames or assembly poses in the local description.
 
-```yaml
-robot:
-  name: sensor-rig
-  mobility: stationary
-components:
-  base:
-    type: instrument-base
-    pose: {xyz: [0, 0, 0]}
-assembly:
-  root: base
-  joins: []
-```
-
-Create `catalog/components/instrument-base.yaml` (or use `r3_put_catalog_component`):
-
-```yaml
-components:
-  - id: instrument-base
-    name: Instrument base
-    kind: structure
-    mechanical:
-      shape: box
-      size: [120 mm, 120 mm, 6 mm]
-      mass: 0.11
-      material: PETG
-      density: 1270
-      fabricated: true
-      provenance: {status: estimated, notes: Initial solid base; replace mass with CAD evidence}
-```
-
-This is a geometric starting point. Add holes, load-bearing supports and connection
-interfaces for the parts you actually select. Never treat a pose or surface contact as
-physical retention.
+The project uses an explicit include index in `robot.yaml` to keep large descriptions
+readable: `parts/<name>.yaml` holds each part's Onshape reference and pulled evidence;
+`electrical/`, `software/` and similar folders hold domain descriptions. Use
+`r3_get_schema` and `r3_get_spec` for the exact schema. `r3_patch_spec` applies typed patches
+across the include files with optimistic concurrency. A change to any included file changes
+the spec revision. Includes must stay inside the project; unknown fields, cycles and
+conflicting keys are errors. Pulled fields are refreshed only by `r3_cad_pull`.
 
 ## 3. Find or source components
 
@@ -143,9 +121,8 @@ dimensions, mass and which values are estimated in the project catalog. Add a re
 download with `r3_models_add(name, category, url, license, catalog_component)`;
 for an archive also supply `format="stp.zip"` or `"stp.rar"` and its exact `member`.
 For a public Onshape model, supply its immutable `/documents/D/v/V/e/E` URL as
-`onshape` instead of `url`. A connected browser transport works for local
-development as well as API keys. It must be a public document; keep the source
-unchanged and insert the supplied version.
+`onshape` instead of `url`. Use onshape-native to import/insert the exact vendor model in your working document,
+keep its source unchanged and add the required mate connectors in Onshape.
 
 `r3_models_search(query)` searches the shared bank plus project records;
 `r3_models_fetch(model_id)` downloads a pinned source and reports geometry or a
@@ -159,75 +136,77 @@ mismatched models remain explicit in CAD diagnostics.
 Model-bank categories are exposed in the tools' enum/schema. Use `other` for a
 category absent from that list; a component's catalog `kind` is a separate field.
 
-## 4. Join the assembly
+## 4. Model and assemble in Onshape
 
-Treat assembly as a geometric puzzle: pair compatible connection sites, declare each join, and let the compiler derive poses and check the fit.
+Start with `onshape_native.search_commands` for the concrete task, then discover the native
+message schema and inspect current state. `native_schema`, `native_state`, `native_read`
+and `native_write` provide the native editor lifecycle for sketches and standard features,
+mate connectors and real assembly mates. Keep the exact element URL, occurrence paths,
+IDs and current revision guard. After any write, refresh state and check regeneration.
+Do not blindly retry an uncertain write. No FeatureScript is permitted.
 
-Only the root needs an authored pose. Other poses follow joins between catalog interfaces:
-hole patterns, shafts and bores, headers and sockets, face mounts, or adhesive pads. An
-interface's `origin` lies on the physical seating surface, `z` points outward and `x`
-defines clocking. Use actual catalog interface names when writing `assembly.joins`.
+Use `document_tree` and `document_edit` for tabs and folders. Create documents in the
+project's designated folder through the native integration's supported workflow. For
+purchased parts, search `r3_models_search` first, download the exact vendor STEP with
+provenance, then import it into Onshape. Add mate connectors on its real seating faces,
+holes and axes. Electrical and software catalog metadata stays useful; catalog boxes do
+not become CAD. Missing native import or document-creation capabilities must be reported
+explicitly; never fall back to the quota-limited public API or sculpt a bought part.
 
-The join kinds are `fasten`, `revolute`, `slider`, `ball` and `drive_flat`. Declare screw
-type, length, clamped parts, mating threads or nut, grip and locking method as applicable.
-A moving join creates a joint. Connect an actuator to it with a `direct` transmission,
-or another transmission model appropriate to the declared mechanism. Keep the transmission
-path continuous through physically verified connections.
+Build the real assembly in Onshape using its native insert and mate operations. Define
+attachments there, including joint type, axis and limits. Use full occurrence paths for
+nested subassemblies and repeated parts. R3 reads solved native transforms and connector
+frames; it does not derive placements from catalog interfaces or synthesize assemblies.
 
-Run `r3 validate --stage assembly,model`. Read the assembly graph and structured diagnostics
-under `build/model/`. Resolve `assembly_misfit`, `hole_pattern_mismatch`, `clock_ambiguous`,
-`object_interference`, `seat_not_in_contact` and `fit_out_of_range` using their measured
-values. See [the assembly model](../architecture/assembly-model.md).
+Verify the design with geometry and images before pulling: body count, dimensions,
+closed solids, material density, connector frames, mate status, solved placements and
+motion limits. Use `native_measure` for supported geometric measurements and
+`view_control` plus `capture_viewport` to inspect the actual viewport. A capture alone
+does not establish fit or interference clearance.
 
-## 5. Build CAD and qualify fabricated parts
+## 5. Pull CAD and qualify fabricated parts
 
-Fabricated parts can use boxes, cylinders, prisms, revolutions and spheres, with additive
-and subtractive operations. Holes and fits must agree with the interfaces used by the
-assembly. Printed fits use the configured process/material tables.
+Create or select an immutable Onshape version, then pull the assembly:
 
-Purchased parts use downloaded manufacturer or library models with checksum, license,
-measurement validation and interface frames. Do not sculpt replacements for bought parts.
-If no real model exists, an explicitly labelled datasheet proxy remains estimated evidence.
+```sh
+r3 cad pull --url https://cad.onshape.com/documents/D/v/V/e/A
+# or supply a workspace URL together with its explicit pinned version:
+r3 cad pull --url https://cad.onshape.com/documents/D/w/W/e/A --version V
+r3 validate --stage assembly,model,cad,fabrication
+```
 
-`r3 cad sync` or `r3 validate --stage cad` builds standard editable Onshape features and
-assemblies through the official API transport. No FeatureScript is used. Without a CAD
-transport, diagnostics identify catalog geometry as estimated. Server rendering uses the
-REST shaded-view endpoints.
+The MCP equivalent is `r3_cad_pull(url=..., version_id=...)`. `r3_run_stage("cad")`
+checks the current pulled copy; it never creates geometry or refreshes the native model.
+The pull downloads each exact part's STL in metres and STEP, reads native mate connectors,
+mates, joint axes/limits and solved poses, computes volume/mass/centre of mass/inertia with
+Open CASCADE plus the assigned material density, and captures viewport evidence. A
+missing material, unresolved occurrence, unsupported constraint or missing geometry is an
+error. Pull never substitutes an envelope or drops a part.
 
-Create or update your own printed-part type with `r3_put_catalog_component(entry)`.
-The `component` schema describes `mechanical.solids` and `mechanical.features`:
-additive/subtractive boxes, cylinders, prisms and revolutions, holes and other
-supported standard operations. Define connection interfaces at real seating
-faces and hole axes; the assembly compiler derives placement from `assembly.joins`.
-The same tool adds or overrides a purchased component's electrical and software
-metadata. It writes only `catalog/components/` in this project. New connector and
-wire types can be authored in the project's `catalog/connectors.yaml` and
-`catalog/wires.yaml`, using the `connector` and `wire` schemas and existing
-catalog entries as typed examples.
+Files live at `cad/pulled/pull.json`, `cad/pulled/parts/<name>.stl` and `.step`, with
+viewport evidence alongside them. All are read-only. `r3.lock.yaml` pins the manifest's
+SHA-256 and Onshape version; the manifest pins every file's SHA-256. The pull refreshes
+Onshape-derived fields in `parts/<name>.yaml` and the top-level attachments. Editing
+pulled bytes, hashes, connector frames, material, mass or attachments locally is an
+integrity error. Fix the model in Onshape and pull again.
 
-Before building, set `cad.folder` to the user-approved provider folder and
-`cad.document_name` to the project name through `r3_patch_spec`. Call
-`r3_cad_plan` for a quota estimate before `r3_run_stage("cad")`. The offline plan
-does not create or verify geometry. The CAD stage makes the real standard Onshape
-features and editable assemblies, then reads native body details, mass, meshes,
-fits and mates. Read `cad/cad_model.json` and `cad/report.json` through
-`r3_get_artifact`; list `cad/` to find exact artifact names. Use `r3_view_artifact`
-on a file under `cad/views/` to see the actual server-rendered image. Read the
-numeric diagnostics, edit the design through the tools, and run CAD again; pinned
-documents update incrementally. Never edit generated meshes or use an offline
-preview as the real model.
+The only export backend is the authenticated loopback companion at
+`http://127.0.0.1:8766/native/api/v17`. It supports selected-part STL and STEP through
+UI translations, polling and the translation's `resultDocumentId` external-data download.
+Public `/api` calls, `bodydetails`, `tessellatedfaces`, `massproperties`, `shadedviews` and
+public `/translations` are unavailable and never used as fallbacks. Only STL supports
+microversions; STEP requires a pinned version. Install the updated extension and restart
+the companion to expose `/native` routes. Unsupported operations fail with a clear code.
+The desktop native integration needs its signed-in browser/companion on the worker;
+a server must provide that native session or consume an already pulled copy.
 
-If an unfinished new build no longer matches edited inputs, call
-`r3_cad_recover()` to inspect its pending attempts and lock `sha256`. Pass that
-value as `expected_sha256` to explicitly restart. This archives the old document
-references locally and clears only unfinished new-build state. Existing native
-documents, completed pins and request journals are retained; recovery makes no
-Onshape calls and refuses to run while CAD is active. Then plan and run CAD with
-the current inputs. Never hand-edit the generated lock or claim old geometry is current.
-
-Run `r3 validate --stage fabrication` for printable parts. Review wall thickness, overhangs,
-loads, strength margins, material orientation and manufacturing artifacts. Tests and
-simulation must verify real retention under gravity, vibration and impact where applicable.
+All checks and consumers use the pull: fit/interference/thread checks read STEP with OCP;
+wiring, simulation, viewer and fabrication read STL. No checks or tolerances are relaxed.
+If a check needs native thread annotations, preload, a material property or another datum
+absent from the pull, the diagnostic names that missing evidence rather than inventing it.
+Run fabrication validation for printed parts and inspect wall thickness, overhangs, loads,
+strength margins, orientation and manufacturing artifacts. Test real retention under the
+required loads. A successful pull is data acquisition, not a fabrication release.
 
 ## 6. Add power, electronics and wiring
 

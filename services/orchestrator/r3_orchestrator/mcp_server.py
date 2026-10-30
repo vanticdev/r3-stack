@@ -33,7 +33,7 @@ from r3_catalog.modelbank.schema import Category
 INSTRUCTIONS = """R3 robot project tools. robot.yaml is the single source of truth.
 New robot: r3_guide (read it first), r3_create_project(template="blank"), then grow the spec component by component.
 Purchased CAD: r3_models_search first; on a miss find a public model and r3_models_add it with provenance.
-Parts: r3_list_catalog / r3_get_catalog_component; your own printed parts with r3_put_catalog_component.
+Parts: r3_list_catalog / r3_get_catalog_component for electrical/software metadata. Model CAD in Onshape through onshape_native; verify geometry and viewport images, then r3_cad_pull. R3 never generates parts or assemblies.
 Loop: r3_get_spec -> r3_patch_spec (pass the sha256 you read; on spec_conflict re-read and re-apply)
 -> r3_validate -> r3_get_diagnostics / r3_diagnose -> fix -> repeat. Parts declared by requirements
 (`source:` in robot.yaml) are found with r3_source_search and pinned with r3_source_choose. Diagnostics carry stable codes,
@@ -186,11 +186,11 @@ def r3_put_catalog_entry(kind: str, entry: dict[str, Any], project: str = "", dr
 
 
 @_tool(_READ)
-def r3_guide() -> dict[str, Any]:
+def r3_guide(topic: str = "build") -> dict[str, Any]:
     """How to build a robot from nothing with R3 (docs/guide/build-a-robot.md): the spec, sourcing, joins and
     interfaces, CAD (standard features only), wiring, electrical, firmware with r3_hal, sim scenarios, the release
     gate, the policies and every tool. Read it before starting a new robot."""
-    return api.guide()
+    return api.guide(topic)
 
 
 @_tool(_READ)
@@ -206,35 +206,30 @@ def r3_get_schema(domain: str = "robot") -> dict[str, Any]:
     return {"ok": True, "schema": schema.model_json_schema()} if schema else {"ok": False, "code": "usage_error", "message": f"use {', '.join(schemas)}"}
 
 
-@_tool(_READ)
-def r3_cad_plan(project: str = "") -> dict[str, Any]:
-    """Offline standard-feature plan and estimated Onshape quota calls. Does not build CAD or claim measured geometry."""
-    from r3_onshape.dry_run import rebuild_plan
-    from .readiness import precheck
+@_tool(_EDIT)
+def r3_cad_pull(project: str = "", url: str = "", version_id: str = "") -> dict[str, Any]:
+    """Pull the real Onshape assembly at an immutable version. Downloads selected-part STL/STEP through
+    /native/api/v17, reads real mates/connectors/poses, computes mass from geometry/material and captures
+    the viewport. Replaces read-only cad/pulled and refreshes derived part descriptions. Never generates CAD."""
+    from r3_onshape.pull import pull
 
-    def plan() -> dict[str, Any]:
-        loaded = api.load_project(project or None)
-        pending = precheck(loaded, "cad")
-        if pending is not None:
-            diagnostic = pending.diagnostics[0]
-            return {"ok": False, "code": diagnostic.code, "message": diagnostic.message, "hint": diagnostic.hint,
-                    "diagnostics": [d.model_dump(mode="json") for d in pending.diagnostics], "dry_run": True}
-        try:
-            return {"ok": True, "plan": rebuild_plan(loaded)}
-        except ValueError as error:
-            return {"ok": False, "code": "cad_plan_invalid", "message": str(error), "dry_run": True}
-
-    return _guard(plan)
+    return _guard(lambda: pull(api.load_project(project or None), url=url, version_id=version_id))
 
 
-@_tool(_DESIGN)
-def r3_cad_recover(project: str = "", expected_sha256: str = "", dry_run: bool = False) -> dict[str, Any]:
-    """Inspect failed new-build state (no expected_sha256), then pass that sha256 to restart with current inputs.
-    Archives pending library/robot build references; preserves native documents, completed pins and request journals.
-    Refuses recovery while CAD is active. No Onshape calls. Never hand-edit generated lock records."""
-    from r3_onshape.recovery import recover
+@_tool(_EDIT)
+def r3_onshape_native(operation: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Direct native bridge access when no separate onshape_native MCP launcher is installed.
+    operation is a local tool (search_commands, element_tree, document_edit, capture_viewport, etc.)
+    or command with a schema-discovered editor envelope. Native commands support modeling, mates and
+    mate connectors. Public REST proxy and FeatureScript are refused. Use fresh revision guards for writes."""
+    from r3_onshape.native import NativeCadTransport
+    from r3_model.pulled import PullError
 
-    return _guard(lambda: recover(api.load_project(project or None), expected_sha256, dry_run))
+    try:
+        native = NativeCadTransport()
+        return {"ok": True, "result": native.command(arguments) if operation == "command" else native.local(operation, arguments)}
+    except (PullError, FileNotFoundError) as error:
+        return {"ok": False, "code": getattr(error, "code", "cad_native_unavailable"), "message": str(error)}
 
 
 @_tool(_DESIGN)
