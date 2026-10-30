@@ -41,8 +41,8 @@ key_specs:
   pcb_thickness:
     value: 0.001276
     unit: m
-    source: 'Official STEP PCB OBJ8572: z=0.030..1.306 mm; nominal catalog mount stack
-      is still 1.6 mm and requires physical-board review'
+    source: 'Official STEP PCB OBJ8572: z=0.030..1.306 mm; catalog seats use these measured
+      planes; physical-board dimensions remain unmeasured'
     status: measured
   pcb_faces_z:
     value:
@@ -80,10 +80,27 @@ validation:
   key_features:
     pcb_outline_85x56: true
     mount_holes_58x49_d2p7: true
-  date: '2026-10-29T19:45:53.829523+00:00'
-  validated_by: r3/cascadio
-  notes: Axis-specific bbox check; interface features require independent geometry
-    inspection.
+    pcb_seating_faces_z0p030_z1p306: true
+    header_base_top_z3p876: true
+    header_2x20_pitch2p54: true
+    interface_frames_from_step: true
+  date: '2026-10-30T15:43:13.047281+00:00'
+  validated_by: Codex / Open CASCADE native STEP B-rep inspection
+  notes: 'Inspected rpi-5b_no_graphics.step extracted from the checksum-pinned official ZIP with STEPControl_Reader,
+    BRepAdaptor_Surface and BRepBndLib.AddOptimal (no tolerance inflation). Measurements below are source
+    mm; face numbers are zero-based TopExp FACE traversal. Four radius-1.35 PCB bores have axes (3.5,3.5),
+    (61.5,3.5), (3.5,52.5), (61.5,52.5): cylindrical half-faces 45659/45680, 45660/45679, 45667/45672,
+    45668/45671. PCB bottom/top faces 45670/45669 are Z=0.030/1.306 with X=0..85, Y=0..56; 58x49 pitch
+    and 1.276 thickness. Intersect each bore axis with these planes, then subtract (42.5,28,0) mm. mc_h1..h4
+    are bottom seats (-Z); their _h1 far seats and mc_t1..t4 are top (+Z); mc_t1_h1..t4_h1 are bottom
+    (-Z). X follows the PCB long edge. J8 plastic body (solid 1341) bounds are (7.1,49.96,1.336)..(57.9,55.04,3.876);
+    top face 20441 is centred at (32.5,52.5,3.876), hence mc_J8=(-10,24.5,3.876), +Z, X along the pin
+    row. Forty 0.64 mm square pin bodies have centres X=8.37+2.54*n (n=0..19), Y=51.23/53.77,
+    confirming the row direction and 2.54 mm pitch. All 17 frames agree with the effective Pi 5 8GB catalog to numerical precision; the authored
+    3.88 mm header height is rounded by 0.004 mm, within unchanged 1.5 mm tolerance. The effective catalog
+    already uses the measured PCB faces, not the historical nominal 1.6 mm stack (0.324 mm thicker). No
+    supplied geometry or catalog interface was changed. This is model evidence, not a physical-board measurement
+    or live Onshape verification; retain vendor guidance-only accuracy caveat.'
 catalog_component: raspberry-pi-5-4gb
 catalog_aliases:
 - raspberry-pi-5-1gb
@@ -109,5 +126,22 @@ placement:
   - 0.0
   - 0.0
   - 1.0
-interface_frames: {}
+interface_frames:
+  mc_h1: {origin: [-0.039, -0.0245, 3.0e-05], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
+  mc_h1_h1: {origin: [-0.039, -0.0245, 0.001306], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_t1: {origin: [-0.039, -0.0245, 0.001306], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_t1_h1: {origin: [-0.039, -0.0245, 3.0e-05], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
+  mc_h2: {origin: [0.019, -0.0245, 3.0e-05], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
+  mc_h2_h1: {origin: [0.019, -0.0245, 0.001306], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_t2: {origin: [0.019, -0.0245, 0.001306], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_t2_h1: {origin: [0.019, -0.0245, 3.0e-05], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
+  mc_h3: {origin: [-0.039, 0.0245, 3.0e-05], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
+  mc_h3_h1: {origin: [-0.039, 0.0245, 0.001306], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_t3: {origin: [-0.039, 0.0245, 0.001306], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_t3_h1: {origin: [-0.039, 0.0245, 3.0e-05], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
+  mc_h4: {origin: [0.019, 0.0245, 3.0e-05], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
+  mc_h4_h1: {origin: [0.019, 0.0245, 0.001306], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_t4: {origin: [0.019, 0.0245, 0.001306], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_t4_h1: {origin: [0.019, 0.0245, 3.0e-05], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
+  mc_J8: {origin: [-0.01, 0.0245, 0.003876], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
 onshape_connectors: {}
