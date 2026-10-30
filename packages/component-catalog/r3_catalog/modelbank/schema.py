@@ -32,6 +32,8 @@ class Source(Record):
     # A landing page is a useful pointer, but must never be downloaded as CAD.
     direct: bool = True
     member: str = ''
+    solid_indices: list[int] = Field(default_factory=list, description='Zero-based solids retained from the supplied STEP; '
+                                    'select complete purchased subparts without modifying their geometry.')
     did: str = ''
     vid: str = ''
     eid: str = ''
@@ -39,6 +41,8 @@ class Source(Record):
 
     @model_validator(mode='after')
     def valid_location(self) -> Source:
+        if any(i < 0 for i in self.solid_indices) or len(set(self.solid_indices)) != len(self.solid_indices):
+            raise ValueError('solid_indices must be distinct nonnegative indices')
         if urlparse(self.url).scheme not in ('https', 'http', 'file'):
             raise ValueError('model URL must use https, http or file')
         if self.kind == 'onshape_public' and not all((self.did, self.vid, self.eid)):

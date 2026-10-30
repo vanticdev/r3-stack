@@ -110,6 +110,16 @@ share a corridor; conflicting waypoint lists or unknown wire IDs are rejected.
 These coordinates guide routing, never substitute for installed supports, and
 remain subject to the existing collision and bend-radius checks.
 
+A splice may declare `direction: [x, y, z]` for its installed sleeve axis. The
+router preserves that axis through curvature planning and orients the sleeve's
+collision body accordingly; all existing entry-zone and bend limits still apply.
+
+`route.independent_branches: true` gives each terminal pair a separate physical
+lane. Earlier lanes reserve their full diameter in voxel routing and curvature
+planning. Pins remain fixed, and a solder splice keeps one position and axis
+across all its branches. This is useful for stiff loose conductors that cannot
+share an incidental centreline fork; it does not enlarge collision exemptions.
+
 ### Connector geometry and `build/connectors/connectors.json`
 
 Each catalog connector type has exact geometry (`r3_catalog` `connector_geometry.yaml`,
@@ -191,3 +201,31 @@ for fast iteration. See `packages/hardware-interface/PROTOCOL.md`.
 Codes are stable snake_case identifiers. Each carries `subjects` (ids) and
 `data` with measured value, limit and units, e.g.
 `{"code": "wire_overcurrent", "subjects": ["W_Y_P_IN"], "data": {"current": 41.2, "ampacity": 35, "awg": 12}}`.
+
+### Manufacturer-rated internal joints
+
+A purchased assembly can declare `mechanical.rated_internal_joints` in its
+catalog entry. Each named joint declares its motion (`rotational` or
+`translational`), owner interface, supplied member type/interface, manufacturer
+source, and ratings. Rotational joints require torque (N m) and angular speed
+(rad/s); translational joints require force (N) and linear speed (m/s).
+
+The member instance explicitly names `purchased_unit`. Its assembly join supplies
+`rated_internal: {unit, joint, demand, source}` with sourced design demands for
+all rated quantities. Missing ratings, source, demand or excess demand are
+errors. Peak torque and no-load speed must not be represented as a simultaneous
+operating point; the ordinary actuator simulation still checks loaded motion.
+
+This category replaces only the internal running-fit test and internal overlap
+check between those two supplied members. Both must be purchased, identify
+non-overlapping solid selections of the same pinned assembly asset, and retain
+the source-relative pose. A fabricated part or a separate purchased unit gets
+the normal geometric checks. The declared interfaces must identify exactly the
+catalog-rated factory joint. Mounting, screws, output engagement, external
+interference, retention and joint physics remain checked normally. No geometry
+or tolerance is changed.
+
+Every successful joint emits `rated_internal_joint_verified` at info level and
+stores its unit, source, ratings, demands and measured vendor-model overlap in
+the CAD fit report. This evidence describes a manufacturer's rated assembly;
+it does not claim that simplified internal CAD solids establish a running fit.

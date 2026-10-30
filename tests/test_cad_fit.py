@@ -4,6 +4,7 @@ transforms) of the front-left corner: fastener math, interface probes, retention
 graph and the probe -> diagnostic mapping. No Onshape access."""
 
 import copy
+import shutil
 from pathlib import Path
 
 import pytest
@@ -17,7 +18,7 @@ from r3_onshape.organized import plan_assembly
 from r3_onshape.parts import build_part_catalog
 
 ROOT = Path(__file__).resolve().parents[1]
-RC_CAR = ROOT / "examples" / "robots" / "rc-car"
+RECORDED_PROJECT = ROOT / "tests" / "fixtures" / "cad" / "front_left_corner_phaseb"
 FIXTURE = ROOT / "tests" / "fixtures" / "cad" / "front_left_corner_phaseb.json.gz"
 # The kingpin screw, wheel nut and ball stud are joined objects; the arm screws are plain fasteners.
 PARTS = ["chassis", "arm_fl", "kp_fl", "knuckle_fl", "stub_fl", "wheel_fl", "nut_fl", "bs_kl", "fastener:arm_fl_mount_1",
@@ -31,7 +32,7 @@ def model():
 
 @pytest.fixture(scope="module")
 def project():
-    return Project.load(RC_CAR)
+    return Project.load(RECORDED_PROJECT)
 
 
 def _run(project, model, names=None):
@@ -79,10 +80,11 @@ def test_contact_alone_does_not_retain(project, model):
 
 
 def test_fit_limits_map_to_diagnostics(project, model, tmp_path):
-    spec = yaml.safe_load((RC_CAR / "robot.yaml").read_text())
+    spec = yaml.safe_load((RECORDED_PROJECT / "robot.yaml").read_text())
     kingpin = next(j for j in spec["assembly"]["joins"] if j["id"] == "kingpin_fl")
     kingpin["verify"]["clearance"] = ["0.01 mm", "0.05 mm"]  # the 3.2 mm bore on a 3 mm shank is a 0.1 mm clearance
     (tmp_path / "robot.yaml").write_text(yaml.safe_dump(spec, sort_keys=False))
+    shutil.copytree(RECORDED_PROJECT / "catalog", tmp_path / "catalog")
     mutated = Project.load(tmp_path)
     arm = next(f for f in mutated.spec.mechanical.fasteners if f.id == "arm_fl_mount_1")
     arm.thread_into = "knuckle_fl"  # the screw does not reach the knuckle: no coaxial tapped bore there

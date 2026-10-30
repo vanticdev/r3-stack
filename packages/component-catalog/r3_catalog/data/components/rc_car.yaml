@@ -34,25 +34,28 @@ components:
       so_rr: {kind: hole_pattern, origin: [-52 mm, -45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_fl: {kind: hole_pattern, origin: [60 mm, 39 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_fr: {kind: hole_pattern, origin: [65 mm, -28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
-      arm_fl: {kind: hole_pattern, origin: [130 mm, 31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
-      arm_fr: {kind: hole_pattern, origin: [130 mm, -31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
-      post_a: {kind: hole_pattern, origin: [110.05 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
-      post_b: {kind: hole_pattern, origin: [159.55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
+      arm_fl: {kind: hole_pattern, origin: [290 mm, 31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
+      arm_fr: {kind: hole_pattern, origin: [290 mm, -31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
+      post_a: {kind: hole_pattern, origin: [270.05 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
+      post_b: {kind: hole_pattern, origin: [319.55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
       motor_lead_post: {kind: hole_pattern, origin: [-50 mm, 60 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       power_lead_post: {kind: hole_pattern, origin: [50 mm, -44 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       cap_motor_lead_post: {kind: adhesive_pad, origin: [-50 mm, 60 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       cap_power_lead_post: {kind: adhesive_pad, origin: [50 mm, -44 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      power_front_post: {kind: hole_pattern, origin: [170 mm, 35 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_power_front_post: {kind: adhesive_pad, origin: [170 mm, 35 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      power_mid_post: {kind: hole_pattern, origin: [100 mm, 44 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_power_mid_post: {kind: adhesive_pad, origin: [100 mm, 44 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       encoder_lead_post: {kind: hole_pattern, origin: [-78.20718 mm, -62 mm, 3 mm], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}, x: [1, 0, 0], z: [0, 0, 1]}
       cap_encoder_lead_post: {kind: adhesive_pad, origin: [-78.20718 mm, -62 mm, 0], x: [1, 0, 0], z: [0, 0, -1]}
       # ESC beside the battery (left), clear of the motor's bullet terminals, which point +y off the end bell.
       esc_pad: {kind: adhesive_pad, origin: [-7 mm, 47 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {area: 1408 mm^2}}
-      # Battery 17 mm aft of the servo posts' line: its 12 AWG lead (16 mm bend radius) turns back clear of post A.
-      battery_seat: {kind: face_mount, origin: [11 mm, 0, 3 mm], z: [0, 0, 1], x: [0.984807753, 0.173648178, 0]}
-      strap_slots: {kind: strap_slot, origin: [11 mm, 0, 0], z: [0, 0, -1], x: [0.984807753, 0.173648178, 0], params: {width: 22 mm, slots: [[-11 mm, -25.5 mm, 11 mm, -23 mm], [-11 mm, 23 mm, 11 mm, 25.5 mm]]}, description: "Two 22 x 2.5 mm slots either side of the battery for the hook-and-loop strap"}
-      # Fuse holder on the right of the battery, along x: input (J1) forward from the splices, output (J2) aft,
-      # turning back under the deck to the HAT feed slot.
-      fuse_seat: {kind: face_mount, origin: [26 mm, -37 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      tie_slots: {kind: strap_slot, origin: [26 mm, -37 mm, 0], z: [0, 0, -1], x: [0, -1, 0], params: {width: 4 mm, slots: [[-7.5 mm, -2 mm, -5.5 mm, 2 mm], [5.5 mm, -2 mm, 7.5 mm, 2 mm]]}, description: "Cable-tie slots that retain the fuse holder"}
+      # Battery aligned with the chassis: its forward pigtail has a straight S-bend approach to the XT90.
+      battery_seat: {kind: face_mount, origin: [11 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      strap_slots: {kind: strap_slot, origin: [11 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {width: 22 mm, slots: [[-11 mm, -25.5 mm, 11 mm, -23 mm], [-11 mm, 23 mm, 11 mm, 25.5 mm]]}, description: "Two 22 x 2.5 mm slots either side of the battery for the hook-and-loop strap"}
+      # Fuse holder on a retained left-side tab: J1 faces the forward power splices; J2 feeds the HAT.
+      fuse_seat: {kind: face_mount, origin: [130 mm, 50 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      tie_slots: {kind: strap_slot, origin: [130 mm, 50 mm, 0], z: [0, 0, -1], x: [0, -1, 0], params: {width: 4 mm, slots: [[-7.5 mm, -2 mm, -5.5 mm, 2 mm], [5.5 mm, -2 mm, 7.5 mm, 2 mm]]}, description: "Cable-tie slots that retain the fuse holder"}
   - id: upper-deck-petg
     kind: structure
     cad_name: Electronics deck
@@ -442,42 +445,263 @@ components:
     cad_family: Servo DS3218
     name: 20 kg-cm digital steering servo
     part_number: DS3218
-    description: Frame at the bottom center, long side along y; the 25T output spline is 10 mm off center toward +y.
+    description: 'Exact DS3218, to be purchased. Official STEP housing solids 0,1,3,4; output gear/shaft is a separate
+      supplied solid. Frame at case bottom centre. Verify ear height on receipt; DS3218MG is not a substitute. Component
+      axes retain STEP orientation: X is the long case direction, Y is height, Z is width.'
     mechanical:
+      rated_internal_joints:
+        output:
+          motion: rotational
+          interface: output
+          member_type: servo-output-25t
+          member_interface: journal
+          ratings: {torque: 1.765197, angular_speed: 6.544984694978735}
+          source: https://www.dsservo.com/d_file/DS3218%20datasheet.pdf
+          notes: >-
+            Manufacturer 5 V ratings: 18 kgf cm stall torque and 0.16 s/60 deg no-load speed.
+            Conservative lower-voltage ratings for the regulated 6 V installation; torque and speed
+            are separate peak capabilities, not a simultaneous operating point. The body and output
+            are complete, disjoint solids from the same official DS3218 STEP. Only this factory
+            internal motion uses rated verification; all external interfaces retain geometric checks.
       shape: custom
-      size: [20 mm, 54 mm, 45.5 mm]
-      mass: 0.060
-      color: "#202020"
-      solids:
-        - {kind: box, name: body, position: [0, 0, 20.25 mm], size: [20 mm, 40 mm, 40.5 mm]}
-        - {kind: box, name: ears, position: [0, 0, 27.75 mm], size: [20 mm, 54 mm, 2.5 mm]}
-      features:
-        - {id: output_bushing, kind: bore, position: [0, 10 mm, 40.5 mm], axis: [0, 0, -1], diameter: 6.0 mm, depth: 4 mm,
-           provenance: {status: estimated, source: "Output-shaft bushing; the splined output is the servo-output-25t object"}}
-        - {id: ear_1, kind: clearance_hole, position: [5 mm, 24.75 mm, 29 mm], axis: [0, 0, -1], diameter: 3.6 mm, depth: 2.5 mm}
-        - {id: ear_2, kind: clearance_hole, position: [-5 mm, 24.75 mm, 29 mm], axis: [0, 0, -1], diameter: 3.6 mm, depth: 2.5 mm}
-        - {id: ear_3, kind: clearance_hole, position: [5 mm, -24.75 mm, 29 mm], axis: [0, 0, -1], diameter: 3.6 mm, depth: 2.5 mm}
-        - {id: ear_4, kind: clearance_hole, position: [-5 mm, -24.75 mm, 29 mm], axis: [0, 0, -1], diameter: 3.6 mm, depth: 2.5 mm}
-      provenance: {status: datasheet, source: "DS3218 datasheet: 40 x 20 x 40.5 mm body, 49.5 x 10 mm ear hole pattern; ear height estimated"}
+      size:
+      - 0.062196936
+      - 0.0415
+      - 0.020039128
+      mass: 0.058
+      color: '#202020'
+      solids: []
+      features: []
+      provenance:
+        status: vendor
+        source: DSSERVO official DS3218.stp, down.asp?id=25; case bottom source Y=-20 mm. Housing mass is 60 g total
+          less 2 g output allocation. Ear underside 27.643739 mm and top 30.793155 mm at slot axes; verify on receipt.
+        notes: Factory output motion may use the explicit manufacturer-rated internal-joint category above; external ears, screws, spline, horn and clearances retain geometric verification.
+      envelope_offset:
+      - 0.003906766
+      - 0.02075
+      - -0.010019564
     interfaces:
-      ears_a: {kind: hole_pattern, origin: [0, 24.75 mm, 26.5 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[5 mm, 0, 3.6 mm, clearance, 2.5 mm], [-5 mm, 0, 3.6 mm, clearance, 2.5 mm]]}}
-      ears_b: {kind: hole_pattern, origin: [0, -24.75 mm, 26.5 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[5 mm, 0, 3.6 mm, clearance, 2.5 mm], [-5 mm, 0, 3.6 mm, clearance, 2.5 mm]]}}
-      cap_a1: {kind: adhesive_pad, origin: [5 mm, 24.75 mm, 29 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      cap_a2: {kind: adhesive_pad, origin: [-5 mm, 24.75 mm, 29 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      cap_b1: {kind: adhesive_pad, origin: [5 mm, -24.75 mm, 29 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      cap_b2: {kind: adhesive_pad, origin: [-5 mm, -24.75 mm, 29 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      output: {kind: bore, origin: [0, 10 mm, 40.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {d: 6.0 mm, depth: 4 mm}, description: "Output-shaft bushing in the case top"}
+      ears_a:
+        kind: hole_pattern
+        origin:
+        - 24.75 mm
+        - 0.027643739490227907
+        - 0
+        z:
+        - 0
+        - -1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+        params:
+          holes:
+          - - 5 mm
+            - 0
+            - 4.5 mm
+            - clearance
+            - 0.0031494159081042385
+          - - -5 mm
+            - 0
+            - 4.5 mm
+            - clearance
+            - 0.0031494159081042385
+      ears_b:
+        kind: hole_pattern
+        origin:
+        - -24.75 mm
+        - 0.027643739490227907
+        - 0
+        z:
+        - 0
+        - -1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+        params:
+          holes:
+          - - 5 mm
+            - 0
+            - 4.5 mm
+            - clearance
+            - 0.0031494159081042385
+          - - -5 mm
+            - 0
+            - 4.5 mm
+            - clearance
+            - 0.0031494159081042385
+      cap_a1:
+        kind: adhesive_pad
+        origin:
+        - 24.75 mm
+        - 0.030793155398332148
+        - 5 mm
+        z:
+        - 0
+        - 1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+      cap_a2:
+        kind: adhesive_pad
+        origin:
+        - 24.75 mm
+        - 0.030793155398332148
+        - -5 mm
+        z:
+        - 0
+        - 1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+      cap_b1:
+        kind: adhesive_pad
+        origin:
+        - -24.75 mm
+        - 0.030793155398332148
+        - 5 mm
+        z:
+        - 0
+        - 1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+      cap_b2:
+        kind: adhesive_pad
+        origin:
+        - -24.75 mm
+        - 0.030793155398332148
+        - -5 mm
+        z:
+        - 0
+        - 1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+      output:
+        kind: bore
+        origin:
+        - 10 mm
+        - 41.6 mm
+        - 0
+        z:
+        - 0
+        - 1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+        params:
+          d: 6.0 mm
+          depth: 3.8 mm
+        description: Output-shaft bushing in the case top
+      ear_seat_a:
+        kind: face_mount
+        origin:
+        - 24.75 mm
+        - 0.027643739490227907
+        - 0
+        z:
+        - 0
+        - -1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+      ear_seat_b:
+        kind: face_mount
+        origin:
+        - -24.75 mm
+        - 0.027643739490227907
+        - 0
+        z:
+        - 0
+        - -1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
     pins:
-      SIG: {role: pwm_in, logic_level: 2.0, voltage_max: 7.2}
-      VCC: {role: power_in, voltage_nominal: 6.0, voltage_min: 4.8, voltage_max: 6.8, current_max: 3.0}
-      GND: {role: ground}
+      SIG:
+        role: pwm_in
+        logic_level: 2.0
+        voltage_max: 7.2
+      VCC:
+        role: power_in
+        voltage_nominal: 6.0
+        voltage_min: 4.8
+        voltage_max: 6.8
+        current_max: 3.0
+      GND:
+        role: ground
     connectors:
-      J1: {type: integral, position: [0, -20 mm, 10 mm], direction: [0, -1, 0], pins: {"1": SIG, "2": VCC, "3": GND}}
+      J1:
+        type: integral
+        position:
+        - 35.005234 mm
+        - 8.55 mm
+        - -0.1 mm
+        direction:
+        - 1
+        - 0
+        - 0
+        pins:
+          '1': SIG
+          '2': VCC
+          '3': GND
     behavior:
       model: servo.pwm
-      params: {stall_torque_at_6v: 1.96, speed_60deg_at_6v: 0.15 s, stall_current_at_6v: 2.5, idle_current: 0.008,
-               min_pulse: 500 us, max_pulse: 2500 us, travel: 270 deg, deadband: 3 us, frame_rate: 50 Hz}
-      provenance: {status: datasheet, source: "DS3218: 19.5 kg-cm @5V, 21.5 @6.8V, 0.16 s/60deg @5V; stall current estimated"}
+      params:
+        stall_torque_at_6v: 1.96
+        speed_60deg_at_6v: 0.15 s
+        stall_current_at_6v: 2.5
+        idle_current: 0.008
+        min_pulse: 500 us
+        max_pulse: 2500 us
+        travel: 270 deg
+        deadband: 3 us
+        frame_rate: 50 Hz
+      provenance:
+        status: datasheet
+        source: 'DS3218: 19.5 kg-cm @5V, 21.5 @6.8V, 0.16 s/60deg @5V; stall current estimated'
+    manufacturer: DSSERVO
+    model:
+      source: vendor
+      url: https://www.dsservo.com/down.asp?id=25
+      path: DS3218.stp
+      sha256: 47c8ff34f7657c769ae645acb670d2eacd326f3600986931e70dcc4c6bf3ab8b
+      license: Manufacturer CAD; no redistribution of cached bytes
+      placement:
+        origin:
+        - 0
+        - 0.02
+        - 0
+        x:
+        - 1
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - 1
+      params:
+        bank_id: servo-digital-20kg
+
   - id: lipo-2s-5000-25c
     kind: battery
     cad_name: LiPo 2S 5000
@@ -1209,77 +1433,228 @@ components:
   - id: servo-post-al6061
     kind: structure
     cad_name: Servo post
-    name: Servo mounting post, 6061 aluminum, 9 x 20 x 27.5 mm
-    mechanical:
-      shape: box
-      size: [9 mm, 20 mm, 27.5 mm]
-      mass: 0.013
-      material: Aluminum 6061-T6
-      density: 2700
-      color: "#a9b0b8"
-      fabricated: true
-    interfaces:
-      base: {kind: hole_pattern, origin: [0.25 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
-      top: {kind: hole_pattern, origin: [0.25 mm, 0, 27.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
-  - id: servo-post-al6061-cable
-    kind: structure
-    cad_name: Servo post B
-    name: Servo mounting post with servo-lead pocket, 6061 aluminum, 9 x 20 x 27.5 mm
-    description: 'Front servo post. The DS3218 lead leaves the case end 0.5 mm in front
-      of this post, so an 11 mm pocket between the bottom and top threads runs through
-      the post and opens on its +y side: the lead turns inside the post''s footprint
-      and runs aft below the linkage. The 5 x 8 mm web left beside the pocket carries
-      the ear load (~40 N per ear at servo stall: ~25 MPa bending). Base threads 5 mm
-      (M3 x 8 through the 3 mm plate engages 5 mm).
-
-      '
+    name: DS3218 mounting post with measured drafted ear seat
     mechanical:
       shape: custom
       size:
-      - 54.5 mm
-      - 56 mm
-      - 27.5 mm
+      - 0.009
+      - 0.02
+      - 0.02864373949022791
+      mass: 0.013
+      material: Aluminum 6061-T6
+      density: 2700
+      color: '#a9b0b8'
+      fabricated: true
+      envelope_offset:
+      - 0
+      - 0
+      - 0
+      solids:
+      - kind: prism
+        name: drafted post
+        position:
+        - 0
+        - 0.01
+        - 0
+        axis:
+        - 0
+        - -1
+        - 0
+        u_axis:
+        - 1
+        - 0
+        - 0
+        depth: 0.02
+        profile:
+        - - -0.0045
+          - 0
+        - - 0.0045
+          - 0
+        - - 0.0045
+          - 0.028737406206591643
+        - - -0.0045
+          - 0.02853905316017432
+      features:
+      - id: top_thread_0
+        kind: tapped_hole
+        position:
+        - 0.00025
+        - 0.005
+        - 0.028843739490227907
+        axis:
+        - 0
+        - 0
+        - -1
+        depth: 0.0082
+        thread: shcs-m3
+      - id: top_thread_1
+        kind: tapped_hole
+        position:
+        - 0.00025
+        - -0.005
+        - 0.028843739490227907
+        axis:
+        - 0
+        - 0
+        - -1
+        depth: 0.0082
+        thread: shcs-m3
+    interfaces:
+      base:
+        kind: hole_pattern
+        origin:
+        - 0.25 mm
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 5 mm
+            - 3 mm
+            - tapped
+            - 8 mm
+          - - 0
+            - -5 mm
+            - 3 mm
+            - tapped
+            - 8 mm
+      top:
+        kind: hole_pattern
+        origin:
+        - 0.25 mm
+        - 0
+        - 0.02864373949022791
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 5 mm
+            - 3 mm
+            - tapped
+            - 0.008
+          - - 0
+            - -5 mm
+            - 3 mm
+            - tapped
+            - 0.008
+      ear_seat:
+        kind: face_mount
+        origin:
+        - 0.25 mm
+        - 0
+        - 0.02864373949022791
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+    description: Top matches the official DS3218 ear underside plane (1.26255 degree draft). M3 upper clamp screws
+      fit the real 4.5 mm ear slots; M3 screws retain the post to the chassis. The drafted ear seat positions the
+      servo; the separate top thread pattern secures its retaining plate. The servo is captured beneath that plate,
+      not located by close-fit screws in its open slots.
+
+  - id: servo-post-al6061-cable
+    kind: structure
+    cad_name: Servo post B
+    name: DS3218 mounting post with measured drafted ear seat and cable pocket
+    description: Top matches the official DS3218 ear underside plane (1.26255 degree draft). M3 upper clamp screws
+      fit the real 4.5 mm ear slots; M3 screws retain the post to the chassis. The drafted ear seat positions the
+      servo; the separate top thread pattern secures its retaining plate. The servo is captured beneath that plate,
+      not located by close-fit screws in its open slots.
+    mechanical:
+      shape: custom
+      size:
+      - 0.009
+      - 0.02
+      - 0.02864373949022791
       mass: 0.025572
       material: Aluminum 6061-T6
       density: 2700
       color: '#a9b0b8'
       fabricated: true
       solids:
-      - kind: box
-        name: post
+      - kind: prism
+        name: drafted post
         position:
         - 0
+        - 0.01
         - 0
-        - 13.75 mm
-        size:
-        - 9 mm
-        - 20 mm
-        - 27.5 mm
-      - kind: box
-        name: front lead saddle shelf
-        position:
-        - -25 mm
-        - 19 mm
-        - 1 mm
-        size:
-        - 50 mm
-        - 54 mm
-        - 2 mm
+        axis:
+        - 0
+        - -1
+        - 0
+        u_axis:
+        - 1
+        - 0
+        - 0
+        depth: 0.02
+        profile:
+        - - -0.0045
+          - 0
+        - - 0.0045
+          - 0
+        - - 0.0045
+          - 0.028737406206591643
+        - - -0.0045
+          - 0.02853905316017432
       - kind: box
         op: remove
-        name: lead pocket
+        name: supplied strain relief clearance
         position:
         - 0
-        - 3 mm
-        - 12 mm
+        - 0.003
+        - 0.012
         size:
-        - 10 mm
-        - 16 mm
-        - 11 mm
+        - 0.01
+        - 0.016
+        - 0.011
       envelope_offset:
-      - -22.75 mm
-      - 18 mm
       - 0
+      - 0
+      - 0
+      features:
+      - id: top_thread_0
+        kind: tapped_hole
+        position:
+        - 0.00025
+        - 0.005
+        - 0.028843739490227907
+        axis:
+        - 0
+        - 0
+        - -1
+        depth: 0.0082
+        thread: shcs-m3
+      - id: top_thread_1
+        kind: tapped_hole
+        position:
+        - 0.00025
+        - -0.005
+        - 0.028843739490227907
+        axis:
+        - 0
+        - 0
+        - -1
+        depth: 0.0082
+        thread: shcs-m3
     interfaces:
       base:
         kind: hole_pattern
@@ -1312,7 +1687,7 @@ components:
         origin:
         - 0.25 mm
         - 0
-        - 27.5 mm
+        - 0.02864373949022791
         z:
         - 0
         - 0
@@ -1327,12 +1702,27 @@ components:
             - 5 mm
             - 3 mm
             - tapped
-            - 8 mm
+            - 0.008
           - - 0
             - -5 mm
             - 3 mm
             - tapped
-            - 8 mm
+            - 0.008
+      ear_seat:
+        kind: face_mount
+        origin:
+        - 0.25 mm
+        - 0
+        - 0.02864373949022791
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+
   - id: lead-post-petg
     kind: structure
     cad_name: Lead post
@@ -1367,14 +1757,16 @@ components:
       moving: true
       fabricated: true
       solids:
-        - {kind: prism, name: arms, position: [0, 0, 0], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 6 mm,
+        - {kind: prism, name: arms, position: [0, 0, 0], axis: [0, 0, 1], u_axis: [1, 0, 0], depth: 5.5 mm,
            profile: [[-24.3 mm, -10.5 mm], [-14.8 mm, -10.5 mm], [0, -5.5 mm], [0, 5.5 mm], [-14.8 mm, 10.5 mm], [-24.3 mm, 10.5 mm]]}
         - {kind: cylinder, name: hub, position: [0, 0, 0], axis: [0, 0, 1], diameter: 11 mm, length: 7.5 mm}
+        - {kind: cylinder, name: left stud boss, position: [-19.8 mm, 6 mm, -0.5 mm], axis: [0, 0, 1], diameter: 9 mm, length: 0.5 mm}
+        - {kind: cylinder, name: right stud boss, position: [-19.8 mm, -6 mm, -0.5 mm], axis: [0, 0, 1], diameter: 9 mm, length: 0.5 mm}
     interfaces:
-      spline: {kind: spline, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {teeth: 25, d: 5.92 mm, gender: female, depth: 4 mm}}
-      screw: {kind: hole_pattern, origin: [0, 0, 4 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3.5 mm]]}}
-      ball_l: {kind: hole_pattern, origin: [-19.8 mm, 6 mm, 6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
-      ball_r: {kind: hole_pattern, origin: [-19.8 mm, -6 mm, 6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
+      spline: {kind: spline, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {teeth: 25, d: 6.02 mm, gender: female, depth: 3.5 mm}}
+      screw: {kind: hole_pattern, origin: [0, 0, 3.5 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 4 mm]]}}
+      ball_l: {kind: hole_pattern, origin: [-19.8 mm, 6 mm, 5.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
+      ball_r: {kind: hole_pattern, origin: [-19.8 mm, -6 mm, 5.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 6 mm]]}}
   - id: spacer-m2.5-ff-10
     kind: structure
     cad_name: Spacer M2.5 F-F 10
@@ -1593,22 +1985,109 @@ components:
     cad_name: Servo output 25T
     cad_family: Servo DS3218
     name: Servo output shaft, 25T spline, M3 horn-screw thread (part of the DS3218)
-    description: Frame at the bottom of the 4 mm journal in the case bushing; the spline starts at the case top (z = 4 mm).
+    description: 'Intact official DS3218 STEP solid 2, including output gear and journal; frame at journal bottom
+      (source Y=17.8 mm). Component axes retain STEP orientation: X is the long case direction, Y is height, Z is
+      width.'
     mechanical:
-      shape: cylinder
+      shape: custom
       axis: z
-      size: [5.9 mm, 9 mm]
+      size:
+      - 0.0173
+      - 0.0158
+      - 0.0173
       mass: 0.002
       material: Steel
-      color: "#202020"
+      color: '#202020'
       moving: true
-      features:
-        - {id: horn_screw, kind: tapped_hole, position: [0, 0, 9 mm], axis: [0, 0, -1], depth: 8 mm, thread: shcs-m3}
-      provenance: {status: estimated, source: "25T servo spline at its 5.9 mm major diameter; mass estimated (included in the servo's 60 g)"}
+      features: []
+      provenance:
+        status: vendor
+        source: DSSERVO official DS3218.stp solid 2; 6 mm journal, 25T spline and M3 tapped horn hole supplied intact.
+      envelope_offset:
+      - 0
+      - -0.0002
+      - -0.00865
+      solids: []
     interfaces:
-      journal: {kind: shaft, origin: [0, 0, 4 mm], z: [0, 0, -1], x: [1, 0, 0], params: {d: 5.9 mm, length: 4 mm, short_engagement_ok: true}}
-      spline: {kind: spline, origin: [0, 0, 4 mm], z: [0, 0, 1], x: [1, 0, 0], params: {teeth: 25, d: 5.9 mm, gender: male, length: 5 mm}}
-      top: {kind: hole_pattern, origin: [0, 0, 9 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 8 mm]]}}
+      journal:
+        kind: shaft
+        origin:
+        - 0
+        - 3.8 mm
+        - 0
+        z:
+        - 0
+        - -1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+        params:
+          d: 6 mm
+          length: 3.8 mm
+          short_engagement_ok: true
+      spline:
+        kind: spline
+        origin:
+        - 0
+        - 4.6 mm
+        - 0
+        z:
+        - 0
+        - 1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+        params:
+          teeth: 25
+          d: 6 mm
+          gender: male
+          length: 2.6 mm
+      top:
+        kind: hole_pattern
+        origin:
+        - 0
+        - 7.7 mm
+        - 0
+        z:
+        - 0
+        - 1
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+        params:
+          holes:
+          - - 0
+            - 0
+            - 3 mm
+            - tapped
+            - 8 mm
+    model:
+      source: vendor
+      url: https://www.dsservo.com/down.asp?id=25
+      path: DS3218.stp
+      sha256: 47c8ff34f7657c769ae645acb670d2eacd326f3600986931e70dcc4c6bf3ab8b
+      license: Manufacturer CAD; no redistribution of cached bytes
+      placement:
+        origin:
+        - -0.01
+        - -0.0178
+        - 0
+        x:
+        - 1
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - 1
+      params:
+        bank_id: servo-output-25t
   - id: screw-cap-m2.5-petg
     kind: structure
     cad_name: Screw cap M2.5
@@ -2522,3 +3001,146 @@ components:
         length: 1.2 mm
     description: Collared PETG cable tie support, mounted through a capped M3 screw
       join.
+
+  - id: servo-ear-clamp-pa12
+    kind: structure
+    cad_name: DS3218 ear clamp
+    name: DS3218 drafted ear clamp, PA12
+    description: Drafted seat retains the official DS3218 open ear slots. M3 clamp screws fit through the purchased
+      4.5 mm slots; relieved centre clears the moulded ear rib.
+    mechanical:
+      shape: custom
+      size:
+      - 0.0124
+      - 0.026
+      - 0.005476314
+      envelope_offset:
+      - -0.0018
+      - 0
+      - -0.000176314
+      mass: 0.0008
+      material: Nylon PA12
+      density: 1010
+      fabricated: true
+      solids:
+      - kind: prism
+        name: drafted clamp
+        position:
+        - 0
+        - 0.013
+        - 0
+        axis:
+        - 0
+        - -1
+        - 0
+        u_axis:
+        - 1
+        - 0
+        - 0
+        depth: 0.026
+        profile:
+        - - -0.008
+          - -0.00017631381903762225
+        - - 0.0044
+          - 9.697260047069225e-05
+        - - 0.0044
+          - 0.0028
+        - - -0.008
+          - 0.0028
+      - kind: box
+        op: remove
+        name: ear rib clearance
+        position:
+        - 0.0015
+        - 0
+        - 0.001
+        size:
+        - 0.007
+        - 0.0045
+        - 0.004
+      - kind: box
+        name: head plate
+        position:
+        - -0.0018
+        - 0
+        - 0.00405
+        size:
+        - 0.0124
+        - 0.026
+        - 0.0025
+      features:
+      - id: clamp_hole_0
+        kind: clearance_hole
+        position:
+        - 0
+        - 0.005
+        - 0.0053
+        axis:
+        - 0
+        - 0
+        - -1
+        diameter: 0.0034
+        depth: 0
+      - id: shank_relief_0
+        kind: clearance_hole
+        position:
+        - 0
+        - 0.005
+        - 0.0028
+        axis:
+        - 0
+        - 0
+        - -1
+        diameter: 0.0045
+        depth: 0.0033
+      - id: clamp_hole_1
+        kind: clearance_hole
+        position:
+        - 0
+        - -0.005
+        - 0.0053
+        axis:
+        - 0
+        - 0
+        - -1
+        diameter: 0.0034
+        depth: 0
+      - id: shank_relief_1
+        kind: clearance_hole
+        position:
+        - 0
+        - -0.005
+        - 0.0028
+        axis:
+        - 0
+        - 0
+        - -1
+        diameter: 0.0045
+        depth: 0.0033
+    interfaces:
+      bottom:
+        kind: hole_pattern
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 0.005
+            - 0.0034
+            - clearance
+            - 0.0053
+          - - 0
+            - -0.005
+            - 0.0034
+            - clearance
+            - 0.0053

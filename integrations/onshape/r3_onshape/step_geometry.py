@@ -82,7 +82,8 @@ def read_step(name: str, path: Path, placement: Frame) -> PartGeometry:
             radius = value.Radius() / 1000
         if kind != "OTHER":
             origin = placement.point(np.array(value.Location().Coord()) / 1000)
-            direction = placement.vector(value.Axis().Direction().Coord())
+            direction = (np.zeros(3) if kind == "SPHERE" else
+                         placement.vector(value.Axis().Direction().Coord()))
         points = triangles.reshape(-1, 3)
         faces.append(Face(str(len(faces)), name, kind, origin, direction, radius,
                           float(area), points.min(axis=0), points.max(axis=0), triangles=triangles))

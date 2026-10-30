@@ -21,6 +21,7 @@ from pydantic_core import PydanticCustomError
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .units import Quantity, Vector
+from .ratings import RatedJointDemand
 
 SCHEMA_ID = "r3/robot@1"
 
@@ -91,6 +92,7 @@ class OwnedSpec(_Model):
 
 
 class ComponentInstance(_Model):
+    purchased_unit: str | None = Field(default=None, description="Owner instance of the purchased assembly this supplied subpart belongs to.")
     type: str = Field(default="", description="Catalog id, e.g. raspberry-pi-5-8gb. Optional when `source` is given; "
                                               "a pinned sourcing choice replaces it.")
     source: SourceSpec | None = Field(default=None, description="Requirements for sourcing this part online.")
@@ -190,6 +192,7 @@ class Interface(_Model):
     """
 
     id: str
+    rated_internal: RatedJointDemand | None = None
     kind: InterfaceKind
     parts: list[str] = Field(min_length=2, max_length=2)
     axis_point: Vector | None = None
@@ -198,6 +201,12 @@ class Interface(_Model):
                                                         "frame). Resolved to the robot frame once the assembly is compiled.")
     params: dict[str, Any] = Field(default_factory=dict)
     join: str | None = Field(default=None, description="Assembly join this interface was derived from.")
+
+    @model_validator(mode="after")
+    def _rated_motion_only(self) -> "Interface":
+        if self.rated_internal is not None and self.kind != "revolute_fit":
+            raise ValueError("rated_internal applies only to an internal running joint")
+        return self
 
 
 class Mechanical(_Model):
@@ -233,6 +242,14 @@ class HarnessConnector(_Model):
 
 class Splice(_Model):
     position: Vector
+    direction: Vector | None = Field(default=None, min_length=3, max_length=3,
+                                    description="Installed sleeve axis in the robot frame; omitted axes may be planned.")
+
+    @model_validator(mode="after")
+    def _sleeve_axis(self) -> "Splice":
+        if self.direction is not None and sum(v * v for v in self.direction) < 1e-12:
+            raise ValueError("splice direction must be non-zero")
+        return self
 
 
 class Wire(_Model):
@@ -246,6 +263,8 @@ class Wire(_Model):
 
 
 class RouteHint(_Model):
+    independent_branches: bool = Field(default=False, description="Route terminal pairs in separate physical lanes; "
+                                       "only conductors joining the same terminals share a bundle core.")
     via: list[Vector] = Field(default_factory=list, description="Ordered waypoints in the robot frame.")
     wire_via: dict[str, list[Vector]] = Field(default_factory=dict, description="Branch waypoints keyed by a wire ID, "
                                              "ordered from that wire's from terminal to its to terminal. Wires joining "
@@ -435,6 +454,7 @@ class Join(_Model):
     ``a``'s z (a positive offset leaves a gap)."""
 
     a: str = Field(description="<object>.<interface> on the parent side.")
+    rated_internal: RatedJointDemand | None = None
     b: str = Field(description="<object>.<interface> on the child side.")
     kind: Literal["fasten", "revolute", "slider", "ball", "drive_flat"] = "fasten"
     id: str | None = Field(default=None, description="Stable join id; default '<a>~<b>'.")
@@ -449,6 +469,12 @@ class Join(_Model):
     friction: Quantity = 0.0
     verify: dict[str, Any] = Field(default_factory=dict, description="Exact-geometry verification limits copied into the derived "
                                                                      "mechanical interface (clearance, min_engagement, retainers, ...).")
+
+    @model_validator(mode="after")
+    def _rated_motion_only(self) -> "Join":
+        if self.rated_internal is not None and self.kind not in ("revolute", "slider"):
+            raise ValueError("rated_internal requires a revolute or slider join")
+        return self
 
     @property
     def join_id(self) -> str:

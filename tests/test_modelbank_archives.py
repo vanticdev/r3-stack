@@ -49,3 +49,25 @@ def test_rar_member_selection_and_bounds(tmp_path, monkeypatch):
     monkeypatch.setattr(module, 'MAX_BYTES', 5)
     with pytest.raises(ValueError, match='uncompressed STEP'):
         unpack(path, source(member='../../motor.step'))
+
+
+def test_component_resolver_accepts_pinned_rar_bank_source(tmp_path, monkeypatch):
+    import importlib
+    from r3_catalog.modelbank import ModelBank, ModelEntry
+    from r3_catalog.schema import ModelRef
+    from r3_connectors.models import resolve_step
+    module = importlib.import_module('r3_catalog.modelbank.fetch')
+    entry = ModelEntry(id='vendor-actuator', name='Actuator', category='other',
+                       sources=[source(sha256='a' * 64, solid_indices=[1])])
+    monkeypatch.setattr(ModelBank, 'get', lambda self, name: entry)
+    archive = tmp_path / 'vendor.rar'
+    selected = tmp_path / 'selected.step'
+    monkeypatch.setattr(module, 'acquire', lambda item: (archive, item))
+    calls = []
+    def unpack_selected(path, item):
+        calls.append((path, item.solid_indices))
+        return selected
+    monkeypatch.setattr(module, 'unpack', unpack_selected)
+    ref = ModelRef(source='vendor', params={'bank_id': entry.id})
+    assert resolve_step(ref) == selected
+    assert calls == [(archive, [1])]
