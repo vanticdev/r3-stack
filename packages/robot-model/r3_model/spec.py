@@ -246,6 +246,8 @@ class Wire(_Model):
 
 
 class RouteHint(_Model):
+    independent_branches: bool = Field(default=False, description="Route terminal pairs in separate physical lanes; "
+                                       "only conductors joining the same terminals share a bundle core.")
     via: list[Vector] = Field(default_factory=list, description="Ordered waypoints in the robot frame.")
     wire_via: dict[str, list[Vector]] = Field(default_factory=dict, description="Branch waypoints keyed by a wire ID, "
                                              "ordered from that wire's from terminal to its to terminal. Wires joining "

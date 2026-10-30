@@ -836,6 +836,10 @@ class HarnessRouter:
 
     # -------------------------------------------------------------- harness
     def _route_harness(self, harness: Harness, nodes: dict[str, NodePoint]) -> tuple[HarnessRoute, dict[str, WireRoute]] | None:
+        if harness.route.independent_branches:
+            from .branch_lanes import route_lanes
+
+            return route_lanes(self, harness, nodes)
         def node_name(ref: str) -> str:
             return ref if ref in harness.splices else ref.split(".")[0]
 
@@ -1090,6 +1094,12 @@ class HarnessRouter:
             return None
         pin = ref.split(".", 1)[1]
         if node.connector_type == "integral" or geometry_of(self.catalog, node.connector_type) is None:
+            # Integral pin coordinates belong to the complete installed lead,
+            # even when a branch is routed on its own.
+            harness = next(h for h in self.spec.electrical.harnesses if h.id == node.harness)
+            by_pin = {r.split(".", 1)[1]: self._wire_od(w.awg)
+                      for w in harness.wires for r in (w.from_, w.to)
+                      if r.startswith(node.name + ".")}
             return pigtail_ends(node.frame, list(by_pin), by_pin, node.ref).get(pin)
         return pin_end(self.catalog, node.connector_type, node.frame, pin, node.ref)
 

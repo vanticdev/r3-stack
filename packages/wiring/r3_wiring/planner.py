@@ -1409,8 +1409,14 @@ def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str,
         segments, junctions = build_problem(project, router, routing, group, supports)
         if not segments:
             continue
-        plan = plan_bundle(segments, junctions, fields, requirement, max_iterations=max_iterations,
-                           obstacles=obstacles)
+        if any(h.route.independent_branches for h in project.spec.electrical.harnesses if h.id in group):
+            from .branch_lanes import plan_lanes
+
+            plan = plan_lanes(project, router, routing, segments, junctions, fields, requirement,
+                              max_iterations=max_iterations, obstacles=obstacles)
+        else:
+            plan = plan_bundle(segments, junctions, fields, requirement, max_iterations=max_iterations,
+                               obstacles=obstacles)
         plans.append(plan)
         stats["+".join(group)] = plan.stats
         _apply(project, routing, plan, moved)

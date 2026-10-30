@@ -110,6 +110,12 @@ share a corridor; conflicting waypoint lists or unknown wire IDs are rejected.
 These coordinates guide routing, never substitute for installed supports, and
 remain subject to the existing collision and bend-radius checks.
 
+`route.independent_branches: true` gives each terminal pair a separate physical
+lane. Earlier lanes reserve their full diameter in voxel routing and curvature
+planning. Pins remain fixed, and a solder splice keeps one position and axis
+across all its branches. This is useful for stiff loose conductors that cannot
+share an incidental centreline fork; it does not enlarge collision exemptions.
+
 ### Connector geometry and `build/connectors/connectors.json`
 
 Each catalog connector type has exact geometry (`r3_catalog` `connector_geometry.yaml`,
