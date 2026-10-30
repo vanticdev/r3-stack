@@ -194,7 +194,7 @@ materials:
     process: machined
     keywords:
     - '7075'
-    density: 2700
+    density: 2800
     tensile_strength: 572000000.0
     tensile_strength_z: 572000000.0
     youngs_modulus: 71700000000.0
@@ -211,7 +211,7 @@ materials:
         source: R3 dry surface friction estimate
     provenance:
       status: estimated
-      source: Kaiser Aluminum 7075 technical data, typical T6 values; typical values,
+      source: Kaiser Aluminum 7075 technical data https://online.kaiseraluminum.com/depot/PublicProductInformation/Document/1028/Kaiser_Aluminum_7075_Rod_and_Bar.pdf; typical T6 values,
         no certified material lot
   - id: steel
     name: Unspecified steel
