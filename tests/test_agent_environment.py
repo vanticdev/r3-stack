@@ -66,3 +66,46 @@ def test_session_sandbox_can_commit_and_push_its_own_project(tmp_path):
     head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     pushed = subprocess.check_output(["git", "--git-dir", str(remote), "rev-parse", "refs/heads/probe"], text=True).strip()
     assert pushed == head
+
+
+def test_robot_session_does_not_inherit_unrelated_account_tools_and_skills(tmp_path):
+    from r3_orchestrator.api.agents import codex_scope_overrides
+
+    home = tmp_path / "account"
+    config_home = home / ".codex"
+    skill = config_home / "skills" / "unrelated-skill"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("# Unrelated account skill\n")
+    account_config = config_home / "config.toml"
+    account_config.write_text('[mcp_servers.unrelated]\ncommand="fixture"\n[plugins."unrelated@fixture"]\nenabled=true\n')
+    before = account_config.read_bytes()
+    args = codex_scope_overrides(tmp_path / "project", account_home=home)
+    effective = {}
+    for i, value in enumerate(args):
+        if value != "-c":
+            continue
+        key, literal = args[i + 1].split("=", 1)
+        target = effective
+        # Codex CLI -c paths split on dots; unlike TOML file keys, components
+        # are not quoted (plugin ids can contain @).
+        parts = key.split(".")
+        for part in parts[:-1]:
+            target = target.setdefault(part, {})
+        target[parts[-1]] = tomllib.loads("value=" + literal)["value"]
+    assert effective["mcp_servers"]["unrelated"]["enabled"] is False
+    assert effective["plugins"]["unrelated@fixture"]["enabled"] is False
+    assert effective["apps"]["_default"]["enabled"] is False
+    assert {"path": str(skill.resolve()), "enabled": False} in effective["skills"]["config"]
+    assert {"path": str(skill.resolve() / "SKILL.md"), "enabled": False} in effective["skills"]["config"]
+    assert account_config.read_bytes() == before
+
+
+@pytest.mark.skipif(shutil.which("codex") is None, reason="Codex CLI configuration integration probe")
+def test_native_codex_accepts_generated_session_configuration(tmp_path):
+    from r3_orchestrator.api.agents import codex_command, mcp_config
+
+    command = codex_command("codex", tmp_path, mcp_config(tmp_path), "gpt-6-astra")
+    options = [part for i, value in enumerate(command) if value == "-c" for part in ("-c", command[i + 1])]
+    process = subprocess.run(["codex", "app-server", "--print-startup-config", *options], cwd=tmp_path,
+                             capture_output=True, text=True, timeout=30)
+    assert process.returncode == 0, process.stderr

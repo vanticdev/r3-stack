@@ -335,6 +335,15 @@ def _custom_requirement(ctx: _Context, definition: Any) -> list[Evidence]:
 
     if not isinstance(definition, dict):
         return []
+    if isinstance(test := definition.get("test"), str):
+        result = ctx.result("tests")
+        case = (result.metrics.get("cases") or {}).get(test) if result else None
+        if not isinstance(case, dict):
+            return []
+        state = case.get("status")
+        passed = None if state == "skipped" else state == "passed" and not result.errors
+        return [ctx.stage_evidence("tests", test, passed, state, "passed", "tests/junit.xml",
+                                   detail="Project-authored check executed by pytest; source edits invalidate this evidence")]
     stage, metric = definition.get("stage"), definition.get("metric")
     op = definition.get("op")
     compare = {"<=": operator.le, ">=": operator.ge, "==": operator.eq, "<": operator.lt, ">": operator.gt}.get(op) if isinstance(op, str) else None
@@ -375,7 +384,7 @@ def _requirement_items(ctx: _Context) -> list[Item]:
     for name, value in (requirements.extra or {}).items():
         evidence = _custom_requirement(ctx, value)
         items.append(Item(f"requirement.extra.{name}", "requirement", name, value, evidence=evidence,
-                          message="" if evidence else "custom requirement needs current stage evidence: {stage, metric, op, value}"))
+                          message="" if evidence else "custom requirement needs current evidence: {stage, metric, op, value} or {description, test}"))
     return items
 
 

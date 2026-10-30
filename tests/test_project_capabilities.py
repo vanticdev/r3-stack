@@ -70,6 +70,13 @@ def test_author_components_designs_and_scenarios_from_tools(project):
     assert built.assembly is not None
 
 
+def test_cad_plan_on_empty_project_returns_actionable_readiness(project):
+    result = m.r3_cad_plan(project=str(project))
+    assert not result["ok"] and result["code"] == "not_configured"
+    assert "components" in result["message"] and result["hint"]
+    assert result["dry_run"]
+
+
 def test_project_models_download_with_provenance_and_do_not_write_platform(project, tmp_path, monkeypatch):
     shared = tmp_path / "shared-bank"
     shared.mkdir()
@@ -274,3 +281,29 @@ def test_session_mcp_transports_schema_and_real_image_blocks(project):
             assert not schema.is_error and "electrical_factory" in schema.content[0].text
 
     asyncio.run(asyncio.wait_for(check(), 60))
+
+
+def test_custom_requirement_uses_actual_project_test_outcome(project):
+    tests = project / "tests"
+    tests.mkdir()
+    source = tests / "test_contract.py"
+    source.write_text("def test_contract():\n    assert True\n")
+    initial = m.r3_run_project_tests(project=str(project))
+    case_id = next(iter(initial["stages"][0]["metrics"]["cases"]))
+    current = m.r3_get_spec(project=str(project))
+    assert m.r3_patch_spec({"requirements": {"extra": {"contract": {
+        "description": "Synthetic contract assertion", "test": case_id}}}}, current["sha256"], project=str(project))["ok"]
+    from r3_orchestrator.release import evaluate
+
+    def state():
+        return next(item["status"] for item in evaluate(Project.load(project))["items"] if item["id"] == "requirement.extra.contract")
+
+    assert state() == "stale"
+    assert m.r3_run_project_tests(project=str(project))["ok"]
+    assert state() == "verified"
+    source.write_text("def test_contract():\n    assert False\n")
+    assert not m.r3_run_project_tests(project=str(project))["ok"]
+    assert state() == "failed"
+    source.write_text("import pytest\n@pytest.mark.skip(reason='unmeasured')\ndef test_contract():\n    assert True\n")
+    assert not m.r3_run_project_tests(project=str(project))["ok"]
+    assert state() == "not_run"

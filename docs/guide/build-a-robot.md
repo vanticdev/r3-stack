@@ -24,6 +24,8 @@ normal git and the R3 MCP tools. The user message is passed unchanged. Use
 typed authoring reference, including field descriptions and nested definitions
 (also `connector` and `wire` for project catalog additions).
 Use these tools and this guide; reading platform source is not required.
+The session exposes R3's permitted tools directly and excludes unrelated account
+plugins and skills, so another project's context is not needed or inherited.
 
 When the user explicitly requests GitHub publication, initialize a repository
 inside the project (`git init -b main`) before staging files, then use `gh repo
@@ -50,6 +52,10 @@ conservative, clearly labelled assumptions for unspecified screw lengths, printe
 volume, nozzle, material and process settings. Validate the design against those settings
 and include an assumptions list in the final report. Unknown physical dimensions and
 unconfirmed purchased-part interfaces remain measurement blockers; never label them verified.
+These block final qualification, rather than all other engineering work: finish the
+independent parametric design, software and simulations under labelled assumptions,
+then list the physical measurements still needed. A missing bank entry or simulated
+device is a project research/authoring task, using the capabilities below.
 Keep work inside the project and R3 platform sources; do not consult other local robot
 projects, old robot git history, worktrees or other agents' session files.
 
@@ -337,6 +343,15 @@ hand-authored success flag. Run them with `r3_run_project_tests`,
 stage after simulation. Logs and JUnit results are in `build/tests/`; an empty or
 entirely skipped suite cannot pass. Standard pipeline checks remain in force.
 Firmware, device-source and test edits invalidate older release evidence.
+
+To check a custom requirement that is not a numeric stage metric, retain its
+description and bind it to an actual project test:
+`requirements.extra.fixture: {description: "The fixture has a declared root", test: "tests.test_design::test_root_declared"}`.
+Use the exact case ID from the test stage's `metrics.cases` result. The test must
+assert the stated requirement against the design or native-twin evidence.
+Release uses the runner's actual JUnit outcome; missing or skipped cases remain
+pending, failures block release, and editing the test makes older evidence stale.
+Never replace the requirement with a hand-authored passing flag.
 
 ## 9. Iterate to release evidence
 

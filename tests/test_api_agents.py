@@ -119,6 +119,11 @@ def test_codex_session(env):
     assert 'web_search="live"' in overrides
     assert any(o.startswith("developer_instructions=") for o in overrides)
     assert 'mcp_servers.r3.args=["-m", "r3_orchestrator.mcp_server"]' in overrides
+    tool_policy = next(o for o in overrides if o.startswith("mcp_servers.r3.tools="))
+    approved = tomllib.loads(tool_policy)["mcp_servers"]["r3"]["tools"]
+    assert set(approved) == set(mcp_server.ungated_tools())
+    assert all(value == {"approval_mode": "approve"} for value in approved.values())
+    assert not set(approved) & GATED
     disabled = next(o for o in overrides if o.startswith("mcp_servers.r3.disabled_tools="))
     assert set(json.loads(disabled.split("=", 1)[1])) == GATED
     assert json.loads(log.read_text())["stdin"] == "design a robot"

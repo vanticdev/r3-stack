@@ -190,8 +190,21 @@ def r3_get_schema(domain: str = "robot") -> dict[str, Any]:
 def r3_cad_plan(project: str = "") -> dict[str, Any]:
     """Offline standard-feature plan and estimated Onshape quota calls. Does not build CAD or claim measured geometry."""
     from r3_onshape.dry_run import rebuild_plan
+    from .readiness import precheck
 
-    return _guard(lambda: {"ok": True, "plan": rebuild_plan(api.load_project(project or None))})
+    def plan() -> dict[str, Any]:
+        loaded = api.load_project(project or None)
+        pending = precheck(loaded, "cad")
+        if pending is not None:
+            diagnostic = pending.diagnostics[0]
+            return {"ok": False, "code": diagnostic.code, "message": diagnostic.message, "hint": diagnostic.hint,
+                    "diagnostics": [d.model_dump(mode="json") for d in pending.diagnostics], "dry_run": True}
+        try:
+            return {"ok": True, "plan": rebuild_plan(loaded)}
+        except ValueError as error:
+            return {"ok": False, "code": "cad_plan_invalid", "message": str(error), "dry_run": True}
+
+    return _guard(plan)
 
 
 @_tool(_DESIGN)

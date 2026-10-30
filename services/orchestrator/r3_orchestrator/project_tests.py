@@ -58,9 +58,15 @@ def run(project: Project, timeout: float = 300) -> StageResult:
         failed = sum(case.find("failure") is not None or case.find("error") is not None for case in cases)
         result.metrics.update(collected=len(cases), executed=len(cases) - skipped, skipped=skipped, failed=failed,
                               returncode=process.returncode)
+        result.metrics["cases"] = {
+            f"{case.get('classname', '')}::{case.get('name', '')}": {
+                "status": "skipped" if case.find("skipped") is not None else
+                          "failed" if case.find("failure") is not None or case.find("error") is not None else "passed"}
+            for case in cases}
         if process.returncode or failed or len(cases) == skipped:
             result.add(Diagnostic.error("project_tests_failed", f"Project tests: exit {process.returncode}, {failed} failures, "
-                                        f"{len(cases) - skipped} executed; see tests/pytest.log", data=dict(result.metrics)))
+                                        f"{len(cases) - skipped} executed; see tests/pytest.log",
+                                        data={key: value for key, value in result.metrics.items() if isinstance(value, (int, float))}))
     except subprocess.TimeoutExpired:
         result.add(Diagnostic.error("project_tests_timeout", f"Project tests exceeded {timeout:g} seconds", data={"timeout_s": timeout}))
     except (OSError, ValueError, ET.ParseError) as error:

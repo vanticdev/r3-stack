@@ -51,6 +51,7 @@ import sys
 import threading
 import time
 import uuid
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
@@ -85,6 +86,9 @@ Do not read other local projects, worktrees, old robot git history or other agen
 There is no human available for routine engineering choices: choose sensible conservative assumptions
 for unspecified fasteners, process settings, printer envelope and similar details, label them, validate
 against them and list them at the end. Unknown physical measurements remain explicit release blockers.
+Pending measurements block final qualification, not other independent work: carry clearly labelled parametric
+assumptions through design, firmware and simulation, complete what can be completed, and list the measurements.
+Missing catalog entries, models or devices are research and project-authoring tasks using the documented tools.
 Never weaken requirements, limits or checks. Iterate using diagnostics and r3_release_status.
 Finish with stage and scenario results, remaining diagnostics, assumptions and required measurements."""
 
@@ -151,8 +155,48 @@ def codex_permission_profile(project_root: Path) -> dict[str, Any]:
             "network": {"enabled": True}}
 
 
+def codex_scope_overrides(project_root: Path, account_home: Path | None = None) -> list[str]:
+    """A robot session uses R3 tools and its project, not unrelated account plugins/skills.
+
+    Authentication and provider settings still come from the user's normal CLI.
+    Overrides apply only to this process; account files are never rewritten.
+    """
+    home = account_home or Path.home()
+    codex_home = home / ".codex" if account_home else Path(os.environ.get("CODEX_HOME", home / ".codex"))
+    path = codex_home / "config.toml"
+    try:
+        config = tomllib.loads(path.read_text()) if path.exists() else {}
+    except (OSError, tomllib.TOMLDecodeError):
+        config = {}  # the CLI reports malformed account configuration itself
+    overrides = []
+    for name in sorted(config.get("mcp_servers", {})):
+        if name != MCP_SERVER:
+            overrides += ["-c", f"mcp_servers.{name}.enabled=false"]
+    for name in sorted(config.get("plugins", {})):
+        overrides += ["-c", f"plugins.{name}.enabled=false"]
+    overrides += ["-c", "apps._default.enabled=false"]
+    for name in sorted(config.get("apps", {})):
+        if name != "_default":
+            overrides += ["-c", f"apps.{name}.enabled=false"]
+    roots = (codex_home / "skills", home / ".agents" / "skills")
+    skills = {p.parent.resolve() for root in roots if root.exists() for p in root.rglob("SKILL.md")}
+    # rglob does not traverse directory symlinks. Standalone skill links are
+    # common in account roots, and must receive the same scope treatment.
+    skills.update(p.resolve() for root in roots if root.exists() for p in root.iterdir() if (p / "SKILL.md").is_file())
+    skills.update(Path(item["path"]).expanduser().resolve() for item in config.get("skills", {}).get("config", []) if item.get("path"))
+    project_root = project_root.resolve()
+    platform_root = Path(__file__).resolve().parents[4]
+    outside = [p for p in sorted(skills) if p != project_root and project_root not in p.parents
+               and p != platform_root and platform_root not in p.parents]
+    # Releases differ on whether skill policy keys identify the folder or its
+    # SKILL.md. Include both forms; neither enables or copies account content.
+    disabled = [{"path": str(path), "enabled": False} for p in outside for path in (p, p / "SKILL.md")]
+    overrides += ["-c", f"skills.config={_toml(disabled)}"]
+    return overrides
+
+
 def codex_command(executable: str, project_root: Path, config: dict[str, Any], model: str | None = None) -> list[str]:
-    _, gated = _tools()
+    allowed, gated = _tools()
     server = config["mcpServers"][MCP_SERVER]
     prefix = f"mcp_servers.{MCP_SERVER}"
     command = [executable, "exec", "--json", "--skip-git-repo-check", "--color", "never", "-C", str(project_root),
@@ -161,9 +205,14 @@ def codex_command(executable: str, project_root: Path, config: dict[str, Any], m
                "-c", f"permissions.r3_session={_toml(codex_permission_profile(project_root))}",
                "-c", 'web_search="live"',
                "-c", f"developer_instructions={_toml(SYSTEM_PROMPT)}",
+               "-c", f"{prefix}.enabled=true",
                "-c", f"{prefix}.command={_toml(server['command'])}", "-c", f"{prefix}.args={_toml(server['args'])}",
                "-c", f"{prefix}.env={_toml(server['env'])}", "-c", f"{prefix}.disabled_tools={_toml(gated)}",
+               "-c", f"{prefix}.enabled_tools={_toml(allowed)}",
+               "-c", f'{prefix}.default_tools_approval_mode="prompt"',
+               "-c", f"{prefix}.tools={_toml({tool: {'approval_mode': 'approve'} for tool in allowed})}",
                "-c", f"{prefix}.startup_timeout_sec=120", "-c", f"{prefix}.tool_timeout_sec={MCP_TOOL_TIMEOUT_S}"]
+    command += codex_scope_overrides(project_root)
     if model:
         command += ["--model", model]
     return [*command, "-"]
