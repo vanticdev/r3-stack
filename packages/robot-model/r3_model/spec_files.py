@@ -70,9 +70,11 @@ class SpecFiles:
         return digest.hexdigest()
 
     def origin(self, path: SpecPath) -> Origin:
+        requested = path
         while path not in self.origins:
             path = path[:-1]
-        return self.origins[path]
+        origin = self.origins[path]
+        return Origin(origin.file, (*origin.path, *requested[len(path):]))
 
     def error(self, code: str, path: SpecPath, message: str) -> SpecError:
         source = self.origin(path)
@@ -93,7 +95,7 @@ class SpecFiles:
                     code = "spec_reference_undefined"
                 if "unique" in message or "must differ" in message:
                     code = "spec_duplicate_definition"
-                path = tuple(item["loc"])
+                path = tuple(item.get("ctx", {}).get("spec_path", item["loc"]))
                 # Existing model-level validators include the offending identity
                 # in the message. Locate it rather than losing the source file.
                 if not path:
@@ -405,14 +407,15 @@ def validate_pulled_spec(root: str | Path) -> PulledModel:
         return pulled
 
 
-def refresh_pulled_spec(root: str | Path, expected_sha256: str | None = None) -> dict[str, Any]:
+def refresh_pulled_spec(root: str | Path, expected_sha256: str | None = None,
+                        *, manifest: dict[str, Any] | None = None) -> dict[str, Any]:
     """Pull-only hook: mirror the verified immutable manifest into part files.
 
     Call after atomically publishing cad/pulled and pinning cad_pull in the lock.
     Manifest instances must exactly equal components; missing or extra instances
     fail before any write, preserving the previous description on failure.
     """
-    from .pulled import load_pulled
+    from .pulled import PullError, load_pulled
 
     root = Path(root).resolve()
     with spec_lock(root):
@@ -422,6 +425,8 @@ def refresh_pulled_spec(root: str | Path, expected_sha256: str | None = None) ->
             raise files.error("spec_conflict", (), "description changed since read")
         pulled = load_pulled(root)
         _check_pulled_instances(files, pulled)
+        if manifest is not None and json.loads((root / "cad/pulled/pull.json").read_text()) != manifest:
+            raise PullError("cad_pull_modified", "Refresh manifest differs from the pinned CAD pull")
         parts, attachments = _pulled_values(pulled, root)
         documents = {name: roundtrip(text) for name, text in files.texts.items()}
         changed = set()
