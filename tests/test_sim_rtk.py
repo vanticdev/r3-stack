@@ -199,7 +199,7 @@ def test_estimator_uses_the_fix_sigma(firmware):
 
 # ---------------------------------------------------------------- evaluator
 def test_cross_track_window_starts_on_the_first_segment():
-    """The car approaches waypoint 1 from 1.9 m to the side (inside the capture circle), then tracks within 0.3 m:
+    """The robot approaches waypoint 1 from 1.9 m to the side (inside the capture circle), then tracks within 0.3 m:
     the first path segment, not the capture circle, opens the window."""
     waypoints = [[5, 0], [35, 0], [35, 15], [5, 15]]
     t = np.arange(0.0, 40.0, 0.01)
@@ -215,7 +215,7 @@ def test_cross_track_window_starts_on_the_first_segment():
 
 def test_stop_distance_is_measured_from_a_software_failsafe_gap_without_receiver_loss():
     """At the edge of range a 0.65 s frame gap (above the 0.25 s software timeout, below the receiver's 1 s) stops the
-    car while the receiver keeps resyncing; the stop distance is measured from that gap."""
+    robot while the receiver keeps resyncing; the stop distance is measured from that gap."""
     t = np.arange(0.0, 20.0, 0.01)
     speed = np.clip(4.0 - 4.4 * (t - 10.3), 0.0, 4.0)  # 0.3 s detection, then a 4.4 m/s^2 brake: ~2.9 m
     x = np.cumsum(speed) * 0.01

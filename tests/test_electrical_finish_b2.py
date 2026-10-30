@@ -8,11 +8,11 @@ from r3_kicad.arbiter import ArbiterParams, FailsafeArbiter, ArbiterState
 from r3_model.project import Project
 from r3_sim.evaluation import evaluate
 
-CAR = Path(__file__).resolve().parents[1] / 'tests/fixtures/bench'
+BENCH = Path(__file__).resolve().parents[1] / 'tests/fixtures/bench'
 
 
 def test_owned_imu_reachable_and_no_duplicate_address():
-    project = Project.load(CAR)
+    project = Project.load(BENCH)
     assert project.spec.components['imu'].owned
     assert project.graph.connected('pi.J8.3', 'imu.SDA')
     assert project.graph.connected('pi.J8.5', 'imu.SCL')

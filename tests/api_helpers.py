@@ -83,7 +83,7 @@ def write_stage_outputs(root: Path) -> None:
         "wires": {"W_BAT_P": {"harness": "supply", "awg": 12, "path": [[0, 0, 0], [0.05, 0, 0]], "routed_length": 0.05,
                               "cut_length": 0.08}},
         "harnesses": {"supply": {"bundle_path": [[0, 0, 0], [0.05, 0, 0]], "length": 0.05, "tie_points": []}},
-        "clearances": [{"wire": "W_BAT_P", "component": "wheel_rr", "min_distance": 0.012}]}))
+        "clearances": [{"wire": "W_BAT_P", "component": "sensor", "min_distance": 0.012}]}))
     (wiring / "harness_bom.csv").write_text("section,harness,item,awg,quantity,cut_length_mm\nwire,supply,W_BAT_P,12,1,79\n")
     (wiring / "slack_sim.json").write_text(json.dumps({"requirement": 0.008, "wires": {"W_BAT_P": {"min_distance": 0.02}}}))
     electrical = root / "build" / "electrical"
