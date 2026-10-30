@@ -2,12 +2,11 @@
 
     python -m r3_connectors <project dir> [--no-render]
 
-Reads catalog connector geometry, sourced component models and board exports,
+Reads catalog pin metadata and verified native pulled component meshes,
 and, when present, the wiring
 stage's ``routes.json``/``routing_detail.json``. Writes ``build/connectors/``:
 
-* ``models/connectors/<type>.glb``: every used connector type in its connector frame;
-* ``models/components/<type>.glb``: detailed component models in their component frames;
+* ``models/components/<instance hash>.glb``: pulled component meshes in their part frames;
 * ``connectors.json``: robot-frame frames of every component connector and harness
   half, every pin (contact, tip, wire entry, signal, net, bindings), mated pairs
   with their alignment, and the wire endpoints checked against their pins;
@@ -32,7 +31,7 @@ from r3_model.project import Project
 
 from .display import display_paths, overlaps
 from .frames import Frame
-from .models import ModelUnavailable, component_scene, connector_scene, export_glb, glb_digest
+from .models import export_glb, glb_digest
 from .pins import component_connector_frame, instance_frame, mating_site_frame
 
 STAGE = "connectors"
@@ -86,11 +85,9 @@ class ConnectorStage:
         return {t for t in types if t in self.catalog.connectors and self.catalog.connector(t).geometry is not None}
 
     def connector_models(self) -> None:
-        proxies = []
         for type_id in sorted(self.used_types()):
             ctype = self.catalog.connector(type_id)
             g = ctype.geometry
-            path = self.out / "models" / "connectors" / f"{type_id}.glb"
             entry: dict[str, Any] = {"family": ctype.family, "gender": ctype.gender, "mates_with": ctype.mates_with,
                                      "source": g.model.source, "model_path": g.model.path, "license": g.model.license,
                                      "provenance": g.model.provenance.model_dump(), "footprint": g.footprint,
@@ -101,25 +98,9 @@ class ConnectorStage:
                                                   "pad": None if p.pad is None else _r(p.pad),
                                                   "wire_entry": None if p.wire_entry is None else _r(p.wire_entry)}
                                               for n, p in g.pins.items()}}
-            if g.model.source == "proxy":
-                proxies.append(type_id)
-            try:
-                scene = connector_scene(self.catalog, type_id)
-                export_glb(scene, path)
-                self.scenes[type_id] = scene
-                entry["glb"] = str(path.relative_to(self.out))
-                entry["glb_sha256"] = glb_digest(path)
-            except (ModelUnavailable, FileNotFoundError) as error:
-                entry["glb"] = None
-                self.result.add(Diagnostic.warning("connector_model_unavailable", f"{type_id}: {error}",
-                                                   subjects=[type_id], data={"source": g.model.source}))
+            # Type geometry describes pins and ratings, never physical CAD.
+            entry["glb"] = None
             self.data["types"][type_id] = entry
-        if proxies:
-            self.result.add(Diagnostic.info(
-                "connector_model_proxy", f"{len(proxies)} connector types use datasheet proxies (no free KiCad or "
-                                         f"vendor model): {', '.join(proxies)}",
-                subjects=proxies, data={"count": len(proxies)}))
-        self.result.artifact("connectors/models/connectors", "glb", "Connector type models (connector frame, m)")
 
     def component_models(self) -> None:
         for cid, comp in self.spec.components.items():
@@ -177,13 +158,27 @@ class ConnectorStage:
                     "glb": self.data["types"].get(inst.type, {}).get("glb")}
 
     def _harness_frame(self, harness_id: str, name: str, conn: Any) -> tuple[Frame | None, str]:
+        ref = f"{harness_id}.{name}"
+        if conn.type != "integral":
+            part = self.pulled.parts.get(ref)
+            if part is None:
+                self.result.add(Diagnostic.error("cad_pull_missing", f"{ref}: cable half missing from native pull", subjects=[ref]))
+                return None, "unplaced"
+            local = part.mate_connectors.get("mating", part.mate_connectors.get("origin"))
+            if local is None:
+                self.result.add(Diagnostic.error("cad_pull_invalid", f"{ref}: missing native mating/origin connector", subjects=[ref]))
+                return None, "unplaced"
+            matrix = self.pulled.poses[ref] @ local
+            frame = Frame(matrix[:3, :3], matrix[:3, 3])
+            node = (self.detail or {}).get("nodes", {}).get(ref)
+            if node and node.get("frame"):
+                f = node["frame"]
+                stale = Frame.from_axes(f["origin"], f["x"], f["z"])
+                if not np.allclose(stale.matrix(), matrix, atol=1e-7, rtol=0):
+                    self.result.add(Diagnostic.error("connector_routes_stale", f"{ref}: routing frame differs from native pull; rerun wiring", subjects=[ref]))
+            return frame, "pulled"
         if conn.mates and conn.mates in self.graph.endpoints and self.graph.endpoints[conn.mates].owner_kind == "component":
-            board = mating_site_frame(self.project, f"{harness_id}.{name}", conn)
-            return (board, "pigtail") if conn.type == "integral" else (board.mated(), "component")
-        node = (self.detail or {}).get("nodes", {}).get(f"{harness_id}.{name}")
-        if node and node.get("frame"):
-            f = node["frame"]
-            return Frame.from_axes(f["origin"], f["x"], f["z"]), "floating"
+            return mating_site_frame(self.project, ref, conn), "pigtail"
         return None, "unplaced"
 
     def harness_connectors(self) -> None:
@@ -469,7 +464,7 @@ class ConnectorStage:
 
         for cid, comp in self.spec.components.items():
             ctype = self.catalog.component(comp.type)
-            scene = self.component_scenes.get(comp.type)
+            scene = self.component_scenes.get(cid)
             if scene is None:
                 continue
             bodies = None

@@ -2,9 +2,9 @@
 
 Two representations of every CAD part are checked, because each can be wrong in its own way:
 
-1. **The CAD export** (``build/cad/meshes/*.stl``, Onshape ``tessellatedfaces`` at chord tolerance
+1. **The CAD export** (``cad/pulled/parts/*.stl``, native STL export at chord tolerance
    ``c`` and angle tolerance 2 deg). It must be a closed, consistently wound, outward solid whose
-   bounds and volume match the Onshape mass properties within the tessellation error. Seams left by
+   bounds and volume match the pulled STEP properties within the tessellation error. Seams left by
    per-face tessellation are repaired first: coincident vertices are welded, collapsed and duplicate
    triangles removed, and boundary loops that are *seam gaps* (no wider than the chord tolerance) are
    closed. Larger openings are never filled: they are real holes.
@@ -24,7 +24,7 @@ from typing import Any
 import numpy as np
 
 #: Chord (sag) tolerance of the CAD export, m. Mirrors ``r3_onshape.model.CHORD_TOLERANCE`` (the
-#: ``chordTolerance`` sent to Onshape ``/tessellatedfaces``; ``tests/test_wiring_mesh_audit.py`` checks
+#: ``chordTolerance`` sent to the native selected-part STL export; ``tests/test_wiring_mesh_audit.py`` checks
 #: they agree). A part entry in ``cad_model.json`` may override it with ``chord_tolerance``.
 CAD_CHORD_TOLERANCE = 5e-5
 #: Vertex weld radius, m: 1/50 of the chord tolerance (1 um). The STL stores float32 metres
