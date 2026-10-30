@@ -142,7 +142,7 @@ def _shaft_bore_interface(join: Join, a: "ResolvedInterface", b: "ResolvedInterf
         if lengths:
             params["min_engagement"] = 0.9 * min(lengths)
     return Interface(id=join.join_id, kind=kind, parts=[shaft.obj, bore.obj], axis_point=wb[:3, 3].tolist(),
-                     axis_dir=(-wb[:3, 2]).tolist(), params=params, join=join.join_id)
+                     axis_dir=(-wb[:3, 2]).tolist(), params=params, join=join.join_id, rated_internal=join.rated_internal)
 
 
 def _interface_for_join(join: Join, a: "ResolvedInterface", b: "ResolvedInterface", result: "AssemblyResult") -> Interface | None:

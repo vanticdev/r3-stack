@@ -292,6 +292,28 @@ def _seat_distance_exact(solid: Any, frame: np.ndarray, iface: Any) -> float:
     return 0.0 if any(v == 0.0 for v in values) else values[0]
 
 
+def _clamp_bridges_offset(project: Project, assembly: AssemblyResult, join_id: str,
+                          refs: tuple[str, str], ifaces: list[Any], exact: dict[str, Any] | None) -> bool:
+    """An explicitly clamped spacer may separate the two joined seat faces.
+
+    Confirm that the same declared intermediate solid reaches both seats. Merely
+    naming a clamped part, or placing unrelated material in the gap, is not enough.
+    The CAD fastener check subsequently verifies the complete loaded contact stack.
+    """
+    if exact is None:
+        return False
+    join = next((j for j in project.spec.assembly.joins if j.join_id == join_id), None)
+    if join is None or join.fasteners is None:
+        return False
+    for name in join.fasteners.clamps or []:
+        if name in {i.obj for i in ifaces} or name not in exact:
+            continue
+        if all(_seat_distance_exact(exact[name], assembly.interface_world(ref), iface) == 0.0
+               for ref, iface in zip(refs, ifaces)):
+            return True
+    return False
+
+
 def check_seat_contact(project: Project, assembly: AssemblyResult, solids: dict[str, Solid], result: StageResult,
                        exact: dict[str, Any] | None = None) -> None:
     """Fasten seats must touch: each planar seat origin lies on its object's surface
@@ -313,7 +335,10 @@ def check_seat_contact(project: Project, assembly: AssemblyResult, solids: dict[
             distances = {ref: _signed_distance(solids[i.obj], assembly.interface_world(ref)[:3, 3])
                          for ref, i in zip(refs, ifaces) if i.obj in solids}
         off = {ref: d for ref, d in distances.items() if abs(d) > CONTACT_TOLERANCE}
-        if off or abs(entry.get("offset", 0.0)) > CONTACT_TOLERANCE:
+        gap = abs(entry.get("offset", 0.0)) > CONTACT_TOLERANCE
+        if gap and _clamp_bridges_offset(project, assembly, join_id, refs, ifaces, exact):
+            gap = False
+        if off or gap:
             result.add(Diagnostic.warning(
                 "seat_not_in_contact",
                 f"join {join_id}: seats do not touch (gap {entry.get('offset', 0.0) * 1e3:.3f} mm; "

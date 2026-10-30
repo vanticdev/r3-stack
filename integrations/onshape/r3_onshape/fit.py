@@ -529,6 +529,10 @@ class FitChecker:
         return ok, engaged
 
     def _if_revolute_fit(self, interface: Any, info: dict[str, Any]) -> bool:
+        from .rated_units import verify_rated_internal
+        rated = verify_rated_internal(self, interface, info)
+        if rated is not None:
+            return rated
         ok, _ = self._shaft_bore(interface, info, "running")
         a, b = interface.parts
         if interface.params.get("clearance") and to_si(interface.params["clearance"][0]) >= 0:

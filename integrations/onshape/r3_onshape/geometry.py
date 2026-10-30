@@ -320,8 +320,11 @@ def operation_manifold(op: Operation):
         w = op.plane.normal * op.direction
         depth = op.depth if op.depth is not None else THROUGH_ALL
         if op.op == "remove":
-            # Start cuts 10 um outside a coplanar face so mesh booleans open them (Onshape does natively).
-            solid = _cross_section(op.loops).extrude(depth + 2e-5).translate([0.0, 0.0, -1e-5])
+            # Start outside the entrance face so mesh booleans open it. A blind
+            # cut must still end at its authored depth, like the native extrude;
+            # extending its far end would move a counterbore's seating face.
+            extension = 1e-5 if op.depth is not None else 2e-5
+            solid = _cross_section(op.loops).extrude(depth + extension).translate([0.0, 0.0, -1e-5])
         else:
             solid = _cross_section(op.loops).extrude(depth)
         if op.direction < 0:

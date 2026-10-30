@@ -1169,11 +1169,15 @@ def build_problem(project: Any, router: Any, routing: Any, harnesses: list[str],
             key = f"{harness}/B:{node.name}@{index}"
             if key not in junctions:
                 b = float(bo["arc"])
+                # Independently routed lanes carry the diameter and approach of
+                # their own pins, while the node retains the complete connector.
+                lane_od = float(bo.get("lane_od", node.od))
+                lane_lead = float(bo.get("lane_lead_length", node.lead_length))
                 if node.kind == "connector":
                     zone = node.termination_length
-                    lead = min(node.lead_length, max(2 * node.od, 0.003)) if node.lead_length > 0 else 0.0
+                    lead = min(lane_lead, max(2 * lane_od, 0.003)) if lane_lead > 0 else 0.0
                 else:  # floating pair half: its exit zone extends two bundle diameters
-                    zone, lead = 2 * node.od, 0.0
+                    zone, lead = 2 * lane_od, 0.0
                 junctions[key] = Junction(key, "fanout", np.asarray(bo["position"], float).copy(),
                                           np.asarray(bo["direction"], float).copy(), exempt=set(node.exempt),
                                           termination_length=max(zone - b, 0.0), lead=max(lead - b, 0.0),
@@ -1260,7 +1264,8 @@ def _node_junction(key: str, node: Any, catalog: Any) -> Junction:
                         cone=PIGTAIL_CONE if free else 0.0, exempt=set(node.exempt),
                         termination_length=node.termination_length, lead=lead, harnesses={node.harness})
     if node.kind == "splice":
-        return Junction(key, "splice", node.exit.copy(), None, axis_free=True, move=SPLICE_MOVE,
+        axis = node.direction.copy() if node.direction is not None else None
+        return Junction(key, "splice", node.exit.copy(), axis, axis_free=axis is None, move=SPLICE_MOVE,
                         termination_length=0.006, harnesses={node.harness})
     return Junction(key, node.kind, node.exit.copy() if node.exit is not None else np.zeros(3), None,
                     axis_free=True, harnesses={node.harness})
@@ -1342,6 +1347,8 @@ def _assign_sides(segments: list[Segment], junctions: dict[str, Junction]) -> No
         if j.kind == "hole":
             j.axis = j.axis * (1.0 if combined @ j.axis >= 0 else -1.0)
             signs = [1.0 if t @ j.axis >= 0 else -1.0 for t in tangents]
+        elif j.kind == "splice" and not j.axis_free and j.axis is not None:
+            pass  # an installed sleeve keeps its authored axis
         elif j.kind == "support":
             n = j.plane_normal
             along = combined - (combined @ n) * n
@@ -1409,8 +1416,14 @@ def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str,
         segments, junctions = build_problem(project, router, routing, group, supports)
         if not segments:
             continue
-        plan = plan_bundle(segments, junctions, fields, requirement, max_iterations=max_iterations,
-                           obstacles=obstacles)
+        if any(h.route.independent_branches for h in project.spec.electrical.harnesses if h.id in group):
+            from .branch_lanes import plan_lanes
+
+            plan = plan_lanes(project, router, routing, segments, junctions, fields, requirement,
+                              max_iterations=max_iterations, obstacles=obstacles)
+        else:
+            plan = plan_bundle(segments, junctions, fields, requirement, max_iterations=max_iterations,
+                               obstacles=obstacles)
         plans.append(plan)
         stats["+".join(group)] = plan.stats
         _apply(project, routing, plan, moved)

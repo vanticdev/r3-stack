@@ -80,7 +80,7 @@ def test_fabricated_holes_come_from_interfaces(catalog):
     parts, _ = catalog
     chassis = next(p for p in parts.values() if p.name == "Chassis plate")
     holes = [op for op in chassis.plan.ops if isinstance(op, Hole)]
-    assert len(holes) == 4 + 8 + 4 + 4 + 4 + 3  # gearbox, hubs, standoffs, arms, servo and cable posts
+    assert len(holes) == 4 + 8 + 4 + 4 + 4 + 5  # gearbox, hubs, standoffs, arms, servo and five cable posts
     assert all(op.style == "clearance" and op.diameter == pytest.approx(3.4e-3) for op in holes)
     slots = [op for op in chassis.plan.ops if isinstance(op, Prism) and "slot" in op.name]
     assert len(slots) == 4

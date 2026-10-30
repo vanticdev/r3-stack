@@ -141,3 +141,13 @@ filename. No archive-controlled paths are extracted. A download is evidence of a
 source, not of dimensional suitability: new DS3218 and named XT30U-F downloads
 currently fail validation and remain blocked. Full acquisition and gap evidence
 is in the [seed audit](model-bank-seed-audit.md).
+
+### Selecting supplied subparts
+
+A STEP source may declare `solid_indices: [0, 2]` to retain complete,
+zero-based solids from the supplier's file (for example a housing without its
+detachable horn). The original download and checksum remain unchanged. Open
+CASCADE exports those intact solids into a separate content-keyed cache; no
+cutting, scaling or replacement geometry is performed. Inspect the source body
+ordering and record why each body is retained before using this selection.
+Selections have separate tessellation caches so they cannot overwrite one another.

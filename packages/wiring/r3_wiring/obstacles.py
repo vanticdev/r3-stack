@@ -181,7 +181,9 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
                 continue
             entries, entry_direction = None, None
             if node.kind == "splice":
-                shape = Cylinder(node.exit.copy(), np.eye(3), max(node.od / 2, 0.001), 0.003)
+                rotation = (Frame.from_axes(node.exit, any_perpendicular(node.direction), node.direction).rotation
+                            if node.direction is not None else np.eye(3))
+                shape = Cylinder(node.exit.copy(), rotation, max(node.od / 2, 0.001), 0.003)
                 source = "splice_sleeve_estimated"
             elif node.connector_type and node.connector_type != "integral":
                 frame = node.frame

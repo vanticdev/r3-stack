@@ -229,12 +229,19 @@ def cluster_decimate(vertices: np.ndarray, faces: np.ndarray, cell: float) -> tu
     np.add.at(merged, inverse, vertices)
     merged /= counts[:, None]
     tri = inverse[faces]
-    from .geometry_audit import remove_degenerate_and_duplicate_faces
-
-    # Clustering can fold a thin wall onto itself. Opposite-wound coincident
-    # triangles cancel as an oriented surface; keeping either opens its boundary.
-    tri, _, _ = remove_degenerate_and_duplicate_faces(tri)
-    return merged, tri
+    tri = tri[(tri[:, 0] != tri[:, 1]) & (tri[:, 1] != tri[:, 2]) & (tri[:, 2] != tri[:, 0])]
+    # Push forward the oriented triangle chain, including multiplicity. Opposite
+    # faces cancel, but two equally wound faces must both remain: deduplicating
+    # only that face would leave its neighbouring edges unbalanced.
+    inversions = ((tri[:, 0] > tri[:, 1]).astype(int) +
+                  (tri[:, 0] > tri[:, 2]) + (tri[:, 1] > tri[:, 2]))
+    keys, inverse = np.unique(np.sort(tri, axis=1), axis=0, return_inverse=True)
+    net = np.zeros(len(keys), dtype=int)
+    np.add.at(net, inverse.reshape(-1), np.where(inversions % 2, -1, 1))
+    keep = net != 0
+    oriented, counts = keys[keep].copy(), net[keep]
+    oriented[counts < 0] = oriented[counts < 0][:, [0, 2, 1]]
+    return merged, np.repeat(oriented, np.abs(counts), axis=0)
 
 
 _POOL: Any = None

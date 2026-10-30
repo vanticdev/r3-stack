@@ -517,7 +517,10 @@ class HarnessRouter:
                 nodes[name] = node
             for name, splice in harness.splices.items():
                 od = bundle_diameter(self._wire_od(a) for a in awgs.get(name, [])) if awgs.get(name) else 0.0
-                nodes[name] = NodePoint(harness.id, name, "splice", np.asarray(splice.position, dtype=float), None, od=od)
+                direction = np.asarray(splice.direction, float) if splice.direction is not None else None
+                if direction is not None:
+                    direction /= np.linalg.norm(direction)
+                nodes[name] = NodePoint(harness.id, name, "splice", np.asarray(splice.position, dtype=float), direction, od=od)
             for node in nodes.values():
                 if node.kind == "connector":
                     self._lead(node, awgs.get(node.name, []))
@@ -537,7 +540,7 @@ class HarnessRouter:
             out[harness.id] = nodes
         return out
 
-    def _lead(self, node: NodePoint, awgs: list[int]) -> None:
+    def _lead(self, node: NodePoint, awgs: list[int], *, pin_widths: dict[str, float] | None = None) -> None:
         """Straight strain-relief run out of a connector, long enough for a
         target-radius 90 deg turn, shortened if it would hit something or enter
         a moving part's clearance band (``min_wire_clearance_moving``): the checks
@@ -547,9 +550,10 @@ class HarnessRouter:
             return
         r = node.od / 2
         harness = next(h for h in self.spec.electrical.harnesses if h.id == node.harness)
-        by_pin = {ref.split(".", 1)[1]: self._wire_od(w.awg)
-                  for w in harness.wires for ref in (w.from_, w.to)
-                  if ref.startswith(node.name + ".")}
+        by_pin = pin_widths if pin_widths is not None else {
+            ref.split(".", 1)[1]: self._wire_od(w.awg)
+            for w in harness.wires for ref in (w.from_, w.to)
+            if ref.startswith(node.name + ".")}
         self._fan_length(node, by_pin)
         r_min = bundle_bend_radius(self.catalog, awgs or [22], node.od, harness.jacket != "none")
         r_pref = self.opt.bend_margin * r_min
@@ -836,6 +840,10 @@ class HarnessRouter:
 
     # -------------------------------------------------------------- harness
     def _route_harness(self, harness: Harness, nodes: dict[str, NodePoint]) -> tuple[HarnessRoute, dict[str, WireRoute]] | None:
+        if harness.route.independent_branches:
+            from .branch_lanes import route_lanes
+
+            return route_lanes(self, harness, nodes)
         def node_name(ref: str) -> str:
             return ref if ref in harness.splices else ref.split(".")[0]
 
@@ -1090,6 +1098,12 @@ class HarnessRouter:
             return None
         pin = ref.split(".", 1)[1]
         if node.connector_type == "integral" or geometry_of(self.catalog, node.connector_type) is None:
+            # Integral pin coordinates belong to the complete installed lead,
+            # even when a branch is routed on its own.
+            harness = next(h for h in self.spec.electrical.harnesses if h.id == node.harness)
+            by_pin = {r.split(".", 1)[1]: self._wire_od(w.awg)
+                      for w in harness.wires for r in (w.from_, w.to)
+                      if r.startswith(node.name + ".")}
             return pigtail_ends(node.frame, list(by_pin), by_pin, node.ref).get(pin)
         return pin_end(self.catalog, node.connector_type, node.frame, pin, node.ref)
 
@@ -1128,7 +1142,8 @@ class HarnessRouter:
         tangent = at(b + delta) - at(b - delta)
         norm = float(np.linalg.norm(tangent))
         tangent = tangent / norm if norm > 1e-12 else (points[-1] - points[0]) / arc[-1]
-        return {"node": node.name, "position": q, "direction": tangent, "arc": b}
+        return {"node": node.name, "position": q, "direction": tangent, "arc": b,
+                "lane_od": node.od, "lane_lead_length": node.lead_length}
 
     def _fan_out(self, path: np.ndarray, radius: np.ndarray, count: np.ndarray,
                  ends: tuple[PinEnd | None, PinEnd | None], breakouts: tuple[dict[str, Any] | None, ...],
