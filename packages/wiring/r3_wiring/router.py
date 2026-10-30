@@ -1322,6 +1322,15 @@ class HarnessRouter:
         out, out_r, out_c = [pts[0]], [radius[0]], [count[0]]
         bends: list[Bend] = []
         for k in range(1, n - 1):
+            if phi[k] >= math.pi - 1e-3:
+                # A folded-back polyline has no finite tangent fillet in this
+                # corner. Do not combine the capped tangent used by r_fit with
+                # the uncapped near-pi angle in _arc: that sends millimetre
+                # routes tens of metres away. Preserve the failed bend for the
+                # planner/checker instead of inventing a giant loop.
+                out.append(pts[k]); out_r.append(radius[k]); out_c.append(count[k])
+                bends.append(Bend(pts[k].copy(), 0.0, float(rmin[k]), int(count[k]), float(2 * radius[k])))
+                continue
             if phi[k] <= self.opt.fillet_min_angle:
                 # Already smooth: keep the vertex, record its discrete radius.
                 out.append(pts[k]); out_r.append(radius[k]); out_c.append(count[k])
@@ -1358,7 +1367,7 @@ class HarnessRouter:
 
     @staticmethod
     def _arc(corner: np.ndarray, u_in: np.ndarray, u_out: np.ndarray, phi: float, radius: float) -> np.ndarray:
-        if radius <= 0:
+        if radius <= 0 or phi >= math.pi - 1e-3:
             return corner[None]
         t = radius * math.tan(phi / 2)
         start, finish = corner - u_in * t, corner + u_out * t
