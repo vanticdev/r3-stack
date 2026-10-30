@@ -480,15 +480,21 @@ electrical:
         - {id: W_ESC_N, from: A.2, to: B.2, awg: 12, color: black, signal: GND}
       route: {slack: 20 mm}
     - id: esc_motor
+      description: Individually routed 18 AWG silicone motor lead, directly soldered to motor tab.
       connectors:
-        A: {type: integral, mates: esc.J_MOT}
-        BP: {type: bullet-3.5-female, mates: motor.J_POS}
-        BN: {type: bullet-3.5-female, mates: motor.J_NEG}
+        A: {type: integral, mates: esc.J_MOT_B}
+        BN: {type: integral, mates: motor.J_NEG}
       wires:
-        # The ESC's own 14 AWG leads: a 2 s, 58 A stall heats them by a few kelvin (electrical stage, transient R(T)
-        # model), well within the silicone rating; the stall drop above 3 % is a burst warning.
-        - {id: W_MOT_A, from: A.1, to: BP.1, awg: 14, color: blue, signal: MOTOR_A}
-        - {id: W_MOT_B, from: A.2, to: BN.1, awg: 14, color: yellow, signal: MOTOR_B}
+        # Electrical: 58.81 A for 2 s reaches 45.24 C; continuous operating points pass the installed ampacity.
+        - {id: W_MOT_B, from: A.1, to: BN.1, awg: 18, color: yellow, signal: MOTOR_B}
+      route: {slack: 15 mm, keep_away: [wheel_rl, wheel_rr, gearbox]}
+    - id: esc_motor_upper
+      description: Individually routed 18 AWG silicone motor lead, directly soldered to motor tab.
+      connectors:
+        A: {type: integral, mates: esc.J_MOT_A}
+        BP: {type: integral, mates: motor.J_POS}
+      wires:
+        - {id: W_MOT_A, from: A.1, to: BP.1, awg: 18, color: blue, signal: MOTOR_A}
       route: {slack: 15 mm, keep_away: [wheel_rl, wheel_rr, gearbox]}
     - id: esc_signal
       connectors:

@@ -38,9 +38,9 @@ components:
       arm_fr: {kind: hole_pattern, origin: [130 mm, -31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
       post_a: {kind: hole_pattern, origin: [110.05 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
       post_b: {kind: hole_pattern, origin: [159.55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
-      motor_lead_post: {kind: hole_pattern, origin: [-55 mm, 47 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      motor_lead_post: {kind: hole_pattern, origin: [-50 mm, 60 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       power_lead_post: {kind: hole_pattern, origin: [50 mm, -44 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
-      cap_motor_lead_post: {kind: adhesive_pad, origin: [-55 mm, 47 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      cap_motor_lead_post: {kind: adhesive_pad, origin: [-50 mm, 60 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       cap_power_lead_post: {kind: adhesive_pad, origin: [50 mm, -44 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       encoder_lead_post: {kind: hole_pattern, origin: [-78.20718 mm, -62 mm, 3 mm], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}, x: [1, 0, 0], z: [0, 0, 1]}
       cap_encoder_lead_post: {kind: adhesive_pad, origin: [-78.20718 mm, -62 mm, 0], x: [1, 0, 0], z: [0, 0, -1]}
@@ -294,8 +294,8 @@ components:
       M_POS: {role: motor, voltage_max: 8.4, current_max: 70}
       M_NEG: {role: motor, voltage_max: 8.4, current_max: 70}
     connectors:
-      J_POS: {type: bullet-3.5-male, position: [0, 26 mm, 10 mm], direction: [0, 1, 0], pins: {"1": M_POS}}
-      J_NEG: {type: bullet-3.5-male, position: [0, 26 mm, -10 mm], direction: [0, 1, 0], pins: {"1": M_NEG}}
+      J_POS: {type: integral, position: [0, 26 mm, 10 mm], direction: [0.3686878264946124, 0.8191520442889918, -0.43938504177070503], pins: {"1": M_POS}}
+      J_NEG: {type: integral, position: [0, 26 mm, -10 mm], direction: [0.27165378227418446, 0.9063077870366499, -0.3237443709670646], pins: {"1": M_NEG}}
     behavior:
       model: motor.dc_brushed
       params: {kv_rpm_per_v: 2100, resistance: 0.11, inductance: 60 uH, no_load_current: 1.6, rotor_inertia: 1.2e-5, brush_drop: 0.2, max_rpm: 21000}
@@ -377,6 +377,9 @@ components:
     connectors:
       J_PWR: {type: integral, position: [-23 mm, 8 mm, 10 mm], direction: [-1, 0, 0], pins: {"1": VIN, "2": GND}}
       J_MOT: {type: integral, position: [23 mm, 0, 10 mm], direction: [1, 0, 0], pins: {"1": M_A, "2": M_B}}
+      # Separate wire exits retain the original 14 AWG pigtail centres; flexible leads are clocked outward.
+      J_MOT_A: {type: integral, position: [23 mm, -1.65 mm, 10 mm], direction: [0.70710678, -0.5, 0.5], pins: {"1": M_A}}
+      J_MOT_B: {type: integral, position: [23 mm, 1.65 mm, 10 mm], direction: [0.8660254, 0.5, 0], pins: {"1": M_B}}
       J_SIG: {type: integral, position: [-23 mm, -10 mm, 20 mm], direction: [-1, 0, 0], pins: {"1": SIG, "2": BEC, "3": GND}}
     behavior:
       model: esc.brushed
