@@ -39,6 +39,8 @@ def test_scaffold_tree(tmp_path):
     assert "# Robot frame: stationary" in (target / "robot.yaml").read_text()
     agents = (target / "AGENTS.md").read_text()
     assert "r3_patch_spec" in agents and "--yes" in agents and "trail-bot" in agents
+    assert "$include" in agents and "parts/<id>.yaml" in agents and "components.*.pulled" in agents
+    assert "electrical/system.yaml" in (target / "README.md").read_text()
     assert (target / "CLAUDE.md").read_text().startswith("# Claude Code instructions\n\n@AGENTS.md")
 
 

@@ -5,7 +5,9 @@ GitHub is the source of truth for an R3 robot: the repository holds
 `build/` as an artifact. Live simulation state is never committed.
 
 - `scaffold.create_project(target, template="robot")` writes a project
-  repository: `robot.yaml` (renamed, comments kept), `r3.lock.yaml` (platform
+  repository: `robot.yaml` (description index, renamed with comments kept),
+  `parts/<id>.yaml`, `electrical/system.yaml`, `software/system.yaml`, and other
+  included domain files, `r3.lock.yaml` (platform
   revision pin), `cad/`, `pcb/<board>/`, `catalog/`, `backend/deploy.py` (BLITZ
   hooks generated from `software.modules`) and module stubs, `.gitignore`
   (`build/`), `AGENTS.md`/`CLAUDE.md`, `.mcp.json`, `README.md` and
@@ -28,3 +30,6 @@ GitHub is the source of truth for an R3 robot: the repository holds
   `gh repo create --source --push`. It is the only external side effect and
   runs only when called explicitly (`r3 create --github`, or the MCP
   `create_github_repo` tool with `confirm=true`).
+
+The include syntax, strict diagnostics and read-only CAD pull hooks are documented
+in [robot descriptions](../../docs/architecture/robot-description.md).
