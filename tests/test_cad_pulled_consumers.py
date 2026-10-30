@@ -139,3 +139,21 @@ def test_pulled_motion_uses_mujoco(project):
     sweep = run_motion(project, None, FitReport(), result)
     assert sweep['solver'] == 'mujoco'
     assert not result.errors
+
+
+def test_cad_stage_hook_is_local_and_has_fit_and_motion_evidence(project):
+    from r3_onshape.step_geometry import verify_pulled
+    pull(project)
+    result = StageResult(stage='cad')
+    payload = verify_pulled(project, result)
+    assert payload['source']['provider'] == 'pulled'
+    assert payload['fit']['verified_interfaces'] == []
+    assert payload['motion']['solver'] == 'mujoco'
+    assert not result.errors
+
+
+def test_cad_hook_missing_pull_has_one_diagnostic(project):
+    from r3_onshape.step_geometry import verify_pulled
+    result = StageResult(stage='cad')
+    assert verify_pulled(project, result) == {}
+    assert [d.code for d in result.errors] == ['cad_pull_missing']
