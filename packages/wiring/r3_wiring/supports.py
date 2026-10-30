@@ -49,6 +49,7 @@ from r3_model.diagnostics import Diagnostic
 from r3_model.units import to_si
 
 from .geometry import polyline_length, project_to_polyline, resample_polyline
+from .grid import FIELD_CUTOFF
 from .obstacles import Obstacle, ObstacleSet
 from .witness import exact_closest
 
@@ -63,7 +64,9 @@ CANDIDATE_TILT = math.radians(35.0)
 # m: how far the second planning pass may pull the bundle onto a support (it re-plans the bundle through
 # the support centre; a pull that makes the route infeasible gets the support re-placed or dropped).
 MAX_PULL = 0.020
-HINT_MATCH = 0.004  # requested bundle centre must match real support hardware within 4 mm
+_PLACEMENT = yaml.safe_load(DATA.read_text())["placement"]
+HINT_MATCH = to_si(_PLACEMENT["requested_match"])
+WIRE_CAPTURE_ALLOWANCE = to_si(_PLACEMENT["wire_capture_allowance"])
 POST_MAX_DIAMETER = 0.012  # m: posts / standoffs a tie can loop around
 FLATNESS = 0.0003  # m: footprint corners must lie this close to the face
 STRUCTURE_REACH = 0.022  # m: candidate structure within this of the bundle surface (MAX_PULL + mount height)
@@ -433,7 +436,7 @@ def check_requested_supports(project: Any, report: SupportReport, routing: Any) 
             distances = [float(np.linalg.norm(s.position - point)) for s in installed]
             holding = [s for s in installed if np.linalg.norm(s.position - point) <= HINT_MATCH and
                        all(w in routing.wires and not routing.wires[w].failed and
-                           project_to_polyline(routing.wires[w].path, s.position[None])[0] <= s.bundle_od / 2 + 0.002
+                           project_to_polyline(routing.wires[w].path, s.position[None])[0] <= s.bundle_od / 2 + WIRE_CAPTURE_ALLOWANCE
                            for w in s.wires)]
             if not holding:
                 report.diagnostics.append(Diagnostic.error(
@@ -498,7 +501,7 @@ def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstac
     probe_points = np.asarray([p for p, _, _ in probes])
     near_hosts = []
     for host in structures:
-        d = host.shape.sdf_bounded(probe_points, 0.05) - r
+        d = host.shape.sdf_bounded(probe_points, FIELD_CUTOFF) - r
         if float(d.min()) <= STRUCTURE_REACH:
             near_hosts.append((host, d))
     for i, (p, s, requested_index) in enumerate(probes):
@@ -626,7 +629,7 @@ def _span_check(routing: Any, supports: list[Support], limits: dict[str, float],
         for support in supports:
             if wire.wire_id in support.wires:
                 d, s = project_to_polyline(wire.path, support.position[None])
-                if d < support.bundle_od / 2 + 0.002:
+                if d < support.bundle_od / 2 + WIRE_CAPTURE_ALLOWANCE:
                     held.append((s, support.id))
         held.sort()
         gauge = catalog.wire(wire.awg)

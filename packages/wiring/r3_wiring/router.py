@@ -50,7 +50,7 @@ from r3_connectors.pins import (PinEnd, mating_site_frame, floating_pair_frame, 
 
 from .bodies import ROOT
 from .geometry import bundle_diameter, polyline_length, project_to_polyline, resample_polyline
-from .grid import Fields, VoxelGrid, compute_fields
+from .grid import FIELD_CUTOFF, Fields, VoxelGrid, compute_fields
 from .obstacles import ObstacleSet, cable_obstacles
 from .planner import bundle_bend_radius, plan_routing
 from .smoothing import curvature_radius, make_segment, relax
@@ -387,16 +387,16 @@ class HarnessRouter:
         The posed SDF cache avoids re-tessellating or querying unchanged bodies.
         """
         centers = self.grid.centers()
-        out = np.full(self.grid.size, 0.05)
+        out = np.full(self.grid.size, FIELD_CUTOFF)
         for body in cable_obstacles(self.project, nodes):
             node = body.node
             key = (body.component, body.source, tuple(node.exit),
                    None if node.frame is None else tuple(node.frame.matrix().ravel()))
             if key not in self._cable_fields:
-                self._cable_fields[key] = body.shape.sdf_bounded(centers, 0.05) - body.keepout
+                self._cable_fields[key] = body.shape.sdf_bounded(centers, FIELD_CUTOFF) - body.keepout
             raw = self._cable_fields[key]
             if node.harness in harnesses:
-                raw = np.where(body.entry_mask(centers), 0.05, raw)
+                raw = np.where(body.entry_mask(centers), FIELD_CUTOFF, raw)
             np.minimum(out, raw, out=out)
         # A later, smaller harness still needs its fixed conductor exits. Reserve
         # the straight strain-relief run before assigning the large bundles;
@@ -412,7 +412,7 @@ class HarnessRouter:
                     delta = node.lead_end - node.exit
                     along = np.clip((centers - node.exit) @ delta / max(float(delta @ delta), 1e-20), 0, 1)
                     distance = np.linalg.norm(centers - node.exit - along[:, None] * delta, axis=1)
-                    self._cable_fields[key] = np.minimum(distance - radius, 0.05)
+                    self._cable_fields[key] = np.minimum(distance - radius, FIELD_CUTOFF)
                 np.minimum(out, self._cable_fields[key], out=out)
         # Required ties are fixed destinations just like connector exits. A
         # larger bundle must not consume their space before that harness is
@@ -427,7 +427,7 @@ class HarnessRouter:
             for number, point in enumerate(harness.route.tie_points):
                 key = ("required_support", harness.id, number, tuple(point), radius)
                 if key not in self._cable_fields:
-                    self._cable_fields[key] = np.minimum(np.linalg.norm(centers - point, axis=1) - radius, 0.05)
+                    self._cable_fields[key] = np.minimum(np.linalg.norm(centers - point, axis=1) - radius, FIELD_CUTOFF)
                 np.minimum(out, self._cable_fields[key], out=out)
         return out
 
@@ -441,7 +441,7 @@ class HarnessRouter:
             key = (body.component, body.source, tuple(node.exit),
                    None if node.frame is None else tuple(node.frame.matrix().ravel()))
             if key not in self._cable_fields:
-                self._cable_fields[key] = body.shape.sdf_bounded(self.grid.centers(), 0.05) - body.keepout
+                self._cable_fields[key] = body.shape.sdf_bounded(self.grid.centers(), FIELD_CUTOFF) - body.keepout
             blocked |= self._cable_fields[key] < radius
         return blocked
 
