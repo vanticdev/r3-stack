@@ -52,7 +52,7 @@ from .bodies import ROOT
 from .geometry import bundle_diameter, polyline_length, project_to_polyline, resample_polyline
 from .grid import Fields, VoxelGrid, compute_fields
 from .obstacles import ObstacleSet, cable_obstacles
-from .planner import plan_routing
+from .planner import bundle_bend_radius, plan_routing
 from .smoothing import curvature_radius, make_segment, relax
 from .terminations import (body_width, exit_offset, mated_pair_length, termination_allowance)
 
@@ -512,7 +512,8 @@ class HarnessRouter:
             node.lead_end = None if node.exit is None else node.exit.copy()
             return
         r = node.od / 2
-        r_min = self._bend_factor(awgs or [22]) * node.od
+        jacketed = next(h.jacket != "none" for h in self.spec.electrical.harnesses if h.id == node.harness)
+        r_min = bundle_bend_radius(self.catalog, awgs or [22], node.od, jacketed)
         r_pref = self.opt.bend_margin * r_min
         target = r_pref + node.od
         ts = np.arange(0.0005, target + 1e-9, 0.0005)
@@ -927,7 +928,7 @@ class HarnessRouter:
             awgs = list(segment["awgs"].values())
             segment["od"] = bundle_diameter(self._wire_od(a) for a in awgs)
             segment["conductors"] = len(awgs)
-            segment["r_min"] = self._bend_factor(awgs) * segment["od"]
+            segment["r_min"] = bundle_bend_radius(self.catalog, awgs, segment["od"], harness.jacket != "none")
             r = segment["od"] / 2
             ctx = self.context(min(r, max(self._wire_od(a) for a in awgs) / 2) if awgs else r, keep_away)
             points = np.array([positions[k] for k in canon])
