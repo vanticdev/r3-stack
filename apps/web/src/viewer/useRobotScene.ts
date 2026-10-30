@@ -46,7 +46,7 @@ export function useRobotScene(pid: string) {
 
   const data = useMemo<RobotData | null>(() => {
     const graph = model.data?.graph;
-    if (!model.data || !graph) return null;
+    if (!model.data || !graph || cad.data?.authority?.ready !== true) return null;
     const diags = diagnostics.data?.diagnostics ?? [];
     const routes = wiring.data?.routes ?? null;
     const scene = buildScene({ graph, routes, routingDetail: wiring.data?.routing_detail ?? null, diagnostics: diags });
@@ -80,7 +80,7 @@ export function useRobotScene(pid: string) {
       components: scene.components, wires, graphComponents: graph.components,
       hardware: Object.entries(cadParts).flatMap(([id, part]) => {
         const url = cad.data?.meshes[id];
-        const owner = part.owner && part.owner in graph.components ? part.owner : null;
+        const owner = part.owner && part.owner in graph.components ? part.owner : id;
         return url && owner && !(id in graph.components) ? [{ id, owner, url, kind: part.kind ?? "hardware" }] : [];
       }),
       meshes: cad.data?.meshes ?? {}, cadParts, joints, steering,
@@ -95,7 +95,9 @@ export function useRobotScene(pid: string) {
   return {
     data,
     isPending: model.isPending || (cad.isPending && !cad.isError),
-    error: model.error ?? (model.data && !model.data.graph ? new Error("build/model/graph.json is missing: run the model stage") : null),
+    error: model.error ?? cad.error ?? (cad.data && cad.data.authority?.ready !== true
+      ? new Error(cad.data.authority?.message ?? "No pulled CAD. Model and mate in Onshape, then run r3 cad pull.")
+      : model.data && !model.data.graph && !cad.isPending ? new Error("build/model/graph.json is missing: run the model stage") : null),
     wiring: wiring.data ?? null,
     cad: cad.data ?? null,
   };

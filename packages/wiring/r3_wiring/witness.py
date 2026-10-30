@@ -442,12 +442,17 @@ def _connector_body(diagnostic: Diagnostic, routing: Any, catalog: Any) -> Box |
 # ------------------------------------------------------------ CAD audit
 def audit_cad(project: Project, obstacles: ObstacleSet) -> tuple[list[Diagnostic], dict[str, Any]]:
     """Audit the CAD meshes the obstacles were built from, and CAD staleness."""
-    cad = project.read_build_json("cad/cad_model.json") or {}
+    from r3_model.pulled_view import cad_view
+    from r3_onshape.step_geometry import load_geometry
+    cad = cad_view(project)
+    exact = load_geometry(project.root)
+    for name, geometry in exact.parts.items():
+        cad["parts"][name].update(volume=geometry.manifold().volume(), bbox_min=geometry.lo.tolist(), bbox_max=geometry.hi.tolist())
     parts = cad.get("parts", {}) if isinstance(cad, dict) else {}
     diagnostics: list[Diagnostic] = []
     table: dict[str, Any] = {}
     for obstacle in obstacles.obstacles:
-        if obstacle.source != "cad_mesh" or not isinstance(obstacle.shape, MeshShape):
+        if obstacle.source != "pulled_stl" or not isinstance(obstacle.shape, MeshShape):
             continue
         part = parts.get(obstacle.component, {})
         entry: dict[str, Any] = {}
@@ -492,18 +497,9 @@ def audit_cad(project: Project, obstacles: ObstacleSet) -> tuple[list[Diagnostic
                       "bbox_limit": routing.bbox_limit, "volume_ratio": routing.volume_ratio, "units": "m"},
                 hint="The CAD export is checked separately; the vertex-clustered routing copy "
                      "(geometry.cluster_decimate) must stay a closed oriented surface."))
-    stage = project.read_build_json("cad/stage_result.json") or {}
-    cad_digest = (stage.get("inputs") or {}).get("robot_yaml_sha256") if isinstance(stage, dict) else None
-    current = project.fingerprint().get("robot_yaml_sha256")
-    stale = bool(parts) and cad_digest is not None and cad_digest != current
-    if stale:
-        diagnostics.append(Diagnostic.warning(
-            "cad_stale", f"build/cad was generated from robot.yaml {cad_digest}, current robot.yaml is {current}",
-            subjects=["cad"], data={"cad_robot_yaml_sha256": cad_digest, "robot_yaml_sha256": current,
-                                    "cad_parts": len(parts)},
-            hint="Re-run the cad stage so wiring routes against the current design."))
     summary = {"meshes": len(table), "invalid": sorted(c for c, v in table.items() if v["problems"]),
-               "cad_robot_yaml_sha256": cad_digest, "robot_yaml_sha256": current, "stale": stale, "parts": table}
+               "source": cad["source"], "stale": False, "parts": table}
+
     return diagnostics, summary
 
 

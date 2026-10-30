@@ -40,8 +40,13 @@ class Project:
         lock = yaml.safe_load(lock_path.read_text()) if lock_path.exists() else {}
         project = cls(root=root, spec=spec, lock=lock or {})
         project.apply_sourcing()
-        if spec.assembly is not None:
-            project.assembly  # compile now so every stage sees derived poses
+        if (root / "cad/pulled/pull.json").exists():
+            from .pulled_view import apply_pulled
+            from .pulled import PullError
+            try:
+                apply_pulled(project)
+            except PullError:
+                pass  # geometry stages report the one stable pull diagnostic
         return project
 
     @property
@@ -50,16 +55,11 @@ class Project:
         ``spec.components[*].pose`` (and ``mount`` / derived joints) with the
         derived poses, so stages that read poses work unchanged. Specs without
         an ``assembly`` section are left untouched and return None."""
-        if self.spec.assembly is None:
-            return None
         if not hasattr(self, "_assembly"):
-            from .assembly import apply_to_spec, compile_assembly
-            from .mechanics import derive_mechanical
-
-            result = compile_assembly(self.spec, self.catalog)
-            result.diagnostics.extend(apply_to_spec(self.spec, result))
-            result.diagnostics.extend(derive_mechanical(self.spec, self.catalog, result))
-            self._assembly = result
+            if not (self.root / "cad/pulled/pull.json").exists():
+                return None
+            from .pulled_view import apply_pulled
+            apply_pulled(self)
         return self._assembly
 
     # Catalog is resolved lazily so r3_model has no hard import-time dependency.

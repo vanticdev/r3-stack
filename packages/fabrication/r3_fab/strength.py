@@ -128,14 +128,12 @@ def _side(adjacency: dict[str, list[tuple[str, str]]], start: str, removed: str)
 
 
 def component_mass(project: Any, cid: str, cad_parts: dict[str, Any]) -> float:
-    """CAD mass when the CAD stage measured one, else the catalog mass (kg)."""
+    """Pulled mass only; an unknown carried load cannot be estimated silently."""
+    from r3_model.pulled import PullError
     entry = cad_parts.get(cid) or {}
     if entry.get("mass"):
         return float(entry["mass"])
-    comp = project.spec.components[cid]
-    if comp.type not in project.catalog.components:
-        return 0.0
-    return float(project.catalog.component(comp.type).mechanical.mass)
+    raise PullError("cad_pull_mass_missing", f"{cid}: pulled mass required for fabrication strength")
 
 
 def _is_wheel(project: Any, cid: str) -> bool:

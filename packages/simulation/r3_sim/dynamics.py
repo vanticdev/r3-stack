@@ -114,28 +114,8 @@ class RobotDynamics:
             **vm.body_origin,
             **{f"mount:{k}": v for k, v in vm.body_origin.items()},
         }
-        # Catalog-only envelopes may include overlapping service volumes. Once
-        # real retainers release, their small hardware needs a finer native
-        # contact integration step. This changes neither geometry nor capacity.
-        cad = project.read_build_json("cad/cad_model.json") or {}
-        if not cad.get("parts"):
-            mujoco.mj_forward(model, self.data)
-            contacts = self.data.contact
-            rigid = (model.geom_group[contacts.geom[:self.data.ncon, 0]] == 3) & (model.geom_group[contacts.geom[:self.data.ncon, 1]] == 3)
-            penetration = float(max(0.0, -np.min(contacts.dist[:self.data.ncon][rigid]))) if rigid.any() else 0.0
-            tolerance = float(project.catalog.joint_defaults["fit_tolerance"].value)
-            if penetration > tolerance and model.opt.timestep > 0.00005:
-                self.substeps = math.ceil(float(project.spec.simulation.timestep) / 0.00005)
-                model.opt.timestep = float(project.spec.simulation.timestep) / self.substeps
-                coefficient = dict(value=float(model.opt.timestep), status="estimated",
-                                   source="R3 conservative native integration step for penetrating catalog-only envelopes; MuJoCo timestep stability guidance")
-                vm.connections.estimated["solver.catalog_penetration_timestep"] = coefficient
-                self.diagnostics.append(Diagnostic.warning(
-                    "joint_timestep_reduced", coefficient["source"],
-                    data={"penetration_m":penetration,"physics_timestep_s":float(model.opt.timestep),"substeps":self.substeps}))
-                import xml.etree.ElementTree as ET
-                xml=ET.fromstring(vm.xml);xml.find("option").set("timestep",str(model.opt.timestep))
-                vm.xml=ET.tostring(xml,encoding="unicode")
+        from r3_model.pulled_view import cad_view
+        cad = cad_view(project, mass_required=True)
         self._resting_poses = {}
         hardware_parents = {}
         for fastener in project.spec.mechanical.fasteners:
