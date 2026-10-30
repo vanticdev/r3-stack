@@ -301,7 +301,14 @@ def recompose(project: Project, result: StageResult | None = None) -> dict[str, 
         recorded = recorded_plans["parts"].get(key)
         geometry = recording["parts"].get(key)
         same, difference = same_solid(part.plan, recorded) if recorded is not None and geometry is not None else (False, math.inf)
-        if same:
+        if part.source_model is not None:
+            from .step_geometry import supplied_geometry
+            local[key] = supplied_geometry(part)
+            local_masses[key] = local_mass(local[key], part.plan)
+            pending[key] = {"reason": "supplied STEP", "symmetric_difference_mm3": None,
+                            "studio": part.studio, "library": part.library, "instances": sorted(
+                                iid for iid, p in plan.placements.items() if p.key == key)}
+        elif same:
             local[key] = part_from_onshape(key, geometry["part_id"], geometry["body"], geometry["tessellation"])
             local_masses[key] = masses[key]
         else:
@@ -340,7 +347,8 @@ def recompose(project: Project, result: StageResult | None = None) -> dict[str, 
                  "bbox_min": geometry.lo.tolist(), "bbox_max": geometry.hi.tolist(), "mesh": f"meshes/{filename}",
                  "mesh_triangles": int(len(geometry.triangles)), "mesh_sha256": hashlib.sha256(data).hexdigest(),
                  "subassembly": placement.level, "studio": part.studio, "library": part.library,
-                 "geometry_source": "local_plan" if placement.key in pending else "onshape"}
+                 "geometry_source": "supplied_step" if part.source_model is not None else
+                                    "local_plan" if placement.key in pending else "onshape"}
         entry.update(_world_mass(local_masses[placement.key], poses[iid]))
         if part.plan.kind == "fastener":
             fastener = next((f for f in project.spec.mechanical.fasteners if iid in (f.part, f.nut_part)), None)

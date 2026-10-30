@@ -67,6 +67,7 @@ class LocalPart:
     properties: dict[str, str] = field(default_factory=dict)
     instances: list[str] = field(default_factory=list)
     bank_model: dict[str, Any] | None = None
+    source_model: Any = None  # supplied geometry when the catalog has no authored fallback solids
 
 
 def _digest(value: Any) -> str:
@@ -297,6 +298,8 @@ def build_part_catalog(project: Project) -> tuple[dict[str, LocalPart], dict[str
             parts[key] = LocalPart(key=key, name=name, studio=ctype.cad_family or cad_name(ctype), type=type_id, plan=plan,
                                    connectors=interface_connectors(project, type_id, mirror),
                                    library=not mech.fabricated and ctype.kind != "pcb", mirror=mirror, properties=props)
+            if not mech.fabricated and not mech.solids and ctype.model and ctype.model.source in {"vendor", "kicad"}:
+                parts[key].source_model = ctype.model.model_copy(deep=True)
         if not ctype.mechanical.fabricated and ctype.kind != "pcb":
             from .purchased import bank_entry
             entry = bank_entry(ctype)
@@ -370,6 +373,9 @@ def world_manifold(part: LocalPart, pose: np.ndarray):
     """The part's plan solid moved to ``pose`` (offline exact-interference checks)."""
     from .geometry import plan_manifold
 
+    if part.source_model is not None:
+        from .step_geometry import supplied_geometry
+        return supplied_geometry(part).manifold().transform(np.asarray(pose)[:3, :4])
     return plan_manifold(part.plan).transform(np.asarray(pose)[:3, :4])
 
 
