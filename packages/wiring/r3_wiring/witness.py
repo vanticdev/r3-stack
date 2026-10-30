@@ -158,14 +158,25 @@ def _mesh_closest(mesh: MeshShape, points: np.ndarray) -> tuple[np.ndarray, np.n
     """Exact unsigned distance to the triangles (the nearest surface sample bounds the
     search: only triangles whose bounding sphere is within that distance are tested),
     winding-number sign."""
-    tri = mesh.vertices[mesh.faces]
-    centers = tri.mean(axis=1)
-    radii = np.linalg.norm(tri - centers[:, None, :], axis=2).max(axis=1)
+    if not hasattr(mesh, "_closest_index"):
+        from trimesh.util import bounds_tree
+
+        tri = mesh.vertices[mesh.faces]
+        centers = tri.mean(axis=1)
+        radii = np.linalg.norm(tri - centers[:, None, :], axis=2).max(axis=1)
+        # Index the same bounding spheres the original exhaustive scan used.
+        # Their AABBs conservatively contain every sphere intersection; the
+        # original sphere test and triangle arithmetic still choose the witness.
+        tree = bounds_tree(np.column_stack([centers - radii[:, None], centers + radii[:, None]]))
+        mesh._closest_index = tri, centers, radii, tree
+    tri, centers, radii, tree = mesh._closest_index
     upper, _ = mesh._tree.query(points)
     distance = np.empty(len(points))
     closest = np.empty((len(points), 3))
     for i, p in enumerate(points):
-        near = np.nonzero(np.linalg.norm(centers - p, axis=1) - radii <= upper[i] + 1e-12)[0]
+        reach = upper[i] + 1e-12
+        candidates = np.asarray(sorted(tree.intersection(np.r_[p - reach, p + reach])), dtype=int)
+        near = candidates[np.linalg.norm(centers[candidates] - p, axis=1) - radii[candidates] <= reach]
         q = closest_on_triangles(p, tri[near, 0], tri[near, 1], tri[near, 2])
         d = np.linalg.norm(q - p, axis=1)
         k = int(np.argmin(d))

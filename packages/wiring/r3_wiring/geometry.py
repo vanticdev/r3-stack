@@ -433,8 +433,24 @@ class SweptShape(Shape):
         points = np.atleast_2d(points)
         out = np.full(len(points), np.inf)
         for shape in self.shapes:
-            np.minimum(out, shape.sdf(points), out=out)
+            todo = self._candidates(shape, points, out)
+            if todo.any():
+                out[todo] = np.minimum(out[todo], shape.sdf(points[todo]))
         return out
+
+    @staticmethod
+    def _candidates(shape: Shape, points: np.ndarray, best: np.ndarray) -> np.ndarray:
+        """Conservative pose broad phase, including every possible negative SDF.
+
+        Outside a pose's AABB its distance is at least the distance to that
+        box. Inside the box the signed distance may be negative, so always
+        query it, even if another pose already reports penetration.
+        """
+        lo, hi = shape.aabb()
+        lo, hi = np.nextafter(lo, -np.inf), np.nextafter(hi, np.inf)
+        inside = np.all((points >= lo) & (points <= hi), axis=1)
+        gap = np.linalg.norm(np.maximum(np.maximum(lo - points, points - hi), 0.0), axis=1)
+        return inside | (gap <= best)
 
     def sdf_bounded(self, points: np.ndarray, cutoff: float) -> np.ndarray:
         lo, hi = self.aabb()
@@ -444,13 +460,17 @@ class SweptShape(Shape):
             sub = points[near]
             values = np.full(len(sub), cutoff)
             for shape in self.shapes:
-                np.minimum(values, shape.sdf_bounded(sub, cutoff), out=values)
+                todo = self._candidates(shape, sub, values)
+                if todo.any():
+                    values[todo] = np.minimum(values[todo], shape.sdf_bounded(sub[todo], cutoff))
             out[near] = values
         return out
 
     def aabb(self) -> tuple[np.ndarray, np.ndarray]:
-        bounds = [shape.aabb() for shape in self.shapes]
-        return np.min([b[0] for b in bounds], axis=0), np.max([b[1] for b in bounds], axis=0)
+        if not hasattr(self, "_aabb"):
+            bounds = [shape.aabb() for shape in self.shapes]
+            self._aabb = (np.min([b[0] for b in bounds], axis=0), np.max([b[1] for b in bounds], axis=0))
+        return self._aabb
 
     def transformed(self, rotation: np.ndarray, translation: np.ndarray) -> "SweptShape":
         return SweptShape([s.transformed(rotation, translation) for s in self.shapes], self.label)

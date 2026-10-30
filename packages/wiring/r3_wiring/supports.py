@@ -206,7 +206,10 @@ def _envelope(points: np.ndarray, obstacles: ObstacleSet, exclude: set[str], rad
         if o.component in exclude:
             continue
         shape = o.swept if o.moving else o.shape
-        if float(shape.sdf_bounded(points, 0.05).min()) < radius:
+        # Only the predicate d < radius is needed here. Clamping at radius
+        # preserves it exactly, and avoids querying every remote swept pose
+        # out to the general-purpose 50 mm cutoff for each installation probe.
+        if float(shape.sdf_bounded(points, min(radius, 0.05)).min()) < radius:
             return False, o.component
     return True, ""
 

@@ -56,6 +56,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -64,6 +65,7 @@ from scipy.optimize import minimize
 
 from r3_model.diagnostics import Diagnostic
 
+from .cache import NumericCache
 from .geometry import polyline_length, resample_polyline
 from .grid import FIELD_CUTOFF, VoxelGrid
 
@@ -719,13 +721,29 @@ class _Problem:
 
 # ------------------------------------------------------------------ solve
 def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields: ClearanceField,
-                requirement: float, *, max_iterations: int = 300, obstacles: Any = None) -> BundlePlan:
+                requirement: float, *, max_iterations: int = 300, obstacles: Any = None,
+                cache_dir: Path | None = None) -> BundlePlan:
     """Plan one bundle group (harnesses joined by floating mates) as a single
     constrained optimisation. Returns the planned segments and junctions,
     feasibility and the violated constraints (with the parts that cause them)."""
     spacing = {k: float(np.clip(seg.r_min / 3.0, 0.0015, 0.004)) for k, seg in enumerate(segments)}
     problem = _Problem(segments, junctions, fields, requirement, spacing)
     x0 = problem.x0_array.copy()
+    cache = NumericCache(cache_dir, "plans")
+    key = cache.key(segments, junctions, fields, requirement, max_iterations) if cache.directory is not None else ""
+    hit = cache.load(key)
+    if hit is not None:
+        arrays, saved_stats = hit
+        x = arrays.get("x")
+        if x is not None and x.shape == x0.shape and np.isfinite(x).all():
+            # Rebuild the constraints and findings against the current obstacles.
+            # Only the numeric solve is reused; no validity check is bypassed.
+            return _result(problem, x, segments, junctions, saved_stats, obstacles)
+
+    def finish(x: np.ndarray, stats: dict[str, Any]) -> BundlePlan:
+        plan = _result(problem, x, segments, junctions, stats, obstacles)
+        cache.store(key, {"x": x}, stats)
+        return plan
     # The distance fields are defined only on this routing volume. In an
     # infeasible layout an unbounded elastic solve can otherwise send a point
     # tens of metres away, marginally reduce its largest residual, and win the
@@ -742,7 +760,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     bounds = list(zip(lower, upper))
     stats: dict[str, Any] = {"variables": problem.n, "points": problem.n_points}
     if problem.n == 0:
-        return _result(problem, x0, segments, junctions, stats, obstacles)
+        return finish(x0, stats)
 
     violation = problem.max_violation
 
@@ -778,7 +796,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
                      final_violation=violation(x1),
                      initial_length=float(sum(polyline_length(p) for p in problem.points(x0))),
                      planned_length=float(sum(polyline_length(p) for p in problem.points(x1))))
-        return _result(problem, x1, segments, junctions, stats, obstacles)
+        return finish(x1, stats)
 
     # The routing objective is a buildable cable. Once the bounded penalty
     # solve satisfies every constraint, a dense elastic solve cannot improve
@@ -792,6 +810,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
                           "planned_length": float(sum(polyline_length(p) for p in problem.points(x1)))}
         accepted = _result(problem, x1, segments, junctions, accepted_stats, obstacles)
         if accepted.feasible:
+            cache.store(key, {"x": x1}, accepted_stats)
             return accepted
 
     # Phase 2: elastic SLSQP. One slack t >= 0 relaxes every constraint (g + t >= 0) and
@@ -843,7 +862,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     stats.update(slsqp_message=message, slsqp_iterations=iterations, final_violation=violation(best),
                  initial_length=float(sum(polyline_length(p) for p in problem.points(x0))),
                  planned_length=float(sum(polyline_length(p) for p in problem.points(best))))
-    return _result(problem, best, segments, junctions, stats, obstacles)
+    return finish(best, stats)
 
 
 def _max_violation(g: np.ndarray, labels: list[dict[str, Any]]) -> float:
@@ -1043,12 +1062,18 @@ def occupancy_field(grid: VoxelGrid, occupied: list[tuple[np.ndarray, float, set
     for point in termination_exits or []:
         termination |= np.linalg.norm(centers - point, axis=1) <= TERMINATION_ZONE
     seen: set[tuple] = set()
+    groups: dict[tuple[float, float], list[np.ndarray]] = {}
     for points, radius, cats in occupied:
         separation = max([SEPARATION.get(frozenset({a, b}), 0.0) for a in categories for b in cats if a != b] + [0.0])
         key = (points.shape, points.tobytes(), radius, separation)
         if key in seen:
             continue
         seen.add(key)
+        groups.setdefault((radius, separation), []).append(points)
+    for (radius, separation), runs in groups.items():
+        # min_j distance(p, run_j) == distance(p, union_j run_j). Group only
+        # identical radii/EMC margins, retaining the existing cutoff arithmetic.
+        points = np.vstack(runs)
         # Voxels farther than the cutoff from the bundle's bounding box see the cutoff (no query needed).
         near = np.all((centers >= points.min(axis=0) - FIELD_CUTOFF) & (centers <= points.max(axis=0) + FIELD_CUTOFF),
                       axis=1)
@@ -1410,7 +1435,7 @@ def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str,
         if not segments:
             continue
         plan = plan_bundle(segments, junctions, fields, requirement, max_iterations=max_iterations,
-                           obstacles=obstacles)
+                           obstacles=obstacles, cache_dir=project.root / "build" / "wiring" / ".cache")
         plans.append(plan)
         stats["+".join(group)] = plan.stats
         _apply(project, routing, plan, moved)

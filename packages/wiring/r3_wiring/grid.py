@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 
+from .cache import NumericCache, shape_state
 from .obstacles import ObstacleSet
 
 FIELD_CUTOFF = 0.05  # fields are clamped here; no cost term reaches further
@@ -97,7 +99,8 @@ class Fields:
     by_component: dict[str, np.ndarray] = field(default_factory=dict)  # raw swept sdf of ``keep`` components
 
 
-def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet, keep: set[str] | frozenset[str] = frozenset()) -> Fields:
+def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet, keep: set[str] | frozenset[str] = frozenset(), *,
+                   cache_dir: Path | None = None) -> Fields:
     """All fields in one pass over the obstacles; the raw (swept) field of every component in
     ``keep`` is kept as well, so per-harness keep-away fields need no second SDF evaluation."""
     points = grid.centers()
@@ -110,8 +113,20 @@ def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet, keep: set[str] | fro
     struct_dist = np.full(n, FIELD_CUTOFF)
     plates = []
     by_component: dict[str, np.ndarray] = {}
+    cache = NumericCache(cache_dir, "fields")
     for obstacle in obstacles.obstacles:
-        raw = obstacle.swept.sdf_bounded(points, FIELD_CUTOFF)
+        key = ""
+        if cache.directory is not None:
+            try:
+                key = cache.key(grid, shape_state(obstacle.swept), FIELD_CUTOFF)
+            except TypeError:  # custom Shape implementations still use their normal SDF
+                pass
+        hit = cache.load(key) if key else None
+        raw = hit[0].get("raw") if hit is not None else None
+        if raw is None or raw.shape != (n,):
+            raw = obstacle.swept.sdf_bounded(points, FIELD_CUTOFF)
+            if key:
+                cache.store(key, {"raw": raw}, {})
         if obstacle.component in keep and obstacle.component not in by_component:
             by_component[obstacle.component] = raw
         if obstacle.moving:

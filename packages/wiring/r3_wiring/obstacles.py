@@ -91,7 +91,13 @@ class ObstacleSet:
             if exclude and obstacle.component in exclude:
                 continue
             shape = obstacle.swept if swept else obstacle.shape
-            value = shape.sdf_bounded(points, cutoff) - (obstacle.keepout if keepout else 0.0)
+            margin = obstacle.keepout if keepout else 0.0
+            # Preserve the cutoff value and first-obstacle tie breaking, while
+            # querying only points whose AABB lower bound can improve the minimum.
+            value = np.full(len(points), cutoff - margin)
+            todo = SweptShape._candidates(shape, points, best + margin)
+            if todo.any():
+                value[todo] = shape.sdf_bounded(points[todo], cutoff) - margin
             better = value < best
             if better.any():
                 best[better] = value[better]

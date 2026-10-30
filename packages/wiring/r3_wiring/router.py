@@ -241,7 +241,8 @@ class HarnessRouter:
         self.opt = options or RouterOptions()
         self.grid = VoxelGrid.around(obstacles, self.opt.voxel)
         keep = {c for h in self.spec.electrical.harnesses for c in h.route.keep_away}
-        self.fields: Fields = compute_fields(self.grid, obstacles, keep)
+        self.fields: Fields = compute_fields(self.grid, obstacles, keep,
+                                             cache_dir=project.root / "build" / "wiring" / ".cache")
         self.component_fields = self.fields
         self._cable_fields: dict[tuple, np.ndarray] = {}
         self.c_req = float(self.spec.requirements.min_wire_clearance_moving)
@@ -705,27 +706,47 @@ class HarnessRouter:
             chosen = fallback = None
             # Cheapest first. The first 400 voxels (a ~2 cm cube around the optimum) are searched for a
             # lead-clear placement; if no pair body fits there at all, the search continues outward.
-            for rank, voxel in enumerate(order[:FLOATING_CANDIDATES]):
-                if fallback is not None and rank >= 400:
+            candidates = order[:FLOATING_CANDIDATES]
+            for begin in range(0, len(candidates), 128):
+                if fallback is not None and begin >= 400:
                     break
-                if not np.isfinite(total[voxel]):
-                    break
-                center = self.grid.center(int(voxel))
-                pa, pb = self._walk(preds_a, int(voxel), 7), self._walk(preds_b, int(voxel), 7)
-                axis = requested_axes[0].copy() if requested_axes else pb - pa
-                if np.linalg.norm(axis) < 1e-9:
+                batch = []
+                for rank in range(begin, min(begin + 128, len(candidates))):
+                    voxel = candidates[rank]
+                    if not np.isfinite(total[voxel]):
+                        break
+                    center = self.grid.center(int(voxel))
+                    pa, pb = self._walk(preds_a, int(voxel), 7), self._walk(preds_b, int(voxel), 7)
+                    axis = requested_axes[0].copy() if requested_axes else pb - pa
+                    if np.linalg.norm(axis) < 1e-9:
+                        continue
+                    axis /= np.linalg.norm(axis)
+                    body = center + axis[None] * np.linspace(-length / 2, length / 2, 9)[:, None]
+                    batch.append((rank, voxel, center, axis, body))
+                if not batch:
+                    if not np.isfinite(total[candidates[min(begin + 127, len(candidates) - 1)]]):
+                        break
                     continue
-                axis /= np.linalg.norm(axis)
-                body = center + axis[None] * np.linspace(-length / 2, length / 2, 9)[:, None]
-                static, _ = self.obstacles.min_distance(body, self.obstacles.static, keepout=True)
-                moving, _ = self.obstacles.min_distance(body, self.obstacles.moving, swept=True)
-                if static.min() >= width / 2 and moving.min() >= self.c_req + width / 2:
+                # Query identical nine-point bodies in batches; candidate order,
+                # all body/lead checks and the 400-candidate fallback stay unchanged.
+                bodies = np.vstack([item[4] for item in batch])
+                static, _ = self.obstacles.min_distance(bodies, self.obstacles.static, keepout=True)
+                moving, _ = self.obstacles.min_distance(bodies, self.obstacles.moving, swept=True)
+                clear = ((static.reshape(-1, 9).min(axis=1) >= width / 2) &
+                         (moving.reshape(-1, 9).min(axis=1) >= self.c_req + width / 2))
+                for (rank, voxel, center, axis, body), valid in zip(batch, clear):
+                    if fallback is not None and rank >= 400:
+                        break
+                    if not valid:
+                        continue
                     if not any(project_to_polyline(np.vstack([a, b]), body[k][None])[0] < width / 2 + r_lead
                                for a, b, r_lead in leads for k in range(len(body))):
                         chosen = (center, axis, float(total[voxel]))
                         break
                     if fallback is None:
                         fallback = (center, axis, float(total[voxel]))
+                if chosen is not None or not np.isfinite(total[candidates[min(begin + 127, len(candidates) - 1)]]):
+                    break
             chosen = chosen or fallback
             if chosen is None:
                 self.diagnostics.append(Diagnostic.error(
