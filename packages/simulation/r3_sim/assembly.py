@@ -245,7 +245,7 @@ def build_assembly_model(
         name="ground",
         type="plane",
         size="0 0 .05",
-        rgba=".65 .65 .65 1",
+        material="ground",
         friction=f"{spec.simulation.environment.ground_friction} .005 .0001",
         contype="0",
         conaffinity="3",
