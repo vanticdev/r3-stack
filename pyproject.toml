@@ -19,7 +19,8 @@ mcp = ["mcp>=1.2"]
 models = ["cascadio>=0.1.1", "cadquery-ocp>=7.8", "trimesh>=4", "rarfile>=4.2", "shapely>=2", "scipy>=1.11", "rtree>=1.2", "manifold3d>=2.4"]
 # `r3 serve`: HTTP API (services/orchestrator/r3_orchestrator/api) and web app host.
 api = ["fastapi>=0.115", "uvicorn>=0.30", "mcp>=1.2", "ruamel.yaml>=0.18"]
-dev = ["pytest>=8", "pytest-xdist>=3.6,<4", "httpx>=0.27"]
+# xdist 3.x grouping uses pytest 8's string node-ID API.
+dev = ["pytest>=8,<9", "pytest-xdist>=3.6,<4", "httpx>=0.27"]
 # `r3 source`: product-brief/drawing text (pypdf) and agent-output schema validation (jsonschema).
 sourcing = ["pypdf>=4", "jsonschema>=4"]
 # `fabrication` stage (3D printing): meshes, booleans, ray casts, 3MF export and scikit-fem strength checks.
