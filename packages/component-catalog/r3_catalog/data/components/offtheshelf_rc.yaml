@@ -517,7 +517,7 @@ components:
       - id: hole_1
         kind: clearance_hole
         position:
-        - 7.75 mm
+        - 8.175 mm
         - 5.825 mm
         - 1 mm
         axis:
@@ -530,12 +530,12 @@ components:
           status: estimated
           source: https://fluxworkshop.com/products/bdaa100044-gy-521-mpu-6050
           notes: 'Generic vendor variant: Flux Workshop 15.5 mm mounting pitch; downloaded STEP 16.35 mm; JK EMC GY-521
-            V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Retain common 21x16-class vendor pitch, not a fabrication-certified
+            V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Use the downloaded STEP centres at +/-8.175 mm for this build, not a fabrication-certified
             pattern.'
       - id: hole_2
         kind: clearance_hole
         position:
-        - -7.75 mm
+        - -8.175 mm
         - 5.825 mm
         - 1 mm
         axis:
@@ -548,7 +548,7 @@ components:
           status: estimated
           source: https://fluxworkshop.com/products/bdaa100044-gy-521-mpu-6050
           notes: 'Generic vendor variant: Flux Workshop 15.5 mm mounting pitch; downloaded STEP 16.35 mm; JK EMC GY-521
-            V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Retain common 21x16-class vendor pitch, not a fabrication-certified
+            V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Use the downloaded STEP centres at +/-8.175 mm for this build, not a fabrication-certified
             pattern.'
       provenance:
         status: vendor
@@ -574,18 +574,18 @@ components:
         - 0
         params:
           holes:
-          - - 7.75 mm
+          - - 8.175 mm
             - -5.825 mm
             - 3 mm
             - clearance
             - 1 mm
-          - - -7.75 mm
+          - - -8.175 mm
             - -5.825 mm
             - 3 mm
             - clearance
             - 1 mm
         description: 'Generic vendor variant: Flux Workshop 15.5 mm mounting pitch; downloaded STEP 16.35 mm; JK EMC
-          GY-521 V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Retain common 21x16-class vendor pitch, not a
+          GY-521 V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Use the downloaded STEP centres at +/-8.175 mm for this build, not a
           fabrication-certified pattern.'
       bottom:
         kind: adhesive_pad
