@@ -48,3 +48,34 @@ def test_branch_waypoint_typo_and_conflicting_shared_pair_are_rejected():
         Harness.model_validate({**spec, 'route': {'wire_via': {'a': [[0, 0, 0]], 'b': [[1, 0, 0]]}}})
     route = {'wire_via': {'a': [[0, 0, 0], [1, 0, 0]], 'b': [[1, 0, 0], [0, 0, 0]]}}
     assert Harness.model_validate({**spec, 'route': route}).route.wire_via == route['wire_via']
+
+
+def test_waypoint_behind_a_connector_does_not_retrace_the_arrival_path(tmp_path):
+    root = write_project(tmp_path, block=False)
+    file = root / 'robot.yaml'
+    spec = yaml.safe_load(file.read_text())
+    # Go behind the destination body, then return to its west-facing connector.
+    # The old second leg walked back over its first leg, creating a foldback
+    # and duplicate graph edges instead of a loop around the body.
+    spec['electrical']['harnesses'][0]['route']['via'] = [[.24, 0., .013]]
+    file.write_text(yaml.safe_dump(spec, sort_keys=False))
+    project = Project.load(root)
+    obstacles, _ = build_obstacles(project)
+    router = HarnessRouter(project, obstacles, RouterOptions(plan=False))
+    visited = []
+    astar = router._astar
+
+    def record(*args, **kwargs):
+        result = astar(*args, **kwargs)
+        if result is not None:
+            visited.append(result)
+        return result
+
+    router._astar = record
+    routing = router.route()
+    assert all(not wire.failed for wire in routing.wires.values())
+    assert len(visited) == 2
+    assert set(visited[0][:-1]).isdisjoint(visited[1])
+    for wire in routing.wires.values():
+        assert np.max(np.linalg.norm(wire.path, axis=1)) < .3
+        assert project_to_polyline(wire.path, np.array([[.24, 0., .013]]))[0] < .006

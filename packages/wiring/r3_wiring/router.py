@@ -866,7 +866,18 @@ class HarnessRouter:
                 if leg > 0 and voxels and len(voxels) > 1:
                     start_dir = self.grid.center(voxels[-1]) - self.grid.center(voxels[-2])
                     start_dir = start_dir / (np.linalg.norm(start_dir) or 1.0)
-                path = self._astar(stops[leg], stops[leg + 1], ctx, blocked, used, start_dir, goal_dir)
+                    # A waypoint must carry the conductor through a corridor,
+                    # not walk it out and back along the same occupied voxels.
+                    # Repeated edges create a folded wire and an ambiguous
+                    # bundle graph that the planner cannot reconstruct.
+                    for visited in voxels[:-1]:
+                        blocked[visited] = 1
+                leg_blocked = bytearray(blocked)
+                # Do not consume a later waypoint/terminal on the way to this
+                # one: the returning leg must still be able to reach it.
+                for future in stops[leg + 2:]:
+                    leg_blocked[future] = 1
+                path = self._astar(stops[leg], stops[leg + 1], ctx, leg_blocked, used, start_dir, goal_dir)
                 if path is None:
                     ok = False
                     break
