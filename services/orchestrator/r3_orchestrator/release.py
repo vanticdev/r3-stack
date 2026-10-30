@@ -17,7 +17,7 @@ gate finds the latest evidence under ``build/`` and classifies it:
 payload backs ``r3 status --release``, the MCP tool ``r3_release_status`` and
 ``GET /api/projects/{pid}`` (``release``).
 
-Staleness compares ``robot_yaml_sha256`` and the ``*_revision`` keys of
+Staleness compares ``robot_yaml_sha256``, the native manifest hash and the ``*_revision`` keys of
 ``Project.fingerprint()``. The git commit is deliberately ignored: committing
 an unrelated file does not invalidate a simulation.
 """
@@ -72,7 +72,7 @@ class Item:
 def is_stale(inputs: dict[str, str] | None, current: dict[str, str]) -> bool:
     if not inputs:
         return True
-    keys = ["robot_yaml_sha256", *(k for k in current if k.endswith("_revision"))]
+    keys = ["robot_yaml_sha256", *(k for k in current if k.endswith("_revision") or k == "cad_pull_manifest_sha256")]
     return any(inputs.get(key) != current.get(key) for key in keys if key in current)
 
 
@@ -439,10 +439,26 @@ def _stage_items(ctx: _Context) -> list[Item]:
     return items
 
 
+def _integrity_items(ctx: _Context) -> list[Item]:
+    """Cached stage results cannot release a missing or locally changed pull."""
+    if not ctx.project.spec.components and not (ctx.project.root / "cad/pulled/pull.json").exists():
+        return []
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec
+
+    try:
+        validate_pulled_spec(ctx.project.root)
+    except PullError as error:
+        return [Item("stage.cad.integrity", "stage", "cad", 0,
+                     evidence=[Evidence("cad", error.code, False, inputs=ctx.current,
+                                        artifact="cad/pulled/pull.json", detail=str(error))], message=str(error))]
+    return []
+
+
 def evaluate(project: Project) -> dict[str, Any]:
     """The requirement evidence matrix and ``fabrication_ready`` for ``project``."""
     ctx = _Context(project)
-    items = [*_requirement_items(ctx), *_scenario_items(ctx), *_stage_items(ctx)]
+    items = [*_requirement_items(ctx), *_scenario_items(ctx), *_stage_items(ctx), *_integrity_items(ctx)]
     for item in items:
         item.status = _status(item.evidence)
         if not item.message and item.evidence:

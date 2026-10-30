@@ -137,3 +137,27 @@ def test_custom_requirement_uses_fresh_stage_metric(root):
     result.inputs = {**fingerprint, "robot_yaml_sha256": "old"}
     result.write(root / "build/model/result.json")
     assert items(api.release(root))["requirement.extra.capacity"]["status"] == "stale"
+
+
+def test_manifest_identity_invalidates_cached_evidence():
+    current = {'robot_yaml_sha256': 'same-spec', 'cad_pull_manifest_sha256': 'new-pull'}
+    assert release.is_stale({'robot_yaml_sha256': 'same-spec', 'cad_pull_manifest_sha256': 'old-pull'}, current)
+    assert not release.is_stale(dict(current), current)
+
+
+def test_release_rechecks_immutable_bytes_even_with_cached_passes(root):
+    from r3_model.project import Project
+    from r3_model.pulled import load_pulled
+
+    project = Project.load(root)
+    fingerprint = project.fingerprint()
+    StageResult(stage='cad', inputs=fingerprint).write(project.build_dir('cad') / 'result.json')
+    part = next(iter(load_pulled(root).parts.values()))
+    part.stl.chmod(0o644)
+    part.stl.write_bytes(part.stl.read_bytes() + b'changed')
+    gate = api.release(root)
+    issue = items(gate)['stage.cad.integrity']
+    assert not gate['fabrication_ready'] and issue['status'] == 'failed'
+    assert issue['evidence'][0]['check'] == 'cad_pull_modified'
+    assert project.fingerprint() == fingerprint  # no authored input/manifest changed
+    assert 'stage.cad.integrity' in gate['blocking']
