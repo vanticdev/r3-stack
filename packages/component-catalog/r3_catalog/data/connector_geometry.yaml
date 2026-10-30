@@ -39,6 +39,1396 @@ geometry:
     provenance: {status: "estimated", source: "3.5 mm gold bullet: 9 mm split pin, 5 mm solder cup (hobby vendor drawings; proxy)"}
     pins:
       "1": {position: [0, 0, 0], tip: 9.0 mm, wire_entry: [0, 0, -5.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x1:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x01_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [0, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x01_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x01_P2.54mm_Vertical"
+    footprint_placement: {origin: [0, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [2.74 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x01_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x10:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x10_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-11.43 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x10_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x10_P2.54mm_Vertical"
+    footprint_placement: {origin: [-11.43 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [25.6 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x10_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-11.43 mm, 0, 0], tip: -1.1 mm, pad: [-11.43 mm, 0, -8.5 mm], wire_entry: [-11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-8.89 mm, 0, 0], tip: -1.1 mm, pad: [-8.89 mm, 0, -8.5 mm], wire_entry: [-8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-6.35 mm, 0, 0], tip: -1.1 mm, pad: [-6.35 mm, 0, -8.5 mm], wire_entry: [-6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-3.81 mm, 0, 0], tip: -1.1 mm, pad: [-3.81 mm, 0, -8.5 mm], wire_entry: [-3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [3.81 mm, 0, 0], tip: -1.1 mm, pad: [3.81 mm, 0, -8.5 mm], wire_entry: [3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [6.35 mm, 0, 0], tip: -1.1 mm, pad: [6.35 mm, 0, -8.5 mm], wire_entry: [6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [8.89 mm, 0, 0], tip: -1.1 mm, pad: [8.89 mm, 0, -8.5 mm], wire_entry: [8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [11.43 mm, 0, 0], tip: -1.1 mm, pad: [11.43 mm, 0, -8.5 mm], wire_entry: [11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x11:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x11_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-12.7 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x11_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x11_P2.54mm_Vertical"
+    footprint_placement: {origin: [-12.7 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [28.14 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x11_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-12.7 mm, 0, 0], tip: -1.1 mm, pad: [-12.7 mm, 0, -8.5 mm], wire_entry: [-12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-10.16 mm, 0, 0], tip: -1.1 mm, pad: [-10.16 mm, 0, -8.5 mm], wire_entry: [-10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-7.62 mm, 0, 0], tip: -1.1 mm, pad: [-7.62 mm, 0, -8.5 mm], wire_entry: [-7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-5.08 mm, 0, 0], tip: -1.1 mm, pad: [-5.08 mm, 0, -8.5 mm], wire_entry: [-5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-2.54 mm, 0, 0], tip: -1.1 mm, pad: [-2.54 mm, 0, -8.5 mm], wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [2.54 mm, 0, 0], tip: -1.1 mm, pad: [2.54 mm, 0, -8.5 mm], wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [5.08 mm, 0, 0], tip: -1.1 mm, pad: [5.08 mm, 0, -8.5 mm], wire_entry: [5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [7.62 mm, 0, 0], tip: -1.1 mm, pad: [7.62 mm, 0, -8.5 mm], wire_entry: [7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [10.16 mm, 0, 0], tip: -1.1 mm, pad: [10.16 mm, 0, -8.5 mm], wire_entry: [10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [12.7 mm, 0, 0], tip: -1.1 mm, pad: [12.7 mm, 0, -8.5 mm], wire_entry: [12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x12:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x12_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-13.97 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x12_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x12_P2.54mm_Vertical"
+    footprint_placement: {origin: [-13.97 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [30.68 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x12_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-13.97 mm, 0, 0], tip: -1.1 mm, pad: [-13.97 mm, 0, -8.5 mm], wire_entry: [-13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-11.43 mm, 0, 0], tip: -1.1 mm, pad: [-11.43 mm, 0, -8.5 mm], wire_entry: [-11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-8.89 mm, 0, 0], tip: -1.1 mm, pad: [-8.89 mm, 0, -8.5 mm], wire_entry: [-8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-6.35 mm, 0, 0], tip: -1.1 mm, pad: [-6.35 mm, 0, -8.5 mm], wire_entry: [-6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-3.81 mm, 0, 0], tip: -1.1 mm, pad: [-3.81 mm, 0, -8.5 mm], wire_entry: [-3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [3.81 mm, 0, 0], tip: -1.1 mm, pad: [3.81 mm, 0, -8.5 mm], wire_entry: [3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [6.35 mm, 0, 0], tip: -1.1 mm, pad: [6.35 mm, 0, -8.5 mm], wire_entry: [6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [8.89 mm, 0, 0], tip: -1.1 mm, pad: [8.89 mm, 0, -8.5 mm], wire_entry: [8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [11.43 mm, 0, 0], tip: -1.1 mm, pad: [11.43 mm, 0, -8.5 mm], wire_entry: [11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [13.97 mm, 0, 0], tip: -1.1 mm, pad: [13.97 mm, 0, -8.5 mm], wire_entry: [13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x13:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x13_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-15.24 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x13_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x13_P2.54mm_Vertical"
+    footprint_placement: {origin: [-15.24 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [33.22 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x13_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-15.24 mm, 0, 0], tip: -1.1 mm, pad: [-15.24 mm, 0, -8.5 mm], wire_entry: [-15.24 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-12.7 mm, 0, 0], tip: -1.1 mm, pad: [-12.7 mm, 0, -8.5 mm], wire_entry: [-12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-10.16 mm, 0, 0], tip: -1.1 mm, pad: [-10.16 mm, 0, -8.5 mm], wire_entry: [-10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-7.62 mm, 0, 0], tip: -1.1 mm, pad: [-7.62 mm, 0, -8.5 mm], wire_entry: [-7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-5.08 mm, 0, 0], tip: -1.1 mm, pad: [-5.08 mm, 0, -8.5 mm], wire_entry: [-5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-2.54 mm, 0, 0], tip: -1.1 mm, pad: [-2.54 mm, 0, -8.5 mm], wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [2.54 mm, 0, 0], tip: -1.1 mm, pad: [2.54 mm, 0, -8.5 mm], wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [5.08 mm, 0, 0], tip: -1.1 mm, pad: [5.08 mm, 0, -8.5 mm], wire_entry: [5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [7.62 mm, 0, 0], tip: -1.1 mm, pad: [7.62 mm, 0, -8.5 mm], wire_entry: [7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [10.16 mm, 0, 0], tip: -1.1 mm, pad: [10.16 mm, 0, -8.5 mm], wire_entry: [10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [12.7 mm, 0, 0], tip: -1.1 mm, pad: [12.7 mm, 0, -8.5 mm], wire_entry: [12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [15.24 mm, 0, 0], tip: -1.1 mm, pad: [15.24 mm, 0, -8.5 mm], wire_entry: [15.24 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x14:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x14_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-16.51 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x14_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical"
+    footprint_placement: {origin: [-16.51 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [35.76 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x14_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-16.51 mm, 0, 0], tip: -1.1 mm, pad: [-16.51 mm, 0, -8.5 mm], wire_entry: [-16.51 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-13.97 mm, 0, 0], tip: -1.1 mm, pad: [-13.97 mm, 0, -8.5 mm], wire_entry: [-13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-11.43 mm, 0, 0], tip: -1.1 mm, pad: [-11.43 mm, 0, -8.5 mm], wire_entry: [-11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-8.89 mm, 0, 0], tip: -1.1 mm, pad: [-8.89 mm, 0, -8.5 mm], wire_entry: [-8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-6.35 mm, 0, 0], tip: -1.1 mm, pad: [-6.35 mm, 0, -8.5 mm], wire_entry: [-6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-3.81 mm, 0, 0], tip: -1.1 mm, pad: [-3.81 mm, 0, -8.5 mm], wire_entry: [-3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [3.81 mm, 0, 0], tip: -1.1 mm, pad: [3.81 mm, 0, -8.5 mm], wire_entry: [3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [6.35 mm, 0, 0], tip: -1.1 mm, pad: [6.35 mm, 0, -8.5 mm], wire_entry: [6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [8.89 mm, 0, 0], tip: -1.1 mm, pad: [8.89 mm, 0, -8.5 mm], wire_entry: [8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [11.43 mm, 0, 0], tip: -1.1 mm, pad: [11.43 mm, 0, -8.5 mm], wire_entry: [11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [13.97 mm, 0, 0], tip: -1.1 mm, pad: [13.97 mm, 0, -8.5 mm], wire_entry: [13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [16.51 mm, 0, 0], tip: -1.1 mm, pad: [16.51 mm, 0, -8.5 mm], wire_entry: [16.51 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x15:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x15_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-17.78 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x15_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x15_P2.54mm_Vertical"
+    footprint_placement: {origin: [-17.78 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [38.3 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x15_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-17.78 mm, 0, 0], tip: -1.1 mm, pad: [-17.78 mm, 0, -8.5 mm], wire_entry: [-17.78 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-15.24 mm, 0, 0], tip: -1.1 mm, pad: [-15.24 mm, 0, -8.5 mm], wire_entry: [-15.24 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-12.7 mm, 0, 0], tip: -1.1 mm, pad: [-12.7 mm, 0, -8.5 mm], wire_entry: [-12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-10.16 mm, 0, 0], tip: -1.1 mm, pad: [-10.16 mm, 0, -8.5 mm], wire_entry: [-10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-7.62 mm, 0, 0], tip: -1.1 mm, pad: [-7.62 mm, 0, -8.5 mm], wire_entry: [-7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-5.08 mm, 0, 0], tip: -1.1 mm, pad: [-5.08 mm, 0, -8.5 mm], wire_entry: [-5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-2.54 mm, 0, 0], tip: -1.1 mm, pad: [-2.54 mm, 0, -8.5 mm], wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [2.54 mm, 0, 0], tip: -1.1 mm, pad: [2.54 mm, 0, -8.5 mm], wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [5.08 mm, 0, 0], tip: -1.1 mm, pad: [5.08 mm, 0, -8.5 mm], wire_entry: [5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [7.62 mm, 0, 0], tip: -1.1 mm, pad: [7.62 mm, 0, -8.5 mm], wire_entry: [7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [10.16 mm, 0, 0], tip: -1.1 mm, pad: [10.16 mm, 0, -8.5 mm], wire_entry: [10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [12.7 mm, 0, 0], tip: -1.1 mm, pad: [12.7 mm, 0, -8.5 mm], wire_entry: [12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [15.24 mm, 0, 0], tip: -1.1 mm, pad: [15.24 mm, 0, -8.5 mm], wire_entry: [15.24 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [17.78 mm, 0, 0], tip: -1.1 mm, pad: [17.78 mm, 0, -8.5 mm], wire_entry: [17.78 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x16:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x16_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-19.05 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x16_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x16_P2.54mm_Vertical"
+    footprint_placement: {origin: [-19.05 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [40.84 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x16_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-19.05 mm, 0, 0], tip: -1.1 mm, pad: [-19.05 mm, 0, -8.5 mm], wire_entry: [-19.05 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-16.51 mm, 0, 0], tip: -1.1 mm, pad: [-16.51 mm, 0, -8.5 mm], wire_entry: [-16.51 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-13.97 mm, 0, 0], tip: -1.1 mm, pad: [-13.97 mm, 0, -8.5 mm], wire_entry: [-13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-11.43 mm, 0, 0], tip: -1.1 mm, pad: [-11.43 mm, 0, -8.5 mm], wire_entry: [-11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-8.89 mm, 0, 0], tip: -1.1 mm, pad: [-8.89 mm, 0, -8.5 mm], wire_entry: [-8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-6.35 mm, 0, 0], tip: -1.1 mm, pad: [-6.35 mm, 0, -8.5 mm], wire_entry: [-6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-3.81 mm, 0, 0], tip: -1.1 mm, pad: [-3.81 mm, 0, -8.5 mm], wire_entry: [-3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [3.81 mm, 0, 0], tip: -1.1 mm, pad: [3.81 mm, 0, -8.5 mm], wire_entry: [3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [6.35 mm, 0, 0], tip: -1.1 mm, pad: [6.35 mm, 0, -8.5 mm], wire_entry: [6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [8.89 mm, 0, 0], tip: -1.1 mm, pad: [8.89 mm, 0, -8.5 mm], wire_entry: [8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [11.43 mm, 0, 0], tip: -1.1 mm, pad: [11.43 mm, 0, -8.5 mm], wire_entry: [11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [13.97 mm, 0, 0], tip: -1.1 mm, pad: [13.97 mm, 0, -8.5 mm], wire_entry: [13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [16.51 mm, 0, 0], tip: -1.1 mm, pad: [16.51 mm, 0, -8.5 mm], wire_entry: [16.51 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [19.05 mm, 0, 0], tip: -1.1 mm, pad: [19.05 mm, 0, -8.5 mm], wire_entry: [19.05 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x17:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x17_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-20.32 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x17_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x17_P2.54mm_Vertical"
+    footprint_placement: {origin: [-20.32 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [43.38 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x17_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-20.32 mm, 0, 0], tip: -1.1 mm, pad: [-20.32 mm, 0, -8.5 mm], wire_entry: [-20.32 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-17.78 mm, 0, 0], tip: -1.1 mm, pad: [-17.78 mm, 0, -8.5 mm], wire_entry: [-17.78 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-15.24 mm, 0, 0], tip: -1.1 mm, pad: [-15.24 mm, 0, -8.5 mm], wire_entry: [-15.24 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-12.7 mm, 0, 0], tip: -1.1 mm, pad: [-12.7 mm, 0, -8.5 mm], wire_entry: [-12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-10.16 mm, 0, 0], tip: -1.1 mm, pad: [-10.16 mm, 0, -8.5 mm], wire_entry: [-10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-7.62 mm, 0, 0], tip: -1.1 mm, pad: [-7.62 mm, 0, -8.5 mm], wire_entry: [-7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-5.08 mm, 0, 0], tip: -1.1 mm, pad: [-5.08 mm, 0, -8.5 mm], wire_entry: [-5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-2.54 mm, 0, 0], tip: -1.1 mm, pad: [-2.54 mm, 0, -8.5 mm], wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [2.54 mm, 0, 0], tip: -1.1 mm, pad: [2.54 mm, 0, -8.5 mm], wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [5.08 mm, 0, 0], tip: -1.1 mm, pad: [5.08 mm, 0, -8.5 mm], wire_entry: [5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [7.62 mm, 0, 0], tip: -1.1 mm, pad: [7.62 mm, 0, -8.5 mm], wire_entry: [7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [10.16 mm, 0, 0], tip: -1.1 mm, pad: [10.16 mm, 0, -8.5 mm], wire_entry: [10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [12.7 mm, 0, 0], tip: -1.1 mm, pad: [12.7 mm, 0, -8.5 mm], wire_entry: [12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [15.24 mm, 0, 0], tip: -1.1 mm, pad: [15.24 mm, 0, -8.5 mm], wire_entry: [15.24 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [17.78 mm, 0, 0], tip: -1.1 mm, pad: [17.78 mm, 0, -8.5 mm], wire_entry: [17.78 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [20.32 mm, 0, 0], tip: -1.1 mm, pad: [20.32 mm, 0, -8.5 mm], wire_entry: [20.32 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x18:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x18_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-21.59 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x18_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x18_P2.54mm_Vertical"
+    footprint_placement: {origin: [-21.59 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [45.92 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x18_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-21.59 mm, 0, 0], tip: -1.1 mm, pad: [-21.59 mm, 0, -8.5 mm], wire_entry: [-21.59 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-19.05 mm, 0, 0], tip: -1.1 mm, pad: [-19.05 mm, 0, -8.5 mm], wire_entry: [-19.05 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-16.51 mm, 0, 0], tip: -1.1 mm, pad: [-16.51 mm, 0, -8.5 mm], wire_entry: [-16.51 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-13.97 mm, 0, 0], tip: -1.1 mm, pad: [-13.97 mm, 0, -8.5 mm], wire_entry: [-13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-11.43 mm, 0, 0], tip: -1.1 mm, pad: [-11.43 mm, 0, -8.5 mm], wire_entry: [-11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-8.89 mm, 0, 0], tip: -1.1 mm, pad: [-8.89 mm, 0, -8.5 mm], wire_entry: [-8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-6.35 mm, 0, 0], tip: -1.1 mm, pad: [-6.35 mm, 0, -8.5 mm], wire_entry: [-6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-3.81 mm, 0, 0], tip: -1.1 mm, pad: [-3.81 mm, 0, -8.5 mm], wire_entry: [-3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [3.81 mm, 0, 0], tip: -1.1 mm, pad: [3.81 mm, 0, -8.5 mm], wire_entry: [3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [6.35 mm, 0, 0], tip: -1.1 mm, pad: [6.35 mm, 0, -8.5 mm], wire_entry: [6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [8.89 mm, 0, 0], tip: -1.1 mm, pad: [8.89 mm, 0, -8.5 mm], wire_entry: [8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [11.43 mm, 0, 0], tip: -1.1 mm, pad: [11.43 mm, 0, -8.5 mm], wire_entry: [11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [13.97 mm, 0, 0], tip: -1.1 mm, pad: [13.97 mm, 0, -8.5 mm], wire_entry: [13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [16.51 mm, 0, 0], tip: -1.1 mm, pad: [16.51 mm, 0, -8.5 mm], wire_entry: [16.51 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [19.05 mm, 0, 0], tip: -1.1 mm, pad: [19.05 mm, 0, -8.5 mm], wire_entry: [19.05 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [21.59 mm, 0, 0], tip: -1.1 mm, pad: [21.59 mm, 0, -8.5 mm], wire_entry: [21.59 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x19:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x19_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-22.86 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x19_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x19_P2.54mm_Vertical"
+    footprint_placement: {origin: [-22.86 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [48.46 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x19_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-22.86 mm, 0, 0], tip: -1.1 mm, pad: [-22.86 mm, 0, -8.5 mm], wire_entry: [-22.86 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-20.32 mm, 0, 0], tip: -1.1 mm, pad: [-20.32 mm, 0, -8.5 mm], wire_entry: [-20.32 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-17.78 mm, 0, 0], tip: -1.1 mm, pad: [-17.78 mm, 0, -8.5 mm], wire_entry: [-17.78 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-15.24 mm, 0, 0], tip: -1.1 mm, pad: [-15.24 mm, 0, -8.5 mm], wire_entry: [-15.24 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-12.7 mm, 0, 0], tip: -1.1 mm, pad: [-12.7 mm, 0, -8.5 mm], wire_entry: [-12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-10.16 mm, 0, 0], tip: -1.1 mm, pad: [-10.16 mm, 0, -8.5 mm], wire_entry: [-10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-7.62 mm, 0, 0], tip: -1.1 mm, pad: [-7.62 mm, 0, -8.5 mm], wire_entry: [-7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-5.08 mm, 0, 0], tip: -1.1 mm, pad: [-5.08 mm, 0, -8.5 mm], wire_entry: [-5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-2.54 mm, 0, 0], tip: -1.1 mm, pad: [-2.54 mm, 0, -8.5 mm], wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [2.54 mm, 0, 0], tip: -1.1 mm, pad: [2.54 mm, 0, -8.5 mm], wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [5.08 mm, 0, 0], tip: -1.1 mm, pad: [5.08 mm, 0, -8.5 mm], wire_entry: [5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [7.62 mm, 0, 0], tip: -1.1 mm, pad: [7.62 mm, 0, -8.5 mm], wire_entry: [7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [10.16 mm, 0, 0], tip: -1.1 mm, pad: [10.16 mm, 0, -8.5 mm], wire_entry: [10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [12.7 mm, 0, 0], tip: -1.1 mm, pad: [12.7 mm, 0, -8.5 mm], wire_entry: [12.7 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [15.24 mm, 0, 0], tip: -1.1 mm, pad: [15.24 mm, 0, -8.5 mm], wire_entry: [15.24 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [17.78 mm, 0, 0], tip: -1.1 mm, pad: [17.78 mm, 0, -8.5 mm], wire_entry: [17.78 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [20.32 mm, 0, 0], tip: -1.1 mm, pad: [20.32 mm, 0, -8.5 mm], wire_entry: [20.32 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [22.86 mm, 0, 0], tip: -1.1 mm, pad: [22.86 mm, 0, -8.5 mm], wire_entry: [22.86 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x2:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x02_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-1.27 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x02_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x02_P2.54mm_Vertical"
+    footprint_placement: {origin: [-1.27 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [5.28 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x02_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x20:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x20_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-24.13 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x20_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x20_P2.54mm_Vertical"
+    footprint_placement: {origin: [-24.13 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [51.0 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x20_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-24.13 mm, 0, 0], tip: -1.1 mm, pad: [-24.13 mm, 0, -8.5 mm], wire_entry: [-24.13 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-21.59 mm, 0, 0], tip: -1.1 mm, pad: [-21.59 mm, 0, -8.5 mm], wire_entry: [-21.59 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-19.05 mm, 0, 0], tip: -1.1 mm, pad: [-19.05 mm, 0, -8.5 mm], wire_entry: [-19.05 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-16.51 mm, 0, 0], tip: -1.1 mm, pad: [-16.51 mm, 0, -8.5 mm], wire_entry: [-16.51 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-13.97 mm, 0, 0], tip: -1.1 mm, pad: [-13.97 mm, 0, -8.5 mm], wire_entry: [-13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-11.43 mm, 0, 0], tip: -1.1 mm, pad: [-11.43 mm, 0, -8.5 mm], wire_entry: [-11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-8.89 mm, 0, 0], tip: -1.1 mm, pad: [-8.89 mm, 0, -8.5 mm], wire_entry: [-8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-6.35 mm, 0, 0], tip: -1.1 mm, pad: [-6.35 mm, 0, -8.5 mm], wire_entry: [-6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-3.81 mm, 0, 0], tip: -1.1 mm, pad: [-3.81 mm, 0, -8.5 mm], wire_entry: [-3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [3.81 mm, 0, 0], tip: -1.1 mm, pad: [3.81 mm, 0, -8.5 mm], wire_entry: [3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [6.35 mm, 0, 0], tip: -1.1 mm, pad: [6.35 mm, 0, -8.5 mm], wire_entry: [6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [8.89 mm, 0, 0], tip: -1.1 mm, pad: [8.89 mm, 0, -8.5 mm], wire_entry: [8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [11.43 mm, 0, 0], tip: -1.1 mm, pad: [11.43 mm, 0, -8.5 mm], wire_entry: [11.43 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [13.97 mm, 0, 0], tip: -1.1 mm, pad: [13.97 mm, 0, -8.5 mm], wire_entry: [13.97 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [16.51 mm, 0, 0], tip: -1.1 mm, pad: [16.51 mm, 0, -8.5 mm], wire_entry: [16.51 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [19.05 mm, 0, 0], tip: -1.1 mm, pad: [19.05 mm, 0, -8.5 mm], wire_entry: [19.05 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [21.59 mm, 0, 0], tip: -1.1 mm, pad: [21.59 mm, 0, -8.5 mm], wire_entry: [21.59 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [24.13 mm, 0, 0], tip: -1.1 mm, pad: [24.13 mm, 0, -8.5 mm], wire_entry: [24.13 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x3:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x03_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-2.54 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x03_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x03_P2.54mm_Vertical"
+    footprint_placement: {origin: [-2.54 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [7.82 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x03_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-2.54 mm, 0, 0], tip: -1.1 mm, pad: [-2.54 mm, 0, -8.5 mm], wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [2.54 mm, 0, 0], tip: -1.1 mm, pad: [2.54 mm, 0, -8.5 mm], wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x4:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x04_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-3.81 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x04_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x04_P2.54mm_Vertical"
+    footprint_placement: {origin: [-3.81 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [10.36 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x04_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-3.81 mm, 0, 0], tip: -1.1 mm, pad: [-3.81 mm, 0, -8.5 mm], wire_entry: [-3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [3.81 mm, 0, 0], tip: -1.1 mm, pad: [3.81 mm, 0, -8.5 mm], wire_entry: [3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x5:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x05_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-5.08 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x05_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x05_P2.54mm_Vertical"
+    footprint_placement: {origin: [-5.08 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [12.9 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x05_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-5.08 mm, 0, 0], tip: -1.1 mm, pad: [-5.08 mm, 0, -8.5 mm], wire_entry: [-5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-2.54 mm, 0, 0], tip: -1.1 mm, pad: [-2.54 mm, 0, -8.5 mm], wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [2.54 mm, 0, 0], tip: -1.1 mm, pad: [2.54 mm, 0, -8.5 mm], wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [5.08 mm, 0, 0], tip: -1.1 mm, pad: [5.08 mm, 0, -8.5 mm], wire_entry: [5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x6:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x06_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-6.35 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x06_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x06_P2.54mm_Vertical"
+    footprint_placement: {origin: [-6.35 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [15.44 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x06_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-6.35 mm, 0, 0], tip: -1.1 mm, pad: [-6.35 mm, 0, -8.5 mm], wire_entry: [-6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-3.81 mm, 0, 0], tip: -1.1 mm, pad: [-3.81 mm, 0, -8.5 mm], wire_entry: [-3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [3.81 mm, 0, 0], tip: -1.1 mm, pad: [3.81 mm, 0, -8.5 mm], wire_entry: [3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [6.35 mm, 0, 0], tip: -1.1 mm, pad: [6.35 mm, 0, -8.5 mm], wire_entry: [6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x7:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x07_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-7.62 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x07_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x07_P2.54mm_Vertical"
+    footprint_placement: {origin: [-7.62 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [17.98 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x07_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-7.62 mm, 0, 0], tip: -1.1 mm, pad: [-7.62 mm, 0, -8.5 mm], wire_entry: [-7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-5.08 mm, 0, 0], tip: -1.1 mm, pad: [-5.08 mm, 0, -8.5 mm], wire_entry: [-5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-2.54 mm, 0, 0], tip: -1.1 mm, pad: [-2.54 mm, 0, -8.5 mm], wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [2.54 mm, 0, 0], tip: -1.1 mm, pad: [2.54 mm, 0, -8.5 mm], wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [5.08 mm, 0, 0], tip: -1.1 mm, pad: [5.08 mm, 0, -8.5 mm], wire_entry: [5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [7.62 mm, 0, 0], tip: -1.1 mm, pad: [7.62 mm, 0, -8.5 mm], wire_entry: [7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x8:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x08_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-8.89 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x08_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x08_P2.54mm_Vertical"
+    footprint_placement: {origin: [-8.89 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [20.52 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x08_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-8.89 mm, 0, 0], tip: -1.1 mm, pad: [-8.89 mm, 0, -8.5 mm], wire_entry: [-8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-6.35 mm, 0, 0], tip: -1.1 mm, pad: [-6.35 mm, 0, -8.5 mm], wire_entry: [-6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-3.81 mm, 0, 0], tip: -1.1 mm, pad: [-3.81 mm, 0, -8.5 mm], wire_entry: [-3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-1.27 mm, 0, 0], tip: -1.1 mm, pad: [-1.27 mm, 0, -8.5 mm], wire_entry: [-1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [1.27 mm, 0, 0], tip: -1.1 mm, pad: [1.27 mm, 0, -8.5 mm], wire_entry: [1.27 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [3.81 mm, 0, 0], tip: -1.1 mm, pad: [3.81 mm, 0, -8.5 mm], wire_entry: [3.81 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [6.35 mm, 0, 0], tip: -1.1 mm, pad: [6.35 mm, 0, -8.5 mm], wire_entry: [6.35 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [8.89 mm, 0, 0], tip: -1.1 mm, pad: [8.89 mm, 0, -8.5 mm], wire_entry: [8.89 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-1x9:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x09_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-10.16 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_1x09_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_1x09_P2.54mm_Vertical"
+    footprint_placement: {origin: [-10.16 mm, 0, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [23.06 mm, 2.5 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_1x09_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-10.16 mm, 0, 0], tip: -1.1 mm, pad: [-10.16 mm, 0, -8.5 mm], wire_entry: [-10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-7.62 mm, 0, 0], tip: -1.1 mm, pad: [-7.62 mm, 0, -8.5 mm], wire_entry: [-7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-5.08 mm, 0, 0], tip: -1.1 mm, pad: [-5.08 mm, 0, -8.5 mm], wire_entry: [-5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-2.54 mm, 0, 0], tip: -1.1 mm, pad: [-2.54 mm, 0, -8.5 mm], wire_entry: [-2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [0, 0, 0], tip: -1.1 mm, pad: [0, 0, -8.5 mm], wire_entry: [0, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [2.54 mm, 0, 0], tip: -1.1 mm, pad: [2.54 mm, 0, -8.5 mm], wire_entry: [2.54 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [5.08 mm, 0, 0], tip: -1.1 mm, pad: [5.08 mm, 0, -8.5 mm], wire_entry: [5.08 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [7.62 mm, 0, 0], tip: -1.1 mm, pad: [7.62 mm, 0, -8.5 mm], wire_entry: [7.62 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [10.16 mm, 0, 0], tip: -1.1 mm, pad: [10.16 mm, 0, -8.5 mm], wire_entry: [10.16 mm, 0, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x1:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x01_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [0, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x01_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x01_P2.54mm_Vertical"
+    footprint_placement: {origin: [0, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [2.54 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x01_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x10:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x10_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-11.43 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x10_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x10_P2.54mm_Vertical"
+    footprint_placement: {origin: [-11.43 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [25.4 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x10_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x11:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x11_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-12.7 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x11_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x11_P2.54mm_Vertical"
+    footprint_placement: {origin: [-12.7 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [27.94 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x11_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x12:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x12_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-13.97 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x12_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x12_P2.54mm_Vertical"
+    footprint_placement: {origin: [-13.97 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [30.48 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x12_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "23": {position: [13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "24": {position: [13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x13:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x13_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-15.24 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x13_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x13_P2.54mm_Vertical"
+    footprint_placement: {origin: [-15.24 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [33.02 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x13_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-15.24 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-15.24 mm, 1.27 mm, -8.5 mm], wire_entry: [-15.24 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-15.24 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-15.24 mm, -1.27 mm, -8.5 mm], wire_entry: [-15.24 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [-2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [-2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "23": {position: [12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "24": {position: [12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "25": {position: [15.24 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [15.24 mm, 1.27 mm, -8.5 mm], wire_entry: [15.24 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "26": {position: [15.24 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [15.24 mm, -1.27 mm, -8.5 mm], wire_entry: [15.24 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x14:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x14_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-16.51 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x14_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x14_P2.54mm_Vertical"
+    footprint_placement: {origin: [-16.51 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [35.56 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x14_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-16.51 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-16.51 mm, 1.27 mm, -8.5 mm], wire_entry: [-16.51 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-16.51 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-16.51 mm, -1.27 mm, -8.5 mm], wire_entry: [-16.51 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [-3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [-3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "23": {position: [11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "24": {position: [11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "25": {position: [13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "26": {position: [13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "27": {position: [16.51 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [16.51 mm, 1.27 mm, -8.5 mm], wire_entry: [16.51 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "28": {position: [16.51 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [16.51 mm, -1.27 mm, -8.5 mm], wire_entry: [16.51 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x15:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x15_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-17.78 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x15_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x15_P2.54mm_Vertical"
+    footprint_placement: {origin: [-17.78 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [38.1 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x15_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-17.78 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-17.78 mm, 1.27 mm, -8.5 mm], wire_entry: [-17.78 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-17.78 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-17.78 mm, -1.27 mm, -8.5 mm], wire_entry: [-17.78 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-15.24 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-15.24 mm, 1.27 mm, -8.5 mm], wire_entry: [-15.24 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-15.24 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-15.24 mm, -1.27 mm, -8.5 mm], wire_entry: [-15.24 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [-5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [-5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [-2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [-2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "23": {position: [10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "24": {position: [10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "25": {position: [12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "26": {position: [12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "27": {position: [15.24 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [15.24 mm, 1.27 mm, -8.5 mm], wire_entry: [15.24 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "28": {position: [15.24 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [15.24 mm, -1.27 mm, -8.5 mm], wire_entry: [15.24 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "29": {position: [17.78 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [17.78 mm, 1.27 mm, -8.5 mm], wire_entry: [17.78 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "30": {position: [17.78 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [17.78 mm, -1.27 mm, -8.5 mm], wire_entry: [17.78 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x16:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x16_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-19.05 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x16_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x16_P2.54mm_Vertical"
+    footprint_placement: {origin: [-19.05 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [40.64 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x16_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-19.05 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-19.05 mm, 1.27 mm, -8.5 mm], wire_entry: [-19.05 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-19.05 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-19.05 mm, -1.27 mm, -8.5 mm], wire_entry: [-19.05 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-16.51 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-16.51 mm, 1.27 mm, -8.5 mm], wire_entry: [-16.51 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-16.51 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-16.51 mm, -1.27 mm, -8.5 mm], wire_entry: [-16.51 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [-6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [-6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [-3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [-3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "23": {position: [8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "24": {position: [8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "25": {position: [11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "26": {position: [11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "27": {position: [13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "28": {position: [13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "29": {position: [16.51 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [16.51 mm, 1.27 mm, -8.5 mm], wire_entry: [16.51 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "30": {position: [16.51 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [16.51 mm, -1.27 mm, -8.5 mm], wire_entry: [16.51 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "31": {position: [19.05 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [19.05 mm, 1.27 mm, -8.5 mm], wire_entry: [19.05 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "32": {position: [19.05 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [19.05 mm, -1.27 mm, -8.5 mm], wire_entry: [19.05 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x17:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x17_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-20.32 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x17_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x17_P2.54mm_Vertical"
+    footprint_placement: {origin: [-20.32 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [43.18 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x17_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-20.32 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-20.32 mm, 1.27 mm, -8.5 mm], wire_entry: [-20.32 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-20.32 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-20.32 mm, -1.27 mm, -8.5 mm], wire_entry: [-20.32 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-17.78 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-17.78 mm, 1.27 mm, -8.5 mm], wire_entry: [-17.78 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-17.78 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-17.78 mm, -1.27 mm, -8.5 mm], wire_entry: [-17.78 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-15.24 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-15.24 mm, 1.27 mm, -8.5 mm], wire_entry: [-15.24 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-15.24 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-15.24 mm, -1.27 mm, -8.5 mm], wire_entry: [-15.24 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [-7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [-7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [-5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [-5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [-2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [-2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "23": {position: [7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "24": {position: [7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "25": {position: [10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "26": {position: [10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "27": {position: [12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "28": {position: [12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "29": {position: [15.24 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [15.24 mm, 1.27 mm, -8.5 mm], wire_entry: [15.24 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "30": {position: [15.24 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [15.24 mm, -1.27 mm, -8.5 mm], wire_entry: [15.24 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "31": {position: [17.78 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [17.78 mm, 1.27 mm, -8.5 mm], wire_entry: [17.78 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "32": {position: [17.78 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [17.78 mm, -1.27 mm, -8.5 mm], wire_entry: [17.78 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "33": {position: [20.32 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [20.32 mm, 1.27 mm, -8.5 mm], wire_entry: [20.32 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "34": {position: [20.32 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [20.32 mm, -1.27 mm, -8.5 mm], wire_entry: [20.32 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x18:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x18_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-21.59 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x18_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x18_P2.54mm_Vertical"
+    footprint_placement: {origin: [-21.59 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [45.72 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x18_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-21.59 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-21.59 mm, 1.27 mm, -8.5 mm], wire_entry: [-21.59 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-21.59 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-21.59 mm, -1.27 mm, -8.5 mm], wire_entry: [-21.59 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-19.05 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-19.05 mm, 1.27 mm, -8.5 mm], wire_entry: [-19.05 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-19.05 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-19.05 mm, -1.27 mm, -8.5 mm], wire_entry: [-19.05 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-16.51 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-16.51 mm, 1.27 mm, -8.5 mm], wire_entry: [-16.51 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-16.51 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-16.51 mm, -1.27 mm, -8.5 mm], wire_entry: [-16.51 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [-8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [-8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [-6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [-6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [-3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [-3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "23": {position: [6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "24": {position: [6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "25": {position: [8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "26": {position: [8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "27": {position: [11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "28": {position: [11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "29": {position: [13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "30": {position: [13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "31": {position: [16.51 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [16.51 mm, 1.27 mm, -8.5 mm], wire_entry: [16.51 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "32": {position: [16.51 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [16.51 mm, -1.27 mm, -8.5 mm], wire_entry: [16.51 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "33": {position: [19.05 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [19.05 mm, 1.27 mm, -8.5 mm], wire_entry: [19.05 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "34": {position: [19.05 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [19.05 mm, -1.27 mm, -8.5 mm], wire_entry: [19.05 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "35": {position: [21.59 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [21.59 mm, 1.27 mm, -8.5 mm], wire_entry: [21.59 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "36": {position: [21.59 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [21.59 mm, -1.27 mm, -8.5 mm], wire_entry: [21.59 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x19:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x19_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-22.86 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x19_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x19_P2.54mm_Vertical"
+    footprint_placement: {origin: [-22.86 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [48.26 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x19_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-22.86 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-22.86 mm, 1.27 mm, -8.5 mm], wire_entry: [-22.86 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-22.86 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-22.86 mm, -1.27 mm, -8.5 mm], wire_entry: [-22.86 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-20.32 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-20.32 mm, 1.27 mm, -8.5 mm], wire_entry: [-20.32 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-20.32 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-20.32 mm, -1.27 mm, -8.5 mm], wire_entry: [-20.32 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-17.78 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-17.78 mm, 1.27 mm, -8.5 mm], wire_entry: [-17.78 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-17.78 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-17.78 mm, -1.27 mm, -8.5 mm], wire_entry: [-17.78 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-15.24 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-15.24 mm, 1.27 mm, -8.5 mm], wire_entry: [-15.24 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-15.24 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-15.24 mm, -1.27 mm, -8.5 mm], wire_entry: [-15.24 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [-12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [-10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [-10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [-7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [-7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [-5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [-5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [-2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [-2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "23": {position: [5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "24": {position: [5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "25": {position: [7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "26": {position: [7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "27": {position: [10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "28": {position: [10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "29": {position: [12.7 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, 1.27 mm, -8.5 mm], wire_entry: [12.7 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "30": {position: [12.7 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [12.7 mm, -1.27 mm, -8.5 mm], wire_entry: [12.7 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "31": {position: [15.24 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [15.24 mm, 1.27 mm, -8.5 mm], wire_entry: [15.24 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "32": {position: [15.24 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [15.24 mm, -1.27 mm, -8.5 mm], wire_entry: [15.24 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "33": {position: [17.78 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [17.78 mm, 1.27 mm, -8.5 mm], wire_entry: [17.78 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "34": {position: [17.78 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [17.78 mm, -1.27 mm, -8.5 mm], wire_entry: [17.78 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "35": {position: [20.32 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [20.32 mm, 1.27 mm, -8.5 mm], wire_entry: [20.32 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "36": {position: [20.32 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [20.32 mm, -1.27 mm, -8.5 mm], wire_entry: [20.32 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "37": {position: [22.86 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [22.86 mm, 1.27 mm, -8.5 mm], wire_entry: [22.86 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "38": {position: [22.86 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [22.86 mm, -1.27 mm, -8.5 mm], wire_entry: [22.86 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x2:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x02_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-1.27 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x02_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x02_P2.54mm_Vertical"
+    footprint_placement: {origin: [-1.27 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [5.08 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x02_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x20:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x20_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-24.13 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x20_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical"
+    footprint_placement: {origin: [-24.13 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [50.8 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "estimated", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x20_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-24.13 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-24.13 mm, 1.27 mm, -8.5 mm], wire_entry: [-24.13 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-24.13 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-24.13 mm, -1.27 mm, -8.5 mm], wire_entry: [-24.13 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-21.59 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-21.59 mm, 1.27 mm, -8.5 mm], wire_entry: [-21.59 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-21.59 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-21.59 mm, -1.27 mm, -8.5 mm], wire_entry: [-21.59 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-19.05 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-19.05 mm, 1.27 mm, -8.5 mm], wire_entry: [-19.05 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-19.05 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-19.05 mm, -1.27 mm, -8.5 mm], wire_entry: [-19.05 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-16.51 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-16.51 mm, 1.27 mm, -8.5 mm], wire_entry: [-16.51 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-16.51 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-16.51 mm, -1.27 mm, -8.5 mm], wire_entry: [-16.51 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [-13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [-13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [-13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [-11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [-11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [-11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [-8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [-8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [-6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [-6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [-3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [-3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "19": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "20": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "21": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "22": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "23": {position: [3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "24": {position: [3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "25": {position: [6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "26": {position: [6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "27": {position: [8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "28": {position: [8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "29": {position: [11.43 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, 1.27 mm, -8.5 mm], wire_entry: [11.43 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "30": {position: [11.43 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [11.43 mm, -1.27 mm, -8.5 mm], wire_entry: [11.43 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "31": {position: [13.97 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, 1.27 mm, -8.5 mm], wire_entry: [13.97 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "32": {position: [13.97 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [13.97 mm, -1.27 mm, -8.5 mm], wire_entry: [13.97 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "33": {position: [16.51 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [16.51 mm, 1.27 mm, -8.5 mm], wire_entry: [16.51 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "34": {position: [16.51 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [16.51 mm, -1.27 mm, -8.5 mm], wire_entry: [16.51 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "35": {position: [19.05 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [19.05 mm, 1.27 mm, -8.5 mm], wire_entry: [19.05 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "36": {position: [19.05 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [19.05 mm, -1.27 mm, -8.5 mm], wire_entry: [19.05 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "37": {position: [21.59 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [21.59 mm, 1.27 mm, -8.5 mm], wire_entry: [21.59 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "38": {position: [21.59 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [21.59 mm, -1.27 mm, -8.5 mm], wire_entry: [21.59 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "39": {position: [24.13 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [24.13 mm, 1.27 mm, -8.5 mm], wire_entry: [24.13 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "40": {position: [24.13 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [24.13 mm, -1.27 mm, -8.5 mm], wire_entry: [24.13 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x3:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x03_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-2.54 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x03_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x03_P2.54mm_Vertical"
+    footprint_placement: {origin: [-2.54 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [7.62 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x03_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x4:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x04_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-3.81 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x04_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x04_P2.54mm_Vertical"
+    footprint_placement: {origin: [-3.81 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [10.16 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x04_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x5:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x05_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-5.08 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x05_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x05_P2.54mm_Vertical"
+    footprint_placement: {origin: [-5.08 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [12.7 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x05_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x6:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x06_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-6.35 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x06_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x06_P2.54mm_Vertical"
+    footprint_placement: {origin: [-6.35 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [15.24 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x06_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x7:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x07_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-7.62 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x07_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x07_P2.54mm_Vertical"
+    footprint_placement: {origin: [-7.62 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [17.78 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x07_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x8:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x08_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-8.89 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x08_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x08_P2.54mm_Vertical"
+    footprint_placement: {origin: [-8.89 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [20.32 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x08_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [-8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [-6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [-3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [-1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [1.27 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, 1.27 mm, -8.5 mm], wire_entry: [1.27 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [1.27 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [1.27 mm, -1.27 mm, -8.5 mm], wire_entry: [1.27 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [3.81 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, 1.27 mm, -8.5 mm], wire_entry: [3.81 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [3.81 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [3.81 mm, -1.27 mm, -8.5 mm], wire_entry: [3.81 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [6.35 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, 1.27 mm, -8.5 mm], wire_entry: [6.35 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [6.35 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [6.35 mm, -1.27 mm, -8.5 mm], wire_entry: [6.35 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [8.89 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, 1.27 mm, -8.5 mm], wire_entry: [8.89 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [8.89 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [8.89 mm, -1.27 mm, -8.5 mm], wire_entry: [8.89 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+  dupont-2x9:
+    model:
+      source: kicad
+      path: "${KICAD10_3DMODEL_DIR}/Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x09_P2.54mm_Vertical.step"
+      license: "KiCad libraries, CC-BY-SA 4.0 with the KiCad library exception (designs and generated files using the libraries are not adapted material); https://www.kicad.org/libraries/license/"
+      units: mm
+      placement: {origin: [-10.16 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+      provenance: {status: "datasheet", source: "KiCad 3D library Connector_PinSocket_2.54mm.3dshapes/PinSocket_2x09_P2.54mm_Vertical.step", notes: "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration."}
+    footprint: "Connector_PinSocket_2.54mm:PinSocket_2x09_P2.54mm_Vertical"
+    footprint_placement: {origin: [-10.16 mm, 1.27 mm, -8.5 mm], x: [0.0, 1.0, 0.0], z: [0.0, 0.0, 1.0]}
+    pin_shape: socket
+    pin_size: 1.0 mm
+    envelope: [22.86 mm, 5.1 mm, 14.0 mm]
+    depth: 14.0 mm
+    reach: 0.0 mm
+    color: "#202020"
+    contact_color: "#d4a640"
+    provenance: {status: "derived", source: "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf; https://www.harwin.com/products/M20-1070300; KiCad pads: Connector_PinSocket_2.54mm:PinSocket_2x09_P2.54mm_Vertical", notes: "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, availability must be checked. Wire-entry depth approximated by the 14 mm body length. Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+    pins:
+      "1": {position: [-10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "2": {position: [-10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [-10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "3": {position: [-7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "4": {position: [-7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [-7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "5": {position: [-5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "6": {position: [-5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [-5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "7": {position: [-2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "8": {position: [-2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [-2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [-2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "9": {position: [0, 1.27 mm, 0], tip: -1.1 mm, pad: [0, 1.27 mm, -8.5 mm], wire_entry: [0, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "10": {position: [0, -1.27 mm, 0], tip: -1.1 mm, pad: [0, -1.27 mm, -8.5 mm], wire_entry: [0, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "11": {position: [2.54 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, 1.27 mm, -8.5 mm], wire_entry: [2.54 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "12": {position: [2.54 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [2.54 mm, -1.27 mm, -8.5 mm], wire_entry: [2.54 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "13": {position: [5.08 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, 1.27 mm, -8.5 mm], wire_entry: [5.08 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "14": {position: [5.08 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [5.08 mm, -1.27 mm, -8.5 mm], wire_entry: [5.08 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "15": {position: [7.62 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, 1.27 mm, -8.5 mm], wire_entry: [7.62 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "16": {position: [7.62 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [7.62 mm, -1.27 mm, -8.5 mm], wire_entry: [7.62 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "17": {position: [10.16 mm, 1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, 1.27 mm, -8.5 mm], wire_entry: [10.16 mm, 1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
+      "18": {position: [10.16 mm, -1.27 mm, 0], tip: -1.1 mm, pad: [10.16 mm, -1.27 mm, -8.5 mm], wire_entry: [10.16 mm, -1.27 mm, -14.0 mm], wire_axis: [0.0, 0.0, -1.0]}
   fpc-15p-1.0mm-cable:
     model:
       source: proxy

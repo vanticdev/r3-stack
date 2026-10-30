@@ -45,7 +45,7 @@ from r3_model.project import Project
 from r3_model.spec import Harness
 
 from r3_connectors.frames import Frame
-from r3_connectors.pins import (PinEnd, component_connector_frame, floating_pair_frame, geometry_of, pigtail_ends,
+from r3_connectors.pins import (PinEnd, mating_site_frame, floating_pair_frame, geometry_of, pigtail_ends,
                                 pin_end, wire_entry_depth)
 
 from .bodies import ROOT
@@ -462,13 +462,14 @@ class HarnessRouter:
                 od = bundle_diameter(self._wire_od(a) for a in awgs.get(name, [])) if awgs.get(name) else 0.0
                 endpoint = self.graph.endpoints.get(conn.mates) if conn.mates else None
                 if endpoint is not None and endpoint.owner_kind == "component":
+                    board_half = mating_site_frame(self.project, ref, conn)
                     component = conn.mates.split(".")[0]
-                    direction = endpoint.direction / np.linalg.norm(endpoint.direction)
+                    face = board_half.origin if conn.at is not None else endpoint.position
+                    direction = board_half.z if conn.at is not None else endpoint.direction / np.linalg.norm(endpoint.direction)
                     offset = exit_offset(self.catalog, conn.type)
-                    node = NodePoint(harness.id, name, "connector", endpoint.position + direction * offset, direction,
+                    node = NodePoint(harness.id, name, "connector", face + direction * offset, direction,
                                      conn.type, conn.mates, component, self.kin.body_of(component),
-                                     {component}, endpoint.position.copy(), offset, od)
-                    board_half = component_connector_frame(self.project, conn.mates)
+                                     {component}, face.copy(), offset, od)
                     # A pigtail leaves the component's own connector frame; a mated half is turned about x.
                     node.frame = board_half if conn.type == "integral" else board_half.mated()
                 elif ref in floating:

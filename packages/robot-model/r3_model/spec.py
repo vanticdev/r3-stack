@@ -213,6 +213,7 @@ class HarnessConnector(_Model):
 
     type: str
     mates: str | None = Field(default=None, description="<component|harness>.<connector> this plugs into.")
+    at: str | None = Field(default=None, description="Partial header mate: component pin receiving housing pin 1; row axis unchanged.")
     position: Vector | None = Field(default=None, description="Free-end position when not mated (robot frame).")
     direction: Vector | None = Field(default=None, min_length=3, max_length=3,
                                     description="Wire exit axis for a floating in-line connector half (robot frame).")
@@ -221,6 +222,12 @@ class HarnessConnector(_Model):
     def _exit_axis(self) -> "HarnessConnector":
         if self.direction is not None and sum(v * v for v in self.direction) < 1e-12:
             raise ValueError("connector direction must be non-zero")
+        return self
+
+    @model_validator(mode="after")
+    def _check_site(self) -> "HarnessConnector":
+        if self.at is not None and self.mates is None:
+            raise ValueError("at requires mates")
         return self
 
 

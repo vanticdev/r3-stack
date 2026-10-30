@@ -28,6 +28,7 @@ from .frames import Frame, any_perpendicular
 
 if TYPE_CHECKING:  # pragma: no cover
     from r3_model.project import Project
+    from r3_model.spec import HarnessConnector
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,22 @@ def component_connector_frame(project: "Project", ref: str) -> Frame:
                 return component_connector_frame(project, partners[0]).mated()
     position, rotation = project.graph.component_pose(component)
     return Frame(rotation, position) @ instance_frame(inst)
+
+
+def mating_site_frame(project: "Project", ref: str, conn: "HarnessConnector") -> Frame:
+    """Robot-frame cable-exit frame selected by a harness's mates/at.
+
+    Full mates keep the original frame exactly. Partial site poses compose
+    with the current component pose, so both contacts and conductors follow it.
+    """
+    assert conn.mates is not None
+    if conn.at is None:
+        return component_connector_frame(project, conn.mates)
+    site = project.graph.mating_sites.get(ref)
+    if site is None:
+        raise ValueError(f"{ref}: invalid partial mate (see graph diagnostics)")
+    position, rotation = project.graph.component_pose(conn.mates.partition(".")[0])
+    return Frame(rotation, position) @ Frame.from_placement(site.frame)
 
 
 def floating_pair_frame(face: np.ndarray, axis: np.ndarray) -> Frame:
@@ -121,4 +138,4 @@ def pigtail_ends(frame: Frame, pins: Sequence[str], diameters: dict[str, float],
 
 
 __all__ = ["PinEnd", "component_connector_frame", "floating_pair_frame", "geometry_of", "instance_frame",
-           "pigtail_ends", "pin_end", "wire_entry_depth"]
+           "mating_site_frame", "pigtail_ends", "pin_end", "wire_entry_depth"]
