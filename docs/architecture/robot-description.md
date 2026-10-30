@@ -13,8 +13,8 @@ electrical/system.yaml
 software/system.yaml
 simulation/system.yaml
 cad/pulled/pull.json        # immutable local CAD, pinned in r3.lock.yaml
-cad/pulled/*.stl
-cad/pulled/*.step
+cad/pulled/parts/*.stl
+cad/pulled/parts/*.step
 ```
 
 The only include syntax is a mapping with exactly one `$include` key:
@@ -43,12 +43,11 @@ For example `parts/link.yaml` contains a complete component value:
 
 ```yaml
 type: project-link
-mount: base
 onshape:
   occurrence_path: [instance-id]
   configuration: ""
 label: Moving link
-# pulled: populated by CAD pull, never authored
+# pulled, pose and mount: populated by CAD pull, never authored
 ```
 
 Includes may replace any value, including a list element. A file contributes its
@@ -59,6 +58,9 @@ A file may be included only once; cycles, duplicate YAML keys, unknown schema
 keys, duplicate identities and undefined local references are errors. Existing
 single-file descriptions remain supported, with the same strict validation.
 External catalog connector and pin checks remain in the graph/model stage.
+Physical `pose` and `mount` compatibility fields are refreshed from the native
+assembly alongside `pulled`; local changes are integrity errors. They never
+position a physical part independently of the pull.
 
 `r3_model.spec_files.load_spec_files(root)` retains the source file and source
 path for every resolved value. `SpecError.errors` carries stable `code`, `file`,
