@@ -57,7 +57,7 @@ export interface ConnectorJson {
   embedded?: boolean;
   source?: string;
   mates?: string | null;
-  placement?: "component" | "pigtail" | "floating";
+  placement?: "component" | "pigtail" | "floating" | "pulled";
   glb: string | null;
   pins: Record<string, ComponentPinJson & HarnessPinJson>;
 }
