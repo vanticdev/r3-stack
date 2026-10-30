@@ -128,3 +128,11 @@ seated flexible ends and end stiffener only. There is no qualified installed
 ribbon path/bend/support simulation. `flat_cable_route_estimated` must continue
 to block fabrication release; endpoint reach is not clearance proof. The owner's
 UC-717 mounting pattern also remains unconfirmed (4 x 2.5 mm, 30 x 30 mm).
+
+A later vertical-XT90 trial was also rejected rather than promoted. With the
+pair axis constrained vertically and its hint moved to (240,25,100) mm, the
+three-harness power subset finished in 818.44 s with 24 errors: 11 planning,
+3 unsupported spans, 1 connector clearance, 1 inter-wire overlap and 8 bends.
+The resulting XT90 body clears the tie rod by only 6.485279 mm versus 8 mm;
+the power trunk has a 241.329 mm unsupported span versus 99.469 mm. The trial
+removes the earlier wheel-sag symptom but does not make a buildable power loom.
