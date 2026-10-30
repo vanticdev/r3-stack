@@ -55,6 +55,7 @@ class AssemblyModel:
     moving_joints: dict[str, Any] = field(default_factory=dict)
     cables: Any = None
     cad_extras: dict[str, list[str]] = field(default_factory=dict)
+    fixture_world_contacts: dict[str, tuple[str | None, str | None]] = field(default_factory=dict, repr=False)
 
 
 def _fmt(values: Any) -> str:

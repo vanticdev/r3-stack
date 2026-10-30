@@ -470,6 +470,7 @@ def _finish(
     metrics.update(_gnss_metrics(kernel, rec))
     diagnostics.extend(_sensor_capability(project, kernel, scenario))
     diagnostics.extend(kernel.vehicle.joints.final_diagnostics())
+    diagnostics.extend(kernel.vehicle.load_case.final_diagnostics())
     passed = all(c.passed for c in checks) and not any(
         d.severity.value == "error" for d in diagnostics
     )
@@ -544,7 +545,8 @@ def _finish(
         "passed": passed,
         "seed": kernel.seed,
         "timestep": kernel.dt,
-        "duration": kernel.duration,
+        "duration": float(scenario.duration),
+        "load_case": kernel.vehicle.load_case.report(),
         "checks": [c.as_dict() for c in checks],
         "metrics": metrics,
         "software": {

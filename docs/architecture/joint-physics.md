@@ -107,6 +107,13 @@ are reserved so an authored test cannot replace them.
 an explicit choice, positive translational top/impact speed indicates mobility. This choice does not
 infer mobile behavior from an articulated joint, wheel count or robot name.
 
+Mechanical fixture version 2 disables ambient scene support while preserving
+robot self-contact. Drops use a dedicated infinite ground plane and native
+MuJoCo surface distances for clearance. Impact uses an infinite vertical plane,
+placed one native travel step ahead of the assembly's actual support surface.
+Native wall contact reactions are recorded; a moving case with no reaction is
+blocked as `load_case_not_exercised`. This also covers tall non-vehicle robots.
+
 The vibration default follows the tailoring approach of
 [MIL-STD-810H Method 514.8, Annex C](https://quicksearch.dla.mil/qaDocDetails.aspx?ident_number=35978).
 It is an **estimated small-platform profile**, not a verbatim standard qualification spectrum:
@@ -135,13 +142,15 @@ the simulator or suppress its diagnostics to recover a legacy pass.
 
 ## Already-failed runs and replay
 
-`simulation.joint_failure_replay_duration` defaults to 2 seconds after the first
-irreversible `joint_failed` or `part_detached` event. All native load, contact,
+`simulation.joint_failure_replay_duration` defaults to `null`: qualification runs
+continue for their full requested duration. An explicit duration is a replay-only
+cutoff after the first irreversible `joint_failed` or `part_detached` event. All native load, contact,
 detachment and cable checks continue during this fully coupled replay tail.
 A shortened case reports `scenario_incomplete`, `simulation_complete: false`,
 and a `joint_failure_stop` event. Every expectation is non-qualifying when its
 requested time window is incomplete. It cannot pass the scenario or release gate.
 Healthy designs still run the full requested duration. Set this field to `null`,
 or pass `--full-duration` to `r3_sim_worker`, to continue a failed assembly for the
-entire case. The two-second tail is a recording/runtime policy, not an engineering
-allowable or a substitute for the sustained vibration requirement.
+entire case. An explicit replay cutoff is not qualification evidence or a substitute for the
+sustained vibration requirement. Qualification requires full requested durations;
+historical truncated rc-car recordings are explicitly labeled in the run report.

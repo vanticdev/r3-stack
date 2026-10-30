@@ -432,7 +432,7 @@ class Scenario(_Model):
 
 class Simulation(_Model):
     base_mount: Literal["auto", "free", "fixed"] = Field(default="auto", description="auto fixes a stationary base to the world; drop cases release the test fixture.")
-    joint_failure_replay_duration: Quantity | None = Field(default=2.0, gt=0, description="Seconds of fully coupled replay after the first irreversible joint failure; null runs the full failed scenario. Truncated evidence always fails.")
+    joint_failure_replay_duration: Quantity | None = Field(default=None, gt=0, description="Optional replay-only cutoff after an irreversible joint failure; default null runs the full requested duration. Truncated evidence always fails.")
     timestep: Quantity = 0.001
     physics_max_timestep: Quantity = Field(default=0.00025, description="Maximum native MuJoCo step; master steps are subdivided without changing software/electrical timing.")
 

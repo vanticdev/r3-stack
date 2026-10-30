@@ -165,6 +165,8 @@ def test_missing_nut_zero_capacity_and_inverted_release(tmp_path):
     assert v.joints.events and all(e["capacity"] == 0 for e in v.joints.events if e["event"] == "joint_failed")
     assert any(d.code == "part_detached" for d in v.joints.diagnostics)
     assert abs(v.body_pose("part")[0][2] - v.body_pose("base")[0][2]) > 0.05
+    # Gravity alone has no ambient floor propping up an unretained payload.
+    assert v.body_pose("part")[0][2] < -0.1
 
 
 def test_tape_holds_then_peels_at_measured_force(tmp_path):
@@ -656,6 +658,26 @@ def test_stationary_wall_impact_skips_with_diagnostic_and_drop_releases_base(tmp
     vm = build_assembly_model(p)
     configure_model(vm, next(s for s in all_scenarios(p) if s.id == "drop_upright"), p)
     assert "joint_fixture_weld" not in vm.xml
+
+    # A non-vehicle tower higher than the old finite wall still hits it. Native
+    # contact forces, rather than a geometry-type assertion, prove the fixture.
+    mobile = fixture_project(tmp_path / "tower")
+    mobile.spec.components.pop("part")
+    mobile.spec.mechanical.fasteners = []
+    mobile.spec.robot.mobility = "mobile"
+    mobile.spec.requirements.impact_speed = 0.2
+    mobile.catalog.component("plate").mechanical.size = [0.1, 0.1, 6.0]
+    case = next(s for s in all_scenarios(mobile) if s.id == "wall_impact")
+    model = build_assembly_model(mobile)
+    configure_model(model, case, mobile)
+    robot = RobotDynamics(mobile, model)
+    robot.load_case = LoadCase(robot, case, mobile, 1)
+    robot.data.qpos[robot.free_qpos + 2] += 10.0
+    mujoco.mj_forward(robot.model, robot.data)
+    run_steps(robot, 10)
+    assert robot.load_case.impact_first_time is not None
+    assert robot.load_case.impact_peak_force > 0
+    assert not robot.load_case.final_diagnostics()
 
 @pytest.mark.parametrize("face,detaches", [("upright", False), ("inverted", True)])
 def test_unretained_payload_in_a_real_pocket(tmp_path, face, detaches):

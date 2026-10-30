@@ -18,6 +18,9 @@ import numpy as np
 
 from r3_model.spec import Scenario
 
+# Bump when mechanical fixture geometry or placement changes.
+FIXTURE_VERSION = 2
+
 FACES = {
     "upright": [0, 0, 1],
     "inverted": [0, 0, -1],
@@ -120,6 +123,30 @@ def configure_model(vm: Any, scenario: Scenario, project: Any) -> None:
     kind = load.get("kind")
     xml = ET.fromstring(vm.xml)
     world = xml.find("worldbody")
+    for geom in list(world.findall("geom")):
+        if geom.get("name") in ("joint_test_ground", "joint_impact_wall"):
+            world.remove(geom)
+    for index, geom in enumerate(world.findall("geom")):
+        key = geom.get("name", f"#{index}")
+        masks = vm.fixture_world_contacts.setdefault(key, (geom.get("contype"), geom.get("conaffinity")))
+        for attribute, value in zip(("contype", "conaffinity"), masks):
+            if value is None:
+                geom.attrib.pop(attribute, None)
+            else:
+                geom.set(attribute, value)
+        if kind:
+            geom.set("contype", "0")
+            geom.set("conaffinity", "0")
+    if kind:
+        assumption = ("mechanical", "Dedicated mechanical fixture: robot self-contact remains active; ambient scene objects provide no support.")
+        if assumption not in vm.assumptions:
+            vm.assumptions.append(assumption)
+    if kind in ("drop", "impact"):
+        # Inactive during cable pre-roll; reset enables the plane after native
+        # distance queries place the complete assembly above its test surface.
+        ET.SubElement(world, "geom", name="joint_test_ground", type="plane", size="0 0 .01",
+                      contype="0", conaffinity="3", group="3", rgba="0 0 0 0",
+                      friction=f"{project.spec.simulation.environment.ground_friction} .005 .0001")
     # Reconfiguration is idempotent: a drop releases the default stationary
     # fixture, while gravity/vibration replace it at the case's posed base.
     for body in list(world.findall("body")):
@@ -156,17 +183,19 @@ def configure_model(vm: Any, scenario: Scenario, project: Any) -> None:
             solimp="0.99 0.999 0.001",
         )
     if kind == "impact":
-        # Wall 0.1 m ahead of the foremost collision extent (refined at reset).
+        # An infinite native plane covers robots of any height or width.
+        # Reset positions it one native travel step ahead of the actual surface.
         ET.SubElement(
             world,
             "geom",
             name="joint_impact_wall",
-            type="box",
-            pos="1 0 2",
-            size=".05 100 2",
+            type="plane",
+            pos="1 0 0",
+            size="0 0 .01",
+            zaxis="-1 0 0",
             contype="0",
             conaffinity="3",
-            friction=".2 .005 .0001",
+            friction=f"{project.catalog.joint_defaults['friction'].value} .005 .0001",
         )
     vm.xml = ET.tostring(xml, encoding="unicode")
 
@@ -178,6 +207,10 @@ class LoadCase:
         self.vehicle = vehicle
         self.load = scenario.initial.get("joint_load") or {}
         self.displacement = None
+        self.initial_clearance: float | None = None
+        self.impact_geom: int | None = None
+        self.impact_first_time: float | None = None
+        self.impact_peak_force = 0.0
         if not self.load:
             return
         if self.load["kind"] == "impact_skipped":
@@ -215,12 +248,21 @@ class LoadCase:
             return float(m.geom_rbound[g])
 
         bottom = min((d.geom_xpos[g, 2] - bound(g, 2) for g in rigid), default=0)
-        shift = np.array([0.0, 0.0, float(self.load.get("height", 0.1)) - bottom])
+        clearance = float(self.load.get("height", 0.1))
+        if self.load["kind"] in ("drop", "impact"):
+            ground = m.geom("joint_test_ground").id
+            limit = max(1.0, 4 * float(m.stat.extent))
+            bottom = min((mujoco.mj_geomDistance(m, d, g, ground, limit, None) for g in rigid), default=0)
+            clearance = float(self.load["height"]) if self.load["kind"] == "drop" else 0.0
+            self.initial_clearance = clearance
+        shift = np.array([0.0, 0.0, clearance - bottom])
         for j in free:
             q = int(m.jnt_qposadr[j])
             d.qpos[q : q + 3] += shift
             if self.load["kind"] == "impact":
                 d.qvel[m.jnt_dofadr[j]] = float(self.load["speed"])
+        if self.load["kind"] in ("drop", "impact"):
+            m.geom_conaffinity[m.geom("joint_test_ground").id] = 3
         mujoco.mj_forward(m, d)
         if self.load["kind"] in ("gravity", "vibration"):
             bid = m.body("joint_fixture").id
@@ -244,8 +286,21 @@ class LoadCase:
                         data={"speed_mps": speed},
                     )
                 )
+            wall = m.geom("joint_impact_wall").id
             front = max((d.geom_xpos[g, 0] + bound(g, 0) for g in rigid), default=0)
-            m.geom_pos[m.geom("joint_impact_wall").id, 0] = front + 0.15
+            m.geom_pos[wall, 0] = front
+            # World geoms are static: mj_kinematics leaves their cached data
+            # poses alone. Update both native arrays when placing the fixture.
+            d.geom_xpos[wall] = m.geom_pos[wall]
+            mujoco.mj_forward(m, d)
+            limit = max(1.0, 2 * abs(front) + 4 * float(m.stat.extent))
+            # MuJoCo supplies the actual convex support distance; bounding
+            # spheres would place a wall far ahead of tall, slender robots.
+            gap = min((mujoco.mj_geomDistance(m, d, g, wall, limit, None) for g in rigid), default=0)
+            m.geom_pos[wall, 0] = front - gap + speed * float(m.opt.timestep)
+            d.geom_xpos[wall] = m.geom_pos[wall]
+            m.geom_conaffinity[wall] = 3
+            self.impact_geom = wall
         if self.load["kind"] == "vibration":
             profile = project.spec.requirements.vibration
             dt = float(m.opt.timestep)
@@ -303,3 +358,33 @@ class LoadCase:
             )
             d.mocap_pos[self.mocap] = self.origin
             d.mocap_pos[self.mocap, int(self.load["axis"])] += self.displacement[i]
+
+
+    def observe(self) -> None:
+        """Read native wall reaction after every native step, including non-vehicles."""
+        if self.impact_geom is None:
+            return
+        import mujoco
+
+        m, d = self.vehicle.model, self.vehicle.data
+        hits = np.flatnonzero(np.any(d.contact.geom[:d.ncon] == self.impact_geom, axis=1))
+        force = np.zeros(6)
+        normal = 0.0
+        for index in hits:
+            mujoco.mj_contactForce(m, d, int(index), force)
+            normal += float(force[0])
+        self.impact_peak_force = max(self.impact_peak_force, normal)
+        if normal > 0 and self.impact_first_time is None:
+            self.impact_first_time = float(d.time)
+
+    def report(self) -> dict[str, Any]:
+        return {"fixture_version": FIXTURE_VERSION, "kind": self.load.get("kind"),
+                "initial_clearance_m": self.initial_clearance,
+                "impact_first_contact_s": self.impact_first_time, "impact_peak_force_n": self.impact_peak_force}
+
+    def final_diagnostics(self) -> list[Any]:
+        if self.load.get("kind") == "impact" and self.impact_first_time is None:
+            from r3_model.diagnostics import Diagnostic
+            return [Diagnostic.error("load_case_not_exercised", "Wall impact did not develop a native contact reaction; cannot qualify",
+                                     subjects=["wall_impact"], data={"speed_mps": float(self.load["speed"])})]
+        return []

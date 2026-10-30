@@ -52,6 +52,13 @@ class RobotDynamics:
             from .vehicle.servo import SteeringServo
         self.model = mujoco.MjModel.from_xml_string(vm.xml)
         self.data = mujoco.MjData(self.model)
+        # Compile fixture planes with their final masks so MuJoCo's aggregate
+        # world-body mask includes them. Hold them inactive only during setup;
+        # LoadCase enables each plane after its native distance-based placement.
+        for name in ("joint_test_ground", "joint_impact_wall"):
+            geom = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, name)
+            if geom >= 0:
+                self.model.geom_conaffinity[geom] = 0
         self.mujoco_threads = mujoco_threads()
         if self.mujoco_threads > 1:
             # MuJoCo's own thread pool parallelises collision inside a step; the results are bit-identical to the
@@ -406,6 +413,8 @@ class RobotDynamics:
                 raise SimulationInstability(
                     f"MuJoCo {warning.name}: unstable state at t={self.data.time:g} s; load results are incomplete"
                 )
+        if hasattr(self, "load_case"):
+            self.load_case.observe()
         self.joints.step()
         for name, (a, b, rest, rest_rot) in self._resting_poses.items():
             if name in self.joints.detached:

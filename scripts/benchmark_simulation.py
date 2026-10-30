@@ -54,7 +54,11 @@ def main() -> int:
         if args.resume and summary_path.exists():
             candidate = json.loads(summary_path.read_text())
             inputs = candidate.get("inputs", {})
-            if (all(inputs.get(key) == value for key, value in fingerprint.items() if key != "git_commit")
+            fixture_current = True
+            if case.initial.get("joint_load"):
+                from r3_sim.load_cases import FIXTURE_VERSION
+                fixture_current = candidate.get("load_case", {}).get("fixture_version") == FIXTURE_VERSION
+            if (fixture_current and all(inputs.get(key) == value for key, value in fingerprint.items() if key != "git_commit")
                     and (not args.full_duration or candidate["metrics"]["sim_time_s"] >= float(case.duration) - 0.0005)):
                 summary, reused = candidate, True
         code = int(not summary["passed"]) if reused else 0
