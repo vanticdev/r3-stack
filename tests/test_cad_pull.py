@@ -232,3 +232,24 @@ def test_failed_description_refresh_restores_complete_previous_pull(project, geo
     assert not (project.root / 'cad/.pulled-previous').exists()
     assert not list((project.root / 'cad').glob('.pull-*'))
     check_pulled(project.root, load_pulled(project.root))
+
+
+def test_failed_pull_preserves_concurrent_authored_description_edit(project, geometry, native_snapshot, monkeypatch):
+    from r3_onshape.pull import pull
+    from r3_model.project import Project
+    from r3_orchestrator.spec_ops import get_spec, patch_spec
+
+    transport = fake_transport(geometry, native_snapshot)
+    assert pull(project, transport=transport)['ok']
+    manifest = (project.root / 'cad/pulled/pull.json').read_bytes()
+
+    def reject(*args):
+        current = get_spec(project.root)
+        edited = patch_spec(project.root, {'robot': {'description': 'Concurrent authored edit'}}, current['sha256'])
+        assert edited['ok']
+        raise PullError('cad_pull_invalid', 'synthetic refresh failure')
+
+    monkeypatch.setattr('r3_model.description.refresh_pulled', reject)
+    assert pull(project, transport=transport)['code'] == 'cad_pull_invalid'
+    assert (project.root / 'cad/pulled/pull.json').read_bytes() == manifest
+    assert Project.load(project.root).spec.robot.description == 'Concurrent authored edit'

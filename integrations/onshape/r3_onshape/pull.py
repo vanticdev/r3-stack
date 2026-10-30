@@ -285,8 +285,6 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
         download(transport, manifest, staging, pin["url"])
         checksum = hashlib.sha256((staging / "pull.json").read_bytes()).hexdigest()
         from r3_model.description import refresh_pulled
-        from r3_model.spec_files import load_spec_files
-        sources = load_spec_files(project.root)
         previous_lock = (project.root / "r3.lock.yaml").read_bytes() if (project.root / "r3.lock.yaml").exists() else None
         previous_pin = project.lock.get("cad_pull")
         if backup.exists():
@@ -314,8 +312,8 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
                 project.lock.pop("cad_pull", None)
             else:
                 project.lock["cad_pull"] = previous_pin
-            from r3_model.spec_files import atomic_write_files
-            atomic_write_files(project.root, sources.texts)
+            # refresh_pulled owns its atomic spec transaction. Rewriting an
+            # earlier snapshot here would discard concurrent authored edits.
             raise
         if backup.exists():
             shutil.rmtree(backup)
