@@ -217,6 +217,11 @@ Declare a supply compatible with every connected device, including transient dem
 voltage limits, protection and regulator margins. Model the actual board behavior and pin
 maps in the catalog. Do not infer electrical connections from component proximity.
 
+Model each nonintegral cable half and splice as an explicit native part named `<harness>.<node>`.
+Add a mate connector named `mating` (or `origin`) at its electrical mating plane; for a splice it
+marks the sleeve centre and wire axis. Pull their real assembled poses. Routing keeps those
+physical parts fixed and optimizes only the conductors between them.
+
 Each harness declares connectors, wires, optional splices and routing constraints. Connector
 `mates` fields name exact component or harness endpoints. Wire `from` and `to` references
 name connector pins or declared splices. Choose catalog wire gauges and connector types
