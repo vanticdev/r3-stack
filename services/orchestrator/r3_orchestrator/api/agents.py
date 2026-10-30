@@ -31,7 +31,7 @@ Events (normalized for both providers; ``raw`` events carry anything else):
 ``tool_result``  ``{id, name, ok, content}``
 ``run_started`` / ``run_finished``  pipeline runs the agent triggered through ``r3_validate``,
 ``r3_run_stage`` or ``r3_run_scenario`` (``run_finished`` has ``ok``, ``counts``, ``stages``)
-``spec_changed``  ``{previous_sha256, sha256, diff, cumulative_diff}`` whenever robot.yaml changes
+``spec_changed``  ``{previous_sha256, sha256, diff, cumulative_diff}`` whenever any included description file changes
 ``usage``  ``{input_tokens, output_tokens, cost_usd?}``
 ``stderr``  ``{line}``
 ``raw``  ``{event}``  unrecognized CLI events, verbatim
@@ -59,6 +59,7 @@ from typing import Any, Iterable
 from .errors import ApiError
 from .events import EventLog
 from ..environment import r3_pythonpath
+from r3_model.spec_files import SpecFiles, load_spec_files, spec_lock
 
 PROVIDERS = ("claude", "codex")
 MCP_SERVER = "r3"
@@ -354,8 +355,8 @@ class AgentSession:
     cancel_requested: bool = False
     _process: Any = None
     _calls: dict[str, dict[str, Any]] = field(default_factory=dict)
-    _spec_start: str = ""
-    _spec_last: str = ""
+    _spec_start: dict[str, str] = field(default_factory=dict)
+    _spec_last: dict[str, str] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def to_json(self) -> dict[str, Any]:
@@ -365,13 +366,20 @@ class AgentSession:
                 "transcript": str(self.directory / "transcript.jsonl") if self.directory else None}
 
 
-def _sha(text: str) -> str:
-    return hashlib.sha256(text.encode()).hexdigest()
+def _sha(texts: dict[str, str]) -> str:
+    return SpecFiles(Path("."), texts=texts).sha256
 
 
-def _diff(before: str, after: str) -> str:
-    return "".join(difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True),
-                                        "a/robot.yaml", "b/robot.yaml"))
+def _description(root: Path) -> dict[str, str]:
+    with spec_lock(root, shared=True):
+        return load_spec_files(root).texts
+
+
+def _diff(before: dict[str, str], after: dict[str, str]) -> str:
+    return "".join("".join(difflib.unified_diff(before.get(name, "").splitlines(keepends=True),
+                                              after.get(name, "").splitlines(keepends=True),
+                                              f"a/{name}", f"b/{name}"))
+                   for name in sorted(before.keys() | after.keys()))
 
 
 class AgentManager:
@@ -426,8 +434,7 @@ class AgentManager:
         else:
             session.command = codex_command(info["path"], Path(root), config, model)
             stdin = prompt
-        spec = Path(root) / "robot.yaml"
-        session._spec_start = session._spec_last = spec.read_text() if spec.exists() else ""
+        session._spec_start = session._spec_last = _description(Path(root))
         env = {**os.environ, **self.extra_env, "R3_PROJECT": str(root), "PYTHONPATH": r3_pythonpath(),
                "MCP_TOOL_TIMEOUT": str(MCP_TOOL_TIMEOUT_S * 1000), "MCP_TIMEOUT": "120000"}
         self._sessions[session.id] = session
@@ -545,8 +552,7 @@ class AgentManager:
         self._emit(session, kind, **payload)
 
     def _check_spec(self, session: AgentSession) -> None:
-        spec = session.root / "robot.yaml"
-        current = spec.read_text() if spec.exists() else ""
+        current = _description(session.root)
         with session._lock:
             if current == session._spec_last:
                 return

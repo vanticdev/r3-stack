@@ -1,4 +1,4 @@
-# @@NAME@@: a new R3 robot, starting from nothing. robot.yaml is the single source of truth.
+# @@NAME@@: a new R3 robot. robot.yaml indexes the complete local description.
 # Read the guide first: MCP r3_guide (docs/guide/build-a-robot.md). Grow the robot section by section,
 # validating as you go (`r3 validate`; every stage says what it still needs with `not_configured`).
 #
@@ -14,6 +14,9 @@ requirements: {}        # e.g. {max_mass: 2.5 kg, top_speed: 8 m/s, min_runtime:
 # id -> {type: <catalog id>} (r3_list_catalog) or {source: {requires: {...}}} (r3_source_search/choose).
 # Your own printed parts go in catalog/components/ (r3_put_catalog_component). Only the assembly root has a pose.
 components: {}
+# Add parts as: <id>: {$include: parts/<id>.yaml}
+electrical: {$include: electrical/system.yaml}
+software: {$include: software/system.yaml}
 
 # assembly: {root: <frame id>, joins: [{a: <obj>.<interface>, b: <obj>.<interface>, fasteners: {type: M3x10}}]}
 # electrical: {harnesses: [...], direct_mates: [...]}

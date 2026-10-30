@@ -32,6 +32,7 @@ STATUS_BY_CODE: dict[str, int] = {
     "agent_busy": 409,
     "validation_required": 409,
     "spec_invalid": 422,
+    "spec_read_only": 422,
     "patch_invalid": 422,
     "request_invalid": 422,
     "usage_error": 422,
@@ -86,6 +87,11 @@ def project_load_error(error: Exception, spec_path: str | Path, data: dict[str, 
     from pydantic import ValidationError
     import yaml
 
+    from r3_model.spec_files import SpecError
+
+    source_error = error if isinstance(error, SpecError) else None
+    if source_error is not None and isinstance(error.__cause__, (ValidationError, yaml.YAMLError)):
+        error = error.__cause__
     name = Path(spec_path).name
     errors: list[dict[str, str]]
     if isinstance(error, ValidationError):
@@ -111,5 +117,11 @@ def project_load_error(error: Exception, spec_path: str | Path, data: dict[str, 
         total = 1
         message = f"{name} does not load: {type(error).__name__}: {errors[0]['message']}"
         details = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    if source_error is not None and any(e["file"] != "robot.yaml" for e in source_error.errors):
+        for index, entry in enumerate(errors):
+            source = source_error.errors[min(index, len(source_error.errors) - 1)]
+            entry.update({"file": source["file"], "code": source["code"], "source_path": source.get("source_path", source["path"])})
+            if source["loc"]:
+                entry["path"] = source["loc"]
     return ApiError("project_invalid", message, {**(data or {}), "exception": type(error).__name__, "file": str(spec_path),
                                                  "errors": errors[:MAX_LISTED_ERRORS], "total": total, "details": details})

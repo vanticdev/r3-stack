@@ -64,7 +64,8 @@ the gated `deploy_fleet` and `create_github_repo` (`mcp_server.TOOL_TIERS`).
   `create_github_repo` (external account) refuse unless `confirm=true`, and
   carry `destructive_hint` annotations.
 - `r3_patch_spec(patch, expected_sha256)` applies an RFC 7386 JSON merge patch
-  to `robot.yaml`. The SHA must match the file (from `r3_get_spec`), so
+  to the merged description, routed to the owning files with comments preserved.
+  The SHA must match all included files (from `r3_get_spec`), so
   concurrent Codex/Claude edits fail loudly with `spec_conflict` instead of
   overwriting each other. The result is validated against `r3/robot@1` before
   writing (`spec_invalid` otherwise). Graph problems such as dangling connectors
@@ -113,3 +114,6 @@ tools are never pre-approved. See [docs/architecture/api.md](../../docs/architec
 .venv/bin/python -m pytest tests/test_orchestrator_*.py tests/test_api_*.py
 node --test apps/web/tests/loader.test.mjs
 ```
+
+Split description syntax, read-only CAD fields and pull hooks are documented in
+[robot descriptions](../../docs/architecture/robot-description.md).

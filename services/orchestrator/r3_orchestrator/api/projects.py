@@ -30,7 +30,7 @@ from r3_model.project import Project
 from .. import api, release, spec_ops
 from .. import stages as stage_runner
 from . import freshness
-from .errors import ApiError, project_load_error
+from .errors import ApiError, project_load_error, raise_for
 
 IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".svg", ".gif")
 VIDEO_SUFFIXES = (".mp4", ".webm")
@@ -230,8 +230,8 @@ def _github_url(remote: str | None) -> str | None:
 
 
 def spec_document(ref: ProjectRef) -> dict[str, Any]:
-    spec = spec_ops.get_spec(ref.root)
-    return {"yaml": (ref.root / "robot.yaml").read_text(), "sha256": spec["sha256"], "spec": spec["spec"], "path": spec["path"]}
+    spec = raise_for(spec_ops.get_spec(ref.root))
+    return {**spec, "yaml": spec["files"]["robot.yaml"]["yaml"]}
 
 
 def model_view(ref: ProjectRef) -> dict[str, Any]:

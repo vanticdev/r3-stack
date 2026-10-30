@@ -120,7 +120,50 @@ class OwnedSpec(_Model):
     note: str = Field(default="", description="Optional inventory or provenance note.")
 
 
+class OnshapeSelection(_Model):
+    """Authored selector into the assembly, not a generated geometry definition."""
+
+    occurrence_path: list[str] | None = None
+    configuration: str = ""
+
+
+class PulledOnshapeReference(_Model):
+    document_id: str
+    version_id: str
+    element_id: str | None = None
+    part_id: str | None = None
+    occurrence_path: list[str] = Field(default_factory=list)
+    configuration: str = ""
+
+
+class PulledPartSpec(_Model):
+    """Read-only mirror of r3/pull@1, refreshed only by refresh_pulled_spec.
+
+    Frames are 4x4 rigid transforms in metres, not authored poses. Geometry
+    consumers must still verify the pinned manifest with load_pulled().
+    """
+
+    owner: Literal["onshape-pull"]
+    onshape: PulledOnshapeReference
+    document_id: str
+    version_id: str
+    stl: str
+    step: str
+    sha256: dict[Literal["stl", "step"], str]
+    mate_connectors: dict[str, list[list[float]]]
+    pose: list[list[float]]
+    mass: float | None = None
+    com: list[float] | None = None
+    inertia: list[float] | None = None
+    material: str | None = None
+    density: float | None = None
+    volume: float | None = None
+    purchased: bool
+
+
 class ComponentInstance(_Model):
+    onshape: OnshapeSelection = Field(default_factory=OnshapeSelection)
+    pulled: PulledPartSpec | None = Field(default=None, json_schema_extra={"readOnly": True, "owner": "onshape-pull"})
     purchased_unit: str | None = Field(default=None, description="Owner instance of the purchased assembly this supplied subpart belongs to.")
     type: str = Field(default="", description="Catalog id, e.g. raspberry-pi-5-8gb. Optional when `source` is given; "
                                               "a pinned sourcing choice replaces it.")
@@ -362,6 +405,8 @@ class Pcb(_Model):
 
 
 class Cad(_Model):
+    version_id: str | None = Field(default=None, description="Optional explicitly selected immutable Onshape version.")
+    source: str | None = Field(default=None, description="Onshape assembly URL; /w/ is resolved to a pinned /v/ by pull.")
     provider: Literal["onshape", "none"] = "onshape"
     generator: str | None = Field(default=None, description="Legacy project CAD generator reference; the supported CAD path uses standard Onshape features, never FeatureScript.")
     folder: str | None = Field(default=None, description="Provider folder id where documents are created.")
@@ -598,11 +643,25 @@ class Fabrication(_Model):
     min_wall: Quantity = Field(default=0.0012, description="Minimum printable wall (3 perimeters x 0.4 mm nozzle).")
 
 
+class PulledAttachment(_Model):
+    """An assembly mate copied from Onshape; only pull may write it."""
+
+    owner: Literal["onshape-pull"]
+    feature: str | None = None
+    id: str
+    kind: str
+    a: tuple[str, str]
+    b: tuple[str, str]
+    axis: list[float] | None = None
+    limits: list[float] | None = None
+
+
 class RobotSpec(_Model):
     schema_: str = Field(alias="schema", default=SCHEMA_ID)
     robot: RobotInfo
     requirements: Requirements = Field(default_factory=Requirements)
     components: dict[str, ComponentInstance]
+    attachments: list[PulledAttachment] = Field(default_factory=list, json_schema_extra={"readOnly": True, "owner": "onshape-pull"})
     mechanical: Mechanical = Field(default_factory=Mechanical)
     electrical: Electrical = Field(default_factory=Electrical)
     pcb: Pcb = Field(default_factory=Pcb)
@@ -661,6 +720,11 @@ class RobotSpec(_Model):
             if module.runs_on not in ids:
                 raise ValueError(f"software module {module.name!r} runs on unknown component {module.runs_on!r}")
         return self
+
+    @property
+    def parts(self) -> dict[str, ComponentInstance]:
+        """Part instances; components remains the serialized/stage-facing name."""
+        return self.components
 
     def source_slots(self) -> dict[str, list[str]]:
         """Sourcing slot key (``source.group`` or the component id) -> component ids, in spec order."""

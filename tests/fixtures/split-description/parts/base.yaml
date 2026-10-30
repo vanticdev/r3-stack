@@ -1,0 +1,3 @@
+# Base metadata stays next to its pulled CAD reference.
+type: synthetic-base
+label: Base  # keep this comment

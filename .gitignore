@@ -13,6 +13,9 @@ eggs/
 /lib/
 lib64/
 parts/
+# Robot part descriptions are authored inputs, not buildout artifacts.
+!tests/fixtures/**/parts/
+!examples/robots/**/parts/
 sdist/
 var/
 wheels/

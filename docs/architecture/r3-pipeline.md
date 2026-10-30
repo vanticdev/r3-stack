@@ -1,6 +1,7 @@
 # R3 pipeline and cross-package contracts (v1)
 
-Goal: describe a robot once in `robot.yaml`, build every domain from it, run the
+Goal: describe a robot in a `robot.yaml` index and explicitly included part/domain
+files (see [robot descriptions](robot-description.md)), build every domain from it, run the
 real robot software against a multi-domain digital twin, and get structured,
 actionable diagnostics, so that an AI agent (or a human) can iterate to a robot
 that works on the first physical build. Passing does not guarantee physical

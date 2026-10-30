@@ -22,6 +22,7 @@ from typing import Any, Callable
 import yaml
 
 from r3_model.spec import RobotSpec
+from r3_model.spec_files import dump_yaml, load_spec_files, roundtrip
 
 from .lock import git_revision, pin
 
@@ -32,7 +33,7 @@ DEFAULT_PLATFORM_URL = os.environ.get("R3_PLATFORM_URL", "git+https://github.com
 # The R3 worker image (docker/r3-worker) CI runs in, tagged by platform revision
 # by the platform's own workflow. Override the repository with $R3_WORKER_IMAGE_REPO.
 DEFAULT_WORKER_IMAGE_REPO = os.environ.get("R3_WORKER_IMAGE_REPO", "ghcr.io/vanticdev/r3-worker")
-TEMPLATE_DIRS = ("cad", "pcb", "backend", "catalog")
+TEMPLATE_DIRS = ("cad", "pcb", "backend", "catalog", "parts", "electrical", "software", "mechanical", "simulation", "fabrication")
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 
 
@@ -73,7 +74,12 @@ def _rename_robot(text: str, name: str) -> str:
         if in_robot and (match := re.match(r"^(\s+name:\s*)\S.*?(\s*)$", line)):
             lines[index] = f"{match.group(1)}{name}{match.group(2)}"
             break
-    return "".join(lines)
+    result = "".join(lines)
+    if yaml.safe_load(result)["robot"]["name"] != name:
+        loader, data = roundtrip(result)
+        data["robot"]["name"] = name
+        result = dump_yaml(loader, data)
+    return result
 
 
 def _identifier(name: str) -> str:
@@ -109,8 +115,46 @@ def create_project(target: str | Path, name: str | None = None, template: str = 
         source = examples_dir() / template
         if not (source / "robot.yaml").exists():
             raise KeyError(f"unknown template {template!r}; available: {', '.join(available_templates())}")
-        spec_text = _rename_robot((source / "robot.yaml").read_text(), name)
-    spec = RobotSpec.model_validate(yaml.safe_load(spec_text))
+        original = load_spec_files(source)
+        renamed = dict(original.texts)
+        origin = original.origin(("robot", "name"))
+        if origin.file == "robot.yaml" and origin.path == ("robot", "name"):
+            renamed["robot.yaml"] = _rename_robot(renamed["robot.yaml"], name)
+        else:
+            loader, data = roundtrip(renamed[origin.file])
+            if origin.path:
+                target_value = data
+                for key in origin.path[:-1]:
+                    target_value = target_value[key]
+                target_value[origin.path[-1]] = name
+            else:
+                data = name
+            renamed[origin.file] = dump_yaml(loader, data)
+        spec_text = renamed["robot.yaml"]
+    if source is None:
+        descriptions = {"robot.yaml": spec_text, "electrical/system.yaml": "# Electrical harnesses and direct mates.\n{}\n",
+                        "software/system.yaml": "# Software modules, hardware bindings and runtime configuration.\n{}\n"}
+        loaded = load_spec_files(TEMPLATES, descriptions)
+    else:
+        loaded = load_spec_files(source, renamed)
+        descriptions = dict(loaded.texts)
+    spec = loaded.validate()
+    loader, index = roundtrip(spec_text)
+    components = index["components"]
+    for cid, component in ([] if "$include" in components else components.items()):
+        if isinstance(component, dict) and "$include" in component:
+            continue
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", cid):
+            raise ValueError(f"part id cannot be used as a filename: {cid!r}")
+        relative = f"parts/{cid}.yaml"
+        descriptions[relative] = dump_yaml(loader, component)
+        index["components"][cid] = {"$include": relative}
+    for section in ("electrical", "software", "mechanical", "simulation", "fabrication", "pcb"):
+        if section in index and not (isinstance(index[section], dict) and "$include" in index[section]):
+            relative = f"{section}/system.yaml"
+            descriptions[relative] = dump_yaml(loader, index[section])
+            index[section] = {"$include": relative}
+    descriptions["robot.yaml"] = dump_yaml(loader, index)
 
     target.mkdir(parents=True, exist_ok=True)
     written: list[str] = []
@@ -123,13 +167,16 @@ def create_project(target: str | Path, name: str | None = None, template: str = 
         path.write_text(content)
         written.append(relative)
 
-    write("robot.yaml", spec_text)
+    (target / "parts").mkdir(exist_ok=True)
     if source is not None:
         for folder in TEMPLATE_DIRS:
             if (source / folder).is_dir():
                 shutil.copytree(source / folder, target / folder, dirs_exist_ok=True,
                                 ignore=shutil.ignore_patterns("build", "__pycache__", "*.pyc", ".venv"))
                 written += sorted(str(p.relative_to(target)) for p in (target / folder).rglob("*") if p.is_file())
+
+    for relative, content in descriptions.items():
+        write(relative, content, overwrite=True)
 
     first_scenario = spec.simulation.scenarios[0].id if spec.simulation.scenarios else "<id>"
     ref = platform_ref or git_revision(PLATFORM_ROOT) or "main"
@@ -141,9 +188,9 @@ def create_project(target: str | Path, name: str | None = None, template: str = 
     write(".gitignore", _render("gitignore.j2", values))
     write(".mcp.json", _render("mcp.json.j2", values))
     write(".github/workflows/r3.yml", render_workflow(values["PLATFORM_URL"], ref))
-    write("cad/README.md", "# CAD\n\nThe CAD is generated in Onshape from `robot.yaml` (one Part Studio per object, an assembly "
-                           "with standard mates; standard features only, never FeatureScript). `r3 cad sync` writes "
-                           "`build/cad/cad_model.json` and pins the document microversion in `r3.lock.yaml`.\n")
+    write("cad/README.md", "# CAD\n\nModel parts, mate connectors and mates directly in Onshape using standard editable features. "
+                           "R3 reads a pinned, immutable local copy under `cad/pulled/`. The description index is `robot.yaml`; "
+                           "part metadata lives in `parts/<id>.yaml`. Fields under `pulled` are owned by the pull path.\n")
     for board in spec.pcb.boards:
         write(f"{board.source}/README.md", f"# {Path(board.source).name}\n\nKiCad generator inputs for component `{board.component}` "
                                            f"({board.layers} layers, {board.copper_oz} oz). `r3 pcb build` generates the KiCad project.\n")

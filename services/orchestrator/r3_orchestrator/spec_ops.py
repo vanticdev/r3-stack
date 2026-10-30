@@ -1,41 +1,31 @@
-"""Read and patch ``robot.yaml`` with optimistic concurrency.
+"""Read and patch the complete robot description with optimistic concurrency.
 
 Agents (Codex, Claude Code) and humans edit the same spec. Every read returns
-the SHA-256 of the file bytes; a patch must quote the SHA it was computed
-against. If the file changed in between, the patch is rejected with
+the SHA-256 of all included file names and bytes; a patch must quote the SHA it was computed
+against. If any file changed in between, the patch is rejected with
 ``spec_conflict`` and the current SHA, so the agent re-reads and re-applies
 instead of silently overwriting a concurrent edit.
 
 Patches are RFC 7386 JSON merge patches: objects merge recursively, ``null``
 deletes a key, and any other value (including lists) replaces the target.
-Comments and key order are preserved when ``ruamel.yaml`` is installed.
+Comments and key order are preserved with round-trip YAML.
 """
 
 from __future__ import annotations
 
-import contextlib
 import copy
-import fcntl
 import hashlib
-import io
-import os
 import re
-import tempfile
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
 
 from r3_model.spec import RobotSpec
+from r3_model.spec_files import (SpecError, atomic_write_files, dump_yaml, load_spec_files, roundtrip, spec_lock)
 
-try:  # round-trip YAML keeps the author's comments and formatting
-    from ruamel.yaml import YAML
-    from ruamel.yaml.comments import CommentedMap, CommentedSeq
-except ImportError:  # pragma: no cover - exercised only without ruamel
-    YAML = None
-    CommentedMap = dict
-    CommentedSeq = list
+from ruamel.yaml.comments import CommentedMap
 
 
 def spec_path(root: str | Path) -> Path:
@@ -47,15 +37,25 @@ def file_sha(path: Path) -> str:
 
 
 def get_spec(root: str | Path, section: str | None = None) -> dict[str, Any]:
-    path = spec_path(root)
-    text = path.read_text()
-    data = yaml.safe_load(text)
-    if section:
-        for key in section.split("."):
-            if not isinstance(data, dict) or key not in data:
-                return {"ok": False, "code": "spec_section_missing", "section": section, "sha256": file_sha(path)}
-            data = data[key]
-    return {"ok": True, "sha256": hashlib.sha256(text.encode()).hexdigest(), "path": str(path), "section": section or "", "spec": data}
+    try:
+        with spec_lock(root, shared=True):
+            files = load_spec_files(root)
+            files.validate()
+            data = files.data
+            if section:
+                for key in section.split("."):
+                    if not isinstance(data, dict) or key not in data:
+                        return {"ok": False, "code": "spec_section_missing", "section": section, "sha256": files.sha256}
+                    data = data[key]
+            return {"ok": True, "sha256": files.sha256, "path": str(spec_path(root)),
+                    "section": section or "", "spec": data,
+                    "files": {name: {"sha256": hashlib.sha256(text.encode()).hexdigest(), "yaml": text}
+                              for name, text in files.texts.items()},
+                    "sources": [{"path": list(path), "file": origin.file, "source_path": list(origin.path)}
+                                for path, origin in files.origins.items()],
+                    "read_only": ["attachments", *[f"components.{name}.pulled" for name in files.data["components"]]]}
+    except SpecError as error:
+        return error.payload()
 
 
 def merge_patch(target: Any, patch: Any) -> Any:
@@ -63,7 +63,7 @@ def merge_patch(target: Any, patch: Any) -> Any:
     if not isinstance(patch, dict):
         return copy.deepcopy(patch)
     if not isinstance(target, dict):
-        target = CommentedMap() if YAML is not None else {}
+        target = CommentedMap()
     for key, value in patch.items():
         if value is None:
             target.pop(key, None)
@@ -83,27 +83,6 @@ def _plain(value: Any) -> Any:
     return value
 
 
-@contextlib.contextmanager
-def _locked(path: Path) -> Iterator[None]:
-    lock_path = path.with_name(f".{path.name}.lock")
-    with open(lock_path, "w") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        try:
-            yield
-        finally:
-            fcntl.flock(handle, fcntl.LOCK_UN)
-
-
-def _load_roundtrip(text: str) -> tuple[Any, Any]:
-    if YAML is None:
-        return None, yaml.safe_load(text)
-    loader = YAML()
-    loader.preserve_quotes = True
-    loader.width = 4096
-    loader.indent(mapping=2, sequence=4, offset=2)
-    return loader, loader.load(text)
-
-
 def _line_key(line: str) -> tuple[int, str]:
     return len(line) - len(line.lstrip(" ")), re.sub(r"\s+", " ", line.strip())
 
@@ -117,14 +96,6 @@ def _restore_unchanged_lines(original: str, dumped: str) -> str:
         by_key.setdefault(_line_key(line), line)
     lines = [by_key.get(_line_key(line), line) for line in dumped.splitlines()]
     return "\n".join(lines) + ("\n" if dumped.endswith("\n") else "")
-
-
-def _dump(loader: Any, data: Any) -> str:
-    if loader is None:
-        return yaml.safe_dump(_plain(data), sort_keys=False)
-    stream = io.StringIO()
-    loader.dump(data, stream)
-    return stream.getvalue()
 
 
 def validation_errors(data: Any) -> list[dict[str, Any]]:
@@ -150,37 +121,87 @@ def _graph_diagnostics(root: Path, data: Any) -> list[dict[str, Any]]:
     return [d.model_dump(mode="json") for d in graph.diagnostics]
 
 
-def patch_spec(root: str | Path, patch: dict[str, Any], expected_sha256: str, dry_run: bool = False) -> dict[str, Any]:
-    """Apply a merge patch to robot.yaml if its SHA still equals ``expected_sha256``.
+def _patch_documents(files: Any, patch: dict[str, Any]) -> dict[str, str]:
+    """Route merge patches through include pointers, retaining round-trip nodes."""
+    documents = {name: roundtrip(text) for name, text in files.texts.items()}
+    changed: set[str] = set()
+    split = len(files.texts) > 1
 
-    Returns ``{"ok": True, "sha256": <new>, "previous_sha256": ...}`` or a
-    structured failure with ``code`` ``spec_conflict`` / ``spec_invalid``."""
-    path = spec_path(root)
+    def apply(target: Any, change: Any, file: str, path: tuple[Any, ...]) -> Any:
+        if isinstance(target, dict) and "$include" in target:
+            included = target["$include"]
+            loader, document = documents[included]
+            documents[included] = loader, apply(document, change, included, path)
+            return target
+        changed.add(file)
+        if not isinstance(change, dict):
+            return copy.deepcopy(change)
+        if "$include" in change:
+            raise files.error("patch_invalid", path, "include pointers are managed by the description layout")
+        if not isinstance(target, dict):
+            target = CommentedMap()
+        for key, value in change.items():
+            if value is None:
+                target.pop(key, None)
+            elif split and path == ("components",) and key not in target:
+                if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", key):
+                    raise files.error("patch_invalid", (*path, key), "part id must be a safe filename")
+                name = f"parts/{key}.yaml"
+                if name in documents or (files.root / name).exists():
+                    raise files.error("spec_duplicate_definition", (*path, key), f"part file already exists: {name}")
+                loader, _ = roundtrip("{}\n")
+                documents[name] = loader, apply(CommentedMap(), value, name, (*path, key))
+                target[key] = CommentedMap({"$include": name})
+            else:
+                target[key] = apply(target.get(key), value, file, (*path, key))
+        return target
+
+    loader, data = documents["robot.yaml"]
+    documents["robot.yaml"] = loader, apply(data, patch, "robot.yaml", ())
+    return {name: _restore_unchanged_lines(files.texts.get(name, ""), dump_yaml(*documents[name])) for name in changed}
+
+
+def _check_readonly(files: Any, proposed: Any, patch: dict[str, Any]) -> None:
+    if "attachments" in patch or files.data.get("attachments") != proposed.data.get("attachments"):
+        raise files.error("spec_read_only", ("attachments",), "assembly attachments are owned by Onshape pull")
+    before = files.data.get("components", {})
+    after = proposed.data.get("components", {})
+    if not isinstance(after, dict):
+        after = {}
+    changes = patch.get("components", {})
+    for name in set(before) | set(after):
+        old = before[name].get("pulled") if isinstance(before.get(name), dict) else None
+        new = after[name].get("pulled") if isinstance(after.get(name), dict) else None
+        explicit = isinstance(changes, dict) and isinstance(changes.get(name), dict) and "pulled" in changes[name]
+        if old != new or explicit:
+            raise files.error("spec_read_only", ("components", name, "pulled"),
+                              "Onshape-derived fields are owned by pull; run r3 cad pull to refresh them")
+
+
+def patch_spec(root: str | Path, patch: dict[str, Any], expected_sha256: str, dry_run: bool = False) -> dict[str, Any]:
+    """Patch the merged description, writing its owning files under one lock."""
     if not isinstance(patch, dict):
         return {"ok": False, "code": "patch_invalid", "message": "a merge patch must be a JSON object"}
-    with _locked(path):
-        text = path.read_text()
-        current = hashlib.sha256(text.encode()).hexdigest()
-        if expected_sha256 != current:
-            return {"ok": False, "code": "spec_conflict", "expected_sha256": expected_sha256, "current_sha256": current,
-                    "message": "robot.yaml changed since it was read; re-read it with r3_get_spec and re-apply the patch"}
-        loader, data = _load_roundtrip(text)
-        patched = merge_patch(data, patch)
-        errors = validation_errors(patched)
-        if errors:
-            return {"ok": False, "code": "spec_invalid", "errors": errors, "current_sha256": current,
-                    "message": f"patched spec fails schema validation ({len(errors)} error(s)); file unchanged"}
-        graph_diagnostics = _graph_diagnostics(Path(root), patched)
-        new_text = _dump(loader, patched)
-        if loader is not None:
-            new_text = _restore_unchanged_lines(text, new_text)
-        new_sha = hashlib.sha256(new_text.encode()).hexdigest()
-        if not dry_run and new_text != text:
-            handle, tmp = tempfile.mkstemp(dir=path.parent, prefix=".robot.yaml.")
-            with os.fdopen(handle, "w") as out:
-                out.write(new_text)
-            os.chmod(tmp, path.stat().st_mode & 0o777)
-            os.replace(tmp, path)
-        return {"ok": True, "dry_run": dry_run, "changed": new_text != text, "previous_sha256": current,
-                "sha256": new_sha if not dry_run else current, "patched_sha256": new_sha,
-                "preserves_comments": loader is not None, "graph_diagnostics": graph_diagnostics}
+    root = Path(root).resolve()
+    current = ""
+    try:
+        with spec_lock(root):
+            files = load_spec_files(root)
+            current = files.sha256
+            if expected_sha256 != current:
+                return {"ok": False, "code": "spec_conflict", "expected_sha256": expected_sha256, "current_sha256": current,
+                        "message": "description files changed since read; re-read with r3_get_spec and re-apply the patch"}
+            updates = _patch_documents(files, patch)
+            proposed = load_spec_files(root, updates)
+            _check_readonly(files, proposed, patch)
+            proposed.validate()
+            graph_diagnostics = _graph_diagnostics(root, proposed.data)
+            changed = {name: text for name, text in updates.items() if text != files.texts.get(name)}
+            if not dry_run:
+                atomic_write_files(root, changed)
+            return {"ok": True, "dry_run": dry_run, "changed": bool(changed), "previous_sha256": current,
+                    "sha256": current if dry_run else proposed.sha256, "patched_sha256": proposed.sha256,
+                    "preserves_comments": True, "files_changed": sorted(changed), "graph_diagnostics": graph_diagnostics}
+    except SpecError as error:
+        return {**error.payload(), "code": "spec_read_only" if error.code == "spec_read_only" else "spec_invalid",
+                "current_sha256": current}

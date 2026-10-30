@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 from fastapi.concurrency import run_in_threadpool
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from r3_model.spec_files import SpecError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import api, spec_ops
@@ -63,7 +64,7 @@ class CreateProjectRequest(BaseModel):
 
 class SpecPatchRequest(BaseModel):
     patch: dict[str, Any] = Field(description="RFC 7386 JSON merge patch: objects merge, null deletes, lists replace.")
-    sha256: str = Field(description="sha256 of the robot.yaml the patch was computed against (from GET .../spec).")
+    sha256: str = Field(description="sha256 of all included description files the patch was computed against (from GET .../spec).")
     dry_run: bool = False
 
 
@@ -325,7 +326,7 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
             raise ApiError("project_not_found", str(error)) from error
         except KeyError as error:
             raise ApiError("usage_error", str(error).strip("'\"")) from error
-        except (ValidationError, yaml.YAMLError) as error:  # a project load outside views.load (status, release, ...)
+        except (ValidationError, yaml.YAMLError, SpecError) as error:  # a project load outside views.load (status, release, ...)
             raise project_load_error(error, "robot.yaml") from error
 
     # ------------------------------------------------------------ system
