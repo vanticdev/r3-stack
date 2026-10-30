@@ -24,23 +24,22 @@ Model
   ``I = pi r^4 / 4``, so ``E = EI / I`` reproduces the catalog EI; ``twist`` is
   ``G = E / (2 (1 + nu))`` (``nu`` estimated). ``flat``: the stress-free shape is
   straight (limp, silicone-insulated stranded wire is not formed to its route).
-* **Mass.** Capsule density is chosen from the bundle's cut mass divided by
+* **Mass.** Capsule density is chosen from the installed core mass divided by
   the sum of its actual capsule volumes, including hemispherical caps. This
   preserves wire mass when tied spans have different segment lengths or the
-  discrete slack curve approximates the requested free length.
-* **Slack.** A span's free length is its route length times
-  ``(cut length - termination allowances) / routed length``. The extra length
-  is laid out as a ``sin^2`` bulge (zero slope at both pins, so the pins clamp
-  the route tangent) towards the side with the most room. It then settles
-  under gravity before t = 0 (:func:`settle`).
+  discrete chords approximate the routed arc length.
+* **Initial shape.** Nodes lie on the installed routed core, without an extra
+  cut-stock bulge. Cut length includes manufacturing and termination allowances;
+  it must not change the installed geometry. MuJoCo relaxes the route under
+  gravity before t = 0 (:func:`settle`). Pin fan-outs are rigid to their end body.
 * **Segment length.** The plugin's bending stiffness is explicit in MuJoCo's
   integrator. The shortest bending wave a chain of segments of length ``l``
   carries has ``omega = (pi / l)^2 sqrt(EI / m')`` (Euler-Bernoulli
   dispersion), so a stable step needs ``omega dt < 2``, i.e.
   ``l > pi sqrt(dt sqrt(EI / m') / 2)``: 18 mm for 12 AWG, 10 mm for 28 AWG at
-  1 ms. Spans use segments of at least ``max(SEGMENT_LENGTH, bound)``. A span
-  too short for three such segments (MuJoCo's minimum) instead gets implicit
-  joint damping that stabilises its shortest wave: with ``I = m l^2 / 12`` and
+  1 ms. Nodes use at most 10 mm arc spacing (three segments minimum).
+  Segments below the bound get implicit joint damping that stabilises their
+  shortest wave: with ``I = m l^2 / 12`` and
   the implicit update, ``b >= I omega^2 dt / 2 = (pi^4 / 24) EI dt / l``.
 * **Damping.** Kelvin-Voigt internal damping of the insulation: joint damping
   ``b = tau EI / l`` (``tau`` estimated), with a floor ``b >= k I_x / dt``. The
@@ -74,6 +73,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import json
 import math
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -94,7 +94,7 @@ CABLE_PLUGIN = "mujoco.elasticity.cable"
 CABLE_CONTYPE, CABLE_CONAFFINITY = 4, 8
 PART_CONTYPE, PART_CONAFFINITY = 8, 0
 SEGMENT_LENGTH = 0.010  # m, target; the cantilever converges as 1 - 2 l / L (tests/test_wiring_sim.py)
-BEND_STABILITY = 1.5  # safety factor on the implicit-damping floor of spans shorter than the bound
+BEND_STABILITY = 4.0  # safety factor on the implicit-damping floor of spans shorter than the bound
 MIN_SEGMENTS = 3  # MuJoCo's cable composite needs at least three bodies
 CLEARANCE_MARGIN = 0.025  # m (3x the RC car requirement); larger clearances are reported as this value
 POISSON_RATIO = 0.45  # silicone-insulated stranded copper (estimate)
@@ -208,6 +208,7 @@ class CablePlan:
     timestep: float = 0.001
     diagnostics: list[Diagnostic] = field(default_factory=list)
     assumptions: list[tuple[str, str]] = field(default_factory=list)
+    conductors: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @property
     def wire_bundle(self) -> dict[str, str]:
@@ -256,97 +257,23 @@ def _end_info(project: Project, kin: Kinematics, harness: Any, ref: str) -> tupl
     return ROOT, set(), connector.type
 
 
-def _bulged(path: np.ndarray, length: float, direction: np.ndarray, segments: int) -> np.ndarray:
-    """``segments + 1`` cable vertices from the first to the last point of ``path`` whose
-    segments add up to ``length`` (the free wire length): the path plus a sin^2 bulge along
-    ``direction`` (perpendicular to the local tangent; zero offset and slope at both pins,
-    so the pins keep the route tangent). The amplitude is solved on the segmented curve,
-    because chords of a few long segments cut the corners of the smooth one."""
-    seg = np.linalg.norm(np.diff(path, axis=0), axis=1)
-    arc = np.concatenate([[0.0], np.cumsum(seg)])
-    u = arc / max(arc[-1], 1e-12)
-    tangent = np.gradient(path, axis=0)
-    tangent /= np.maximum(np.linalg.norm(tangent, axis=1, keepdims=True), 1e-12)
-    normal = direction[None, :] - (tangent @ direction)[:, None] * tangent
-    norm = np.linalg.norm(normal, axis=1, keepdims=True)
-    fallback = np.cross(tangent, np.array([1.0, 0.0, 0.0]) if abs(direction[0]) < 0.9 else np.array([0.0, 1.0, 0.0]))
-    normal = np.where(norm > 0.2, normal / np.maximum(norm, 1e-12), fallback / np.maximum(
-        np.linalg.norm(fallback, axis=1, keepdims=True), 1e-12))
-    offset = (np.sin(math.pi * u) ** 2)[:, None] * normal
-
-    def vertices(amplitude: float) -> np.ndarray:
-        return _equal_chords(path + amplitude * offset, segments)
-
-    def chord_length(amplitude: float) -> float:
-        return float(np.linalg.norm(np.diff(vertices(amplitude), axis=0), axis=1).sum())
-
-    if chord_length(0.0) >= length - 1e-9:
-        return vertices(0.0)
-    lo, hi = 0.0, max(length - chord_length(0.0), 1e-3)
-    while chord_length(hi) < length and hi < 1.0:
-        hi *= 2.0
-    for _ in range(60):  # bisection on the bulge amplitude
-        mid = 0.5 * (lo + hi)
-        lo, hi = (mid, hi) if chord_length(mid) < length else (lo, mid)
-    return vertices(hi)
-
-
-def _equal_chords(path: np.ndarray, segments: int) -> np.ndarray:
-    """``segments + 1`` vertices on ``path`` with equal chord lengths (equal arc spacing would
-    let chords across a tight curl fall below the bending-stability segment length)."""
-    dense = _resample(path, max(4 * segments, 200))
-    end = dense[-1]
-    pts = dense.tolist()  # the walk is sequential: plain floats, no per-step array overhead
-    last = len(pts) - 1
-    ex, ey, ez = pts[-1]
-    sqrt = math.sqrt
-
-    def walk(chord: float) -> tuple[list[list[float]], float]:
-        cx, cy, cz = pts[0]
-        out, k = [[cx, cy, cz]], 0
-        chord2 = chord * chord
-        for _ in range(segments):
-            while k < last:
-                nx, ny, nz = pts[k + 1]
-                dx, dy, dz = nx - cx, ny - cy, nz - cz
-                if sqrt(dx * dx + dy * dy + dz * dz) >= chord:
-                    break
-                k += 1
-            if k >= last:
-                out.append([ex, ey, ez])
-                cx, cy, cz = ex, ey, ez
-                continue
-            # Point on dense[k] -> dense[k+1] at distance ``chord`` from ``current``.
-            (ax, ay, az), (bx, by, bz) = pts[k], pts[k + 1]
-            dx, dy, dz = bx - ax, by - ay, bz - az
-            fx, fy, fz = ax - cx, ay - cy, az - cz
-            qa = dx * dx + dy * dy + dz * dz
-            qb = 2 * (fx * dx + fy * dy + fz * dz)
-            qc = fx * fx + fy * fy + fz * fz - chord2
-            disc = max(qb * qb - 4 * qa * qc, 0.0)
-            t = min(max((-qb + sqrt(disc)) / (2 * qa) if qa > 0 else 1.0, 0.0), 1.0)
-            cx, cy, cz = ax + dx * t, ay + dy * t, az + dz * t
-            out.append([cx, cy, cz])
-        mx, my, mz = cx - ex, cy - ey, cz - ez
-        return out, sqrt(mx * mx + my * my + mz * mz)
-
-    total = float(np.linalg.norm(np.diff(dense, axis=0), axis=1).sum())
-    lo, hi = 0.0, total / segments * 1.0000001
-    for _ in range(50):  # bisection: the last vertex lands on the end of the path
-        mid = 0.5 * (lo + hi)
-        vertices, miss = walk(mid)
-        reached = np.allclose(vertices[-1], end) and miss < 1e-12
-        lo, hi = (lo, mid) if reached else (mid, hi)
-    vertices = np.asarray(walk(lo)[0])  # the largest chord that does not run past the end; snap the last vertex
-    vertices[-1] = end
-    return vertices
-
-
 def _resample(path: np.ndarray, segments: int) -> np.ndarray:
     seg = np.linalg.norm(np.diff(path, axis=0), axis=1)
     arc = np.concatenate([[0.0], np.cumsum(seg)])
     s = np.linspace(0.0, arc[-1], segments + 1)
     return np.column_stack([np.interp(s, arc, path[:, axis]) for axis in range(3)])
+
+
+def routed_vertices(path: np.ndarray, segment_length: float) -> np.ndarray:
+    """Place physical nodes on the route at no more than 10 mm arc spacing.
+
+    The display retains the dense curve between nodes. Resolving every router
+    vertex introduces sub-millimetre bending waves at a 1 ms timestep; instead
+    these modest physical elements use the existing implicit damping floor.
+    """
+    length = float(np.linalg.norm(np.diff(path, axis=0), axis=1).sum())
+    n = max(MIN_SEGMENTS, math.ceil(length / min(segment_length, SEGMENT_LENGTH)))
+    return _resample(path, n)
 
 
 def _dense(path: np.ndarray, s0: float, s1: float, step: float = 0.001) -> np.ndarray:
@@ -355,33 +282,6 @@ def _dense(path: np.ndarray, s0: float, s1: float, step: float = 0.001) -> np.nd
     inner = arc[(arc > s0) & (arc < s1)]
     s = np.unique(np.concatenate([[s0], inner, np.linspace(s0, s1, max(2, int(math.ceil((s1 - s0) / step)) + 1)), [s1]]))
     return np.column_stack([np.interp(s, arc, path[:, axis]) for axis in range(3)])
-
-
-_BULGE_DIRECTIONS = [np.array(v, dtype=float) for v in ((0, 0, 1), (0, 1, 0), (0, -1, 0), (1, 0, 0), (-1, 0, 0), (0, 0, -1))]
-
-
-def _best_bulge(path: np.ndarray, length: float, segments: int, obstacles: ObstacleSet | None,
-                radius: float) -> np.ndarray:
-    """Cable vertices bulged towards the side whose middle 60 % keeps the most clearance to
-    every part (moving parts by their swept envelope)."""
-    straight = _bulged(path, length, _BULGE_DIRECTIONS[0], segments)
-    if obstacles is None or np.allclose(straight, _resample(path, segments), atol=1e-6):
-        return straight  # no bulge needed: the direction does not matter
-    candidates, samples = [], []
-    for direction in _BULGE_DIRECTIONS:
-        candidate = _bulged(path, length, direction, segments)
-        dense = np.vstack([candidate[:-1] + (candidate[1:] - candidate[:-1]) * f for f in (0.0, 0.25, 0.5, 0.75)])
-        u = np.linalg.norm(dense - candidate[0], axis=1) / max(np.linalg.norm(candidate[-1] - candidate[0]), 1e-9)
-        middle = dense[(u > 0.2) & (u < 0.8)] if np.any((u > 0.2) & (u < 0.8)) else dense
-        candidates.append(candidate)
-        samples.append(middle[np.unique(np.linspace(0, len(middle) - 1, min(len(middle), 16)).astype(int))])
-    points = np.vstack(samples)  # one distance query for all candidate directions
-    clearance = np.minimum(obstacles.min_distance(points, obstacles.static, cutoff=0.05)[0],
-                           obstacles.min_distance(points, obstacles.moving, swept=True, cutoff=0.05)[0]) - radius
-    bounds = np.cumsum([0] + [len(m) for m in samples])
-    scores = [float(clearance[a:b].min()) for a, b in zip(bounds[:-1], bounds[1:])]
-    best = int(np.argmax(np.asarray(scores) + 1e-4 * (np.arange(len(scores)) == 0)))  # ties prefer up
-    return candidates[best]
 
 
 def stable_segment_length(bending_stiffness: float, mass_per_m: float, timestep: float) -> float:
@@ -408,6 +308,8 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
     dt = float(timestep if timestep is not None else project.spec.simulation.timestep)
     wires = _wire_index(project)
     plan = CablePlan([], part_geoms(project, obstacles), margin, dt)
+    connector_file = project.root / "build" / "connectors" / "connectors.json"
+    display_wires = json.loads(connector_file.read_text()).get("wires", {}) if connector_file.exists() else {}
 
     groups: list[list[str]] = []
     for wire_id, data in routes.get("wires", {}).items():
@@ -438,14 +340,14 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
         routed = float(np.linalg.norm(np.diff(path, axis=0), axis=1).sum())
         # The fan-outs from the pins into the bundle are short and held by the housings: not simulated.
         free = float(data["cut_length"]) - allowance - fanout_length(data)
-        stretch = max(free, routed) / max(routed, 1e-9)
         if free <= routed + 1e-6:
             zero_slack.append(members[0])
 
         # Pins: both ends plus every tie of the harness that the path passes through.
         pins: list[tuple[float, str, str]] = [(0.0, ends[0][0], "clamped"), (routed, ends[1][0], "clamped")]
         harness_routes = routes.get("harnesses", {}).get(harness.id, {})
-        supports = [(np.asarray(sp["position"], dtype=float), sp.get("permitted_motion", "clamped"))
+        supports = [(np.asarray(sp["position"], dtype=float), sp.get("permitted_motion", "clamped"),
+                     kin.body_of(sp.get("host", "")))
                     for sp in harness_routes.get("supports", [])]
         tie_count = 0
         for tie in routes.get("harnesses", {}).get(harness.id, {}).get("tie_points", []):
@@ -453,40 +355,49 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
             if distance <= 0.8 * od + 0.0015 and segment_length < arc < routed - segment_length:
                 if all(abs(arc - s) > segment_length for s, _, _ in pins):
                     tie_point = np.asarray(tie, dtype=float)
-                    motion = next((m for q, m in supports if np.linalg.norm(q - tie_point) < 1e-6), "clamped")
-                    pins.append((arc, ROOT, motion))
+                    motion, host = next(((m, b) for q, m, b in supports if np.linalg.norm(q - tie_point) < 1e-6),
+                                        ("clamped", ROOT))
+                    pins.append((arc, host, motion))
                     tie_count += 1
         pins.sort(key=lambda item: item[0])
 
         bundle_id = f"cable{index:02d}"
-        target = max(segment_length, stable_segment_length(ei, mass_per_m, dt))
         spans: list[CableSpan] = []
-        free_arc = 0.0
-        free_total = routed * stretch
+        # routes.json already specifies the installed shape. Cut/termination
+        # allowances are manufacturing stock, not a second geometric slack curve.
+        free_total = routed
         for k, ((s0, body0, motion0), (s1, body1, motion1)) in enumerate(zip(pins[:-1], pins[1:])):
             span_path = _dense(path, s0, s1)
-            span_free = (s1 - s0) * stretch
-            n = max(MIN_SEGMENTS, int(math.floor(span_free / target + 1e-9)))
-            vertices = _best_bulge(span_path, span_free, n, obstacles, od / 2)
-            length = float(np.mean(np.linalg.norm(np.diff(vertices, axis=0), axis=1)))
+            span_free = s1 - s0
+            vertices = routed_vertices(span_path, segment_length)
+            n = len(vertices) - 1
+            length = float(np.min(np.linalg.norm(np.diff(vertices, axis=0), axis=1)))
             span = CableSpan(f"{bundle_id}s{k}_", vertices, body0, body1,
                              _damping(ei, mass_per_m, od / 2, length, dt), start_motion=motion0, end_motion=motion1)
             # Termination zones: segments within the zone of a connector end do not
             # contact the body they terminate on (the conductors leave the housing there).
             for seg_index in range(n):
-                a = free_arc + seg_index * length
-                b = a + length
+                a = s0 + seg_index * span_free / n
+                b = s0 + (seg_index + 1) * span_free / n
                 for end_index, (body, components, _) in enumerate(ends):
                     zone = 0.012 + 3 * od if components else 0.006
                     inside = a <= zone if end_index == 0 else b >= free_total - zone
                     if inside:
                         span.exclude.append((seg_index, body))
-            free_arc += span_free
             spans.append(span)
         bundle = CableBundle(bundle_id, harness.id, list(members),
                              [next(w for w in harness.wires if w.id == m).color for m in members],
                              od, ei, mass_per_m, routed, free_total, spans, (ends[0][0], ends[1][0]), tie_count)
         plan.bundles.append(bundle)
+        for member, color, gauge in zip(members, bundle.colors, gauges):
+            source = routes["wires"][member]
+            display = display_wires.get(member, {})
+            plan.conductors[member] = {
+                "wire_id": member, "bundle": bundle_id, "harness": harness.id,
+                "od": float(gauge.outer_diameter), "color": color,
+                "display_path": display.get("display_path") or source["path"],
+                "core_path": path.tolist(), "end_bodies": [e[0] for e in ends],
+            }
 
     _exclude_initial_penetration(plan, obstacles)
     plan.assumptions.extend([
@@ -498,10 +409,12 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
                    "radius from the optimal circle packing; every member reports the bundle surface clearance."),
         ("wiring", f"Plugin bend modulus E = EI / (pi r^4 / 4) from the catalog EI (estimates); twist G = E / (2 (1 + "
                    f"{POISSON_RATIO})); stress-free shape straight; Kelvin-Voigt damping tau = {RETARDATION_TIME * 1e3:.0f} ms "
-                   f"(estimate) with a torsion-stability floor of {TWIST_STABILITY:.0f} I_x / dt."),
+                   f"(estimate) with a torsion-stability floor of {TWIST_STABILITY:.0f} I_x / dt and an implicit bending "
+                   f"stability floor of {BEND_STABILITY:g} pi^4 EI dt / (24 l)."),
         ("wiring", "Connector ends and cable ties clamp the bundle (span rooted in, or welded to, the pin's body); "
-                   "splices and harness-to-harness connectors are fixed to the chassis; route slack is laid out as a "
-                   f"bulge and settles under gravity for {SETTLE_TIME:.1f} s before t = 0."),
+                   "splices and harness-to-harness connectors are fixed to the chassis. The installed route is the "
+                   "initial shape (no added cut-stock bulge), sampled on-route at at most 10 mm arc spacing; "
+                   f"it settles under gravity for {SETTLE_TIME:.1f} s before t = 0."),
         ("wiring", "Cables collide with massless part collision geoms (CAD meshes split into convex pieces, else catalog "
                    "primitives), not with each other; friction 0.5 against static parts (estimate), frictionless against "
                    "moving parts (abrasion is not modeled; interference is reported); clearance to moving parts is the "
