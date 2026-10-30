@@ -110,6 +110,10 @@ share a corridor; conflicting waypoint lists or unknown wire IDs are rejected.
 These coordinates guide routing, never substitute for installed supports, and
 remain subject to the existing collision and bend-radius checks.
 
+A splice may declare `direction: [x, y, z]` for its installed sleeve axis. The
+router preserves that axis through curvature planning and orients the sleeve's
+collision body accordingly; all existing entry-zone and bend limits still apply.
+
 `route.independent_branches: true` gives each terminal pair a separate physical
 lane. Earlier lanes reserve their full diameter in voxel routing and curvature
 planning. Pins remain fixed, and a solder splice keeps one position and axis

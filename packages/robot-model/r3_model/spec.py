@@ -233,6 +233,14 @@ class HarnessConnector(_Model):
 
 class Splice(_Model):
     position: Vector
+    direction: Vector | None = Field(default=None, min_length=3, max_length=3,
+                                    description="Installed sleeve axis in the robot frame; omitted axes may be planned.")
+
+    @model_validator(mode="after")
+    def _sleeve_axis(self) -> "Splice":
+        if self.direction is not None and sum(v * v for v in self.direction) < 1e-12:
+            raise ValueError("splice direction must be non-zero")
+        return self
 
 
 class Wire(_Model):

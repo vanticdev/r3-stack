@@ -1264,7 +1264,8 @@ def _node_junction(key: str, node: Any, catalog: Any) -> Junction:
                         cone=PIGTAIL_CONE if free else 0.0, exempt=set(node.exempt),
                         termination_length=node.termination_length, lead=lead, harnesses={node.harness})
     if node.kind == "splice":
-        return Junction(key, "splice", node.exit.copy(), None, axis_free=True, move=SPLICE_MOVE,
+        axis = node.direction.copy() if node.direction is not None else None
+        return Junction(key, "splice", node.exit.copy(), axis, axis_free=axis is None, move=SPLICE_MOVE,
                         termination_length=0.006, harnesses={node.harness})
     return Junction(key, node.kind, node.exit.copy() if node.exit is not None else np.zeros(3), None,
                     axis_free=True, harnesses={node.harness})
@@ -1346,6 +1347,8 @@ def _assign_sides(segments: list[Segment], junctions: dict[str, Junction]) -> No
         if j.kind == "hole":
             j.axis = j.axis * (1.0 if combined @ j.axis >= 0 else -1.0)
             signs = [1.0 if t @ j.axis >= 0 else -1.0 for t in tangents]
+        elif j.kind == "splice" and not j.axis_free and j.axis is not None:
+            pass  # an installed sleeve keeps its authored axis
         elif j.kind == "support":
             n = j.plane_normal
             along = combined - (combined @ n) * n

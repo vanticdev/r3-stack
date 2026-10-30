@@ -517,7 +517,10 @@ class HarnessRouter:
                 nodes[name] = node
             for name, splice in harness.splices.items():
                 od = bundle_diameter(self._wire_od(a) for a in awgs.get(name, [])) if awgs.get(name) else 0.0
-                nodes[name] = NodePoint(harness.id, name, "splice", np.asarray(splice.position, dtype=float), None, od=od)
+                direction = np.asarray(splice.direction, float) if splice.direction is not None else None
+                if direction is not None:
+                    direction /= np.linalg.norm(direction)
+                nodes[name] = NodePoint(harness.id, name, "splice", np.asarray(splice.position, dtype=float), direction, od=od)
             for node in nodes.values():
                 if node.kind == "connector":
                     self._lead(node, awgs.get(node.name, []))

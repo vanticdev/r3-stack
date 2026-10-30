@@ -94,3 +94,36 @@ def test_stiff_conductors_fit_between_nearby_facing_exits(tmp_path):
     checker._bend_radius()
     assert not [d for d in checker.diagnostics if d.severity.value == 'error']
     assert all(plan.feasible for plan in routing.planning.plans)
+
+
+def test_installed_splice_axis_is_preserved_by_lane_planning(tmp_path):
+    from r3_wiring.obstacles import cable_obstacles
+    root = write_project(tmp_path, block=False)
+    path = root / 'robot.yaml'
+    spec = yaml.safe_load(path.read_text())
+    harness = spec['electrical']['harnesses'][0]
+    for connector in harness['connectors'].values():
+        connector['type'] = 'integral'
+    harness['splices'] = {'S': {'position': [.08, .01, .025], 'direction': [2., 0., 0.]}}
+    harness['wires'] = [{'id': 'in', 'from': 'A.1', 'to': 'S', 'awg': 22},
+                        {'id': 'out', 'from': 'S', 'to': 'B.1', 'awg': 22}]
+    harness['route'] = {'independent_branches': True}
+    path.write_text(yaml.safe_dump(spec, sort_keys=False))
+    project = Project.load(root)
+    obstacles, _ = build_obstacles(project)
+    router = HarnessRouter(project, obstacles, RouterOptions(plan=True))
+    routing = router.route()
+    junction = routing.planning.plans[0].junctions['lead/N:S']
+    np.testing.assert_allclose(junction.axis, [1., 0., 0.], atol=1e-12)
+    assert not junction.axis_free
+    sleeve = next(body for body in cable_obstacles(project, routing.nodes) if body.component == 'lead.S')
+    np.testing.assert_allclose(sleeve.shape.axis, junction.axis, atol=1e-12)
+    assert all(plan.feasible for plan in routing.planning.plans)
+
+
+def test_splice_axis_cannot_be_zero():
+    import pytest
+    from pydantic import ValidationError
+    from r3_model.spec import Splice
+    with pytest.raises(ValidationError, match='splice direction must be non-zero'):
+        Splice(position=[0., 0., 0.], direction=[0., 0., 0.])
