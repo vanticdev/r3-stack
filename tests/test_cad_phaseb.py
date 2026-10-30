@@ -48,7 +48,10 @@ def test_rc_car_compiles_with_every_object_joined(project):
     authored = [cid for cid, c in yaml.safe_load((RC_CAR / "robot.yaml").read_text())["components"].items() if "pose" in c]
     assert authored == ["chassis"]  # only the root keeps an authored pose
     warnings = {d.code for d in result.diagnostics if d.severity.value == "warning"}
-    assert warnings <= {"loop_mobility_low"}  # coaxial gearbox output + bearing (special geometry)
+    assert warnings <= {"loop_mobility_low", "mount_pattern_estimated"}
+    provisional = [d for d in result.diagnostics if d.code == "mount_pattern_estimated"]
+    assert len(provisional) == 1 and "front_camera" in provisional[0].subjects
+    assert "30 × 30 mm" in provisional[0].message  # owned UC-717 measurements are pending
 
 
 def test_exact_interference_and_seats_are_clean(project):
