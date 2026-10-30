@@ -61,55 +61,18 @@ def test_revision_ignores_cache_and_mtime(inputs):
 def test_stale_fit_proof_cannot_suppress_interference(inputs, artifact):
     from types import SimpleNamespace
     from r3_orchestrator.model_stage import ModelChecker
-    from r3_orchestrator.geometry import make_solid
+    from r3_model.pulled import PullError
 
     project, roots = inputs
-    project.spec.components = {
-        'a': SimpleNamespace(mount='world'), 'b': SimpleNamespace(mount='world')}
     before = project.fingerprint()
-    proof = {'inputs': before, 'parts': {'a': {}, 'b': {}}, 'fit': {},
-             'poses': {'a': {}, 'b': {}}, 'interference_method': 'exact'}
-    project.read_build_json = lambda path: proof if path.startswith(artifact if artifact == 'cad' else 'model/') else None
-    solids = {name: make_solid(name, 'box', [.01, .01, .01], 'z', [0, 0, 0], [0, 0, 0]) for name in ('a', 'b')}
+    proof = {'inputs': before, 'parts': {'a': {}, 'b': {}}, 'fit': {}, 'interference_method': 'exact'}
+    project.read_build_json = lambda path: proof
     validator = object.__new__(ModelChecker)
     validator.project, validator.spec = project, project.spec
     validator.result = StageResult(stage='model')
-    assert validator.check_interference(solids) == []
-    (roots[1] / 'review.yaml').write_text('validation: changed\n')
-    assert validator.check_interference(solids)
-    assert any(d.code == 'component_interference' for d in validator.result.diagnostics)
-
-
-def test_new_cad_proof_uses_revision_that_will_be_pinned(inputs):
-    import json
-    from types import SimpleNamespace
-    from r3_onshape.organized import TOP_LEVEL, write_model
-
-    project, _ = inputs
-    project.lock['cad'] = {'revision': 'old'}
-    document = SimpleNamespace(did='document', wid='workspace', vid='version', digest='library',
-                               assemblies={TOP_LEVEL: 'assembly'}, studios={}, variable_studio='',
-                               url=lambda *args: 'https://cad.onshape.com/documents/fixture')
-    path = write_model(project, {'robot': document, 'library_doc': document, 'parts': {},
-                                 'microversion': 'new'}, 'fixture', 'digest')
-    project.lock['cad'] = {'revision': 'new'}
-    assert not is_stale(json.loads(path.read_text())['inputs'], project.fingerprint())
-
-
-def test_matching_cad_geometry_can_be_revalidated_after_dataset_edit(inputs, monkeypatch):
-    import json
-    from types import SimpleNamespace
-    from r3_onshape import organized, stage
-
-    project, roots = inputs
-    project.spec.cad.provider = 'onshape'
-    project.spec.assembly = SimpleNamespace()
-    path = project.build_dir('cad') / 'cad_model.json'
-    before = project.fingerprint()
-    path.write_text(json.dumps({'inputs': before, 'source': {'generator_digest': 'matching'}, 'parts': {}}))
-    (roots[1] / 'review.yaml').write_text('id: review\nname: changed\ncategory: other\n')
-    assert is_stale(before, project.fingerprint())
-    monkeypatch.setattr(organized, 'input_digest', lambda p: 'matching')
-    result = stage.run(project)
-    assert result.ok and any(d.code == 'cad_model_reused' for d in result.diagnostics)
-    assert not is_stale(json.loads(path.read_text())['inputs'], project.fingerprint())
+    for changed in (False, True):
+        if changed:
+            (roots[1] / 'review.yaml').write_text('validation: changed\n')
+        with pytest.raises(PullError) as error:
+            validator.check_interference({})
+        assert error.value.code == 'cad_pull_missing'

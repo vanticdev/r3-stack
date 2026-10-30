@@ -181,7 +181,7 @@ export function Inspector({ data, selection, onClear, onSelect, interference = n
             ["Id", selection.id], ["Catalog type", c.type], ["Mount", c.mount],
             ["Position (mm)", c.xyz.map((v) => (v * 1000).toFixed(1)).join(", ")],
             ["Behavior model", entry?.behavior ?? null],
-            ["CAD mesh", part?.mesh ? `${part.mesh} (${part.mesh_triangles ?? "?"} triangles)` : "none (catalog envelope)"],
+            ["CAD mesh", part?.mesh ? `${part.mesh} (${part.mesh_triangles ?? "?"} triangles)` : "none (no pulled mesh)"],
           ]} />
           {entry && Object.keys(entry.pins).length > 0 && (
             <Details summary={`Pins (${Object.keys(entry.pins).length})`}>

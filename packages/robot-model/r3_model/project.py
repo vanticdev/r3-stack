@@ -2,7 +2,9 @@
 
 Layout of an R3 project (also the layout of its GitHub repository)::
 
-    robot.yaml              unified spec (source of truth)
+    robot.yaml              description index (source of truth)
+    parts/<name>.yaml       part descriptions included by the index
+    electrical/ software/   included domain descriptions
     r3.lock.yaml            pinned external revisions (Onshape microversion, PCB hashes)
     catalog/                optional project-local catalog additions
     cad/                    CAD notes and source mapping; geometry lives in Onshape
@@ -23,6 +25,7 @@ from typing import Any
 import yaml
 
 from .spec import RobotSpec
+from .spec_files import load_spec_files, spec_lock
 
 
 @dataclass
@@ -34,32 +37,29 @@ class Project:
     @classmethod
     def load(cls, root: str | Path) -> "Project":
         root = Path(root).resolve()
-        spec_path = root / "robot.yaml"
-        spec = RobotSpec.model_validate(yaml.safe_load(spec_path.read_text()))
+        with spec_lock(root, shared=True):
+            spec = load_spec_files(root).validate()
         lock_path = root / "r3.lock.yaml"
         lock = yaml.safe_load(lock_path.read_text()) if lock_path.exists() else {}
         project = cls(root=root, spec=spec, lock=lock or {})
         project.apply_sourcing()
-        if spec.assembly is not None:
-            project.assembly  # compile now so every stage sees derived poses
+        if (root / "cad/pulled/pull.json").exists():
+            from .pulled_view import apply_pulled
+            from .pulled import PullError
+            try:
+                apply_pulled(project)
+            except PullError:
+                pass  # geometry stages report the one stable pull diagnostic
         return project
 
     @property
     def assembly(self):  # -> r3_model.assembly.AssemblyResult | None
-        """Compiled object/interface assembly. Compiling fills
-        ``spec.components[*].pose`` (and ``mount`` / derived joints) with the
-        derived poses, so stages that read poses work unchanged. Specs without
-        an ``assembly`` section are left untouched and return None."""
-        if self.spec.assembly is None:
-            return None
+        """Read the pulled solved poses/mates and project them to stage-facing fields."""
         if not hasattr(self, "_assembly"):
-            from .assembly import apply_to_spec, compile_assembly
-            from .mechanics import derive_mechanical
-
-            result = compile_assembly(self.spec, self.catalog)
-            result.diagnostics.extend(apply_to_spec(self.spec, result))
-            result.diagnostics.extend(derive_mechanical(self.spec, self.catalog, result))
-            self._assembly = result
+            if not (self.root / "cad/pulled/pull.json").exists():
+                return None
+            from .pulled_view import apply_pulled
+            apply_pulled(self)
         return self._assembly
 
     # Catalog is resolved lazily so r3_model has no hard import-time dependency.
@@ -109,8 +109,12 @@ class Project:
 
     def fingerprint(self) -> dict[str, str]:
         """Revision fingerprints of authored inputs, recorded on every result."""
-        digest = hashlib.sha256((self.root / "robot.yaml").read_bytes()).hexdigest()[:16]
+        with spec_lock(self.root, shared=True):
+            digest = load_spec_files(self.root).sha256[:16]
         result = {"robot_yaml_sha256": digest}
+        manifest = self.root / "cad/pulled/pull.json"
+        if manifest.is_file():
+            result["cad_pull_manifest_sha256"] = hashlib.sha256(manifest.read_bytes()).hexdigest()
         from r3_catalog.revision import catalog_modelbank_revision
 
         result["catalog_modelbank_revision"] = catalog_modelbank_revision(self.root / "catalog")

@@ -73,75 +73,46 @@ def _net_of_label(system: ElectricalSystem) -> dict[str, str]:
 
 
 def vehicle_model(project: Any, result: StageResult) -> dict[str, Any]:
+    from ..vehicle.roles import wheel_joints, wheel_dimensions
+    from ..load_cases import is_mobile
+
+    wheel_owners = wheel_joints(project)
     spec, catalog = project.spec, project.catalog
     motors = [cid for cid, c in spec.components.items()
-              if (ct := catalog.components.get(c.type)) and ct.behavior and ct.behavior.model == "motor.dc_brushed"]
-    transmission = next((t for t in spec.mechanical.transmissions if t.actuator in motors), None)
+              if (ct := catalog.components.get(c.type)) and ct.kind == "motor" and ct.behavior]
+    transmissions = [t for t in spec.mechanical.transmissions if t.actuator in motors and t.type in ("direct", "differential")]
+    ground_transmissions = [t for t in transmissions if any(j.id in t.joints for j in wheel_owners.values())]
+    transmission = next(iter(ground_transmissions or transmissions), None)
     ratio = transmission.ratio if transmission else 1.0
     efficiency = transmission.efficiency if transmission else 1.0
-    radius = None
-    if transmission:
-        joints = {j.id: j for j in spec.mechanical.joints}
-        for joint_id in transmission.joints:
-            child = spec.components.get(joints[joint_id].child) if joint_id in joints else None
-            ctype = catalog.components.get(child.type) if child else None
-            if ctype and ctype.behavior and "radius" in ctype.behavior.params:
-                radius = float(ctype.behavior.params["radius"])
-                break
-    if radius is None:
-        radius = 0.05
-        result.assume("vehicle", "No wheel behavior radius found; using 0.05 m.")
-    cad = project.read_build_json("cad/cad_model.json")
-    cad_parts = (cad.get("parts") or {}) if isinstance(cad, dict) else {}
-    catalog_mass = sum(catalog.components[c.type].mechanical.mass for c in spec.components.values() if c.type in catalog.components)
-    if cad_parts:
-        # Per component: CAD mass, else catalog mass (a stale cad_model may lack new parts); plus CAD-only
-        # hardware (fasteners, nuts).
-        mass, missing = 0.0, []
-        for cid, c in spec.components.items():
-            part = cad_parts.get(cid) or {}
-            if part.get("mass"):
-                mass += float(part["mass"])
-            elif c.type in catalog.components:
-                mass += float(c.params.get("mass", catalog.components[c.type].mechanical.mass))
-                missing.append(cid)
-        mass += sum(float(p.get("mass") or 0.0) for name, p in cad_parts.items() if name not in spec.components)
-        mass_source = "cad" if not missing else "cad+catalog"
-        if missing:
-            result.assume("vehicle", f"{len(missing)} components missing from cad_model.json use catalog mass: {', '.join(sorted(missing))}.")
-    else:
-        mass, mass_source = catalog_mass, "catalog"
-    lows, highs = [], []
-    graph = project.graph
-    boxes = [(np.asarray(p["bbox_min"], dtype=float), np.asarray(p["bbox_max"], dtype=float))
-             for p in cad_parts.values() if p.get("bbox_min") and p.get("bbox_max")]
-    if boxes:
-        # Exact CAD bounding boxes (robot frame) of every modeled part.
-        lows, highs = [lo for lo, _ in boxes], [hi for _, hi in boxes]
-    else:
-        for cid, c in spec.components.items():
-            ctype = catalog.components.get(c.type)
-            if not ctype:
-                continue
-            size = list(ctype.mechanical.size)
-            half = (np.array([size[0], size[0], size[1]]) / 2 if ctype.mechanical.shape == "cylinder" else np.array(size[:3]) / 2)
-            position, _ = graph.component_pose(cid)
-            center = position + np.array([0.0, 0.0, half[2]])
-            lows.append(center - half)
-            highs.append(center + half)
+    radius = next((wheel_dimensions(project, wheel, joint)[0] for wheel, joint in wheel_owners.items()
+                   if transmission and joint.id in transmission.joints), 0.0)
+    from r3_model.pulled_view import cad_view
+    cad = cad_view(project, mass_required=True)
+    cad_parts = cad["parts"]
+    mass = sum(p["mass"] for p in cad_parts.values())
+    mass_source = "pulled"
+    lows = [np.asarray(p["bbox_min"]) for p in cad_parts.values()]
+    highs = [np.asarray(p["bbox_max"]) for p in cad_parts.values()]
     extent = np.max(highs, axis=0) - np.min(lows, axis=0) if highs else np.zeros(3)
     frontal_area = FRONTAL_FILL * extent[1] * extent[2]
     wheels = {cid for cid, c in spec.components.items() if (ct := catalog.components.get(c.type)) and ct.kind == "wheel"}
-    driven = {j.child for j in spec.mechanical.joints if transmission and j.id in transmission.joints} & wheels
-    ground_drive = bool(driven)
+    driven = {wheel for wheel, joint in wheel_owners.items() if any(joint.id in t.joints for t in ground_transmissions)}
+    ground_drive = is_mobile(project) and bool(driven)
+    if ground_drive:
+        characteristics = {(float(t.ratio), float(t.efficiency)) for t in ground_transmissions}
+        radii = {round(wheel_dimensions(project, wheel, wheel_owners[wheel])[0], 9) for wheel in driven}
+        if len(characteristics) > 1 or len(radii) > 1:
+            result.add(Diagnostic.error("electrical_drive_layout_unsupported",
+                "Steady road-load estimation requires equal driven radii, transmission ratios and efficiencies; heterogeneous drives need individual load allocation"))
     if not ground_drive and motors:
         result.assume("motor_load", "Non-wheeled operating points use component operating_speed and load_torque; unspecified values are estimated as zero.")
     loads = [{**catalog.component(spec.components[cid].type).behavior.params, **spec.components[cid].params} for cid in motors]
     env = spec.simulation.environment
-    return {"mass": mass, "mass_source": mass_source, "catalog_component_mass": catalog_mass, "wheel_radius": radius,
+    return {"mass": mass, "mass_source": mass_source, "catalog_component_mass": None, "wheel_radius": radius,
             "ratio": ratio, "drivetrain_efficiency": efficiency, "rolling_resistance": env.ground_rolling_resistance,
             "friction": env.ground_friction, "gravity": env.gravity, "frontal_area": frontal_area,
-            "frontal_area_source": "cad" if boxes else "catalog",
+            "frontal_area_source": "pulled",
             "drag_coefficient": DRAG_COEFFICIENT, "air_density": AIR_DENSITY,
             "driven_axle_load_fraction": len(driven) / len(wheels) if wheels else 0.0,
             "ground_drive": ground_drive,
@@ -855,10 +826,10 @@ def estimate_runtime(system: ElectricalSystem, ops: OperatingPoints, duty: dict[
 
 
 def full_throttle_transient(project: Any, routes: Any, ops: OperatingPoints, duration: float = 2.0, dt: float = 1e-3) -> dict[str, list[float]]:
-    """Full throttle from rest with a constant motor-speed ramp to the
-    traction-limited speed reached after ``duration`` (no vehicle dynamics)."""
+    """Full-throttle electrical ramp: road-drive speed or the declared stationary operating speed."""
     system = ElectricalSystem(project, routes, initial={"battery_soc": 1.0})
-    w_end = ops.cruise_speed * 2.0 / ops.vehicle["wheel_radius"] * ops.vehicle["ratio"]
+    w_end = (ops.cruise_speed * 2.0 / ops.vehicle["wheel_radius"] * ops.vehicle["ratio"]
+             if ops.vehicle["ground_drive"] else ops.vehicle["motor_operating_speed"])
     trace: dict[str, list[float]] = {"time": [], "omega": [], "motor_current": [], "torque": [], "battery_voltage": [], "pi_voltage": []}
     motor = next(iter(ops.motors))
     esc = ops.esc_for_motor.get(motor)
@@ -889,7 +860,12 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
         routes = project.read_build_json("wiring/routes.json")
     system = ElectricalSystem(project, routes)
     result.extend(system.diagnostics)
-    vehicle = vehicle_model(project, result)
+    from r3_model.pulled import PullError
+    try:
+        vehicle = vehicle_model(project, result)
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
+        return result
     ops = OperatingPoints(system, vehicle, cruise_speed)
     battery = next(iter(_models(system, BatteryLipo).values()), None)
     states = {"full": 1.0, "nominal": 0.5, "minimum": 0.0}

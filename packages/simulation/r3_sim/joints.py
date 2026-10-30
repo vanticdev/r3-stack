@@ -54,7 +54,8 @@ def separate_parts(
     if custom is None:
         custom = ET.SubElement(mj, "custom")
     ET.SubElement(custom, "text", name="r3_root", data=root)
-    cm = compile_connections(project)
+    from .pulled_connections import pulled_connections
+    cm = pulled_connections(project)
     world, asset = mj.find("worldbody"), mj.find("asset")
     old_origins = {k: v.copy() for k, v in origins.items()}
     parent_of = {child: parent for parent in mj.iter() for child in parent}
@@ -76,63 +77,6 @@ def separate_parts(
                 geoms[cid].append(geom)
             el.remove(geom)
     all_parts = dict(part_props)
-    # Fasteners absent from CAD still have mass and a primitive shank/head.
-    for f in project.spec.mechanical.fasteners:
-        ft = project.catalog.fastener(f.type)
-        for name in (f.part, f.nut_part):
-            if name is None or name in all_parts:
-                continue
-            actual_type = project.catalog.fastener(f.nut) if name == f.nut_part else ft
-            axis = np.asarray(f.axis, float)
-            axis /= np.linalg.norm(axis)
-            quat = np.zeros(4)
-            mujoco.mju_quatZ2Vec(quat, axis)
-            rotation_matrix = np.zeros(9)
-            mujoco.mju_quat2Mat(rotation_matrix, quat)
-            rotation_matrix = rotation_matrix.reshape(3, 3)
-            seat = np.asarray(f.position, float)
-            if name == f.nut_part:
-                seat = seat + axis * float(f.grip or 0)
-            length = float(actual_type.height or f.length or actual_type.thread_length or actual_type.d)
-            width = float(actual_type.across_flats or actual_type.d)
-            is_nut = actual_type.kind == "nut"
-            volume = (
-                (math.sqrt(3) / 2 * width**2 - math.pi * (actual_type.minor_diameter / 2) ** 2) * length
-                if is_nut
-                else math.pi * (actual_type.d / 2) ** 2 * length
-            )
-            mass = float(actual_type.density) * volume
-            center = seat + axis * length / 2
-            pieces = [
-                MassProperties(
-                    mass,
-                    center,
-                    rotation_matrix @ cylinder_inertia(mass, width, length) @ rotation_matrix.T,
-                    "catalog",
-                )
-            ]
-            head_h = float(actual_type.head_height or actual_type.collar_height or 0)
-            head_d = float(actual_type.head_diameter or actual_type.collar_diameter or 0)
-            if head_h and head_d and not is_nut:
-                head_mass = float(actual_type.density) * math.pi * (head_d / 2) ** 2 * head_h
-                pieces.append(
-                    MassProperties(
-                        head_mass,
-                        seat - axis * head_h / 2,
-                        rotation_matrix @ cylinder_inertia(head_mass, head_d, head_h) @ rotation_matrix.T,
-                        "catalog",
-                    )
-                )
-            all_parts[name] = combine(pieces)
-            mass = all_parts[name].mass
-            cm.diagnostics.append(
-                Diagnostic.warning(
-                    "joint_hardware_geometry_estimated",
-                    f"{name}: cylindrical envelope and mass estimated from catalog dimensions (CAD missing)",
-                    subjects=[name],
-                    data={"mass_kg": mass},
-                )
-            )
     # Remove all old bodies (including nested ones); their children are rebuilt.
     for body, el in list(elements.items()):
         if el in list(parent_of[el]):
@@ -264,17 +208,8 @@ def separate_parts(
                     group="1",
                 )
             else:
-                ET.SubElement(
-                    el,
-                    "geom",
-                    name=f"vis_{name}",
-                    type="sphere",
-                    size=".0015",
-                    mass="0",
-                    contype="0",
-                    conaffinity="0",
-                    group="1",
-                )
+                from r3_model.pulled import PullError
+                raise PullError("cad_pull_missing", f"{name}: no pulled visual mesh asset")
     # Move reference/sensor/camera nodes from the old tree to their actual hosts.
     for old_el in parent_of:
         if old_el.tag != "body":
@@ -320,7 +255,7 @@ def separate_parts(
     )
     for part in collision:
         name = part.component
-        if name not in elements or name in hardware:
+        if name not in elements:
             continue
         el = elements[name]
         origin = origins[name]
@@ -353,144 +288,7 @@ def separate_parts(
             )
     common["contype"] = "1"
 
-    def hex_ring(
-        name: str,
-        el: Any,
-        origin: np.ndarray,
-        seat: np.ndarray,
-        axis: np.ndarray,
-        across_flats: float,
-        height: float,
-        bore: float,
-    ) -> None:
-        helper = np.eye(3)[int(np.argmin(np.abs(axis)))]
-        u = np.cross(axis, helper)
-        u /= np.linalg.norm(u)
-        v = np.cross(axis, u)
-        count = 6
-        for k in range(count):
-            angles = 2 * math.pi * np.asarray([k, k + 1]) / count
-            normals = math.pi / 6 + np.arange(6) * math.pi / 3
-            outer = across_flats / (2 * np.max(np.cos(angles[:, None] - normals), axis=1))
-            inner = bore / 2 / math.cos(math.pi / count)
-            if not bore:
-                inner = 0
-            planar = [
-                r * (math.cos(angle) * u + math.sin(angle) * v)
-                for angle, r in [(angles[0], inner), (angles[0], outer[0]), (angles[1], outer[1]), (angles[1], inner)]
-            ]
-            vertices = np.asarray([seat + point + axis * z - origin for z in (0, height) for point in planar])
-            mesh = f"joint_ring_{name}_{len(el)}_{k}"
-            ET.SubElement(asset, "mesh", name=mesh, vertex=_fmt(vertices))
-            ET.SubElement(el, "geom", name=mesh, type="mesh", mesh=mesh, **common)
-
-    for name in (all_parts.keys() - project.spec.components.keys()) | hardware.keys():
-        el = elements[name]
-        origin = origins[name]
-        if name in hardware:
-            f, ft = hardware[name]
-            axis = np.asarray(f.axis, float)
-            axis /= np.linalg.norm(axis)
-            quat = np.zeros(4)
-            mujoco.mju_quatZ2Vec(quat, axis)
-            seat = np.asarray(f.position, float)
-            is_nut = name == f.nut_part or ft.kind == "nut"
-            if name == f.nut_part:
-                seat += axis * float(f.grip or 0)
-            if is_nut:
-                hex_ring(
-                    name, el, origin, seat, axis, float(ft.across_flats or ft.d), float(ft.height or ft.d), float(ft.d)
-                )
-            else:
-                length = float(f.length or ft.thread_length or ft.height or ft.d)
-                ET.SubElement(
-                    el,
-                    "geom",
-                    name=f"joint_col_{name}",
-                    type="cylinder",
-                    pos=_fmt(seat + axis * length / 2 - origin),
-                    quat=_fmt(quat),
-                    size=_fmt([ft.minor_diameter / 2, length / 2]),
-                    **common,
-                )
-                if ft.kind == "standoff_mf":
-                    h = float(ft.height)
-                    depth = float(ft.female_depth or h)
-                    hex_ring(name, el, origin, seat - axis * h, axis, float(ft.across_flats), depth, float(ft.d))
-                    if h > depth:
-                        hex_ring(
-                            name, el, origin, seat - axis * (h - depth), axis, float(ft.across_flats), h - depth, 0
-                        )
-                if ft.kind == "ball_stud" and ft.ball_diameter:
-                    neck = float(ft.neck_length or 0)
-                    collar = float(ft.collar_height or 0)
-                    radius = float(ft.ball_diameter) / 2
-                    if neck:
-                        ET.SubElement(
-                            el,
-                            "geom",
-                            name=f"joint_neck_{name}",
-                            type="cylinder",
-                            pos=_fmt(seat - axis * (collar + neck / 2) - origin),
-                            quat=_fmt(quat),
-                            size=_fmt([float(ft.neck_diameter or ft.d) / 2, neck / 2]),
-                            **common,
-                        )
-                    ET.SubElement(
-                        el,
-                        "geom",
-                        name=f"joint_ball_{name}",
-                        type="sphere",
-                        pos=_fmt(seat - axis * (collar + neck + radius) - origin),
-                        size=str(radius),
-                        **common,
-                    )
-                head_h = float(ft.head_height or ft.collar_height or 0)
-                head_d = float(ft.head_diameter or ft.collar_diameter or 0)
-                if head_h and head_d:
-                    ET.SubElement(
-                        el,
-                        "geom",
-                        name=f"joint_head_{name}",
-                        type="cylinder",
-                        pos=_fmt(seat - axis * head_h / 2 - origin),
-                        quat=_fmt(quat),
-                        size=_fmt([head_d / 2, head_h / 2]),
-                        **common,
-                    )
-        else:
-            part = cad_parts.get(name, {})
-            half = (
-                (np.asarray(part["bbox_max"]) - np.asarray(part["bbox_min"])) / 2
-                if part.get("bbox_max")
-                else np.array([0.0015] * 3)
-            )
-            ET.SubElement(
-                el,
-                "geom",
-                name=f"joint_col_{name}",
-                type="box",
-                pos=_fmt((np.asarray(part["bbox_min"])+np.asarray(part["bbox_max"]))/2-origin if part.get("bbox_max") else all_parts[name].com-origin),
-                size=_fmt(np.maximum(half, 1e-5)),
-                **common,
-            )
-            cm.diagnostics.append(
-                Diagnostic.warning(
-                    "joint_collision_estimated",
-                    f"{name}: CAD bounding-box collision estimate",
-                    subjects=[name],
-                    data={"estimated": 1},
-                )
-            )
     cm.estimated["collision.friction"] = project.catalog.joint_defaults["friction"].model_dump()
-    cm.diagnostics.append(
-        Diagnostic.warning(
-            "joint_collision_estimated",
-            "Fastener collision proxies use ISO thread-core cylinders and six-wedge hollow nut/standoff prisms (circumscribed polygonal bore); helical flanks are represented by the breakable connection, not penetrating collision solids.",
-            subjects=sorted(hardware),
-            data={"hardware_parts": len(hardware)},
-        )
-    )
     # Optional contact proxies replace environment contact for declared parts;
     # their actual convex geometry still handles all internal contacts.
     for geom in mj.iter("geom"):
@@ -855,8 +653,8 @@ class JointMonitor:
             self._point = np.asarray(
                 [np.asarray(c.point) - self._origin(a) for c, a in zip(self._connections, self._a)]
             )
-            self._caps = np.asarray([[c.axial, c.shear, c.torque, c.bending] for c in self._connections])
-            self._slip = np.asarray([c.slip for c in self._connections])
+            self._caps = np.asarray([[c.axial, c.shear, c.torque, c.bending] for c in self._connections], dtype=float)
+            self._slip = np.asarray([c.slip for c in self._connections], dtype=float)
             self._decay = np.asarray([c.loosening_distance for c in self._connections])
             self._locked = np.asarray([c.locked for c in self._connections])
             self._ball = np.asarray([c.kind == "ball_joint" for c in self._connections])

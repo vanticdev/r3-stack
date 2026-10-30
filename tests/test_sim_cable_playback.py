@@ -19,6 +19,8 @@ def cable_world(tmp_path_factory):
     from test_wiring_support import write_project
 
     project = Project.load(write_project(tmp_path_factory.mktemp("cable-playback"), moving_end=True))
+    from pulled_fixture import wiring_pull
+    project = wiring_pull(project)
     routes = route_and_check(project)["routes"]
     # A distinct per-conductor display offset must survive, even though the
     # physical bundle core is shared. This is the connectors-stage contract.

@@ -3,8 +3,8 @@
 A part counts as fitted only when a physical interface is verified: fastener
 threads engaged, clamp faces in contact, shafts coaxial in bores with the right
 fit, D-flats engaged, balls in sockets, straps through slots, adhesive area.
-Contact alone counts for nothing. Inputs are Onshape ``bodydetails`` analytic
-faces and fine tessellations (:mod:`r3_onshape.model`); booleans use manifold3d.
+Contact alone counts for nothing. Inputs are analytic STEP faces and fine OCP
+tessellations from the pinned pull; booleans use manifold3d.
 
 Every finding is a structured diagnostic with subjects and numeric data (SI).
 """
@@ -368,6 +368,9 @@ class FitChecker:
 
     def check_thread(self, fastener: Any, thread_type: Any, male: str, female: str, seat: np.ndarray, axis: np.ndarray,
                      nut: bool, info: dict[str, Any]) -> bool:
+        if self.model.source == "pulled_step":
+            self.err("thread_definition_unavailable", f"{fastener.id}: STEP supplies bore/shank surfaces but the pull has no verified thread pitch, hand or threaded extent; thread qualification remains blocked",
+                     [fastener.part, male, female])
         d = thread_type.d
         volume = self.intersection(male, female)
         self.report.allowed[_key(male, female)] = f"thread {fastener.id}"
@@ -413,7 +416,7 @@ class FitChecker:
                 self.err("thread_engagement_short", f"{fastener.id}: {measured * 1000:.2f} mm thread engagement in {female} "
                          f"({'plastic' if plastic else 'metal'}) < {factor:g} d = {factor * d * 1000:.2f} mm",
                          [fastener.part, female], engagement=measured, required=factor * d, plastic=plastic)
-        return ok
+        return ok and self.model.source != "pulled_step"
 
     def _protrusion(self, male: str, nut_part: str, seat: np.ndarray, axis: np.ndarray, fastener: Any) -> float:
         """Distance the male thread extends beyond the nut's outer face, measured
@@ -945,11 +948,22 @@ def _frame(z_axis: np.ndarray, origin: np.ndarray) -> np.ndarray:
     return matrix
 
 
-def verify_fit(project: Project, model: GeometryModel, materials: dict[str, str], result: StageResult,
+def verify_fit(project: Project, model: GeometryModel | None, materials: dict[str, str] | None, result: StageResult,
                scoped: bool = False) -> FitReport:
-    result.assume("mechanical", f"Fit checks use Onshape B-rep surface definitions plus tessellations with chord <= "
-                                f"{model.chord_tolerance * 1e3:.2f} mm and angle <= {math.degrees(model.angle_tolerance):.1f} deg; "
-                                f"intersections below {VOLUME_TOL * 1e9:.2f} mm^3 are tessellation slivers of coincident surfaces.")
-    result.assume("mechanical", "Threads are modeled at the screw major diameter in tap-drill holes; engagement = intersection volume / "
-                                "(pi/4 (d^2 - D_drill^2)), required >= 1.5 d in metal and >= 2 d in plastic.")
-    return FitChecker(project, model, materials, result, scoped).run()
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    from r3_model.pulled_view import apply_pulled
+    from .step_geometry import geometry_from_pulled
+
+    try:
+        pulled = load_pulled(project.root)
+        apply_pulled(project, pulled)
+        model = geometry_from_pulled(pulled)
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
+        return FitReport()
+    materials = {name: part.material or "" for name, part in pulled.parts.items()}
+    result.assume("mechanical", f"Fit checks read pulled STEP analytic surfaces and OCP tessellation at chord <= "
+                  f"{model.chord_tolerance * 1e3:.2f} mm and angle <= {math.degrees(model.angle_tolerance):.1f} deg; "
+                  f"volume tolerance remains {VOLUME_TOL * 1e9:.2f} mm^3.")
+    return FitChecker(project, model, materials, result, scoped=False).run()

@@ -4,7 +4,7 @@ Every component and load-bearing fastener/nut has its own massive body.
 Nominal mounts define placement only; real compiled connections supply
 breakable equality constraints. Moving joints retain their actuator coordinates
 inside free mount carriers, so releasing their mount frees the part. Collision
-uses CAD convex pieces or catalog primitives, including after release.
+uses native CAD convex pieces, including after release.
 
 Steering: when the cad stage solved the linkage (``kinematics.steering.table``:
 kingpin angle per servo horn angle from the real tie-rod geometry), the knuckle
@@ -13,8 +13,8 @@ targets interpolate that table; otherwise the bicycle angle is
 
 All body frames are aligned with the robot frame (+x forward, +y left, +z up);
 a body's origin is its joint origin (root: the project-defined robot design datum). Mass properties come from
-``build/cad/cad_model.json`` when present (CAD mass, COM, inertia about the COM
-in robot axes) and otherwise from catalog mass with solid box/cylinder inertia.
+a required current native Onshape export (mass, COM and inertia about the COM
+in robot axes). Catalog geometry cannot supply missing parts.
 
 Wheels collide as MuJoCo *cylinders* (native plane-cylinder contact, which
 returns up to four rim/edge contacts per wheel, so the tire contact patch has
@@ -43,6 +43,7 @@ from r3_model.units import to_si
 from ..geometry import MassProperties, axis_rotation, combine, rotation_to_quat
 from .scene_visual import add_cameras, add_scene
 from .servo import ackermann_angles
+from .roles import wheel_joints, wheel_dimensions
 from ..assembly import (AssemblyModel, TransmissionInfo, write_mjcf, mass_report, _add_cables, _behavior_params, _component_shape, _find_root, _fmt, _hex_rgba, _local_center, _si, cad_mass_properties, catalog_mass_properties)
 
 #: Contact bitmasks: robot geoms (1) collide only with the environment (2).
@@ -105,7 +106,7 @@ class VehicleModel(AssemblyModel):
 
 def _joint_children(project: Project) -> dict[str, Any]:
     children: dict[str, Any] = {joint.child: joint for joint in project.spec.mechanical.joints}
-    children.update({rod.child: rod for rod in _linkage_rods(project, children)})
+    # Joint topology is exclusively projected from pulled mates.
     return children
 
 
@@ -215,6 +216,12 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     """Build the MJCF for the spec. ``initial_pose`` is (x, y, yaw) of the robot
     origin in the world; ``course`` waypoints are drawn as visual markers;
     ``routes`` adds the routed harnesses as MuJoCo cables."""
+    project.assembly  # joins must be compiled before assigning rigid bodies
+    from r3_model.pulled_view import apply_pulled
+    assembly = apply_pulled(project)
+    from r3_model.pulled import PullError
+    if assembly.errors:
+        raise PullError(assembly.errors[0].code, assembly.errors[0].message)
     spec = project.spec
     catalog = project.catalog
     diagnostics: list[Diagnostic] = []
@@ -222,7 +229,8 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     joint_children = _joint_children(project)
     root = _find_root(project, joint_children)
 
-    cad = project.read_build_json("cad/cad_model.json") or {}
+    from r3_model.pulled_view import cad_view, apply_pulled
+    cad = cad_view(project, mass_required=True)
     cad_parts: dict[str, Any] = cad.get("parts", {}) if isinstance(cad, dict) else {}
     mesh_dir = project.root / "build" / "cad"
 
@@ -235,35 +243,14 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     # CAD-only parts (fasteners, nuts) ride with the body of the component that owns them.
     cad_extras: dict[str, list[str]] = {body: [] for body in bodies}
     for name, part in cad_parts.items():
-        owner = part.get("owner") if isinstance(part, dict) else None
+        owner = part.get("owner", root) if isinstance(part, dict) else root
         if name in spec.components or owner not in spec.components:
             continue
         if part.get("mass") and part.get("inertia") and part.get("com"):
             cad_extras[_owner_body(project, owner, joint_children, root)].append(name)
 
-    estimated: list[str] = []
-    part_props: dict[str, MassProperties] = {}
-    mass_source: dict[str, str] = {}
-    for cid in spec.components:
-        part = cad_parts.get(cid)
-        if part and part.get("mass") and part.get("inertia") and part.get("com"):
-            part_props[cid] = cad_mass_properties(part)
-            mass_source[cid] = str(part.get("mass_status", "cad"))
-        else:
-            part_props[cid] = catalog_mass_properties(project, cid)
-            mass_source[cid] = "catalog"
-            estimated.append(cid)
-    if estimated:
-        diagnostics.append(Diagnostic.warning(
-            "cad_mass_estimated",
-            f"{len(estimated)} of {len(spec.components)} components use catalog mass with solid box/cylinder inertia "
-            "(no CAD mass properties in build/cad/cad_model.json)",
-            subjects=sorted(estimated),
-            data={"estimated_count": len(estimated), "component_count": len(spec.components),
-                  "estimated_mass": round(sum(part_props[c].mass for c in estimated), 6)},
-            hint="Run the cad stage to replace estimates with Onshape mass properties."))
-        assumptions.append(("mechanical", "Components without CAD mass properties are solid homogeneous boxes/cylinders "
-                                          "with catalog mass; every component retains its own body."))
+    part_props = {cid: cad_mass_properties(cad_parts[cid]) for cid in spec.components}
+    mass_source = {cid: str(cad_parts[cid].get("mass_status", "cad")) for cid in spec.components}
 
     for members in cad_extras.values():
         for name in members:
@@ -281,18 +268,13 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     # --- wheels
     wheels: dict[str, WheelInfo] = {}
     env = spec.simulation.environment
-    for cid, comp in spec.components.items():
-        ctype = catalog.component(comp.type)
-        if ctype.kind != "wheel":
-            continue
-        body = _owner_body(project, cid, joint_children, root)  # the wheel, or the axle it is fixed to
-        if body not in joint_children or joint_children[body].type != "continuous":
-            continue
+    for cid, joint in wheel_joints(project).items():
+        body = joint.child
         params = _behavior_params(project, cid)
-        _, size, _ = _component_shape(project, cid)
+        radius, width = wheel_dimensions(project, cid, joint)
         wheels[cid] = WheelInfo(
-            component=cid, joint=joint_children[body].id, body=body,
-            radius=_si(params.get("radius"), size[0] / 2.0), width=_si(params.get("width"), size[1]),
+            component=cid, joint=joint.id, body=body,
+            radius=radius, width=width,
             friction=float(params.get("friction", env.ground_friction)),
             rolling_resistance=float(env.ground_rolling_resistance if env.ground_rolling_resistance is not None
                                      else params.get("rolling_resistance", 0.015)))
@@ -431,52 +413,18 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
                       fullinertia=_fmt([inertia[0, 0], inertia[1, 1], inertia[2, 2], inertia[0, 1], inertia[0, 2], inertia[1, 2]]))
         for cid in bodies[body]:
             ctype = catalog.component(spec.components[cid].type)
-            position, rotation = project.graph.component_pose(cid)
-            shape, size, axis = _component_shape(project, cid)
             rgba = _hex_rgba(ctype.mechanical.color)
             common = {"contype": "0", "conaffinity": "0", "group": "1", "mass": "0", "rgba": rgba}
-            if cid in meshes_used:
-                ET.SubElement(el, "geom", name=f"vis_{cid}", type="mesh", mesh=meshes_used[cid], pos=_fmt(-origin), **common)
-            else:
-                center = position + rotation @ (_local_center(shape, size) + np.asarray(ctype.mechanical.envelope_offset)) - origin
-                if shape == "cylinder":
-                    rot = rotation @ axis_rotation(axis)
-                    ET.SubElement(el, "geom", name=f"vis_{cid}", type="cylinder", pos=_fmt(center), quat=_fmt(rotation_to_quat(rot)),
-                                  size=f"{size[0] / 2:.9g} {size[1] / 2:.9g}", **common)
-                else:
-                    ET.SubElement(el, "geom", name=f"vis_{cid}", type="box", pos=_fmt(center), quat=_fmt(rotation_to_quat(rotation)),
-                                  size=_fmt(np.asarray(size) / 2.0), **common)
+            ET.SubElement(el, "geom", name=f"vis_{cid}", type="mesh", mesh=meshes_used[cid], pos=_fmt(-origin), **common)
             if cid == body and body != root:
-                center_robot = position + rotation @ (_local_center(shape, size) + np.asarray(ctype.mechanical.envelope_offset))
-                geometry[body] = {"shape": shape, "size": size, "axis_vector": (rotation @ axis_rotation(axis))[:, 2].tolist()
-                                  if shape == "cylinder" else None, "center_offset": (center_robot - origin).tolist(),
-                                  "rotation": rotation.tolist(), "keepout": float(ctype.mechanical.keepout_margin)}
+                lo, hi = np.asarray(cad_parts[cid]["bbox_min"]), np.asarray(cad_parts[cid]["bbox_max"])
+                geometry[body] = {"shape": "mesh", "size": (hi-lo).tolist(), "axis_vector": None,
+                    "center_offset": ((lo+hi)/2-origin).tolist(), "rotation": np.eye(3).tolist(),
+                    "keepout": float(ctype.mechanical.keepout_margin)}
         for name in cad_extras[body]:
             if name in meshes_used:
                 ET.SubElement(el, "geom", name=f"vis_{name.replace(':', '__')}", type="mesh", mesh=meshes_used[name],
                               pos=_fmt(-origin), contype="0", conaffinity="0", group="1", mass="0", rgba="0.62 0.63 0.66 1")
-        for wheel in [w for w in wheels.values() if w.body == body]:
-            joint = joint_children[body]
-            axis_vec = np.asarray(joint.axis, dtype=float)
-            # Cylinder local z -> wheel spin axis.
-            z = axis_vec / np.linalg.norm(axis_vec)
-            ref = np.array([1.0, 0.0, 0.0]) if abs(z[0]) < 0.9 else np.array([0.0, 0.0, 1.0])
-            x = np.cross(ref, z)
-            x /= np.linalg.norm(x)
-            rot = np.column_stack([x, np.cross(z, x), z])
-            wheel_center = project.graph.component_pose(wheel.component)[0] - origin
-            ET.SubElement(el, "geom", name=f"tire_{wheel.component}", type="cylinder", pos=_fmt(wheel_center), quat=_fmt(rotation_to_quat(rot)),
-                          size=f"{wheel.radius:.9g} {wheel.width / 2:.9g}", friction=f"{wheel.friction:.6g} 0.005 0.0001",
-                          condim="3", solref="0.004 1", solimp="0.95 0.99 0.001", mass="0",
-                          contype=str(ROBOT_CONTYPE), conaffinity=str(ROBOT_CONAFFINITY), rgba="0.12 0.12 0.12 0.0", group="3")
-        if body == root:
-            # Underbody collision box (bottoming out / rollover), from the root component's footprint.
-            shape, size, _ = _component_shape(project, root)
-            position, rotation = project.graph.component_pose(root)
-            center = position + rotation @ _local_center("box", size)
-            ET.SubElement(el, "geom", name="underbody", type="box", pos=_fmt(center), size=_fmt(np.asarray(size) / 2.0),
-                          friction="0.4 0.005 0.0001", condim="3", mass="0", contype=str(ROBOT_CONTYPE),
-                          conaffinity=str(ROBOT_CONAFFINITY), rgba="0 0 0 0", group="3")
         for child, joint in joint_children.items():
             parent_body = _owner_body(project, joint.parent, joint_children, root) if joint.parent != "world" else root
             if parent_body == body:
@@ -539,11 +487,10 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     from ..joints import separate_parts
 
     connections, joint_bindings = separate_parts(project, mj, root, bodies, body_origin, body_props, cad_extras,
-                                                 elements, joint_children, cad_parts, part_props, initial_pose,
-                                                 contact_proxies={cid:f"tire_{cid}" for cid in wheels})
+                                                 elements, joint_children, cad_parts, part_props, initial_pose)
     diagnostics.extend(connections.diagnostics)
     total_mass = sum(p.mass for p in body_props.values())
-    assumptions.append(("mechanical", "Each part is a separate MuJoCo body. Catalog or CAD convex-piece collisions, "
+    assumptions.append(("mechanical", "Each part is a separate MuJoCo body. Pulled STL convex-piece collisions, "
                         "breakable constraints from real connections; mounts alone provide no retention."))
     cable_plan = _add_cables(project, mj, routes, root, elements, body_origin, diagnostics, assumptions) if routes else None
 

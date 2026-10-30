@@ -258,3 +258,15 @@ describe("charts", async () => {
     expect(tickLabels([-0.0000001, 0.5])).toEqual(["-0.0", "0.5"].map((x) => (Number(x) === 0 ? "0" : x)));
   });
 });
+
+describe("split description diffs", () => {
+  it("retains filenames and line numbers for modified and added source files", async () => {
+    const { specDiffFiles } = await import("./domain.ts");
+    const diff = unifiedDiff("label: Before\n", "label: After\n", "parts/link.yaml")
+      + unifiedDiff("", "modules: []\n", "software/system.yaml");
+    const files = specDiffFiles(diff);
+    expect(files.map((f) => f.file)).toEqual(["parts/link.yaml", "software/system.yaml"]);
+    expect(files[0]!.lines.filter((line) => line?.op === "+").map((line) => line!.text)).toEqual(["label: After"]);
+    expect(files[1]!.lines.filter((line) => line?.op === "+").map((line) => line!.b)).toEqual([1]);
+  });
+});

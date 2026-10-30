@@ -12,10 +12,11 @@ import numpy as np
 import pytest
 import yaml
 
+from test_camera_twin import printbot  # Explicit native optics fixture.
+
 from r3_catalog import default_catalog, load_catalog
 from r3_model.project import Project
 from r3_model.units import to_si
-from r3_orchestrator.geometry import overlap, solids_solid
 from r3_orchestrator.readiness import precheck
 from r3_sim.vehicle import build_vehicle_model
 from r3_sim.vehicle.scene_visual import cone_positions, render_ground_texture, track_centerline
@@ -122,10 +123,8 @@ def test_track_texture_and_cones(tmp_path: Path) -> None:
     assert abs(int(lane[0]) - int(lane[2])) < 15 and grass[1] > grass[0] + 20
 
 
-def test_vehicle_model_has_the_camera_and_scene(tmp_path: Path) -> None:
-    root = tmp_path / "printbot"
-    shutil.copytree(FIXTURE, root)
-    project = Project.load(root)
+def test_vehicle_model_has_the_camera_and_scene(printbot: Path) -> None:
+    project = Project.load(printbot)
     project.spec.simulation.environment.visual = {"ground": "asphalt", "cones": [{"position": [3, 0.5], "color": "orange"}]}
     vm = build_vehicle_model(project)
     xml = ET.fromstring(vm.xml)
@@ -148,19 +147,6 @@ def test_vehicle_model_has_the_camera_and_scene(tmp_path: Path) -> None:
     np.testing.assert_allclose(up, [0, 0, 1], atol=1e-6)
 
 
-def test_piecewise_solids_are_not_bounding_boxes() -> None:
-    frame = default_catalog().components.get("raspberry-pi-5-8gb")
-    assert frame is not None
-    catalog = load_catalog(FIXTURE / "catalog")
-    wall_frame = catalog.component("printbot-frame-petg")
-    solid = solids_solid("frame", wall_frame.mechanical.solids, {}, [0, 0, 0], [0, 0, 0])
-    assert solid is not None and len(solid.pieces) == 2
-    from r3_orchestrator.geometry import make_solid
-
-    above_plate = make_solid("pi", "box", [0.085, 0.056, 0.017], "z", [-0.01, 0, 0.004], [0, 0, 0])
-    assert overlap(solid, above_plate) is None                     # sits on the plate, clear of the wall
-    into_wall = make_solid("pi", "box", [0.02, 0.02, 0.02], "z", [0.076, 0, 0.02], [0, 0, 0])
-    assert overlap(solid, into_wall) is not None
 
 
 def test_readiness(tmp_path: Path) -> None:

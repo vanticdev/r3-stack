@@ -16,7 +16,7 @@ EXPECTED_TOOLS = {"r3_status", "r3_validate", "r3_run_stage", "r3_get_diagnostic
 
 @pytest.fixture
 def project(tmp_path):
-    return str(make_project(tmp_path))
+    return str(make_project(tmp_path, with_pull=True))
 
 
 def test_tools_registered_with_tiers():
@@ -33,9 +33,9 @@ def test_validate_and_diagnostics(project):
     assert result["ok"] is False and result["stages"][0]["stage"] == "model"
     errors = m.r3_get_diagnostics(project=project, severity="error")
     assert errors["counts"]["error"] == len(errors["diagnostics"]) > 0
-    assert all(d["code"] == "component_interference" for d in errors["diagnostics"])
+    assert "cad_interference" in {d["code"] for d in errors["diagnostics"]}
     esc = m.r3_get_diagnostics(project=project, subject="block_a")
-    assert [d["subjects"] for d in esc["diagnostics"]] == [["block_a", "block_b"]]
+    assert [d["subjects"] for d in esc["diagnostics"] if d["code"] == "cad_interference"] == [["block_a", "block_b"]]
     status = m.r3_status(project=project)
     assert next(s for s in status["stages"] if s["stage"] == "model")["status"] == "failed"
     assert m.r3_diagnose(project=project)["errors"] > 0
@@ -48,24 +48,26 @@ def test_run_stage_returns_assumptions(project):
 
 
 def test_spec_patch_concurrency(project):
+    before = m.r3_validate(project=project, stages=["model"])
+    original_pairs = {frozenset(d["subjects"]) for d in before["diagnostics"] if d["code"] == "cad_interference"}
     read = m.r3_get_spec(project=project)
-    first = m.r3_patch_spec({"components": {"panel": {"pose": {"xyz": ["30 mm", "45 mm", "28 mm"]}}}}, read["sha256"], project=project)
+    first = m.r3_patch_spec({"components": {"panel": {"label": "Instrument panel"}}}, read["sha256"], project=project)
     assert first["ok"] and first["previous_sha256"] == read["sha256"] and first["sha256"] != read["sha256"]
     # A second agent still holding the old revision must conflict, not overwrite.
     second = m.r3_patch_spec({"robot": {"version": "9.9.9"}}, read["sha256"], project=project)
     assert second == {"ok": False, "code": "spec_conflict", "expected_sha256": read["sha256"], "current_sha256": first["sha256"],
                       "message": second["message"]}
     assert m.r3_get_spec(project=project, section="robot")["spec"]["version"] == "0.1.0"
-    # The applied edit fixed one interference.
+    # Metadata edits preserve the native physical assembly.
     result = m.r3_validate(project=project, stages=["model"])
-    pairs = {frozenset(d["subjects"]) for d in result["diagnostics"] if d["code"] == "component_interference"}
-    assert frozenset({"esc", "panel"}) not in pairs
+    pairs = {frozenset(d["subjects"]) for d in result["diagnostics"] if d["code"] == "cad_interference"}
+    assert pairs == original_pairs
 
 
 def test_spec_patch_schema_validation_and_dry_run(project):
     read = m.r3_get_spec(project=project)
     bad = m.r3_patch_spec({"components": {"esc": {"mount": "missing_part"}}}, read["sha256"], project=project)
-    assert bad["code"] == "spec_invalid" and "missing_part" in bad["errors"][0]["msg"]
+    assert bad["code"] == "spec_read_only"
     typo = m.r3_patch_spec({"components": {"esc": {"poze": {}}}}, read["sha256"], project=project)
     assert typo["code"] == "spec_invalid" and typo["errors"][0]["loc"] == "components.esc.poze"
     dry = m.r3_patch_spec({"robot": {"version": "0.2.0"}}, read["sha256"], project=project, dry_run=True)
@@ -88,10 +90,10 @@ def test_spec_patch_preserves_comments_and_layout(project):
 
 def test_spec_patch_reports_dangling_connectors(project):
     read = m.r3_get_spec(project=project)
-    # Removing the fuse is schema-valid but leaves the Y-harness fuse connectors unmated.
+    # Removing a referenced object is rejected, including in single-file projects.
     result = m.r3_patch_spec({"components": {"fuse": None}}, read["sha256"], project=project, dry_run=True)
-    assert result["ok"] and {d["code"] for d in result["graph_diagnostics"]} == {"unknown_connector"}
-    assert {d["subjects"][0] for d in result["graph_diagnostics"]} == {"fuse.J1", "fuse.J2"}
+    assert result["code"] == "spec_read_only"
+    assert m.r3_get_spec(project=project)["sha256"] == read["sha256"]
 
 
 def test_catalog_and_artifacts(project):
@@ -151,3 +153,14 @@ def test_stdio_round_trip(project):
     names, spec = asyncio.run(asyncio.wait_for(session_calls(), timeout=60))
     assert EXPECTED_TOOLS <= names
     assert spec["ok"] and spec["spec"]["name"] == "r3-bench" and len(spec["sha256"]) == 64
+
+
+def test_unpulled_reference_edits_remain_strict(tmp_path):
+    project = str(make_project(tmp_path))
+    read = m.r3_get_spec(project=project)
+    bad = m.r3_patch_spec({"components": {"esc": {"mount": "missing_part"}}}, read["sha256"], project=project)
+    assert bad["code"] == "spec_invalid" and "missing_part" in bad["errors"][0]["msg"]
+    deleted = m.r3_patch_spec({"components": {"fuse": None}}, read["sha256"], project=project, dry_run=True)
+    assert deleted["code"] == "spec_invalid"
+    assert deleted["errors"][0]["code"] == "spec_reference_undefined"
+    assert deleted["errors"][0]["file"] == "robot.yaml"

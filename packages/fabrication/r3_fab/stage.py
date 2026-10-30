@@ -63,6 +63,8 @@ def resolve_material(catalog: Any, text: str | None) -> Any | None:
 
 def select_parts(project: Project, result: StageResult) -> dict[str, PrintedPart]:
     """Fabricated components printed in an FDM material; the others are reported as not printed."""
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    pulled = load_pulled(project.root)
     fab = project.spec.fabrication
     catalog = project.catalog
     printed: dict[str, PrintedPart] = {}
@@ -74,17 +76,19 @@ def select_parts(project: Project, result: StageResult) -> dict[str, PrintedPart
             continue
         ctype = catalog.component(comp.type)
         options = dict(fab.parts.get(cid, {}))
-        if not ctype.mechanical.fabricated and "material" not in options:
+        if cid not in pulled.parts or pulled.parts[cid].purchased:
             continue
         if options.get("print") is False:
             not_printed[cid] = f"{ctype.mechanical.material or 'unknown material'} (print: false)"
             continue
-        text = ctype.mechanical.material or ""
-        material, source = None, ""
+        text = pulled.parts[cid].material or ""
+        material, source = resolve_material(catalog, text), "pulled material"
         if options.get("material"):
-            material, source = resolve_material(catalog, str(options["material"])), "fabrication.parts override"
-        if material is None:
-            material, source = resolve_material(catalog, text), "catalog mechanical.material"
+            requested = resolve_material(catalog, str(options["material"]))
+            if material is None or requested is None or requested.id != material.id:
+                result.add(Diagnostic.error("print_material_differs_from_pull",
+                    f"{cid}: requested print material differs from native material {text!r}; change it in Onshape and pull again",
+                    subjects=[cid], data={"pulled_material": text, "requested_material": options["material"]}))
         if material is None and fab.material and (not text or any(word in text.lower() for word in GENERIC_PRINTED)):
             material, source = resolve_material(catalog, fab.material), "fabrication.material default"
         if material is None or material.process != "fdm":
@@ -108,7 +112,8 @@ def load_cases(project: Project) -> tuple[list[dict[str, Any]], bool]:
 
 
 def _cad_parts(project: Project) -> dict[str, Any]:
-    data = project.read_build_json("cad/cad_model.json") or {}
+    from r3_model.pulled_view import cad_view
+    data = cad_view(project, mass_required=True)
     return data.get("parts", {}) if isinstance(data, dict) else {}
 
 
@@ -148,7 +153,7 @@ def _strength_diagnostics(part: PrintedPart, analysis: strength.StrengthResult, 
                           result: StageResult) -> dict[str, Any]:
     cid, material = part.cid, part.material
     if not analysis.applicable:
-        result.add(Diagnostic.info("print_strength_not_applicable", f"{cid}: strength not evaluated: {analysis.reason}",
+        result.add(Diagnostic.error("print_strength_geometry_unavailable", f"{cid}: strength requires measured attachment-to-face load/support data: {analysis.reason}",
                                    subjects=[cid], data={"supports": len(analysis.supports), "loads": len(analysis.loads)}))
         return {"applicable": False, "reason": analysis.reason}
     build = np.asarray(chosen.build_direction)
@@ -204,12 +209,12 @@ def process_part(project: Project, part: PrintedPart, printer: Any, cases: list[
     try:
         geometry = build_geometry(project, cid)
     except Exception as error:  # noqa: BLE001 - one bad part must not stop the others
-        result.add(Diagnostic.warning("print_geometry_failed", f"{cid}: print geometry could not be built: {error}", subjects=[cid]))
+        result.add(Diagnostic.error("print_geometry_failed", f"{cid}: print geometry could not be built: {error}", subjects=[cid]))
         entry["error"] = str(error)
         return entry
     mesh = geometry.mesh
     entry["geometry_source"] = geometry.source
-    if geometry.source != "cad":
+    if geometry.source != "pulled_stl":
         result.add(Diagnostic.warning(
             "print_geometry_estimated", f"{cid}: print geometry from the catalog {geometry.source} (no usable CAD mesh)",
             subjects=[cid], data={"source": geometry.source, "notes": geometry.notes, "holes_cut": len(geometry.holes)},
@@ -297,6 +302,19 @@ def process_part(project: Project, part: PrintedPart, printer: Any, cases: list[
 def run(project: Project) -> StageResult:
     started = time.time()
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
+    if not project.spec.components:
+        result.add(Diagnostic.info("not_applicable", "No parts to fabricate", subjects=["fabrication"]))
+        return result
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    from r3_model.pulled_view import apply_pulled, require_mass
+    try:
+        pulled = load_pulled(project.root)
+        require_mass(pulled)
+        apply_pulled(project, pulled)
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
+        return result
     fab = project.spec.fabrication
     out_dir = project.build_dir(STAGE)
     printer = project.catalog.printers.get(fab.printer)
@@ -315,7 +333,7 @@ def run(project: Project) -> StageResult:
         result.assume("fabrication", "Load cases are R3 estimates (no fabrication.load_cases): " +
                       "; ".join(f"{c['id']}: {c['description']}" for c in cases))
     if project.assembly is None:
-        result.add(Diagnostic.info("print_strength_not_applicable", "no assembly section: printed load paths cannot be derived",
+        result.add(Diagnostic.error("print_strength_geometry_unavailable", "Native attachment-to-STEP-face associations are required to derive printed load paths",
                                    subjects=sorted(printed), data={"parts": len(printed)}))
     result.assume("fabrication", "Isotropic linear elasticity with TDS E and an estimated Poisson ratio; FDM anisotropy enters "
                                  "only as the Z (interlayer) strength where the major principal stress is within 45 deg of the "

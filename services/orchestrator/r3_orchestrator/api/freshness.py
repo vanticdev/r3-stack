@@ -104,7 +104,11 @@ def input_files(root: Path) -> list[Path]:
     """Every file ``Project.load`` reads for the project at ``root``."""
     from r3_catalog import DATA_DIR
 
-    files = [root / "robot.yaml", root / "r3.lock.yaml"]
+    from r3_model.spec_files import load_spec_files, spec_lock
+
+    with spec_lock(root, shared=True):
+        files = [root / name for name in load_spec_files(root).texts]
+    files.append(root / "r3.lock.yaml")
     for catalog in (root / "catalog", Path(DATA_DIR)):
         if catalog.is_dir():
             files.extend(sorted(p for p in catalog.rglob("*") if p.suffix in (".yaml", ".yml")))

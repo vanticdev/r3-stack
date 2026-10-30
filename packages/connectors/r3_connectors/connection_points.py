@@ -19,23 +19,10 @@ from .frames import Frame
 
 
 def _envelopes(project: Project) -> dict[str, tuple[np.ndarray, np.ndarray, str]]:
-    from r3_wiring.obstacles import _catalog_shape
-
-    cad = project.read_build_json("cad/cad_model.json") or {}
-    parts = cad.get("parts", {})
-    envelopes = {}
-    for cid, comp in project.spec.components.items():
-        if comp.type not in project.catalog.components:
-            continue
-        part = parts.get(cid, {})
-        if "bbox_min" in part and "bbox_max" in part:
-            lo, hi = np.asarray(part["bbox_min"], float), np.asarray(part["bbox_max"], float)
-            source = "cad_aabb"
-        else:
-            lo, hi = _catalog_shape(project, cid).aabb()
-            source = "catalog_aabb"
-        envelopes[cid] = (lo, hi, source)
-    return envelopes
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    from r3_model.pulled_view import world_mesh
+    pulled = load_pulled(project.root)
+    return {name: (*world_mesh(pulled, name).bounds, "pulled_aabb") for name in pulled.parts}
 
 
 def _access(points: list[dict[str, Any]], envelopes: dict[str, tuple[np.ndarray, np.ndarray, str]]) -> None:
@@ -105,10 +92,11 @@ def connection_points(project: Project) -> dict[str, Any]:
                                "compatible_types": site.compatible_types,
                                "provenance": inst.provenance.model_dump(mode="json") if inst.provenance else {"source": inst.source}})
 
-    # Floating pairs are a single physical site. Authored positions are mating
-    # face centres, never cable roots. Routing can supply a solved pair frame.
+    # Floating pairs are a single physical site, fixed by their native mating frame.
     halves = {f"{h.id}.{name}": conn for h in project.spec.electrical.harnesses for name, conn in h.connectors.items()}
-    detail = project.read_build_json("wiring/routing_detail.json") or {}
+    from r3_model.spec_files import validate_pulled_spec
+    from r3_model.pulled import PullError
+    pulled = validate_pulled_spec(project.root)
     seen: set[tuple[str, str]] = set()
     for ref, conn in halves.items():
         if not conn.mates or conn.mates not in halves:
@@ -117,27 +105,26 @@ def connection_points(project: Project) -> dict[str, Any]:
         if pair in seen:
             continue
         seen.add(pair)
-        partner = halves[conn.mates]
-        placed = detail.get("nodes", {}).get(ref, {}).get("frame")
-        centre = conn.position if conn.position is not None else partner.position
-        if placed:
-            frame = Frame.from_axes(placed["origin"], placed["x"], placed["z"])
-        else:
-            # The spec authors a centre, not an orientation. Until routing
-            # supplies the axis, do not invent an exit direction/access reach.
-            frame = None
+        part = pulled.parts.get(ref)
+        if part is None:
+            raise PullError("cad_pull_missing", f"{ref}: cable half missing from native pull")
+        local = part.mate_connectors.get("mating", part.mate_connectors.get("origin"))
+        if local is None:
+            raise PullError("cad_pull_invalid", f"{ref}: missing native mating/origin connector")
+        matrix = pulled.poses[ref] @ local
+        frame = Frame(matrix[:3, :3], matrix[:3, 3])
         geometry = catalog.connector(conn.type).geometry
         pins = {n: {"signal": None, "net": graph.net_of(f"H:{ref}.{n}")}
                 for n in (geometry.pins if geometry else [])}
         points.append({"id": f"{'|'.join(pair)}/full", "component": None, "connector": ref, "site": "full",
                        "pair": list(pair), "pins": pins,
-                       "origin": frame.origin.tolist() if frame else list(centre) if centre is not None else None,
+                       "origin": frame.origin.tolist(),
                        "exit_direction": frame.z.tolist() if frame else None, "x": frame.x.tolist() if frame else None,
                        "status": "occupied", "occupied_by": conn.mates, "blocked_by": [], "blocks": [],
                        "compatible_types": catalog.connector(conn.type).mates_with,
                        "free_access_reach": None, "access_blocker": None, "access_geometry": None,
-                       "placement": "routed" if frame else "authored" if centre is not None else "unplaced"})
+                       "placement": "pulled"})
     _access([p for p in points if p["origin"] is not None and p["exit_direction"] is not None], _envelopes(project))
     return {"schema": "r3/connection-points@1", "units": "m, robot frame", "connection_points": points,
-            "access_method": "centre ray against other parts' CAD AABBs or posed catalog AABBs; null = unbounded or unplaced",
+            "access_method": "centre ray against other pulled parts' AABBs; null = unbounded or unplaced",
             "diagnostics": [d.model_dump(mode="json") for d in graph.diagnostics]}

@@ -1,229 +1,39 @@
-"""`cad` stage: build the robot in Onshape from robot.yaml and import verified data.
-
-Behavior:
-* If ``build/cad/cad_model.json`` exists and was produced by the current
-  generator digest (plans + spec + catalog + generator/validator versions),
-  it is reused (offline CI, no Onshape access needed).
-* With a transport, pinned CAD is updated incrementally with standard features,
-  verified (geometry, mass, fit, motion and mates), and pinned in ``r3.lock.yaml``.
-  ``R3_CAD_FORCE=1`` bypasses the offline cache. ``R3_CAD_FULL=1`` explicitly builds
-  a fresh robot document; only the full path can delete superseded documents.
-* Without a transport, downstream stages fall back to catalog geometry and a
-  ``cad_geometry_estimated`` warning is emitted.
-* Screenshots come from Onshape's REST shaded-view endpoints
-  (``build/cad/views/{iso,front,top,right}.png``), never from a browser, so the
-  stage runs headless with API keys. ``R3_CAD_VIEWS=0`` skips them.
-"""
-
+"""CAD stage validates the immutable pulled copy; never generates native CAD."""
 from __future__ import annotations
 
 import json
-import os
-import time
 
 from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
-
-from .client import OnshapeError, Transport, default_transport
+from r3_model.pulled import PullError
+from r3_model.spec_files import validate_pulled_spec as load_pulled
 
 
 def run(project: Project) -> StageResult:
-    from .recovery import CadBusy, build_lock
-
-    try:
-        with build_lock(project):
-            return _run(project)
-    except CadBusy as error:
-        result = StageResult(stage="cad", inputs=project.fingerprint())
-        result.add(Diagnostic.error("cad_busy", str(error)))
-        return result
-
-
-def _run(project: Project) -> StageResult:
     result = StageResult(stage="cad", inputs=project.fingerprint())
-    started = time.time()
-    if os.environ.get("R3_CAD_DRY_RUN") == "1":
-        from .dry_run import rebuild_plan
-        plan = rebuild_plan(project)
-        path = project.build_dir("cad") / "rebuild_dry_run.json"
-        path.write_text(json.dumps(plan, indent=1))
-        result.metrics.update(plan["summary"])
-        result.add(Diagnostic.info("onshape_dry_run", "Offline rebuild plan; no Onshape calls made", data=plan))
-        result.artifact("cad/rebuild_dry_run.json", "json", "Part Studios, features and quota call estimates")
-        result.duration_s = time.time() - started
-        return result
-    from .purchased import diagnostics as purchased_diagnostics
-    purchased_diagnostics(project, result)
-    result.assume("mechanical", "Purchased parts resolve through the model bank and use real vendor geometry with datasheet mass overrides. "
-                                "Missing exact models remain explicitly diagnosed catalog proxies; geometry validation is separate from sourcing.")
-    result.assume("mechanical", "Fabricated parts get holes, bores, sockets and slots from their catalog interfaces (the joins they "
-                                "serve); mass from geometry x material density. Missing-source fasteners are labelled standard-geometry proxies.")
-    result.assume("mechanical", "Fit checks run on the Onshape Part Studio geometry moved by the solved assembly transforms, which "
-                                "must equal the compiled poses.")
-    if project.spec.cad.provider == "none":
-        result.add(Diagnostic.info("cad_disabled", "cad.provider is none"))
-        return result
-    if project.spec.assembly is None:
-        result.add(Diagnostic.error("cad_assembly_required", "the organized CAD build needs an assembly section (objects joined at interfaces)"))
-        return result
-    if not result.ok:
-        result.duration_s = time.time() - started
-        return result
-    from .organized import input_digest, sync_organized, write_model
-
-    digest = input_digest(project)
-    existing = project.read_build_json("cad/cad_model.json")
-    force = os.environ.get("R3_CAD_FORCE") == "1"
-    if (existing and existing.get("source", {}).get("generator_digest") == digest and not force
-            and os.environ.get("R3_CAD_FULL") != "1" and not project.lock.get("cad_incremental_pending")):
-        # Revalidate matching geometry against the current input revision (the
-        # digest already covers its resolved plans, sources and feature evidence).
-        existing["inputs"] = project.fingerprint()
-        (project.build_dir("cad") / "cad_model.json").write_text(json.dumps(existing, indent=1))
-        result.add(Diagnostic.info("cad_model_reused", "cad_model.json matches the current generator digest",
-                                   data={"document": existing["source"].get("url"), "digest": digest}))
-        _recomposed(existing, result)
-        _summarize(project, existing, result)
-        result.duration_s = time.time() - started
-        return result
     try:
-        api = default_transport()
-    except OnshapeError as error:
-        if error.status != 429:
-            raise
-        from .quota import quota_diagnostic
-        quota_diagnostic(error, result)
-        result.duration_s = time.time() - started
+        model = load_pulled(project.root)
+        # The split-spec loader owns the exact comparison with derived fields.
+        from r3_model.description import check_pulled
+        check_pulled(project.root, model)
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error), hint="Fix the model in Onshape, then run r3 cad pull. Never edit pulled files or derived values."))
         return result
-    if api is None:
-        result.add(Diagnostic.warning("cad_geometry_estimated", "no Onshape transport (headless session, onshape-native bridge or API keys); "
-                                      "downstream stages use catalog geometry",
-                                      hint="Run `python -m r3_onshape.session login` once, or configure Onshape API keys."))
+    missing_mass = [name for name, part in model.parts.items()
+                    if part.mass is None or part.com is None or part.inertia is None or part.material is None]
+    if missing_mass:
+        result.add(Diagnostic.error("cad_pull_mass_unavailable", "Pulled parts lack geometry/material mass properties",
+                                    subjects=missing_mass, data={"parts": len(missing_mass)}))
         return result
-    previous = (project.lock.get("cad", {}) or {})
-    attempt = previous.get("attempt", 0) + 1
-    from .studio import StudioBuildError
-    try:
-        report = sync_organized(project, api, result, attempt_label=os.environ.get("R3_CAD_LABEL", ""))
-    except StudioBuildError as error:
-        code = error.feature if error.feature.startswith("model_") else "cad_purchased_import_failed"
-        result.add(Diagnostic.error(code, str(error), subjects=[error.part], data={"feature": error.feature}))
-        result.duration_s = time.time() - started
-        return result
-    except OnshapeError as error:
-        if error.status == 429:
-            from .quota import quota_diagnostic
-            quota_diagnostic(error, result)
-        else:
-            result.add(Diagnostic.error("onshape_request_failed", str(error), subjects=["cad"], data={"status": error.status}))
-        result.duration_s = time.time() - started
-        return result
-    except ValueError as error:
-        result.add(Diagnostic.error("cad_resume_inputs_changed", str(error), subjects=["cad"],
-                                    hint="Use r3_cad_recover to inspect and explicitly restart an unfinished new build; native documents are preserved."))
-        result.duration_s = time.time() - started
-        return result
-    if result.ok and report.get("robot") is not None:
-        path = write_model(project, report, api.name, digest)
-        model = json.loads(path.read_text())
-        from .incremental import finish_incremental
-        finish_incremental(project, report)
-        result.artifact(path.relative_to(project.build_dir()), "json", "Per-part mass properties, meshes, fit report, steering table, RF")
-        for name, part in sorted(model["parts"].items()):
-            result.artifact(f"cad/{part['mesh']}", "stl")
-        for image in model.get("images", []):
-            result.artifact(f"cad/{image}", "plot_png", "Onshape shaded view (headless REST) or solved-pose render")
-        robot = report["robot"]
-        project.write_lock("cad", {"provider": "onshape", "document_id": robot.did, "workspace_id": robot.wid,
-                                   "element_id": model["source"]["element_id"], "assembly_id": model["source"]["assembly_id"],
-                                   "url": model["source"]["url"], "microversion": model["source"]["microversion"],
-                                   "generator_digest": digest, "validator_version": model["source"]["validator_version"],
-                                   "mesh_digest": model["source"]["mesh_digest"], "attempt": attempt,
-                                   "revision": model["source"]["microversion"] or digest,
-                                   "library_document_id": model["source"]["library"]["document_id"],
-                                   "library_version_id": model["source"]["library"]["version_id"]})
-        _summarize(project, model, result)
-        old = previous.get("document_id")
-        if old and old != robot.did:
-            # Keep exactly one live document per robot (plus the parts library): the superseded build is trashed.
-            try:
-                from .sync import delete_document
-                delete_document(api, old)
-                result.add(Diagnostic.info("cad_previous_document_trashed", "superseded Onshape document moved to trash",
-                                           data={"document_id": old}))
-            except Exception as error:  # noqa: BLE001 - report cleanup failure
-                if getattr(error, "status", None) == 429:
-                    from .quota import quota_diagnostic
-                    quota_diagnostic(error, result)
-                    result.duration_s = time.time() - started
-                    return result
-                result.add(Diagnostic.warning("cad_previous_document_delete_failed", str(error), data={"document_id": old}))
-    else:
-        project.write_lock("cad", {**(project.lock.get("cad") or {}), "attempt": attempt})
-    result.duration_s = time.time() - started
-    return result
-
-
-def _recomposed(model: dict, result: StageResult) -> None:
-    """An offline recomposition (:mod:`r3_onshape.recompose`) is reported, with its own
-    findings and every part that still needs its Onshape rebuild."""
-    info = model.get("source", {}).get("recomposed")
-    if not info:
-        return
-    pending = info.get("pending_rebuild") or {}
-    result.add(Diagnostic.info("cad_recomposed", "cad_model.json was recomposed offline from the recorded Onshape Part Studio "
-                               "geometry at the compiled poses; the Onshape assembly is re-mated at the next organized build",
-                               data={"at": info.get("at"), "from_microversion": info.get("from_microversion"),
-                                     "pending_rebuild": len(pending)}))
-    for key, item in sorted(pending.items()):
-        result.add(Diagnostic.warning("cad_part_rebuild_pending",
-                                      f"{key}: {item.get('reason')}; verified on the local plan solid (exact booleans), "
-                                      f"not yet rebuilt in Onshape", subjects=list(item.get("instances") or [key]),
-                                      data={"symmetric_difference_mm3": item.get("symmetric_difference_mm3"),
-                                            "studio": item.get("studio"), "library": item.get("library")},
-                                      hint="Rebuild with R3_CAD_FORCE=1 once the Onshape Part Studio features quota allows."))
-    for raw in info.get("diagnostics") or []:
-        result.add(Diagnostic.model_validate({**raw, "stage": "cad"}))
-
-
-def _views(project: Project, api: Transport | None, source: dict, result: StageResult) -> None:
-    """Server-rendered PNGs of the CAD (no browser); failures only warn."""
-    if api is None or os.environ.get("R3_CAD_VIEWS") == "0":
-        return
-    ids = (source.get("document_id"), source.get("workspace_id"), source.get("element_id"))
-    if not all(ids):
-        return
-    from .views import render_document_views
-
-    try:
-        paths = render_document_views(api, *ids, project.build_dir("cad") / "views")
-    except Exception as error:  # noqa: BLE001 - images are evidence, not engineering data
-        result.add(Diagnostic.warning("cad_views_failed", f"Onshape shaded views failed: {error}", subjects=["cad"],
-                                      data={"status": getattr(error, "status", None)}))
-        return
-    result.metrics["cad_views"] = len(paths)
-
-
-def _count(value: object) -> int:
-    return value if isinstance(value, int) else len(value or [])  # type: ignore[arg-type]
-
-
-def _summarize(project: Project, model: dict, result: StageResult) -> None:
-    parts = model.get("parts", {})
-    total = sum(p["mass"] for p in parts.values())
-    fit = model.get("fit", {})
-    steering = (model.get("kinematics") or {}).get("steering") or {}
-    result.metrics.update({"parts": len(parts), "total_mass_kg": round(total, 4), "onshape_document": model["source"].get("url"),
-                           "verified_fasteners": len(fit.get("verified_fasteners", [])),
-                           "verified_interfaces": len(fit.get("verified_interfaces", [])),
-                           "ackermann_pct_full_lock": steering.get("ackermann_pct_full_lock"),
-                           "assembly_mates": _count((model.get("assembly") or {}).get("mates", []))})
+    result.metrics.update(parts=len(model.parts), assembly_mates=len(model.mates),
+                          total_mass_kg=sum(part.mass or 0 for part in model.parts.values()),
+                          onshape_document=f"https://cad.onshape.com/documents/{model.document_id}/v/{model.version_id}")
+    from .step_geometry import verify_pulled
+    payload = verify_pulled(project, result, model)
+    if payload:
+        (project.build_dir("cad") / "cad_model.json").write_text(json.dumps(payload, indent=2, allow_nan=False))
     limit = project.spec.requirements.max_mass
-    if limit and total > limit:
-        result.add(Diagnostic.error("mass_budget_exceeded", f"CAD mass {total:.3f} kg exceeds {limit:.3f} kg",
-                                    subjects=["robot"], data={"mass": total, "limit": limit}))
-    for view in sorted((project.build_dir("cad") / "views").glob("*.png")):
-        result.artifact(f"cad/views/{view.name}", "plot_png", f"Onshape shaded view ({view.stem}, server-rendered)")
-    shot = project.root / "build" / "cad" / "onshape_isometric.png"
-    if shot.exists():
-        result.artifact("cad/onshape_isometric.png", "plot_png", "Onshape viewport capture")
+    if limit is not None and result.metrics["total_mass_kg"] > limit:
+        result.add(Diagnostic.error("mass_budget_exceeded", "Pulled CAD mass exceeds the robot mass budget",
+                                   subjects=["robot"], data={"mass": result.metrics["total_mass_kg"], "limit": limit}))
+    return result

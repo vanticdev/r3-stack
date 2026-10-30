@@ -57,12 +57,13 @@ def _fmt(values: Any) -> str:
 
 
 def _component_mass(project: Project, component: str) -> float:
-    cad = project.read_build_json("cad/cad_model.json") or {}
-    part = (cad.get("parts") or {}).get(component) if isinstance(cad, dict) else None
-    if part and part.get("mass"):
-        return float(part["mass"])
-    comp = project.spec.components[component]
-    return float(comp.params.get("mass", project.catalog.component(comp.type).mechanical.mass))
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    pulled = load_pulled(project.root)
+    part = pulled.parts.get(component)
+    if part is None or part.mass is None:
+        raise PullError("cad_pull_mass_missing", f"{component}: pulled mass is required for cable simulation")
+    return float(part.mass)
 
 
 def build_shaker_mjcf(project: Project, plan: CablePlan, kin: Kinematics, timestep: float) -> str:

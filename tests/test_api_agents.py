@@ -67,7 +67,11 @@ def test_claude_session_streams_transcript_runs_and_spec_diff(env):
     denied = argv[argv.index("--disallowedTools") + 1:]
     denied = denied[:denied.index("--model")] if "--model" in denied else denied
     assert "mcp__r3__r3_patch_spec" in allowed and "Read" in allowed and "Bash" not in allowed and "Edit" not in allowed
-    assert set(denied) == {f"mcp__r3__{t}" for t in GATED} and not {f"mcp__r3__{t}" for t in GATED} & set(allowed)
+    assert {f"mcp__r3__{t}" for t in GATED} <= set(denied)
+    assert not {f"mcp__r3__{t}" for t in GATED} & set(allowed)
+    assert "mcp__onshape_native__native_write" in allowed
+    assert "mcp__onshape_native__api_write" in denied
+    assert "mcp__onshape_native__evaluate" in denied
     config = json.loads(open(argv[argv.index("--mcp-config") + 1]).read())["mcpServers"]["r3"]
     assert config["args"] == ["-m", "r3_orchestrator.mcp_server"] and config["env"]["R3_PROJECT"] == str(root)
     assert call["env"]["R3_PROJECT"] == str(root) and call["env"]["MCP_TOOL_TIMEOUT"]

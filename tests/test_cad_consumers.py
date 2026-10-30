@@ -1,5 +1,4 @@
-"""Downstream stages read the direct-CAD hand-off (``build/cad/cad_model.json``) consistently:
-steering linkage table, CAD-only hardware mass and exact bounding boxes."""
+"""Downstream native CAD mass/bounds and standalone analytical steering-table interpolation."""
 
 from __future__ import annotations
 
@@ -69,25 +68,33 @@ def test_wiring_kinematics_follow_cad_linkage(bare_project):
     assert Kinematics(spec, cad).ackermann(0.2) == ideal.ackermann(0.2)
 
 
-def test_electrical_vehicle_uses_cad_mass_and_boxes(bare_project):
-    project = bare_project
-    spec, catalog = project.spec, project.catalog
-    no_cad = vehicle_model(project, StageResult(stage="electrical"))
-    assert no_cad["mass_source"] == "catalog" and no_cad["frontal_area_source"] == "catalog"
-    # A stale CAD model without the stub axles, plus one CAD-only screw.
-    parts = {cid: {"mass": 0.01, "bbox_min": [0.0, -0.1, 0.0], "bbox_max": [0.3, 0.1, 0.2]}
-             for cid in spec.components if not cid == "encoder"}
-    parts["fastener:mount"] = {"mass": 0.001, "owner": "base", "bbox_min": [0.0, -0.12, 0.0], "bbox_max": [0.01, -0.11, 0.01]}
-    (project.root / "build" / "cad").mkdir(parents=True)
-    (project.root / "build" / "cad" / "cad_model.json").write_text(json.dumps({"parts": parts}))
-    project = Project.load(project.root)
+def test_electrical_vehicle_uses_only_native_mass_and_bounds(tmp_path):
+    import yaml
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from pulled_fixture import write_pull
+    from r3_model.pulled import PullError
+
+    root = tmp_path / "native-mass"
+    root.mkdir()
+    (root / "robot.yaml").write_text(yaml.safe_dump({"robot": {"name": "Mass coupons", "mobility": "stationary"},
+        "components": {"base": {"type": "test-plate"}, "payload": {"type": "test-box"}}}))
+    folder = root / "catalog/components"
+    folder.mkdir(parents=True)
+    (folder / "coupons.yaml").write_text(yaml.safe_dump({"components": [
+        {"id": type_id, "kind": "structure", "name": "Synthetic mass coupon",
+         "mechanical": {"mass": 99, "size": [9, 9, 9]}} for type_id in ("test-plate", "test-box")]}))
+    project = Project.load(root)
+    with pytest.raises(PullError, match="No pulled CAD"):
+        vehicle_model(project, StageResult(stage="electrical"))
+    pose = np.eye(4); pose[:3, 3] = [0, -.12, 0]
+    write_pull(root, {"base": BRepPrimAPI_MakeBox(300, 200, 200).Shape(),
+                      "payload": BRepPrimAPI_MakeBox(10, 10, 10).Shape()},
+               poses={"base": np.eye(4), "payload": pose}, mass={"base": .2, "payload": .001})
+    # An old generated payload cannot override the pinned mass or dimensions.
+    (project.build_dir("cad") / "cad_model.json").write_text(json.dumps({"parts": {"base": {"mass": 99}}}))
     result = StageResult(stage="electrical")
-    vehicle = vehicle_model(project, result)
-    stubs = [cid for cid in spec.components if cid == "encoder"]
-    expected = 0.01 * (len(spec.components) - len(stubs)) + 0.001 + sum(
-        catalog.component(spec.components[cid].type).mechanical.mass for cid in stubs)
-    assert vehicle["mass"] == pytest.approx(expected) and vehicle["mass_source"] == "cad+catalog"
-    assert any("encoder" in a.statement for a in result.assumptions)
-    # Frontal area from the exact boxes: width 0.22 m (screw at y = -0.12) x height 0.2 m x fill.
-    assert vehicle["frontal_area_source"] == "cad"
-    assert vehicle["frontal_area"] == pytest.approx(0.22 * 0.2)
+    vehicle = vehicle_model(Project.load(root), result)
+    assert vehicle["mass"] == pytest.approx(.201)
+    assert vehicle["mass_source"] == "pulled"
+    assert vehicle["frontal_area_source"] == "pulled"
+    assert vehicle["frontal_area"] == pytest.approx(.32 * .2)

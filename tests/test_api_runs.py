@@ -107,3 +107,14 @@ def test_run_request_validation_and_deploy_sim(projects):
 def test_parse_sse_handles_heartbeats():
     lines = ["retry: 2000", "", ": keep-alive", "", "id: 1", "event: run_finished", 'data: {"seq": 1, "type": "run_finished"}', ""]
     assert parse_sse(iter(lines)) == [{"seq": 1, "type": "run_finished"}]
+
+
+def test_real_model_run_reports_missing_pull(projects):
+    with make_client(projects, {}) as client:
+        response = client.post(f"/api/projects/{PID}/runs", json={"stages": ["model"]})
+        assert response.status_code == 202, response.text
+        events = sse(client, response.json()["events_url"])
+        diagnostics = [event["diagnostic"] for event in events if event["type"] == "diagnostic"]
+        assert [diagnostic["code"] for diagnostic in diagnostics] == ["cad_pull_missing"]
+        assert events[-1]["status"] == "failed" and events[-1]["counts"]["error"] == 1
+        assert not (projects / PID / "build/model/graph.json").exists()

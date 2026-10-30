@@ -2,12 +2,11 @@
 
     python -m r3_connectors <project dir> [--no-render]
 
-Reads catalog connector geometry, sourced component models and board exports,
+Reads catalog pin metadata and verified native pulled component meshes,
 and, when present, the wiring
 stage's ``routes.json``/``routing_detail.json``. Writes ``build/connectors/``:
 
-* ``models/connectors/<type>.glb``: every used connector type in its connector frame;
-* ``models/components/<type>.glb``: detailed component models in their component frames;
+* ``models/components/<instance hash>.glb``: pulled component meshes in their part frames;
 * ``connectors.json``: robot-frame frames of every component connector and harness
   half, every pin (contact, tip, wire entry, signal, net, bindings), mated pairs
   with their alignment, and the wire endpoints checked against their pins;
@@ -32,7 +31,7 @@ from r3_model.project import Project
 
 from .display import display_paths, overlaps
 from .frames import Frame
-from .models import ModelUnavailable, component_scene, connector_scene, export_glb, glb_digest
+from .models import export_glb, glb_digest
 from .pins import component_connector_frame, instance_frame, mating_site_frame
 
 STAGE = "connectors"
@@ -68,7 +67,11 @@ class ConnectorStage:
         self.display: dict[str, np.ndarray] = {}
         self.component_scenes: dict[str, trimesh.Scene] = {}
         self._mesh_bodies: dict[str, list[trimesh.Trimesh]] = {}
-        self.cad_meshes = _load(project.build_dir("cad") / "cad_model.json") or {}
+        from r3_model.spec_files import validate_pulled_spec as load_pulled
+        from r3_model.pulled_view import apply_pulled
+        self.pulled = load_pulled(project.root)
+        apply_pulled(project, self.pulled)
+        self.graph = project.graph
         self.data: dict[str, Any] = {"units": "SI (m), robot frame", "types": {}, "components": {}, "connectors": {},
                                      "mated_pairs": [], "wires": {}, "checks": {}}
 
@@ -82,11 +85,9 @@ class ConnectorStage:
         return {t for t in types if t in self.catalog.connectors and self.catalog.connector(t).geometry is not None}
 
     def connector_models(self) -> None:
-        proxies = []
         for type_id in sorted(self.used_types()):
             ctype = self.catalog.connector(type_id)
             g = ctype.geometry
-            path = self.out / "models" / "connectors" / f"{type_id}.glb"
             entry: dict[str, Any] = {"family": ctype.family, "gender": ctype.gender, "mates_with": ctype.mates_with,
                                      "source": g.model.source, "model_path": g.model.path, "license": g.model.license,
                                      "provenance": g.model.provenance.model_dump(), "footprint": g.footprint,
@@ -97,54 +98,24 @@ class ConnectorStage:
                                                   "pad": None if p.pad is None else _r(p.pad),
                                                   "wire_entry": None if p.wire_entry is None else _r(p.wire_entry)}
                                               for n, p in g.pins.items()}}
-            if g.model.source == "proxy":
-                proxies.append(type_id)
-            try:
-                scene = connector_scene(self.catalog, type_id)
-                export_glb(scene, path)
-                self.scenes[type_id] = scene
-                entry["glb"] = str(path.relative_to(self.out))
-                entry["glb_sha256"] = glb_digest(path)
-            except (ModelUnavailable, FileNotFoundError) as error:
-                entry["glb"] = None
-                self.result.add(Diagnostic.warning("connector_model_unavailable", f"{type_id}: {error}",
-                                                   subjects=[type_id], data={"source": g.model.source}))
+            # Type geometry describes pins and ratings, never physical CAD.
+            entry["glb"] = None
             self.data["types"][type_id] = entry
-        if proxies:
-            self.result.add(Diagnostic.info(
-                "connector_model_proxy", f"{len(proxies)} connector types use datasheet proxies (no free KiCad or "
-                                         f"vendor model): {', '.join(proxies)}",
-                subjects=proxies, data={"count": len(proxies)}))
-        self.result.artifact("connectors/models/connectors", "glb", "Connector type models (connector frame, m)")
 
     def component_models(self) -> None:
-        done: dict[str, str | None] = {}
         for cid, comp in self.spec.components.items():
-            ctype = self.catalog.component(comp.type)
-            position, rotation = self.graph.component_pose(cid)
-            entry: dict[str, Any] = {"type": comp.type, "kind": ctype.kind, "name": ctype.name,
-                                     "frame": Frame(rotation, position).to_json(), "glb": None}
-            if ctype.model is not None:
-                entry.update({"source": ctype.model.source, "url": ctype.model.url, "license": ctype.model.license,
-                              "model_path": ctype.model.path})
-                if comp.type not in done:
-                    path = self.out / "models" / "components" / f"{comp.type}.glb"
-                    try:
-                        scene = component_scene(ctype.model, self.project)
-                        export_glb(scene, path)
-                        self.component_scenes[comp.type] = scene
-                        done[comp.type] = str(path.relative_to(self.out))
-                    except (ModelUnavailable, FileNotFoundError) as error:
-                        done[comp.type] = None
-                        self.result.add(Diagnostic.warning(
-                            "component_model_unavailable", f"{cid} ({comp.type}): {error}; catalog solids are used",
-                            subjects=[cid], data={"source": ctype.model.source}))
-                entry["glb"] = done[comp.type]
-                if entry["glb"]:
-                    entry["glb_sha256"] = glb_digest(self.out / entry["glb"])
-            self.data["components"][cid] = entry
+            part = self.pulled.parts.get(cid)
+            if part is None:
+                continue
+            scene = trimesh.load(part.stl, force="scene")
+            self.component_scenes[cid] = scene
+            path = self.out / "models" / "components" / f"{hashlib.sha256(cid.encode()).hexdigest()}.glb"
+            export_glb(scene, path)
+            pose = self.pulled.poses[cid]
+            self.data["components"][cid] = {"type": comp.type, "kind": self.catalog.component(comp.type).kind,
+                "name": cid, "source": "pulled", "frame": Frame(pose[:3, :3], pose[:3, 3]).to_json(),
+                "glb": str(path.relative_to(self.out)), "glb_sha256": glb_digest(path)}
 
-    # ------------------------------------------------------------- pins
     def _bindings(self) -> dict[str, list[str]]:
         out: dict[str, list[str]] = {}
         for name, binding in self.spec.software.bindings.items():
@@ -187,13 +158,27 @@ class ConnectorStage:
                     "glb": self.data["types"].get(inst.type, {}).get("glb")}
 
     def _harness_frame(self, harness_id: str, name: str, conn: Any) -> tuple[Frame | None, str]:
+        ref = f"{harness_id}.{name}"
+        if conn.type != "integral":
+            part = self.pulled.parts.get(ref)
+            if part is None:
+                self.result.add(Diagnostic.error("cad_pull_missing", f"{ref}: cable half missing from native pull", subjects=[ref]))
+                return None, "unplaced"
+            local = part.mate_connectors.get("mating", part.mate_connectors.get("origin"))
+            if local is None:
+                self.result.add(Diagnostic.error("cad_pull_invalid", f"{ref}: missing native mating/origin connector", subjects=[ref]))
+                return None, "unplaced"
+            matrix = self.pulled.poses[ref] @ local
+            frame = Frame(matrix[:3, :3], matrix[:3, 3])
+            node = (self.detail or {}).get("nodes", {}).get(ref)
+            if node and node.get("frame"):
+                f = node["frame"]
+                stale = Frame.from_axes(f["origin"], f["x"], f["z"])
+                if not np.allclose(stale.matrix(), matrix, atol=1e-7, rtol=0):
+                    self.result.add(Diagnostic.error("connector_routes_stale", f"{ref}: routing frame differs from native pull; rerun wiring", subjects=[ref]))
+            return frame, "pulled"
         if conn.mates and conn.mates in self.graph.endpoints and self.graph.endpoints[conn.mates].owner_kind == "component":
-            board = mating_site_frame(self.project, f"{harness_id}.{name}", conn)
-            return (board, "pigtail") if conn.type == "integral" else (board.mated(), "component")
-        node = (self.detail or {}).get("nodes", {}).get(f"{harness_id}.{name}")
-        if node and node.get("frame"):
-            f = node["frame"]
-            return Frame.from_axes(f["origin"], f["x"], f["z"]), "floating"
+            return mating_site_frame(self.project, ref, conn), "pigtail"
         return None, "unplaced"
 
     def harness_connectors(self) -> None:
@@ -332,33 +317,12 @@ class ConnectorStage:
             scene = None
             transform = np.eye(4)
             source = ""
-            if info["owner"] == "component":
-                cid = info["component"]
-                component = self.catalog.component(self.spec.components[cid].type)
-                scene = self.component_scenes.get(component.id)
-                position, rotation = self.graph.component_pose(cid)
-                transform = Frame(rotation, position).matrix()
-                source = component.model.url or component.model.path if component.model else ""
-                if scene is None:
-                    # CAD exports are already placed in robot coordinates.
-                    # A local-plan envelope is not evidence of a bought part.
-                    cad = self.cad_meshes.get("parts", {}).get(cid, {})
-                    current = self.project.fingerprint()
-                    fresh = all(self.cad_meshes.get("inputs", {}).get(key) == value
-                                for key, value in current.items() if key != "git_commit")
-                    if fresh and cad.get("geometry_source") == "onshape" and cad.get("mesh"):
-                        root = self.project.build_dir("cad").resolve()
-                        path = (root / cad["mesh"]).resolve()
-                        if path.is_relative_to(root) and path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == cad.get("mesh_sha256"):
-                            scene = trimesh.load(path, force="scene")
-                            transform = np.eye(4)
-                            source = f"cad/{cad['mesh']} (Onshape export, SHA-256 {cad['mesh_sha256']})"
-            else:
-                scene = self.scenes.get(info["type"])
-                transform = frame.matrix() if frame else transform
-                source = geometry.model.url or geometry.model.path if geometry else ""
-                if geometry is not None and geometry.model.source == "proxy":
-                    scene = None  # invented contacts cannot verify a bought plug
+            cid = info.get("component") if info["owner"] == "component" else ref
+            if cid in self.pulled.parts:
+                part = self.pulled.parts[cid]
+                scene = trimesh.load(part.stl, force="scene")
+                transform = self.pulled.poses[cid]
+                source = f"pulled/{cid} (SHA-256 {part.sha256['stl']})"
             # Cache owner meshes separately from connector instances: two ports
             # on the same component have different placed supplemental models.
             bodies = []
@@ -370,22 +334,9 @@ class ConnectorStage:
             supplied = []
             proxy_bodies = []
             supplier_missing = False
-            if info["owner"] == "component" and not info.get("embedded", False):
-                connector = self.scenes.get(info["type"])
-                if geometry is not None and frame is not None and connector is not None:
-                    supplier_key = f"connector:{ref}"
-                    if supplier_key not in self._mesh_bodies:
-                        self._mesh_bodies[supplier_key] = scene_bodies(connector, frame.matrix())
-                    if geometry.model.source != "proxy":
-                        supplied = self._mesh_bodies[supplier_key]
-                        source += f"; placed connector: {geometry.model.url or geometry.model.path}"
-                    else:
-                        proxy_bodies = self._mesh_bodies[supplier_key]
-                        source += "; placed connector is an unverified proxy"
-                else:
-                    supplier_missing = True
+            # A placed catalog connector is metadata, not pulled CAD evidence.
             if (scene is None and not supplied and not proxy_bodies) or geometry is None or frame is None:
-                reason = "No sourced owner/connector contact geometry available; physical measurement required."
+                reason = "No pulled owner/connector contact geometry available; pull the connector instance from Onshape."
                 record["sides"][ref] = {"declared_type": info["type"], "status": "unverifiable", "reason": reason,
                                        "source": source}
                 diagnostics.append(Diagnostic.warning("connector_unverifiable", f"{ref}: {reason}", subjects=[a, b, ref]))
@@ -513,7 +464,7 @@ class ConnectorStage:
 
         for cid, comp in self.spec.components.items():
             ctype = self.catalog.component(comp.type)
-            scene = self.component_scenes.get(comp.type)
+            scene = self.component_scenes.get(cid)
             if scene is None:
                 continue
             bodies = None
@@ -543,15 +494,6 @@ class ConnectorStage:
                     self.result.add(Diagnostic.error("connector_model_pin_mismatch",
                         f"{cid}.{name}: embedded contact array differs from the owner model",
                         subjects=[cid, f"{cid}.{name}"], data={"max_error": worst, "posts": len(found), "limit": 5e-5}))
-            pcb = next((solid for solid in ctype.mechanical.solids if solid.name == "pcb"), None)
-            if pcb is not None:
-                board = max(scene.geometry.values(), key=lambda mesh: float(np.prod(mesh.extents[:2])))
-                thickness = float(board.extents[2])
-                self.data["checks"][f"{cid}_pcb_thickness"] = {"model": thickness, "catalog": pcb.size[2]}
-                if abs(pcb.size[2] - thickness) > 1e-4:
-                    self.result.add(Diagnostic.warning("component_model_dimension_mismatch",
-                        f"{cid}: vendor PCB thickness {thickness*1000:.3f} mm differs from catalog {pcb.size[2]*1000:.3f} mm",
-                        subjects=[cid], data={"model": thickness, "catalog": pcb.size[2], "units": "m"}))
 
     def verify_board_poses(self) -> None:
         """Catalog connector poses of KiCad boards against the placed footprints (pcbnew)."""
@@ -615,6 +557,14 @@ def run(project: Project, render: bool = True) -> StageResult:
     started = time.time()
     result = StageResult(stage=STAGE)
     result.inputs = project.fingerprint()
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    from r3_model.pulled_view import apply_pulled
+    try:
+        apply_pulled(project, load_pulled(project.root))
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
+        return result
     stage = ConnectorStage(project, result)
     stage.run(render)
     result.assume("geometry", "Connector frame: origin at the centre of the contact array on the mating face, z toward "

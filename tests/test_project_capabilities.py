@@ -52,12 +52,8 @@ def test_author_components_designs_and_scenarios_from_tools(project):
     assert Project.load(project).catalog.component(component["id"]).mechanical.size[0] == .05
     assert m.r3_get_schema("robot")["schema"]["$defs"]["Simulation"]["properties"]["devices"]
     assert m.r3_get_schema("component")["schema"]["properties"]["interfaces"]
-    # This invokes the actual standard-feature planner, with zero quota calls.
-    planned = m.r3_cad_plan(project=str(project))
-    assert planned["ok"] and planned["plan"]["summary"]["estimated_features_calls"] > 0
-    features = [f["type"] for studio in planned["plan"]["part_studios"] for f in studio["features"]]
-    from r3_onshape.policy import STANDARD_FEATURE_TYPES
-    assert features and set(features) <= STANDARD_FEATURE_TYPES
+    assert "r3_cad_pull" in m.ungated_tools()
+    assert "r3_cad_plan" not in m.ungated_tools()
     current = m.r3_get_spec(project=str(project))
     design = {"components": {"b": {"type": component["id"]}},
         "assembly": {"root": "a", "joins": [{"a": "a.face", "b": "b.face", "clock": 0}]},
@@ -67,14 +63,26 @@ def test_author_components_designs_and_scenarios_from_tools(project):
     assert m.r3_patch_spec(design, current["sha256"], project=str(project))["ok"]
     built = Project.load(project)
     assert len(built.spec.assembly.joins) == 1 and len(built.spec.electrical.harnesses[0].wires) == 1
-    assert built.assembly is not None
+    # Authored interfaces describe intent; only a native pull supplies an assembly.
+    assert built.assembly is None
+    from pulled_fixture import box, write_pull
+    poses = {"a": np.eye(4), "b": np.eye(4)}
+    poses["b"][:3, 3] = [0, 0, .004]
+    face_a, face_b = np.eye(4), np.eye(4)
+    face_a[2, 3] = .004
+    write_pull(project, {"a": box((50,40,4)), "b": box((50,40,4))}, poses=poses,
+               connectors={"a": {"face": face_a}, "b": {"face": face_b}},
+               mates=[dict(id="coupon-stack", kind="fastened", a=["a", "face"], b=["b", "face"],
+                           axis=None, limits=None)])
+    native = Project.load(project)
+    assert native.assembly is not None
+    np.testing.assert_allclose(native.spec.components["b"].pose.xyz, [0,0,.004])
 
 
-def test_cad_plan_on_empty_project_returns_actionable_readiness(project):
-    result = m.r3_cad_plan(project=str(project))
-    assert not result["ok"] and result["code"] == "not_configured"
-    assert "components" in result["message"] and result["hint"]
-    assert result["dry_run"]
+def test_cad_pull_on_empty_project_returns_actionable_target_error(project):
+    result = m.r3_cad_pull(project=str(project))
+    assert not result["ok"] and result["code"] == "cad_pull_target_invalid"
+    assert "assembly" in result["message"]
 
 
 def test_project_models_download_with_provenance_and_do_not_write_platform(project, tmp_path, monkeypatch):
@@ -114,34 +122,24 @@ def test_project_models_download_with_provenance_and_do_not_write_platform(proje
         server.server_close()
 
 
-def test_public_onshape_discovery_uses_connected_transport(project, monkeypatch):
+def test_onshape_pointer_does_not_use_public_metadata_api(project, monkeypatch):
     monkeypatch.setenv("R3_PROJECT", str(project))
     from r3_onshape import client
-
-    class API:
-        def json(self, method, path, **kwargs):
-            assert method == "GET" and path == "/documents/" + "a" * 24
-            return {"isPublic": True}
-
-    monkeypatch.setattr(client, "default_transport", lambda: API())
-    result = m.r3_models_add("Synthetic public fixture", "other", model_id="public-fixture",
+    monkeypatch.setattr(client, "default_transport", lambda: pytest.fail("public metadata call"))
+    result = m.r3_models_add("Synthetic source pointer", "other", model_id="native-pointer",
         onshape=f"https://cad.onshape.com/documents/{'a'*24}/v/{'b'*24}/e/{'c'*24}")
-    assert result["ok"] and result["model"]["sources"][0]["kind"] == "onshape_public"
+    assert result["ok"]
+    assert result["model"]["validation"]["status"] == "unverified"
 
 
-def test_onshape_render_is_delivered_as_an_image(project):
-    from r3_onshape.views import ElementRef, render_views
+def test_viewport_capture_is_delivered_as_an_image(project):
     image = Image.new("RGB", (16, 12), "orange")
     stream = io.BytesIO()
     image.save(stream, format="PNG")
-
-    class API:
-        def json(self, method, path, query):
-            assert method == "GET" and path.endswith("/shadedviews")
-            return {"images": [base64.b64encode(stream.getvalue()).decode()]}
-
-    render_views(API(), ElementRef("D", "w", "W", "E"), project / "build/cad/views", views=["iso"])
-    result = m.r3_view_artifact("cad/views/iso.png", project=str(project))
+    folder = project / "build/cad/views"
+    folder.mkdir(parents=True)
+    (folder / "viewport.png").write_bytes(stream.getvalue())
+    result = m.r3_view_artifact("cad/views/viewport.png", project=str(project))
     assert result.content[1].type == "image" and result.content[1].mime_type == "image/png"
     assert base64.b64decode(result.content[1].data) == stream.getvalue()
 
@@ -166,7 +164,8 @@ def test_project_device_runs_with_native_physics_and_real_hal(tmp_path):
     shutil.copytree(FIXTURES / "bench", root)
     (root / "simulation").mkdir()
     shutil.copy(FIXTURES / "project-capabilities/probe.py", root / "simulation/probe.py")
-    project = Project.load(root)
+    from pulled_fixture import instrumentation_pull
+    project = instrumentation_pull(root)
     project.spec.simulation.devices["probe"] = ProjectDeviceSpec(component="base", source="simulation/probe.py")
     kernel = CoSimKernel(project, Scenario(id="instrument-observe", duration=.05))
     server = TwinHalServer(kernel)
@@ -273,7 +272,7 @@ def test_session_mcp_transports_schema_and_real_image_blocks(project):
         async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
             await session.initialize()
             names = {tool.name for tool in (await session.list_tools()).tools}
-            assert {"r3_get_schema", "r3_cad_plan", "r3_view_artifact", "r3_run_project_tests"} <= names
+            assert {"r3_get_schema", "r3_cad_pull", "r3_view_artifact", "r3_run_project_tests"} <= names
             result = await session.call_tool("r3_view_artifact", {"path": "cad/views/synthetic.png"})
             assert any(block.type == "image" for block in result.content)
             assert not result.is_error

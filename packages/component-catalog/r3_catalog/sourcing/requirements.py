@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from r3_model.units import to_si
+
 import hashlib
 import json
 import re
@@ -108,12 +110,11 @@ def catalog_params(component: ComponentType) -> dict[str, SourcedValue]:
     else:
         for axis, name in zip(mech.size, ("length", "width", "height")):
             out[name] = SourcedValue(value=axis, status=status, source=source)
-    for feature in mech.features:
-        if feature.id.startswith("hub") and feature.kind in ("bore", "d_bore", "socket"):
-            shape = {"bore": "bore", "d_bore": "d-bore", "socket": "hex"}[feature.kind]
-            out["hub"] = SourcedValue(value={"size": feature.diameter, "shape": shape}, status=feature.provenance.status
-                                      if feature.provenance.status in ("datasheet", "vendor") else "estimated",
-                                      source=feature.provenance.source or source)
+    for interface in component.interfaces.values():
+        if interface.kind in ("bore", "spline") and "d" in interface.params:
+            out["hub"] = SourcedValue(value={"size": to_si(interface.params["d"]),
+                "shape": interface.params.get("profile", "bore")}, status=status, source=source)
+            break
     for pin in component.pins.values():
         if pin.role == "power_in" and pin.voltage_min is not None and pin.voltage_max is not None:
             out["supply"] = SourcedValue(value=[pin.voltage_min, pin.voltage_max], status="estimated", source=f"catalog:{component.id}")

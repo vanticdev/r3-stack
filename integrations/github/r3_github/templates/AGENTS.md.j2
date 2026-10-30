@@ -1,7 +1,8 @@
 # Working on the @@NAME@@ robot (R3 project)
 
-This repository describes one robot. `robot.yaml` (schema `r3/robot@1`) is the single source of truth.
-It covers components, the object/interface assembly, harnesses, PCBs, software bindings, requirements,
+This repository describes one robot. `robot.yaml` (schema `r3/robot@1`) indexes the complete description.
+It includes part and domain files with `{$include: parts/<id>.yaml}` (literal project-relative paths).
+Together they cover components, assembly attachments, harnesses, PCBs, software bindings, requirements,
 3D printing and simulation scenarios. Everything under `build/` is generated: never edit it or commit it.
 
 **Start here:** the guide `docs/guide/build-a-robot.md` in the R3 platform. You can also get it from the
@@ -41,7 +42,10 @@ MCP tool `r3_guide`. It explains the following topics:
 
 1. `r3 status --json` (MCP: `r3_status`).
 2. `r3_get_spec`, which returns `sha256`, then `r3_patch_spec` with `expected_sha256` (an RFC 7386 merge
-   patch). If you get `spec_conflict`, re-read the spec and re-apply your change. Firmware and other
+   patch). The SHA covers all included files; edits go to their owning files with comments preserved.
+   New components create `parts/<id>.yaml`. Never patch `components.*.pulled` or root `attachments`: pull
+   owns their Onshape identities, file hashes, frames and mates. If you get `spec_conflict`, re-read
+   the spec and re-apply your change. Firmware and other
    authored project files may be edited directly; preserve comments.
 3. Find parts with `r3_list_catalog` / `r3_get_catalog_component`. Source unknown parts with
    `r3_source_search` + `r3_source_choose`. Write your own printed parts with `r3_put_catalog_component`,
@@ -56,14 +60,18 @@ MCP tool `r3_guide`. It explains the following topics:
 
 ## Layout
 
-- `robot.yaml`: the robot. Units are SI, or explicit strings such as `25 mm`. Robot frame: +x forward,
+- `robot.yaml`: robot identity, requirements, the component index and pull-owned attachments.
+- `parts/<id>.yaml`: part metadata and pull-owned CAD references.
+- `electrical/*.yaml`, `software/*.yaml` and other included domain files: the rest of the description.
+  Units are SI, or explicit strings such as `25 mm`. Robot frame: +x forward,
   +y left, +z up.
 - `catalog/`: project-local parts (`components/*.yaml`, `connectors.yaml`, `wires.yaml`), merged over the
   platform catalog.
 - `backend/python/<module>/`: robot software in the BLITZ layout. It uses only `r3_hal`, so it runs on
   the robot (`R3_HAL=linux`) and against the twin (`R3_HAL=virtual`). `backend/deploy.py` keeps the
   hooks `get_modules()` and `pi_name_to_process_types()`.
-- `cad/`: CAD notes. The CAD itself is generated in Onshape from the assembly.
+- `cad/`: CAD notes and the immutable `cad/pulled/` copy. Model parts and mates directly in Onshape;
+  pull refreshes their local metadata and attachments. Never hand-edit the pulled files.
 - `pcb/<board>/`: KiCad inputs (only for a custom board).
 - `r3.lock.yaml`: pinned revisions and sourced parts. Update it only through the tools.
 

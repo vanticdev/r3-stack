@@ -241,14 +241,8 @@ def probe_onshape() -> Tool:
     except ValueError as error:
         return Tool("onshape", False, detail=str(error))
     selected = info["selected"]
-    if selected is None:
-        detail = "no transport: set ONSHAPE_ACCESS_KEY/ONSHAPE_SECRET_KEY (headless) or start the onshape-native bridge (local only)"
-    elif selected == "onshape-session":
-        detail = "headless Onshape session (stored cookies; validity is checked on first use)"
-    elif info["headless"]:
-        detail = f"API keys ({info['api_keys']['auth']}) to {info['api_keys']['base']}"
-    else:
-        detail = "onshape-native browser bridge (local development only, not headless)"
+    detail = ("onshape-native editor and /native UI export backend; public API disabled" if selected
+              else "native session unavailable for modeling/pull; headless stages can validate an existing pinned cad/pulled copy")
     return Tool("onshape", selected is not None, None, detail, info)
 
 
@@ -334,15 +328,8 @@ def _stages(tools: dict[str, Tool]) -> list[StageReadiness]:
     gl = bool(tools["mujoco"].data.get("gl_backend"))
     out = [StageReadiness("assembly", True, "full", [], "Python assembly compiler."),
            StageReadiness("model", True, "full", [], "Python only; plots use matplotlib Agg.")]
-    onshape = tools["onshape"].data or {}
-    if onshape.get("headless"):
-        out.append(StageReadiness("cad", True, "full", [], "Onshape API keys; views from the REST shaded-view endpoint."))
-    elif onshape.get("selected"):
-        out.append(StageReadiness("cad", False, "degraded", ["onshape API keys"],
-                                  "Uses the browser bridge (needs a logged-in browser); reuses build/cad/cad_model.json when current."))
-    else:
-        out.append(StageReadiness("cad", True, "degraded", ["onshape API keys"],
-                                  "Reuses a current build/cad/cad_model.json, else downstream stages use catalog geometry."))
+    out.append(StageReadiness("cad", True, "full", [],
+                              "Validates the pinned cad/pulled copy with OCP/STL headlessly. Refresh requires the native browser/companion; missing pull is an error."))
     pcb_missing = [n for n in ("kicad-cli",) if not ok(n)]
     pcb_missing += [n for n in ("kicad-pcbnew",) if not ok(n)]
     extras = [n for n in ("freerouting",) if not ok(n)]

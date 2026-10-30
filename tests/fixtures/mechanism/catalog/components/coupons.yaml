@@ -1,154 +1,123 @@
 components:
-- id: coupon-base
-  name: Coupon base
-  kind: structure
-  mechanical:
-    shape: box
-    size:
-    - 0.12
-    - 0.08
-    - 0.004
-    mass: 0.1
-    material: Aluminum 6061-T6
-    density: 2700
-    fabricated: true
-    features:
-    - id: access_slot
-      kind: slot
-      slot_dir:
-      - 1
-      - 0
-      - 0
-      position:
-      - 0.04
-      - 0
-      - 0
-      axis:
-      - 0
-      - 0
-      - 1
-      diameter: 0.006
-      length: 0.012
-      depth: 0.004
-  interfaces:
-    mount:
-      kind: hole_pattern
-      origin:
-      - 0
-      - 0
-      - 0.004
-      params:
-        holes:
-        - - -0.018
+  - id: coupon-base
+    name: Coupon base
+    kind: structure
+    mechanical:
+      shape: box
+      size:
+        - 0.12
+        - 0.08
+        - 0.004
+      mass: 0.1
+      material: Aluminum 6061-T6
+      density: 2700
+      fabricated: true
+    interfaces:
+      mount:
+        kind: hole_pattern
+        origin:
           - 0
-          - 0.0034
-          - clearance
+          - 0
           - 0.004
-        - - 0.018
+        params:
+          holes:
+            -   - -0.018
+                - 0
+                - 0.0034
+                - clearance
+                - 0.004
+            -   - 0.018
+                - 0
+                - 0.0034
+                - clearance
+                - 0.004
+  - id: coupon-support
+    name: Coupon support
+    kind: structure
+    mechanical:
+      shape: box
+      size:
+        - 0.05
+        - 0.03
+        - 0.016
+      mass: 0.06
+      material: Aluminum 6061-T6
+      density: 2700
+      fabricated: true
+    interfaces:
+      base:
+        kind: hole_pattern
+        z:
           - 0
-          - 0.0034
-          - clearance
-          - 0.004
-- id: coupon-support
-  name: Coupon support
-  kind: structure
-  mechanical:
-    shape: box
-    size:
-    - 0.05
-    - 0.03
-    - 0.016
-    mass: 0.06
-    material: Aluminum 6061-T6
-    density: 2700
-    fabricated: true
-    features:
-    - id: shaft
-      kind: shaft
-      position:
-      - 0
-      - 0
-      - 0.016
-      axis:
-      - 0
-      - 0
-      - 1
-      diameter: 0.006
-      depth: 0.02
-  interfaces:
-    base:
-      kind: hole_pattern
-      z:
-      - 0
-      - 0
-      - -1
-      params:
-        holes:
-        - - -0.018
           - 0
-          - 0.003
-          - tapped
-          - 0.01
-        - - 0.018
+          - -1
+        params:
+          holes:
+            -   - -0.018
+                - 0
+                - 0.003
+                - tapped
+                - 0.01
+            -   - 0.018
+                - 0
+                - 0.003
+                - tapped
+                - 0.01
+      shaft:
+        kind: shaft
+        origin:
           - 0
-          - 0.003
-          - tapped
-          - 0.01
-    shaft:
-      kind: shaft
-      origin:
-      - 0
-      - 0
-      - 0.016
-      params:
-        d: 0.006
-        length: 0.02
-- id: coupon-sleeve
-  name: Coupon sleeve
-  kind: structure
-  mechanical:
-    shape: cylinder
-    size:
-    - 0.016
-    - 0.01
-    mass: 0.005
-    material: Steel
-    density: 7850
-    fabricated: true
-  interfaces:
-    inner:
-      kind: bore
-      z:
-      - 0
-      - 0
-      - -1
-      params:
-        d: 0.00598
-        depth: 0.01
-    outer:
-      kind: shaft
-      params:
-        d: 0.016
-        length: 0.01
-- id: coupon-rotor
-  name: Coupon rotor
-  kind: structure
-  mechanical:
-    shape: cylinder
-    size:
-    - 0.035
-    - 0.008
-    mass: 0.01
-    material: PETG
-    density: 1270
-    fabricated: true
-  interfaces:
-    inner:
-      kind: bore
-      z:
-      - 0
-      - 0
-      - -1
-      params:
-        d: 0.0162
-        depth: 0.008
+          - 0
+          - 0.016
+        params:
+          d: 0.006
+          length: 0.02
+  - id: coupon-sleeve
+    name: Coupon sleeve
+    kind: structure
+    mechanical:
+      shape: cylinder
+      size:
+        - 0.016
+        - 0.01
+      mass: 0.005
+      material: Steel
+      density: 7850
+      fabricated: true
+    interfaces:
+      inner:
+        kind: bore
+        z:
+          - 0
+          - 0
+          - -1
+        params:
+          d: 0.00598
+          depth: 0.01
+      outer:
+        kind: shaft
+        params:
+          d: 0.016
+          length: 0.01
+  - id: coupon-rotor
+    name: Coupon rotor
+    kind: structure
+    mechanical:
+      shape: cylinder
+      size:
+        - 0.035
+        - 0.008
+      mass: 0.01
+      material: PETG
+      density: 1270
+      fabricated: true
+    interfaces:
+      inner:
+        kind: bore
+        z:
+          - 0
+          - 0
+          - -1
+        params:
+          d: 0.0162
+          depth: 0.008

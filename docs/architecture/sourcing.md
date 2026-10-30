@@ -137,7 +137,7 @@ the catalog loader) records:
 * `catalog_id`, `catalog_file`, `digest` (sha256 of the generated file);
 * `provider`, `candidate_id`, `name`, `manufacturer`, `mpn`, `vendor`, `url`;
 * `price` (amount, currency, quantity) and `retrieved_at`;
-* `requirement_sha256`, `components`, and `cad` (`vendor_step` | `proxy`).
+* `requirement_sha256`, `components`, and `cad` (`vendor_step` | `missing`).
 
 Loading a project never re-sources a slot. The model stage reports:
 * `component_unsourced`: a slot with no `type` and no pin;
@@ -149,23 +149,14 @@ Loading a project never re-sources a slot. The model stage reports:
 
 The project fingerprint gains `sourcing_sha256`.
 
-## CAD of sourced parts (`integrations/onshape/r3_onshape/sourced.py`)
+## CAD of sourced parts
 
-`r3 source --import-cad` works through pinned slots that have a vendor STEP, using the headless
-API-key transport:
-
-1. **Import.** It downloads the model (and unzips it), then imports it into the parts library
-   (`R3_ONSHAPE_PARTS_LIBRARY`, or the project's CAD document). The import uses Onshape's standard
-   translation API, `POST /translations/d/{did}/w/{wid}`, which the *Import* dialog also uses.
-2. **Frame check.** It measures the imported part (`boundingboxes`). Its extents must match the
-   catalog envelope, which also locates the R3 component frame. A rotated model is reported as
-   `sourced_cad_frame_unverified` and gets no mate connectors.
-3. **Mate connectors.** It adds standard `mateConnector` features at the mounting holes and
-   connectors: on the Part Studio origin, offset into place. No FeatureScript is involved, and the
-   direct-CAD policy checks every request.
-
-Parts without a vendor model are **proxies**: the direct-CAD builder already models their catalog
-envelope with standard features.
+Search the model bank first and retain vendor model provenance. The agent imports the
+exact STEP in Onshape with onshape-native, adds real mate connectors, and inserts and
+mates the part in the native assembly. Catalog dimensions are sourcing metadata and
+cannot create geometry. Missing vendor geometry remains missing until modeled or imported
+in Onshape. Verify the actual geometry and viewport, pin a version, and run `r3 cad pull`.
+The local copy is immutable and all physical qualification uses that pull.
 
 ## Interfaces
 
@@ -175,7 +166,7 @@ envelope with standard features.
   * `--choose N|ID` pins a candidate;
   * `r3 source --all [--choose 1]` handles every slot; already-pinned slots are skipped (re-source
     them explicitly by name);
-  * `--unpin`, `--bom` (prices the PCB BOM MPNs through the distributors), `--import-cad`.
+  * `--unpin`, `--bom` (prices the PCB BOM MPNs through the distributors).
 * **MCP:**
   * `r3_source_slots` (read);
   * `r3_source_search` (design tier, open world; writes only `build/sourcing/`);

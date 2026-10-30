@@ -11,8 +11,9 @@ from r3_sim.evaluation import evaluate
 BENCH = Path(__file__).resolve().parents[1] / 'tests/fixtures/bench'
 
 
-def test_owned_imu_reachable_and_no_duplicate_address():
-    project = Project.load(BENCH)
+def test_owned_imu_reachable_and_no_duplicate_address(bench_fresh):
+    from pulled_fixture import instrumentation_pull
+    project = instrumentation_pull(bench_fresh)
     assert project.spec.components['imu'].owned
     assert project.graph.connected('pi.J8.3', 'imu.SDA')
     assert project.graph.connected('pi.J8.5', 'imu.SCL')

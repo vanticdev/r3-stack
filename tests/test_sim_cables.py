@@ -14,19 +14,16 @@ from r3_sim.vehicle import Vehicle, build_vehicle_model
 
 
 @pytest.fixture(scope="module")
-def routed(bench_wiring):
-    """The bench with build/wiring/routes.json (catalog geometry, no CAD export; shared stage run)."""
-    assert (bench_wiring.root / "build" / "wiring" / "routes.json").exists()
-    return Project.load(bench_wiring.root), bench_wiring.bundle["routes"]
+def routed(wired_bench):
+    """The native coupon with routes generated from its pulled solids."""
+    project, routes = wired_bench
+    assert (project.root / "build/wiring/routes.json").exists()
+    return project, routes
 
 
 @pytest.fixture(scope="module")
 def wired_bench(tmp_path_factory):
-    """A qualified non-vehicle arm bench for native cable dynamics checks.
-
-    The reference robot's catalog-only, unqualified assembly is checked
-    statically above; it cannot serve as an intact dynamics fixture anymore.
-    """
+    """A qualified native arm bench for cable dynamics and clearance checks."""
     import yaml
     import json
     from test_wiring_support import write_project
@@ -59,7 +56,9 @@ def wired_bench(tmp_path_factory):
     spec["simulation"]={"environment":{"radio_environment":{"propagation_backend":"analytic"}},
                         "scenarios":[dict(id="bench",duration=1)]}
     (root/"robot.yaml").write_text(yaml.safe_dump(spec))
-    project=Project.load(root);routes=route_and_check(project)["routes"]
+    from pulled_fixture import wiring_pull
+    project = wiring_pull(Project.load(root), long_arm=True)
+    routes = route_and_check(project)["routes"]
     (project.build_dir("wiring")/"routes.json").write_text(json.dumps(routes))
     return project,routes
 

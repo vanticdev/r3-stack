@@ -22,21 +22,21 @@ def project(tmp_path_factory) -> Project:
 def test_mjcf_compiles_with_expected_structure(project):
     vm = build_vehicle_model(project)
     model = mujoco.MjModel.from_xml_string(vm.xml)
-    cad = project.read_build_json("cad/cad_model.json")
-    cad_parts = (cad or {}).get("parts", {})
-    # CAD mass properties take precedence over catalog estimates, per part (a stale cad_model may lack new parts).
-    expected_mass = sum(cad_parts[cid]["mass"] if vm.mass_source[cid] != "catalog"
-                        else project.spec.components[cid].params.get("mass", project.catalog.component(c.type).mechanical.mass)
-                        for cid, c in project.spec.components.items())
-    # Every component and load-bearing fastener/nut has its own massive body.
-    # CAD hardware uses exported mass; otherwise its catalog solid primitives
-    # contribute mass (checked independently by the synthetic hardware fixture).
-    expected_mass += sum(vm.mass_properties[name].mass for names in vm.cad_extras.values() for name in names)
+    from r3_model.pulled import load_pulled
+    pulled = load_pulled(project.root)
+    expected_mass = sum(part.mass for part in pulled.parts.values())
     assert sum(model.body_mass) == pytest.approx(expected_mass, rel=1e-6)
     assert set(project.spec.components) <= set(vm.bodies)
     assert all(members == [cid] for cid,members in vm.bodies.items() if cid in project.spec.components)
     assert model.neq >= len(project.spec.mechanical.interfaces)
-    assert {model.joint(i).name for i in range(model.njnt)} >= {j.id for j in project.spec.mechanical.joints}
+    assert {model.joint(i).name for i in range(model.njnt)} >= {
+        j.id for j in project.spec.mechanical.joints if j.type != "fixed"}
+    # Fastened native mates become monitored weld equalities; moving mates
+    # retain their native MuJoCo joint and qualified attachment constraint.
+    for mate in pulled.mates:
+        if mate.kind == "fastened":
+            binding = next(b for b in vm.joint_bindings if {b["body1"], b["body2"]} == {mate.a[0], mate.b[0]})
+            assert model.eq_type[model.equality(binding["equality"]).id] == mujoco.mjtEq.mjEQ_WELD
     for cid in project.spec.components:
         assert model.body(cid).mass > 0
         assert model.body(cid).geomnum > 0
@@ -49,9 +49,14 @@ def test_mjcf_compiles_with_expected_structure(project):
     expected_armature = to_si(params(drive.actuator)["rotor_inertia"]) * drive.ratio ** 2 + sum(to_si(params(cid).get("output_inertia", 0)) for cid, c in project.spec.components.items() if project.catalog.component(c.type).behavior)
     assert expected_armature > 0
     assert model.tendon_armature[0] == pytest.approx(expected_armature)
-    estimated = [cid for cid, source in vm.mass_source.items() if source == "catalog"]
-    assert any(d.code == "cad_mass_estimated" for d in vm.diagnostics) == bool(estimated)
-    assert model.geom_type[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "tire_roller_left")] == mujoco.mjtGeom.mjGEOM_CYLINDER
+    assert set(vm.mass_source.values()) == {"pulled"}
+    assert not any(d.code == "cad_mass_estimated" for d in vm.diagnostics)
+    roller = model.body("roller_left")
+    collision = [i for i in range(roller.geomadr[0], roller.geomadr[0] + roller.geomnum[0]) if model.geom_contype[i]]
+    assert collision and all(model.geom_type[i] == mujoco.mjtGeom.mjGEOM_MESH for i in collision)
+    assert all(model.geom_dataid[i] >= 0 for i in collision)
+    assert vm.wheels["roller_left"].radius == pytest.approx(.07)
+    assert vm.wheels["roller_left"].width == pytest.approx(.025)
 
 
 def test_steering_follows_cad_linkage_table(project):

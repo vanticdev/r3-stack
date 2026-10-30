@@ -5,7 +5,6 @@ import math
 import numpy as np
 import pytest
 
-from r3_onshape.assembly import correction
 from r3_onshape.fit import axial_field, dipole_field
 from r3_onshape.kinematics import Linkage, Side, ideal_inner, steering_table
 
@@ -59,11 +58,21 @@ def test_axial_magnet_field_matches_closed_form_limits():
     assert dipole_field(1.44, 1e-3, 1e-3, 9.5e-3, 1.5e-3, math.pi / 4) < 2.5e-3
 
 
-def test_connector_correction_aligns_frames():
-    a = {"origin": [0.01, 0.02, 0.03], "xAxis": [1, 0, 0], "zAxis": [0, 0, 1]}
-    b = {"origin": [0.01, 0.02, 0.025], "xAxis": [0, 1, 0], "zAxis": [0, 0, -1]}
-    flip, theta, translation, off_axis = correction(a, b)
-    assert flip
-    # After the flip B's x is still +y; rotating -90 deg about +z aligns it with +x.
-    assert theta == pytest.approx(-math.pi / 2)
-    assert translation[2] == pytest.approx(0.005) and off_axis == pytest.approx(0.0, abs=1e-12)
+def test_pulled_fastened_frames_are_checked_without_correction(tmp_path):
+    from r3_model.project import Project
+    from r3_model.pulled_view import apply_pulled
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from pulled_fixture import write_pull
+    import yaml
+    (tmp_path / "robot.yaml").write_text(yaml.safe_dump({"robot": {"name": "closure-coupon"}, "components": {name: {"type": "test-box"} for name in ("a", "b")}}))
+    a = np.eye(4)
+    b = np.eye(4); b[2, 3] = .005
+    write_pull(tmp_path, {name: BRepPrimAPI_MakeBox(10, 10, 10).Shape() for name in ("a", "b")},
+        poses={"a": a, "b": b}, mates=[{"id": "seat", "kind": "fastened", "a": ["a", "origin"], "b": ["b", "origin"]}])
+    folder = tmp_path / "catalog/components"
+    folder.mkdir(parents=True)
+    (folder / "coupon.yaml").write_text(yaml.safe_dump({"components": [{"id": "test-box", "kind": "structure", "name": "Native closure coupon", "mechanical": {"mass": .02, "size": [.01, .01, .01]}}]}))
+    result = apply_pulled(Project.load(tmp_path))
+    assert result.errors[0].code == "assembly_misfit"
+    assert result.joins["seat"]["position_error"] == pytest.approx(.005)
+    np.testing.assert_array_equal(result.poses["b"], b)

@@ -1,17 +1,9 @@
-"""Physical obstacles for routing, checks and slack simulation.
-
-Geometry comes from ``build/cad/cad_model.json`` (meshes, else bounding boxes)
-when the CAD stage has run, otherwise from catalog primitives posed by
-``RobotGraph.component_pose`` (``cad_geometry_estimated``). Moving parts get a
-swept envelope over their joint travel: wheels spinning about their axle and
-steered wheels/knuckles swept through the steering limits about the kingpin.
-"""
+"""Routing obstacles read exclusively from the verified native pulled STL copy."""
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -135,37 +127,6 @@ class CableBody(Obstacle):
         return (axial >= -0.001 - radius) & (axial <= node.termination_length) & (transverse <= aperture + radius)
 
 
-@lru_cache(maxsize=128)
-def _connector_shape(connector_json: str) -> tuple[Shape, str]:
-    """Viewer model in the connector frame, cached across routing/planning passes."""
-    from r3_catalog.schema import Catalog, ConnectorType
-    from r3_connectors.models import ModelUnavailable, connector_scene, scene_meshes
-
-    connector = ConnectorType.model_validate_json(connector_json)
-    if connector.geometry is not None:
-        try:
-            import trimesh
-
-            scene = connector_scene(Catalog(connectors={connector.id: connector}), connector.id)
-            meshes = [mesh for _, mesh, _ in scene_meshes(scene)]
-            for mesh in meshes:
-                mesh.merge_vertices()  # glTF splits vertices at material/normal seams
-            # Union closed model pieces: overlapping contacts/housings must not
-            # cancel the winding sign or leave internal surfaces as free space.
-            if not all(mesh.is_volume for mesh in meshes):
-                # Some vendor contact meshes have open seams. Keep each signed
-                # surface separately: concatenation can cancel overlapping shells,
-                # and a boolean may silently discard an open contact entirely.
-                shapes = [MeshShape(mesh.vertices, mesh.faces, spacing=0.0005) for mesh in meshes]
-                return SweptShape(shapes, connector.id), f"connector_{connector.geometry.model.source}"
-            mesh = trimesh.boolean.union(meshes, engine="manifold") if len(meshes) > 1 else meshes[0]
-            return MeshShape(mesh.vertices, mesh.faces, spacing=0.0005), f"connector_{connector.geometry.model.source}"
-        except (ModelUnavailable, FileNotFoundError):
-            pass
-    size = np.asarray(connector.body_size, float)
-    return Box(np.array([0.0, 0.0, -size[2] / 2]), np.eye(3), size / 2), "connector_catalog_box"
-
-
 def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[CableBody]:
     """All cable-side halves and splice sleeves at their current routed poses.
 
@@ -174,6 +135,10 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
     """
     from r3_connectors.frames import Frame, any_perpendicular
 
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    from r3_model.pulled_view import world_mesh
+    pulled = load_pulled(project.root)
     out = []
     for harness in sorted(nodes):
         for name, node in sorted(nodes[harness].items()):
@@ -183,8 +148,7 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
             if node.kind == "splice":
                 rotation = (Frame.from_axes(node.exit, any_perpendicular(node.direction), node.direction).rotation
                             if node.direction is not None else np.eye(3))
-                shape = Cylinder(node.exit.copy(), rotation, max(node.od / 2, 0.001), 0.003)
-                source = "splice_sleeve_estimated"
+                source = "pulled_stl"
             elif node.connector_type and node.connector_type != "integral":
                 frame = node.frame
                 if frame is None:
@@ -195,8 +159,7 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
                         project.catalog, node.connector_type)
                     frame = Frame.from_axes(origin,
                                             any_perpendicular(direction), -direction)
-                local, source = _connector_shape(project.catalog.connector(node.connector_type).model_dump_json())
-                shape = local.transformed(frame.rotation, frame.origin)
+                source = "pulled_stl"
                 geometry = project.catalog.connector(node.connector_type).geometry
                 if geometry is not None:
                     exits = [pin.wire_entry for pin in geometry.pins.values() if pin.wire_entry is not None]
@@ -204,6 +167,11 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
                 entry_direction = -frame.z
             else:
                 continue
+            if node.ref not in pulled.parts:
+                raise PullError("cad_pull_missing", f"{node.ref}: connector/splice hardware is absent from pulled CAD")
+            mesh = world_mesh(pulled, node.ref)
+            shape = MeshShape(mesh.vertices, mesh.faces)
+            source = "pulled_stl"
             moving = project.spec.components.get(node.component) is not None and bool(
                 project.catalog.component(project.spec.components[node.component].type).mechanical.moving)
             out.append(CableBody(node.ref, "splice" if node.kind == "splice" else "connector", shape, shape,
@@ -213,60 +181,20 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
     return out
 
 
-def _catalog_shape(project: Project, component: str) -> Shape | None:
-    """Catalog primitive in the robot frame. Box frames sit on their bottom
-    face; x/y-axis cylinders are centred at the component origin; z-axis
-    cylinders (standoffs, posts) start at the mounting face like boxes."""
-    spec, catalog = project.spec, project.catalog
-    ctype = catalog.component(spec.components[component].type)
-    mech = ctype.mechanical
-    position, rotation = project.graph.component_pose(component)
-    size = np.asarray(mech.size, dtype=float)
-    instance = spec.components[component]
-    if mech.fabricated and (mech.solids or instance.params.get("solids")):
-        # An envelope fills the useful gaps in a printed saddle or frame. Use
-        # the same authored boolean solid as offline CAD, even before an export
-        # exists. It remains estimated catalog geometry in the stage evidence.
-        from r3_onshape.geometry import PartPlan, plan_manifold
-        from r3_onshape.parts import component_ops
-
-        plan = PartPlan(name=ctype.name, kind="fabricated", material=mech.material or ctype.name,
-                        density=float(mech.density or 0.0), ops=component_ops(
-            project, ctype.id, instance.params, instance.params.get("mirror")))
-        local = plan_manifold(plan).to_mesh()
-        vertices = np.asarray(local.vert_properties)[:, :3] @ rotation.T + position
-        faces = np.asarray(local.tri_verts)
-        coarse_vertices, coarse_faces = cluster_decimate(vertices, faces, ROUTING_MESH_CELL)
-        if len(coarse_faces):
-            vertices, faces = coarse_vertices, coarse_faces
-        return MeshShape(vertices, faces)
-    if mech.shape == "cylinder":
-        radius, length = size[0] / 2, size[1]
-        local_center = np.array([0.0, 0.0, length / 2]) if mech.axis == "z" else np.zeros(3)
-        return Cylinder(position + rotation @ local_center, rotation @ axis_matrix(mech.axis), radius, length / 2)
-    half = size / 2
-    return Box(position + rotation @ (np.asarray(mech.envelope_offset) + np.array([0.0, 0.0, half[2]])), rotation.copy(), half)
-
-
-def _cad_shape(project: Project, part: dict[str, Any]) -> tuple[Shape, str] | None:
-    mesh = part.get("mesh")
-    if mesh:
-        path = project.root / "build" / "cad" / mesh
-        if path.exists():
-            vertices, faces = load_stl(path)
-            if len(faces):
-                # The CAD export is tessellated for exact fit checks (0.05 mm chord, 2 deg); routing works on 3 mm voxels
-                # and 1.5 mm surface samples, so 1 mm vertex clustering keeps the distance field and cuts winding-number cost.
-                coarse_vertices, coarse_faces = cluster_decimate(vertices, faces, ROUTING_MESH_CELL)
-                # A sub-cell solid can collapse completely. Keep its full CAD
-                # surface instead of dropping the obstacle or sampling an empty mesh.
-                if len(coarse_faces):
-                    vertices, faces = coarse_vertices, coarse_faces
-                return MeshShape(vertices, faces), "cad_mesh"
-    if "bbox_min" in part and "bbox_max" in part:
-        lo, hi = np.asarray(part["bbox_min"], dtype=float), np.asarray(part["bbox_max"], dtype=float)
-        return Box((lo + hi) / 2, np.eye(3), (hi - lo) / 2), "cad_bbox"
-    return None
+def _cad_shape(project: Project, part: dict[str, Any]) -> tuple[Shape, str]:
+    """Compatibility entry point: resolve only a pinned pulled part by identity."""
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    from r3_model.pulled_view import world_mesh
+    pulled = load_pulled(project.root)
+    name = part.get("part_name") or part.get("name")
+    if name not in pulled.parts:
+        raise PullError("cad_pull_missing", "Mesh request does not identify a pulled part")
+    mesh = world_mesh(pulled, name)
+    vertices, faces = cluster_decimate(mesh.vertices, mesh.faces, ROUTING_MESH_CELL)
+    if not len(faces):
+        vertices, faces = mesh.vertices, mesh.faces
+    return MeshShape(vertices, faces), "pulled_stl"
 
 
 def _spin_invariant(shape: Shape, axis: np.ndarray, origin: np.ndarray) -> bool:
@@ -309,37 +237,38 @@ def _swept(kin: Kinematics, shape: Shape, body: str, label: str) -> Shape:
 
 
 def build_obstacles(project: Project) -> tuple[ObstacleSet, list[Diagnostic]]:
-    spec, catalog = project.spec, project.catalog
-    cad = project.read_build_json("cad/cad_model.json") or {}
-    kin = Kinematics(spec, cad if isinstance(cad, dict) else None)
-    parts: dict[str, Any] = cad.get("parts", {}) if isinstance(cad, dict) else {}
-    obstacles: list[Obstacle] = []
-    estimated: list[str] = []
-    diagnostics: list[Diagnostic] = []
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    from r3_model.pulled_view import apply_pulled, world_mesh
 
-    for cid, comp in spec.components.items():
-        try:
-            ctype = catalog.component(comp.type)
-        except KeyError:
+    pulled = load_pulled(project.root)
+    assembly = apply_pulled(project, pulled)
+    spec, catalog = project.spec, project.catalog
+    kin = Kinematics(spec)
+    obstacles: list[Obstacle] = []
+    diagnostics = list(assembly.diagnostics)
+    cable_parts = {f"{h.id}.{name}" for h in spec.electrical.harnesses
+                   for name in [*h.connectors, *h.splices]}
+    for cid, part in pulled.parts.items():
+        # Cable hardware is added once by cable_obstacles, whose entry masks
+        # distinguish its own wires from foreign harnesses.
+        if cid in cable_parts:
             continue
-        mech = ctype.mechanical
-        shape, source = None, "catalog"
-        if cid in parts:
-            resolved = _cad_shape(project, parts[cid])
-            if resolved:
-                shape, source = resolved
-        if shape is None:
-            shape = _catalog_shape(project, cid)
-            estimated.append(cid)
+        comp = spec.components.get(cid)
+        ctype = catalog.components.get(comp.type) if comp else None
+        mech = ctype.mechanical if ctype else None
+        mesh = world_mesh(pulled, cid)
+        vertices, faces = np.asarray(mesh.vertices), np.asarray(mesh.faces)
+        coarse_vertices, coarse_faces = cluster_decimate(vertices, faces, ROUTING_MESH_CELL)
+        if len(coarse_faces):
+            vertices, faces = coarse_vertices, coarse_faces
+        shape = MeshShape(vertices, faces)
         body = kin.body_of(cid)
-        jointed = kin.is_moving(body)
-        moving = jointed or mech.moving
-        # Moving parts without a joint (motor can, enclosed gears) keep their own
-        # envelope: a spinning cylinder or a gear housing occupies its own volume.
-        swept = _swept(kin, shape, body, cid) if jointed else shape
-        structure = ctype.kind == "structure" and not moving
-        obstacles.append(Obstacle(cid, ctype.kind, shape, swept, float(mech.keepout_margin), bool(moving), body,
-                                  structure, source=source, color=mech.color))
+        moving = kin.is_moving(body)
+        swept = _swept(kin, shape, body, cid) if moving else shape
+        kind = ctype.kind if ctype else "part"
+        obstacles.append(Obstacle(cid, kind, shape, swept, float(mech.keepout_margin) if mech else 0.0,
+            moving, body, kind == "structure" and not moving, source="pulled_stl",
+            color=mech.color if mech else "#888888"))
 
     floor = base_plate([o for o in obstacles if o.structure])
     for obstacle in obstacles:
@@ -350,15 +279,8 @@ def build_obstacles(project: Project) -> tuple[ObstacleSet, list[Diagnostic]]:
             if aligned and 2 * obstacle.shape.half[thin] <= PLATE_MAX_THICKNESS:
                 obstacle.plate_axis = int(np.argmax(np.abs(rotation[:, thin])))
 
-    if estimated:
-        diagnostics.append(Diagnostic.warning(
-            "cad_geometry_estimated",
-            f"{len(estimated)} component(s) use catalog primitives instead of CAD geometry "
-            f"({'no build/cad/cad_model.json' if not parts else 'missing from cad_model.json'})",
-            subjects=estimated, data={"estimated_components": len(estimated), "cad_parts": len(parts)},
-            hint="Run the cad stage to route against exported meshes and bounding boxes."))
-    source = cad.get("source", {}) if isinstance(cad, dict) else {}
-    return ObstacleSet(obstacles, kin, estimated, source), diagnostics
+    return ObstacleSet(obstacles, kin, [], {"document_id": pulled.document_id,
+                                         "version_id": pulled.version_id}), diagnostics
 
 
 def base_plate(structures: list[Obstacle]) -> Obstacle | None:

@@ -120,7 +120,50 @@ class OwnedSpec(_Model):
     note: str = Field(default="", description="Optional inventory or provenance note.")
 
 
+class OnshapeSelection(_Model):
+    """Authored selector into the assembly, not a generated geometry definition."""
+
+    occurrence_path: list[str] | None = None
+    configuration: str = ""
+
+
+class PulledOnshapeReference(_Model):
+    document_id: str
+    version_id: str
+    element_id: str | None = None
+    part_id: str | None = None
+    occurrence_path: list[str] = Field(default_factory=list)
+    configuration: str = ""
+
+
+class PulledPartSpec(_Model):
+    """Read-only mirror of r3/pull@1, refreshed only by refresh_pulled_spec.
+
+    Frames are 4x4 rigid transforms in metres, not authored poses. Geometry
+    consumers must still verify the pinned manifest with load_pulled().
+    """
+
+    owner: Literal["onshape-pull"]
+    onshape: PulledOnshapeReference
+    document_id: str
+    version_id: str
+    stl: str
+    step: str
+    sha256: dict[Literal["stl", "step"], str]
+    mate_connectors: dict[str, list[list[float]]]
+    pose: list[list[float]]
+    mass: float | None = None
+    com: list[float] | None = None
+    inertia: list[float] | None = None
+    material: str | None = None
+    density: float | None = None
+    volume: float | None = None
+    purchased: bool
+
+
 class ComponentInstance(_Model):
+    onshape: OnshapeSelection = Field(default_factory=OnshapeSelection)
+    pulled: PulledPartSpec | None = Field(default=None, json_schema_extra={"readOnly": True, "owner": "onshape-pull"})
     purchased_unit: str | None = Field(default=None, description="Owner instance of the purchased assembly this supplied subpart belongs to.")
     type: str = Field(default="", description="Catalog id, e.g. raspberry-pi-5-8gb. Optional when `source` is given; "
                                               "a pinned sourcing choice replaces it.")
@@ -362,6 +405,8 @@ class Pcb(_Model):
 
 
 class Cad(_Model):
+    version_id: str | None = Field(default=None, description="Optional explicitly selected immutable Onshape version.")
+    source: str | None = Field(default=None, description="Onshape assembly URL; /w/ is resolved to a pinned /v/ by pull.")
     provider: Literal["onshape", "none"] = "onshape"
     generator: str | None = Field(default=None, description="Legacy project CAD generator reference; the supported CAD path uses standard Onshape features, never FeatureScript.")
     folder: str | None = Field(default=None, description="Provider folder id where documents are created.")
@@ -598,11 +643,25 @@ class Fabrication(_Model):
     min_wall: Quantity = Field(default=0.0012, description="Minimum printable wall (3 perimeters x 0.4 mm nozzle).")
 
 
+class PulledAttachment(_Model):
+    """An assembly mate copied from Onshape; only pull may write it."""
+
+    owner: Literal["onshape-pull"]
+    feature: str | None = None
+    id: str
+    kind: str
+    a: tuple[str, str]
+    b: tuple[str, str]
+    axis: list[float] | None = None
+    limits: list[float] | None = None
+
+
 class RobotSpec(_Model):
     schema_: str = Field(alias="schema", default=SCHEMA_ID)
     robot: RobotInfo
     requirements: Requirements = Field(default_factory=Requirements)
     components: dict[str, ComponentInstance]
+    attachments: list[PulledAttachment] = Field(default_factory=list, json_schema_extra={"readOnly": True, "owner": "onshape-pull"})
     mechanical: Mechanical = Field(default_factory=Mechanical)
     electrical: Electrical = Field(default_factory=Electrical)
     pcb: Pcb = Field(default_factory=Pcb)
@@ -621,7 +680,8 @@ class RobotSpec(_Model):
             if not comp.type and comp.source is None:
                 raise ValueError(f"component {cid!r} needs a catalog `type` or a `source` block")
             if comp.mount != "world" and comp.mount not in ids:
-                raise ValueError(f"component {cid!r} mounts on unknown component {comp.mount!r}")
+                raise PydanticCustomError("spec_reference_undefined", f"component {cid!r} mounts on unknown component {comp.mount!r}",
+                                          {"spec_path": ("components", cid, "mount")})
         self._check_mount_graph()
         for slot, members in self.source_slots().items():
             first = self.components[members[0]].source
@@ -630,10 +690,11 @@ class RobotSpec(_Model):
                 if (other.requires, other.prefer) != (first.requires, first.prefer):
                     raise ValueError(f"components {members[0]!r} and {cid!r} share sourcing group {slot!r} "
                                      "but declare different requires/prefer")
-        for joint in self.mechanical.joints:
-            for end in (joint.parent, joint.child):
+        for index, joint in enumerate(self.mechanical.joints):
+            for label, end in (("parent", joint.parent), ("child", joint.child)):
                 if end != "world" and end not in ids:
-                    raise ValueError(f"joint {joint.id!r} references unknown component {end!r}")
+                    raise PydanticCustomError("spec_reference_undefined", f"joint {joint.id!r} references unknown component {end!r}",
+                                              {"spec_path": ("mechanical", "joints", index, label)})
         self._check_mechanical(ids)
         harness_ids = [h.id for h in self.electrical.harnesses]
         if len(harness_ids) != len(set(harness_ids)):
@@ -643,24 +704,33 @@ class RobotSpec(_Model):
             raise ValueError("wire ids must be unique across harnesses")
         if self.assembly is not None:
             if self.assembly.root not in ids:
-                raise ValueError(f"assembly root {self.assembly.root!r} is not a component")
+                raise PydanticCustomError("spec_reference_undefined", f"assembly root {self.assembly.root!r} is not a component",
+                                          {"spec_path": ("assembly", "root")})
             join_ids = [join.join_id for join in self.assembly.joins]
             if len(join_ids) != len(set(join_ids)):
                 raise ValueError("assembly join ids must be unique")
-            for join in self.assembly.joins:
-                for end in (join.a, join.b):
+            for index, join in enumerate(self.assembly.joins):
+                for label, end in (("a", join.a), ("b", join.b)):
                     obj, dot, iface = end.partition(".")
                     if not dot or not iface:
                         raise ValueError(f"join end {end!r} must be <object>.<interface>")
                     if obj not in ids:
-                        raise ValueError(f"join {join.join_id!r} references unknown component {obj!r}")
-        for board in self.pcb.boards:
+                        raise PydanticCustomError("spec_reference_undefined", f"join {join.join_id!r} references unknown component {obj!r}",
+                                                  {"spec_path": ("assembly", "joins", index, label)})
+        for index, board in enumerate(self.pcb.boards):
             if board.component not in ids:
-                raise ValueError(f"board references unknown component {board.component!r}")
-        for module in self.software.modules:
+                raise PydanticCustomError("spec_reference_undefined", f"board references unknown component {board.component!r}",
+                                          {"spec_path": ("pcb", "boards", index, "component")})
+        for index, module in enumerate(self.software.modules):
             if module.runs_on not in ids:
-                raise ValueError(f"software module {module.name!r} runs on unknown component {module.runs_on!r}")
+                raise PydanticCustomError("spec_reference_undefined", f"software module {module.name!r} runs on unknown component {module.runs_on!r}",
+                                          {"spec_path": ("software", "modules", index, "runs_on")})
         return self
+
+    @property
+    def parts(self) -> dict[str, ComponentInstance]:
+        """Part instances; components remains the serialized/stage-facing name."""
+        return self.components
 
     def source_slots(self) -> dict[str, list[str]]:
         """Sourcing slot key (``source.group`` or the component id) -> component ids, in spec order."""
@@ -710,9 +780,8 @@ class RobotSpec(_Model):
         if shared:
             raise ValueError(f"fastener and interface ids must differ (transmission paths reference both): {shared}")
         parts = self.part_ids()
-        collisions = sorted(ids & {p for p in parts if ":" in p})
-        if collisions:
-            raise ValueError(f"part names collide with component ids: {collisions}")
+        # Native hardware is an explicitly declared part, including fastener:S
+        # and nut:S. These names no longer collide with generated local solids.
         for fastener in mech.fasteners:
             refs = [*fastener.clamps, *([fastener.thread_into] if fastener.thread_into else [])]
             for ref in refs:

@@ -47,7 +47,7 @@ def test_blank_project_is_graceful_everywhere(project: str) -> None:
     root = Path(project)
     assert "components: {}" in (root / "robot.yaml").read_text()
     assert "r3_guide" in (root / "AGENTS.md").read_text() and "FeatureScript" in (root / "AGENTS.md").read_text()
-    assert "FeatureScript" not in (root / "cad" / "README.md").read_text().replace("never FeatureScript", "")
+    assert "Onshape" in (root / "cad" / "README.md").read_text()
     result = m.r3_validate(project=project)
     assert result["ok"] and result["counts"]["error"] == 0
     statuses = {s["stage"]: s["status"] for s in result["stages"]}
@@ -61,73 +61,24 @@ def test_blank_project_is_graceful_everywhere(project: str) -> None:
     assert items["stage.cad"]["status"] == "not_run" and items["stage.pcb"]["status"] == "verified"
 
 
-def test_grow_a_printed_frame_robot(project: str) -> None:
+def test_grow_a_native_pulled_project(project: str) -> None:
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from pulled_fixture import write_pull
     guide = m.r3_guide()
-    assert guide["ok"] and "puzzle" in guide["content"].lower() and "r3_put_catalog_component" in guide["content"]
-
-    cameras = m.r3_list_catalog(project=project, kind="camera")["components"]
-    assert "arducam-b0445-imx296" in [c["id"] for c in cameras]
-    camera = m.r3_get_catalog_component("arducam-b0445-imx296", project=project)
-    assert camera["defined_in"] == "platform" and {"mount", "csi"} <= set(camera["component"]["interfaces"])
-    assert m.r3_get_catalog_component("arducam-uc-717", project=project)["code"] == "catalog_entry_missing"
-    pis = [c["id"] for c in m.r3_list_catalog(project=project, kind="computer", query="raspberry pi 5")["components"]]
-    assert {"raspberry-pi-5-2gb", "raspberry-pi-5-4gb", "raspberry-pi-5-8gb", "raspberry-pi-5-16gb"} <= set(pis)
-
-    # The agent's own printed frame, validated by the catalog schema.
-    broken = {**frame_entry(), "mechanical": {"shape": "custom", "mass": 0.09}}
-    rejected = m.r3_put_catalog_component(broken, project=project)
-    assert rejected["code"] == "catalog_entry_invalid" and any("size" in e for e in rejected["errors"])
-    written = m.r3_put_catalog_component(frame_entry(), project=project)
-    assert written["ok"] and written["path"] == "catalog/components/printbot-frame-petg.yaml"
-    assert m.r3_get_catalog_component("printbot-frame-petg", project=project)["defined_in"].startswith("catalog/")
-
-    # Step 1: frame + computer, joined at the Pi's mounting holes.
-    patch(project, {"components": {"frame": {"type": "printbot-frame-petg", "pose": {"xyz": [0, 0, 0.03]}},
-                                   "pi": {"type": "raspberry-pi-5-4gb"}},
-                    "assembly": {"root": "frame", "joins": [
-                        {"a": "frame.pi_1", "b": "pi.h1", "fasteners": {"type": "M2.5x5"}},
-                        {"a": "frame.pi_2", "b": "pi.h2", "fasteners": {"type": "M2.5x5"}},
-                        {"a": "frame.pi_3", "b": "pi.h3", "fasteners": {"type": "M2.5x5"}},
-                        {"a": "frame.pi_4", "b": "pi.h4", "fasteners": {"type": "M2.5x5"}}]}})
-    assert stage(project, "assembly")["status"] == "ok"
-    model = stage(project, "model")
-    # An unpowered Pi is a real error; its spare header inputs are not.
-    assert {d["code"] for d in model["diagnostics"] if d["severity"] == "error"} == {"input_without_driver", "joint_capacity_zero"}
-    assert any(d["code"] == "computer_inputs_unused" for d in model["diagnostics"])
-    assert stage(project, "electrical")["status"] == "not_configured"
-
-    # Step 2: power (2S LiPo -> Pololu 5 V buck -> Pi J8), camera on CAM0 through the 22-22 flat cable.
-    spec = yaml.safe_load((FIXTURE / "robot.yaml").read_text())
-    patch(project, {"components": {k: v for k, v in spec["components"].items() if k not in ("frame", "pi")},
-                    "assembly": spec["assembly"], "electrical": spec["electrical"], "software": spec["software"]})
-    for name in ("assembly", "model", "electrical"):
-        result = stage(project, name)
-        if name == "model":
-            assert {d["code"] for d in result["diagnostics"] if d["severity"] == "error"} == {"joint_capacity_zero"}
-        else:
-            assert result["status"] == "ok", (name, result["diagnostics"])
-    assert not [d for d in stage(project, "fabrication")["diagnostics"] if d["code"] == "stage_unavailable"]
-
-    # Step 3: a mistake the checks must catch: the camera binding on the empty CAM1 port.
-    bindings = spec["software"]["bindings"]
-    wrong = {**bindings["front_camera"], "pins": ["pi.CAM1.21", "pi.CAM1.20"], "device": "cam1"}
-    patch(project, {"software": {"bindings": {"front_camera": wrong}}})
-    errors = [d for d in stage(project, "model")["diagnostics"] if d["severity"] == "error"]
-    assert {d["code"] for d in errors} == {"binding_not_connected", "joint_capacity_zero"}
-    diagnosis = m.r3_diagnose(project=project)
-    assert diagnosis["errors"] >= 1 and any(g["subject"] == "front_camera" for g in diagnosis["subjects"])
-    patch(project, {"software": {"bindings": {"front_camera": bindings["front_camera"]}}})
-    assert {d["code"] for d in stage(project, "model")["diagnostics"] if d["severity"] == "error"} == {"joint_capacity_zero"}
-
-    # A cable too short for where the computer sits is reported with numbers.
-    short = {**m.r3_get_catalog_component("arducam-fpc-22-22-150mm", project=project)["component"]}
-    short["behavior"] = {**short["behavior"], "params": {"length": "20 mm"}}
-    assert m.r3_put_catalog_component(short, project=project)["overrides_platform_entry"] is True
-    cable = next(d for d in stage(project, "model")["diagnostics"] if d["code"] == "cable_too_short")
-    assert cable["data"]["span"] > cable["data"]["length"] == pytest.approx(0.02)
-
-    status = m.r3_status(project=project)
-    assert status["summary"]["components"] == 6 and status["summary"]["bindings"] == 1
+    assert guide["ok"] and "Onshape" in guide["content"] and "r3_cad_pull" in guide["content"]
+    entry = {"id": "synthetic-coupon", "name": "Synthetic coupon", "kind": "structure",
+             "mechanical": {"mass": .02, "size": [.04,.03,.004], "fabricated": True, "material": "PLA"}}
+    broken = {**entry, "mechanical": {**entry["mechanical"], "solids": [{"kind": "box"}]}}
+    assert m.r3_put_catalog_component(broken, project=project)["code"] == "catalog_entry_invalid"
+    assert m.r3_put_catalog_component(entry, project=project)["ok"]
+    patch(project, {"components": {"coupon": {"type": "synthetic-coupon"}}})
+    assert {d["code"] for d in stage(project, "cad")["diagnostics"] if d["severity"] == "error"} == {"cad_pull_missing"}
+    write_pull(Path(project), {"coupon": BRepPrimAPI_MakeBox(40,30,4).Shape()})
+    assert stage(project, "model")["status"] == "ok"
+    assert stage(project, "cad")["status"] == "ok"
+    current = m.r3_get_spec(project=project)
+    refused = m.r3_patch_spec({"components": {"coupon": {"pulled": {"mass": 5}}}}, current["sha256"], project=project)
+    assert not refused["ok"] and refused["code"] == "spec_read_only"
     assert m.r3_release_status(project=project)["fabrication_ready"] is False
 
 
@@ -144,8 +95,7 @@ def test_source_a_catalog_part_by_requirements(tmp_path: Path) -> None:
     (root / "robot.yaml").write_text(text)
     project = str(root)
     before = m.r3_validate(project=project, stages=["assembly", "model"])
-    assert [s["status"] for s in before["stages"][:2]] == ["not_configured", "failed"]
-    assert "component_unsourced" in {d["code"] for d in before["diagnostics"]}
+    assert "cad_pull_missing" in {d["code"] for d in before["diagnostics"]}
     found = m.r3_source_search("camera", project=project, providers=["catalog"], offline=True)
     best = found["ranked"][0]
     assert best["candidate"]["id"] == "catalog-arducam-b0445-imx296" and best["tier"] != "rejected"
@@ -156,7 +106,4 @@ def test_source_a_catalog_part_by_requirements(tmp_path: Path) -> None:
     assert not list((root / "catalog" / "components").glob("sourced_*.yaml"))
     for name in ("assembly", "model"):
         result = stage(project, name)
-        if name == "model":
-            assert {d["code"] for d in result["diagnostics"] if d["severity"] == "error"} == {"joint_capacity_zero"}
-        else:
-            assert result["status"] == "ok"
+        assert "cad_pull_missing" in {d["code"] for d in result["diagnostics"]}

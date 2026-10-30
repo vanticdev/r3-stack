@@ -114,8 +114,6 @@ def _category(code: str) -> str:
 
 
 def _twin_diagnostics(project: Project, spec: Any, catalog: Any) -> tuple[dict[tuple[str, tuple[str, ...]], Diagnostic], dict[str, Any]]:
-    from r3_model.assembly import compile_assembly
-
     from .model_stage import ModelChecker
 
     temp = Project(root=project.root, spec=spec, lock=project.lock)
@@ -129,11 +127,12 @@ def _twin_diagnostics(project: Project, spec: Any, catalog: Any) -> tuple[dict[t
     checker.check_roles()
     checker.check_voltages()
     checker.check_i2c()
-    checker.check_interference(checker.solids())
-    mass = checker.check_mass()
-    if spec.assembly is not None:
-        for diagnostic in compile_assembly(spec, catalog).diagnostics:
-            result.add(diagnostic)
+    # Candidate selection compares sourced datasheet mass, not current native CAD.
+    total = sum(catalog.component(c.type).mechanical.mass for c in spec.components.values() if c.type in catalog.components)
+    mass = {"total": total, "limit": spec.requirements.max_mass}
+    if mass["limit"] is not None and total > mass["limit"]:
+        result.add(Diagnostic.error("mass_exceeds_requirement", "Sourced datasheet mass exceeds the requirement",
+            data={"mass": total, "limit": mass["limit"], "source": "catalog estimate"}))
     found = {}
     for diagnostic in result.diagnostics:
         if diagnostic.severity.value != "info":
@@ -175,17 +174,11 @@ def make_checker(project: Project, requirement: Requirement, template: Any) -> C
                                 f"robot mass {mass['total']:.3f} kg" + (f" ({delta * 1e3:+.0f} g vs the current part)" if delta is not None else "")
                                 + (f", limit {mass['limit']:.3f} kg" if mass["limit"] else ""),
                                 requirement.components, {"total": mass["total"], "limit": mass["limit"], "delta": delta}))
-        if template is not None and interfaces:
-            kept = {f["id"] for f in entry["mechanical"].get("features", [])}
-            removed = [f for f in template.mechanical.features if f.id not in kept and f.kind != "face"]
+        if template is not None and interfaces and entry["id"] != template.id:
             for interface in interfaces:
-                if removed and interface.kind in ("revolute_fit", "press_fit", "drive_flat", "spline", "ball_joint"):
-                    checks.append(TwinCheck(
-                        "interface", "sourcing_interface_feature_changed", "warning",
-                        f"interface {interface.id} ({interface.kind} {interface.parts[0]}/{interface.parts[1]}) used the template's "
-                        f"{', '.join(f'{f.id} ({f.kind} {f.diameter * 1e3:.2f} mm)' for f in removed)}; the sourced part has "
-                        f"{', '.join(sorted(kept)) or 'no features'}; an adapter or a redesigned mating part is needed",
-                        [interface.id, *interface.parts], {"removed": [f.id for f in removed], "features": sorted(kept)}))
+                checks.append(TwinCheck("interface", "sourcing_interface_feature_changed", "warning",
+                    f"interface {interface.id}: the sourced part must be imported in Onshape and checked against pulled STEP before its attachment is qualified",
+                    [interface.id, *interface.parts], {"geometry_source": "native import required"}))
         for note in meta["notes"]:
             if "dropped" in note or "removed" in note:
                 checks.append(TwinCheck("mechanical", "sourcing_template_feature_dropped", "info", note, requirement.components))

@@ -3,18 +3,13 @@
 from __future__ import annotations
 
 import math
-from pathlib import Path
 
 import numpy as np
 import pytest
 
-from r3_model.project import Project
 from r3_wiring.geometry import Box
 from r3_wiring.obstacles import Obstacle, base_plate
-from r3_wiring.passthroughs import _inside, cad_slots
 from r3_wiring.supports import Post, _greedy, _tie_loop
-
-BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
 
 
 def _box(name: str, lo: list[float], hi: list[float]) -> Obstacle:
@@ -31,18 +26,6 @@ def test_base_plate_is_the_largest_footprint_not_a_strap_under_it():
     shelf = _box("shelf", [-.03, -.03, .06], [.03, .03, .064])
     assert base_plate([strap, shelf, plate]).component == "base"
     assert base_plate([]) is None
-
-
-def test_lead_slot_in_the_deck_is_a_pass_through():
-    project = Project.load(BENCH)
-    slots = {s["id"]: s for s in cad_slots(project)}
-    slot = slots["access_slot"]
-    assert slot["component"] == "panel"
-    centre = slot["entry"] + slot["axis"] * slot["depth"] / 2
-    through = centre[None] + np.outer(np.linspace(-0.01, 0.01, 41), slot["axis"])
-    assert _inside(through, slot).any()
-    beside = through + slot["along"] * (slot["length"] / 2 + slot["width"] / 2 + 0.002)
-    assert not _inside(beside, slot).any()
 
 
 def _candidate(arc: float, tilt: float = 0.0) -> dict:

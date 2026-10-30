@@ -8,7 +8,7 @@ import math
 import numpy as np
 import pytest
 
-from orchestrator_helpers import catalog_entry, codes, find, make_project, wire
+from orchestrator_helpers import catalog_entry, codes, find, make_project, wire, write_bench_pull
 from r3_model.project import Project
 from r3_orchestrator import model_stage
 from r3_orchestrator.geometry import make_solid, overlap
@@ -22,6 +22,7 @@ ELECTRICAL_CODES = {
 
 
 def run(root):
+    write_bench_pull(root)
     return model_stage.run(Project.load(root))
 
 
@@ -40,10 +41,10 @@ def test_bench_electrical_and_bindings_clean(baseline):
 
 def test_bench_layout_interference(baseline):
     _, result = baseline
-    pairs = {frozenset(d.subjects) for d in find(result, "component_interference")}
+    pairs = {frozenset(d.subjects) for d in find(result, "cad_interference")}
     assert frozenset({"block_a", "block_b"}) in pairs
-    for d in find(result, "component_interference"):
-        assert d.data["overlap_volume"] > 0 and d.data["depth"] > 0
+    for d in find(result, "cad_interference"):
+        assert d.data["intersection_volume"] > 0
 
 
 def test_graph_json_written(baseline):
@@ -107,10 +108,13 @@ def test_duplicate_i2c_address(tmp_path):
 def test_component_overlap_volume(tmp_path):
     def mutate(spec):
         spec["components"]["gps"]["type"] = "test-panel"
-        spec["components"]["gps"]["pose"] = {"xyz": [0, 0, .3]}
+        # Keep the exact-volume oracle at the local origin, avoiding float32
+        # cancellation from translating a 4 mm plate 300 mm in the mesh boolean.
+        spec["components"]["gps"]["pose"] = {"xyz": [0, 0, 0]}
+        spec["components"]["block_a"]["pose"] = {"xyz": [0, 0, 0]}
     result = run(make_project(tmp_path, mutate))
-    hits = [d for d in find(result, "component_interference") if set(d.subjects) == {"gps", "block_a"}]
-    assert hits and hits[0].data["overlap_volume"] == pytest.approx(.09 * .09 * .004, rel=1e-6)
+    hits = [d for d in find(result, "cad_interference") if set(d.subjects) == {"gps", "block_a"}]
+    assert hits and hits[0].data["intersection_volume"] == pytest.approx(.09 * .09 * .004, rel=1e-6)
 
 
 def test_logic_level_overvoltage(tmp_path):
@@ -171,14 +175,33 @@ def test_geometry_box_and_cylinder_volumes():
     assert np.allclose([z_cylinder.aabb[0][2], z_cylinder.aabb[1][2]], [0, 1])
 
 
-def test_concave_outline_does_not_fill_notch():
-    from r3_orchestrator.geometry import make_solid, outline_solid, overlap
+def test_pulled_step_preserves_a_concave_notch(tmp_path):
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
+    from OCP.gp import gp_Pnt
+    from pulled_fixture import write_pull
 
-    # The bench plate tapers from 130 mm to 70 mm wide: a box inside the notch must not collide.
-    outline = [[-0.17, -0.065], [0.04, -0.065], [0.07, -0.035], [0.17, -0.035], [0.17, 0.035], [0.07, 0.035], [0.04, 0.065], [-0.17, 0.065]]
-    plate = outline_solid("plate", outline, 0.003, [0.13, 0, 0.025], [0, 0, 0])
-    assert abs(plate.volume - 0.003 * (0.21 * 0.13 + 0.03 * 0.10 + 0.10 * 0.07)) < 1e-9
-    in_notch = make_solid("arm", "box", [0.02, 0.025, 0.01], "z", [0.26, 0.0475, 0.025], [0, 0, 0])
-    assert overlap(plate, in_notch) is None
-    on_plate = make_solid("blk", "box", [0.02, 0.02, 0.01], "z", [0.20, 0.03, 0.024], [0, 0, 0])
-    assert overlap(plate, on_plate)["volume"] > 0
+    root = make_project(tmp_path, lambda spec: spec.update(
+        components={"plate": {"type": "test-base"}, "probe": {"type": "test-panel"}},
+        mechanical={}, electrical={}, software={}, pcb={}))
+    # A real STEP solid with a 20 x 20 mm notch; its AABB overlaps the probe.
+    plate = BRepPrimAPI_MakeBox(100, 100, 4).Shape()
+    notch = BRepPrimAPI_MakeBox(gp_Pnt(80, 80, -1), 21, 21, 6).Shape()
+    plate = BRepAlgoAPI_Cut(plate, notch).Shape()
+    probe = BRepPrimAPI_MakeBox(gp_Pnt(85, 85, 0), 10, 10, 4).Shape()
+    write_pull(root, {"plate": plate, "probe": probe})
+    result = model_stage.run(Project.load(root))
+    assert not find(result, "cad_interference")
+    assert result.metrics["exact_solids"] == 2
+    # Put the probe into real material: the exact STEP intersection must fail.
+    probe = BRepPrimAPI_MakeBox(gp_Pnt(10, 10, 0), 10, 10, 4).Shape()
+    write_pull(root, {"plate": plate, "probe": probe})
+    hit, = find(model_stage.run(Project.load(root)), "cad_interference")
+    assert hit.data["intersection_volume"] == pytest.approx(10 * 10 * 4 * 1e-9, rel=1e-6)
+
+
+def test_model_requires_native_pull_before_graph_checks(tmp_path):
+    root = make_project(tmp_path, lambda spec: wire(spec, "W_RX_5V").update(awg=22))
+    result = model_stage.run(Project.load(root))
+    assert not result.ok and codes(result) == {"cad_pull_missing"}
+    assert not (root / "build/model/graph.json").exists()

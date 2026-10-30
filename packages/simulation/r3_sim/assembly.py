@@ -182,10 +182,16 @@ def build_assembly_model(
     """
     from .joints import separate_parts
 
+    from r3_model.pulled_view import apply_pulled
+    assembly = apply_pulled(project)
+    from r3_model.pulled import PullError
+    if assembly.errors:
+        raise PullError(assembly.errors[0].code, assembly.errors[0].message)
     spec = project.spec
     joints = {j.child: j for j in spec.mechanical.joints}
     root = _find_root(project, joints)
-    cad = project.read_build_json("cad/cad_model.json") or {}
+    from r3_model.pulled_view import cad_view, apply_pulled
+    cad = cad_view(project, mass_required=True)
     cad_parts = cad.get("parts", {})
     mesh_dir = project.root / "build" / "cad"
     part_props = {}
@@ -193,32 +199,11 @@ def build_assembly_model(
     diagnostics = []
     assumptions = []
     for cid in spec.components:
-        part = cad_parts.get(cid, {})
-        if part.get("mass") and part.get("com") and part.get("inertia"):
-            part_props[cid] = cad_mass_properties(part)
-            mass_source[cid] = part.get("mass_status", "cad")
-        else:
-            part_props[cid] = catalog_mass_properties(project, cid)
-            mass_source[cid] = "catalog"
+        part_props[cid] = cad_mass_properties(cad_parts[cid])
+        mass_source[cid] = cad_parts[cid].get("mass_status", "cad")
     for name, part in cad_parts.items():
-        if (
-            name not in part_props
-            and part.get("owner") in spec.components
-            and part.get("mass")
-            and part.get("com")
-            and part.get("inertia")
-        ):
+        if name not in part_props:
             part_props[name] = cad_mass_properties(part)
-    estimated = [cid for cid, value in mass_source.items() if value == "catalog"]
-    if estimated:
-        diagnostics.append(
-            Diagnostic.warning(
-                "cad_mass_estimated",
-                "Catalog primitive inertia is used where CAD mass properties are unavailable",
-                subjects=estimated,
-                data={"estimated_count": len(estimated)},
-            )
-        )
     mj = ET.Element("mujoco", model=spec.robot.name)
     ET.SubElement(mj, "compiler", angle="radian", autolimits="true", meshdir=str(mesh_dir))
     ET.SubElement(
@@ -282,27 +267,7 @@ def build_assembly_model(
         elements[cid] = el
         mech = project.catalog.component(comp.type).mechanical
         common = dict(mass="0", contype="0", conaffinity="0", group="1", rgba=_hex_rgba(mech.color))
-        if cid in meshes:
-            ET.SubElement(el, "geom", name=f"vis_{cid}", type="mesh", mesh=meshes[cid], **common)
-        else:
-            shape, size, axis = _component_shape(project, cid)
-            position, rotation = project.graph.component_pose(cid)
-            center = position + rotation @ (_local_center(shape, size) + np.asarray(mech.envelope_offset))
-            if shape == "cylinder":
-                rotation = rotation @ axis_rotation(axis)
-                geom_size = [size[0] / 2, size[1] / 2]
-            else:
-                geom_size = np.asarray(size) / 2
-            ET.SubElement(
-                el,
-                "geom",
-                name=f"vis_{cid}",
-                type=shape,
-                pos=_fmt(center),
-                quat=_fmt(rotation_to_quat(rotation)),
-                size=_fmt(geom_size),
-                **common,
-            )
+        ET.SubElement(el, "geom", name=f"vis_{cid}", type="mesh", mesh=meshes[cid], **common)
     connections, bindings = separate_parts(
         project, mj, root, bodies, origins, props, extras, elements, joints, cad_parts, part_props, initial_pose
     )
@@ -362,7 +327,10 @@ def build_assembly_model(
     import mujoco
 
     if hasattr(mujoco.mjtEnableBit, "mjENBL_SLEEP"):
-        mj.find("option/flag").set("sleep", "enable")
+        flag = mj.find("option/flag")
+        if flag is None:
+            flag = ET.SubElement(mj.find("option"), "flag")
+        flag.set("sleep", "enable")
         if cables:
             for element in mj.findall("worldbody/body"):
                 if element.find(".//composite") is not None:

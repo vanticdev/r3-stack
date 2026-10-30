@@ -202,7 +202,8 @@ def compile_connections(project: Project) -> ConnectionModel:
     model = ConnectionModel()
     spec, cat = project.spec, project.catalog
     defaults = cat.joint_defaults
-    cad = project.read_build_json("cad/cad_model.json") or {}
+    from .pulled_view import cad_view
+    cad = cad_view(project, mass_required=True)
     fit = cad.get("fit", {})
     cad_parts = cad.get("parts", {})
     assembly = project.assembly
@@ -214,7 +215,7 @@ def compile_connections(project: Project) -> ConnectionModel:
         override = spec.fabrication.parts.get(cid, {}).get("material")
         if override:
             return cat.material(override)
-        found = cat.material(mech.material or "")
+        found = cat.material(cad_parts.get(cid, {}).get("material") or "")
         if found is not None:
             return found
         if mech.fabricated and (not mech.material or str(mech.material).lower() in {"plastic", "printed", "fdm"}):
@@ -224,7 +225,8 @@ def compile_connections(project: Project) -> ConnectionModel:
     def dims(cid: str) -> list[float]:
         if cid not in spec.components or spec.components[cid].type not in cat.components:
             return []
-        return [float(v) for v in cat.component(spec.components[cid].type).mechanical.size]
+        part = cad_parts.get(cid)
+        return (np.asarray(part["bbox_max"]) - np.asarray(part["bbox_min"])).tolist() if part else []
 
     def value(
         inputs: dict[str, Any],

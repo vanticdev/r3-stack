@@ -56,12 +56,12 @@ def test_manual_add_pins_and_converts(bank, monkeypatch):
         service.add('Motor 2', 'motor', 'M-43', 'Fixture', 'https://vendor.test/motor.step')
 
 
-def test_onshape_missing_keys_is_structured(bank, monkeypatch):
+def test_public_onshape_search_is_unavailable(bank, monkeypatch):
     from r3_onshape import client
     monkeypatch.setattr(client, 'default_transport', lambda: None)
     from r3_catalog.modelbank.ingest import ingest
     result = service.guard(lambda: ingest(bank, 'onshape', query='Pi'))
-    assert result['code'] == 'model_bank_error' and 'connected transport' in result['message']
+    assert result['code'] == 'model_bank_error' and 'native' in result['message'].lower()
 
 
 def test_cli_explicit_project_uses_local_overlay(bank, tmp_path, capsys):

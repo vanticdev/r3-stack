@@ -105,8 +105,9 @@ def test_catalog_mated_pairs_align(catalog):
 
 
 @pytest.fixture(scope="module")
-def project():
-    return Project.load(BENCH)
+def project(bench_fresh):
+    from pulled_fixture import instrumentation_pull
+    return instrumentation_pull(bench_fresh)
 
 
 def test_component_connectors_mate_in_place(project):
@@ -197,8 +198,22 @@ def assert_routes_record_pin_ends(routes) -> None:
 
 
 @pytest.fixture(scope="module")
+def bench_wiring(tmp_path_factory):
+    from conftest import WiringRun
+    from native_wiring_fixture import publish_wiring_pull
+    from r3_wiring.stage import route_and_check
+    import shutil
+    root = tmp_path_factory.mktemp("native-connector-routing")
+    shutil.copytree(ROOT / "tests/fixtures/wiring", root, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns("build", "__pycache__"))
+    publish_wiring_pull(root)
+    project = Project.load(root)
+    return WiringRun(root, project, route_and_check(project))
+
+
+@pytest.fixture(scope="module")
 def routed(bench_wiring):
-    """The bench routed, planned and supported (shared full wiring-stage run, see conftest.py)."""
+    """The native bench routed, planned and supported for this module."""
     return bench_wiring.bundle
 
 

@@ -97,7 +97,7 @@ def test_doctor_stage_matrix(monkeypatch):
     payload = doctor.run_doctor(["model", "pcb", "software"])
     stages = {s["stage"]: s for s in payload["stages"]}
     assert stages["pcb"]["headless"] is False and stages["software"]["level"] == "unavailable"
-    assert stages["cad"]["headless"] is True and stages["cad"]["level"] == "degraded"  # cached cad_model.json or catalog geometry
+    assert stages["cad"]["headless"] is True and stages["cad"]["level"] == "full"  # validates pinned pulls without native access
     assert "mujoco GL backend" in stages["sim"]["missing"]
     assert payload["ok"] is False and payload["code"] == "stage_not_headless" and "pcb" in payload["message"]
 

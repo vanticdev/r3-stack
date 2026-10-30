@@ -409,43 +409,23 @@ export function createMockApi(options: MockOptions) {
     };
   }
 
-  function model(pid: string) {
-    const s = spec(pid);
-    const graph = readJson<ModelGraph>(build(pid, "model", "graph.json"));
-    const assembly = readJson(build(pid, "model", "assembly.json"));
-    const rawCatalog = catalogData().components;
-    const components = Object.fromEntries(Object.entries(s.components ?? {}).map(([id, c]) => {
-      const entry = rawCatalog.find((x) => x.id === c.type);
-      const mech = (entry?.mechanical ?? {}) as Json;
-      return [id, { type: c.type, pose: { xyz: vector(c.pose?.xyz ?? [0, 0, 0]), rpy: vector(c.pose?.rpy ?? [0, 0, 0]) }, mount: c.mount ?? null, label: "",
-                    kind: entry?.kind ?? null, name: entry?.name ?? null, shape: mech.shape ?? null,
-                    size: Array.isArray(mech.size) ? mech.size.map(quantity) : null, mass: quantity(mech.mass) }];
-    }));
-    const joints = (s.mechanical?.joints ?? []).map((j) => ({
-      ...j, origin: vector(j.origin), axis: vector(j.axis), limits: Array.isArray(j.limits) ? [quantity(j.limits[0]), quantity(j.limits[1])] : null,
-    }));
-    return {
-      graph, assembly, components, joints, derived_joints: [], compiled: !!assembly,
-      images: ["model/layout.png", "model/assembly_graph.png"].filter((p) => existsSync(build(pid, p))).map((p) => link(pid, p)),
-      results: { assembly: result(pid, "assembly"), model: result(pid, "model") },
-      missing: [["graph", graph], ["assembly", assembly]].filter(([, v]) => !v).map(([k]) => k as string),
-    };
-  }
-
-  function cad(pid: string) {
-    const cadModel = readJson<{ source?: Json; parts?: Record<string, { mesh?: string }> }>(build(pid, "cad", "cad_model.json"));
-    const meshes: Record<string, string> = {};
-    for (const [id, part] of Object.entries(cadModel?.parts ?? {})) {
-      if (part.mesh && existsSync(build(pid, "cad", part.mesh))) meshes[id] = artifactUrl(pid, `cad/${part.mesh}`);
-    }
-    for (const mesh of files(pid, "cad/meshes", /\.(stl|glb|obj)$/i)) meshes[path.basename(mesh).replace(/\.[^.]+$/, "")] ??= artifactUrl(pid, mesh);
-    const source = cadModel?.source ?? {};
-    const document = (source.url as string | undefined) ?? (source.document_id && source.workspace_id
-      ? `https://cad.onshape.com/documents/${String(source.document_id)}/w/${String(source.workspace_id)}` : null);
-    return {
-      cad_model: cadModel, meshes, onshape: { document, part_studio: (source.url as string | undefined) ?? null, lock: {} },
-      views: files(pid, "cad", IMAGE).map((p) => link(pid, p)), result: result(pid, "cad"), missing: cadModel ? [] : ["cad_model"],
-    };
+  async function nativeView(pid: string, section: "model" | "cad"): Promise<Json> {
+    // Share the production integrity checks and projections. Generated artifacts
+    // and catalog boxes cannot make an unpulled project appear to have CAD.
+    const script = path.join(repoRoot, "apps", "web", "scripts", "project_view.py");
+    return await new Promise<Json>((resolve, reject) => {
+      const child = spawn(python(), [script, projectDir(pid), pid, section], {
+        cwd: repoRoot, env: { ...process.env, PYTHONPATH: pythonPath() },
+      });
+      let output = "", errors = "";
+      child.stdout.setEncoding("utf8").on("data", (chunk: string) => { output += chunk; });
+      child.stderr.setEncoding("utf8").on("data", (chunk: string) => { errors += chunk; });
+      child.once("error", reject);
+      child.once("close", (code) => {
+        if (code !== 0) return reject(new HttpError(503, "mock_native_projection_unavailable", errors || "Native projection worker failed"));
+        try { resolve(JSON.parse(output) as Json); } catch (error) { reject(error); }
+      });
+    });
   }
 
   function wiring(pid: string) {
@@ -886,8 +866,8 @@ export function createMockApi(options: MockOptions) {
       if (section === "spec" && method === "GET") return send(res, 200, specDocument(pid));
       if (section === "spec" && method === "PATCH") return send(res, 200, patchSpec(pid, await body(req)));
       if (section === "catalog") return send(res, 200, catalog());
-      if (section === "model") return send(res, 200, model(pid));
-      if (section === "cad") return send(res, 200, cad(pid));
+      if (section === "model") return send(res, 200, await nativeView(pid, "model"));
+      if (section === "cad") return send(res, 200, await nativeView(pid, "cad"));
       if (section === "wiring") return send(res, 200, wiring(pid));
       if (section === "electrical") return send(res, 200, electrical(pid));
       if (section === "pcb") return send(res, 200, pcb(pid));

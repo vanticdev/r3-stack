@@ -103,6 +103,7 @@ class NodePoint:
     frame: Frame | None = None  # this half's connector frame (robot frame); z points at the mating half
     fan_length: float = 0.0  # arc length over which conductors converge from their pins into the bundle
     entry_radius: float = 0.0  # pin-row envelope reserved before other harnesses are routed
+    native: bool = False  # physical hardware pose belongs to the pinned Onshape assembly
 
     @property
     def ref(self) -> str:
@@ -124,6 +125,7 @@ class FloatingMate:
     length: float
     width: float
     cost: float
+    native: bool = False
 
 
 @dataclass
@@ -522,6 +524,7 @@ class HarnessRouter:
                     direction /= np.linalg.norm(direction)
                 nodes[name] = NodePoint(harness.id, name, "splice", np.asarray(splice.position, dtype=float), direction, od=od)
             for node in nodes.values():
+                self._native_node(node)
                 if node.kind == "connector":
                     self._lead(node, awgs.get(node.name, []))
                     # Integral pigtails and connector pins fan out in a row,
@@ -539,6 +542,39 @@ class HarnessRouter:
                     node.lead_end = node.exit.copy()
             out[harness.id] = nodes
         return out
+
+    def _native_node(self, node: NodePoint) -> None:
+        """Resolve physical cable hardware from its pulled mating frame.
+
+        Pin offsets remain electrical metadata. The native ``mating`` connector
+        (or explicit ``origin`` frame) locates those offsets on the actual part.
+        """
+        if node.connector_type == "integral":
+            return
+        from r3_model.spec_files import validate_pulled_spec
+        from r3_model.pulled import PullError
+
+        if not hasattr(self, "_native_model"):
+            self._native_model = validate_pulled_spec(self.project.root)
+        pulled = self._native_model
+        part = pulled.parts.get(node.ref)
+        if part is None:
+            return  # cable_obstacles reports absent physical hardware
+        local = part.mate_connectors.get("mating", part.mate_connectors.get("origin"))
+        if local is None:
+            raise PullError("cad_pull_invalid", f"{node.ref}: add a native mating connector named mating or origin")
+        matrix = pulled.poses[node.ref] @ local
+        frame = Frame(matrix[:3, :3], matrix[:3, 3])
+        node.native = True
+        node.frame = frame
+        node.body = self.kin.body_of(node.ref)
+        if node.kind == "splice":
+            node.exit, node.direction = frame.origin.copy(), frame.z.copy()
+        else:
+            node.face, node.direction = frame.origin.copy(), -frame.z.copy()
+            offset = exit_offset(self.catalog, node.connector_type)
+            node.exit = node.face + node.direction * offset
+            node.body_length = offset
 
     def _lead(self, node: NodePoint, awgs: list[int], *, pin_widths: dict[str, float] | None = None) -> None:
         """Straight strain-relief run out of a connector, long enough for a
@@ -638,120 +674,33 @@ class HarnessRouter:
         return start, [start]
 
     def _place_floating(self, nodes: dict[str, dict[str, NodePoint]]) -> list[FloatingMate]:
-        from scipy.sparse.csgraph import dijkstra
-
         placed: list[FloatingMate] = []
         harnesses = {h.id: h for h in self.spec.electrical.harnesses}
         for ref_a, ref_b in self._floating_pairs():
             ha, ca = ref_a.split(".", 1)
             hb, cb = ref_b.split(".", 1)
             na, nb = nodes[ha][ca], nodes[hb][cb]
-            length = mated_pair_length(self.catalog, na.connector_type, nb.connector_type)
-            width = max(body_width(self.catalog, na.connector_type), body_width(self.catalog, nb.connector_type))
-            r = max(na.od, nb.od) / 2
-            ctx = self.context(r)
-            graph = self._csgraph(ctx)
-            sides = []
-            for harness_id, name in ((ha, ca), (hb, cb)):
-                anchors: dict[int, float] = {}
-                for wire in harnesses[harness_id].wires:
-                    ends = [wire.from_, wire.to]
-                    names = [e if e in harnesses[harness_id].splices else e.split(".")[0] for e in ends]
-                    if name not in names:
-                        continue
-                    other = nodes[harness_id][names[1] if names[0] == name else names[0]]
-                    point = other.lead_end if other.lead_end is not None else other.exit
-                    if point is None:
-                        continue
-                    voxel, escape = self._free_voxel(point, ctx)
-                    voxel = escape[0] if escape else voxel
-                    anchors[voxel] = anchors.get(voxel, 0.0) + float(self.catalog.wire(wire.awg).mass_per_m)
-                sides.append(anchors)
-            if not sides[0] or not sides[1]:
-                continue
-            total = np.zeros(self.grid.size)
-            heaviest = []
-            for anchors in sides:
-                for voxel, weight in anchors.items():
-                    total += weight * dijkstra(graph, directed=False, indices=voxel)
-                heaviest.append(max(anchors, key=anchors.get))
-            weight_sum = sum(sum(a.values()) for a in sides)
-            # Prefer a spot where the mated pair can be tied to structure.
-            total += 2.0 * weight_sum * np.maximum(0.0, self.fields.struct_dist - (width / 2 + 0.004))
-            invalid = ctx.blocked_np | (ctx.zone_np > 0) | (self.fields.static_clear < width / 2) | \
-                (self.fields.moving_raw < self.c_req + width / 2) | ~np.isfinite(total)
-            total[invalid] = np.inf
-            _, preds_a = dijkstra(graph, directed=False, indices=heaviest[0], return_predecessors=True)
-            _, preds_b = dijkstra(graph, directed=False, indices=heaviest[1], return_predecessors=True)
-            # Straight strain-relief leads out of the two harnesses' connectors are kept free when
-            # possible: a mated pair placed on one makes its conductors double back. If no candidate
-            # clears them, the cheapest otherwise valid placement is used.
-            leads = [(n.exit, n.lead_end, n.od / 2) for h in (ha, hb) for n in nodes[h].values()
-                     if n.kind == "connector" and n.exit is not None and n.lead_end is not None and n.lead_length > 0]
-            order = np.argsort(total)
-            # An authored ``position`` on either half (robot frame) places the mated pair: the valid voxels
-            # are tried nearest first (the layout decides where a pair has room for its leads' bends).
-            hint = next((np.asarray(c.position, float) for c in (harnesses[ha].connectors[ca], harnesses[hb].connectors[cb])
-                         if c.position is not None), None)
-            if hint is not None:
-                distance = np.linalg.norm(self.grid.centers() - hint, axis=1)
-                distance[~np.isfinite(total)] = np.inf
-                order = np.argsort(distance)
-            requested_axes = [sign * np.asarray(conn.direction, float)
-                              for sign, conn in ((-1, harnesses[ha].connectors[ca]),
-                                                 (1, harnesses[hb].connectors[cb])) if conn.direction is not None]
-            requested_axes = [axis / np.linalg.norm(axis) for axis in requested_axes]
-            if len(requested_axes) == 2 and float(requested_axes[0] @ requested_axes[1]) < 1 - 1e-6:
+            if not (na.native and nb.native):
                 self.diagnostics.append(Diagnostic.error(
-                    "floating_mate_axis_conflict", f"{ref_a} / {ref_b}: mating halves need opposite wire exit axes",
+                    "cad_pull_missing", f"{ref_a} / {ref_b}: model and mate both cable halves in Onshape, then pull",
                     subjects=[ref_a, ref_b]))
                 continue
-            chosen = fallback = None
-            # Cheapest first. The first 400 voxels (a ~2 cm cube around the optimum) are searched for a
-            # lead-clear placement; if no pair body fits there at all, the search continues outward.
-            for rank, voxel in enumerate(order[:FLOATING_CANDIDATES]):
-                if fallback is not None and rank >= 400:
-                    break
-                if not np.isfinite(total[voxel]):
-                    break
-                center = self.grid.center(int(voxel))
-                pa, pb = self._walk(preds_a, int(voxel), 7), self._walk(preds_b, int(voxel), 7)
-                axis = requested_axes[0].copy() if requested_axes else pb - pa
-                if np.linalg.norm(axis) < 1e-9:
-                    continue
-                axis /= np.linalg.norm(axis)
-                body = center + axis[None] * np.linspace(-length / 2, length / 2, 9)[:, None]
-                static, _ = self.obstacles.min_distance(body, self.obstacles.static, keepout=True)
-                moving, _ = self.obstacles.min_distance(body, self.obstacles.moving, swept=True)
-                if static.min() >= width / 2 and moving.min() >= self.c_req + width / 2:
-                    if not any(project_to_polyline(np.vstack([a, b]), body[k][None])[0] < width / 2 + r_lead
-                               for a, b, r_lead in leads for k in range(len(body))):
-                        chosen = (center, axis, float(total[voxel]))
-                        break
-                    if fallback is None:
-                        fallback = (center, axis, float(total[voxel]))
-            chosen = chosen or fallback
-            if chosen is None:
+            if (np.linalg.norm(na.face - nb.face) > 1e-6 or
+                    float(na.direction @ nb.direction) > -1 + 1e-6):
                 self.diagnostics.append(Diagnostic.error(
-                    "floating_mate_unplaced", f"no free position for mated pair {ref_a} / {ref_b}",
-                    subjects=[ref_a, ref_b], data={"pair_length": length, "pair_width": width}))
+                    "floating_mate_axis_conflict", f"{ref_a} / {ref_b}: pulled mating frames do not coincide and oppose",
+                    subjects=[ref_a, ref_b]))
                 continue
-            center, axis, cost = chosen
-            depth_a = wire_entry_depth(self.catalog, na.connector_type)
-            depth_b = wire_entry_depth(self.catalog, nb.connector_type)
-            # Mating face: na's conductor exit plus its exit depth (the midpoint without geometry).
-            face = center + axis * ((depth_a - length / 2) if depth_a is not None and depth_b is not None else 0.0)
-            half_a = floating_pair_frame(face, axis)  # na's z points at nb
-            for node, sign, frame in ((na, -1.0, half_a), (nb, 1.0, half_a.mated())):
-                node.face = face.copy()
-                node.direction = sign * axis
-                node.exit = center + sign * axis * (length / 2)
-                node.body_length = float(np.linalg.norm(node.exit - face))
-                node.frame = frame
+            center = (na.exit + nb.exit) / 2
+            axis = nb.direction.copy()
+            length = float(np.linalg.norm(nb.exit - na.exit))
+            width = max(body_width(self.catalog, na.connector_type), body_width(self.catalog, nb.connector_type))
+            for node in (na, nb):
                 gauges = [w.awg for w in harnesses[node.harness].wires
                           if any(ref.startswith(node.name + ".") for ref in (w.from_, w.to))]
                 self._lead(node, gauges)
-            placed.append(FloatingMate(ref_a, ref_b, na.connector_type, nb.connector_type, center, axis, length, width, cost))
+            placed.append(FloatingMate(ref_a, ref_b, na.connector_type, nb.connector_type,
+                                       center, axis, length, width, 0.0, native=True))
         return placed
 
     def _walk(self, preds: np.ndarray, start: int, steps: int) -> np.ndarray:

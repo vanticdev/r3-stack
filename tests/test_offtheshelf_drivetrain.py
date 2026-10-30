@@ -11,28 +11,10 @@ import pytest
 
 from r3_model.project import Project
 from r3_orchestrator import stages
-from r3_onshape.parts import instance_poses
 from r3_sim.scenario import run_scenario
 from test_joint_physics import drivetrain_project
 
 
-def test_bought_driveline_assembles_without_errors(tmp_path) -> None:
-    shutil.copytree(Path(__file__).parent / "fixtures/transmission", tmp_path, dirs_exist_ok=True)
-    project = Project.load(tmp_path)
-    result = stages.run_stage(project, "assembly")
-    assert result.ok, [(d.code, d.subjects) for d in result.errors]
-    poses = json.loads((project.root / "build/model/assembly.json").read_text())["poses"]
-    derived = instance_poses(project)
-    assert set(poses) == set(project.spec.components)
-    for name in project.spec.components:
-        pose = derived[name]
-        np.testing.assert_allclose(poses[name]["xyz"], pose[:3, 3], atol=1e-4)
-    assert {j.id for j in project.spec.assembly.joins} == {"motor_mount", "coupling"}
-    assert next(j for j in project.spec.assembly.joins if j.id == "coupling").kind == "drive_flat"
-    model = stages.run_stage(project, "model")
-    assert not model.ok
-    assert any(d.code == "joint_capacity_zero" for d in model.errors)
-    assert any(d.code == "interference_checked_by_assembly" for d in model.diagnostics)
 
 
 def test_unqualified_driveline_is_rejected_with_real_firmware(tmp_path) -> None:

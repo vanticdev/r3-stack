@@ -31,7 +31,7 @@ Events (normalized for both providers; ``raw`` events carry anything else):
 ``tool_result``  ``{id, name, ok, content}``
 ``run_started`` / ``run_finished``  pipeline runs the agent triggered through ``r3_validate``,
 ``r3_run_stage`` or ``r3_run_scenario`` (``run_finished`` has ``ok``, ``counts``, ``stages``)
-``spec_changed``  ``{previous_sha256, sha256, diff, cumulative_diff}`` whenever robot.yaml changes
+``spec_changed``  ``{previous_sha256, sha256, diff, cumulative_diff}`` whenever any included description file changes
 ``usage``  ``{input_tokens, output_tokens, cost_usd?}``
 ``stderr``  ``{line}``
 ``raw``  ``{event}``  unrecognized CLI events, verbatim
@@ -41,7 +41,6 @@ Events (normalized for both providers; ``raw`` events carry anything else):
 from __future__ import annotations
 
 import difflib
-import hashlib
 import json
 import os
 import shutil
@@ -59,6 +58,7 @@ from typing import Any, Iterable
 from .errors import ApiError
 from .events import EventLog
 from ..environment import r3_pythonpath
+from r3_model.spec_files import SpecFiles, load_spec_files, spec_lock
 
 PROVIDERS = ("claude", "codex")
 MCP_SERVER = "r3"
@@ -73,13 +73,22 @@ SYSTEM_PROMPT = """You are independently building an R3 robot project, launched 
 Read r3_guide first. robot.yaml is the robot specification: change it through r3_get_spec -> r3_patch_spec
 (pass the sha256 you read; on spec_conflict re-read and re-apply). Firmware and other authored project files
 may be edited directly. Use r3_get_schema for typed authoring details, the catalog and sourcing tools for parts,
-r3_cad_plan for quota estimates, r3_view_artifact to inspect images, and the pipeline tools to validate.
+r3_cad_pull for pinned read-only CAD, r3_view_artifact to inspect images, and the pipeline tools to validate.
 Run native stages, scenarios and project test suites through R3 MCP tools in the worker environment.
 Author device bridges under simulation/ and tests under tests/ in this project; the guide documents the
 simulation.devices extension API and r3_run_project_tests. Do not edit platform code to add a project device.
 CAD changes must happen only in a real Onshape document, using standard editable features and assemblies.
 No FeatureScript, locally fabricated CAD, hand-written external tool formats, or sculpted purchased parts.
-Catalog envelopes and offline previews are estimates, never completed CAD. Use real MuJoCo, ngspice and Sionna.
+Use onshape_native directly: discover native commands/schemas, model parts, add mate connectors,
+import vendor STEP, create documents in the designated folder and build real assemblies with real mates.
+Use native editor/local bridge routes only; public /api calls, bodydetails, massproperties, shadedviews,
+and public translations are unavailable. UI exports use /native/api/v17, never a public fallback.
+Search the R3 model bank first for purchased parts, then import them into Onshape and add connectors there.
+Verify geometry, regeneration and mates numerically and inspect viewport captures before r3_cad_pull.
+Create or select an immutable Onshape version. robot.yaml is an index into parts/, electrical/ and software/;
+Onshape-derived fields and cad/pulled files are read-only and refreshed only by pull. Fix CAD in Onshape,
+then pull again. Never author solids, dimensions, connector frames, poses or mates locally.
+Every viewer and simulation mesh must come from that verified pull. Use real MuJoCo, ngspice and Sionna.
 Use gh and normal git for GitHub repository creation and pushing when the user explicitly requests them;
 that request supplies authorization. Never deploy to physical hardware without an explicit request.
 Work only in this project; you may read the R3 platform source and public technical references.
@@ -112,10 +121,51 @@ def detect(provider: str, executable: str | None = None) -> dict[str, Any]:
             "detail": "" if ok else f"`{path} --version` exited with {proc.returncode}"}
 
 
+# Only editor/native tooling is exposed. Public REST, evaluation and generated
+# FeatureScript are deliberately excluded even when installed in the account.
+NATIVE_TOOLS = ("bridge_status", "resolve_target", "search_commands", "browse_commands", "native_catalog",
+    "native_state", "native_schema", "native_read", "native_write", "open_document", "editor_tab",
+    "document_tree", "element_tree", "document_history", "document_edit", "sidebar_edit", "artifact_page",
+    "display_state", "set_visibility", "mate_animation", "view_control", "capture_viewport",
+    "assembly_transform", "native_measure", "assembly_feature", "ui_inspect", "ui_action")
+
+
+def native_mcp_config() -> dict[str, Any] | None:
+    """Reuse the installed plugin's launcher, without copying credentials or enabling other plugins.
+
+    Workers can set R3_ONSHAPE_NATIVE_MCP_CONFIG to an installation's .mcp.json.
+    Desktop sessions also discover the installed native plugin or stdio account entry.
+    """
+    explicit = os.environ.get("R3_ONSHAPE_NATIVE_MCP_CONFIG")
+    home = Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
+    if explicit:
+        candidates = [Path(explicit).expanduser()]
+    else:
+        account = home / "config.toml"
+        if account.is_file():
+            config = tomllib.loads(account.read_text()).get("mcp_servers", {}).get("onshape_native")
+            if config and config.get("command"):
+                return {key: value for key, value in config.items() if key in ("command", "args", "env", "cwd")}
+        candidates = sorted((home / "plugins" / "cache").glob("**/onshape-native/*/.mcp.json"), reverse=True)
+    for path in candidates:
+        config = json.loads(path.read_text()).get("mcpServers", {}).get("onshape_native")
+        if config and config.get("command"):
+            return {key: value for key, value in config.items() if key in ("command", "args", "env", "cwd")}
+    return None
+
+
 def mcp_config(project_root: Path, python: str = sys.executable) -> dict[str, Any]:
-    """The ``.mcp.json`` for a session: R3's stdio MCP server bound to this project."""
-    return {"mcpServers": {MCP_SERVER: {"command": python, "args": ["-m", "r3_orchestrator.mcp_server"],
-                                        "env": {"R3_PROJECT": str(project_root), "PYTHONPATH": r3_pythonpath()}}}}
+    """R3 plus the installed native editor server, bound to this project."""
+    servers = {MCP_SERVER: {"command": python, "args": ["-m", "r3_orchestrator.mcp_server"],
+                           "env": {"R3_PROJECT": str(project_root), "PYTHONPATH": r3_pythonpath()}}}
+    native = native_mcp_config()
+    if native:
+        servers["onshape_native"] = native
+        # Give the R3 pull process the same bridge runtime as the editor server.
+        runtime = native.get("env", {}).get("ONSHAPE_NATIVE_RUNTIME")
+        if runtime:
+            servers[MCP_SERVER]["env"]["ONSHAPE_NATIVE_RUNTIME"] = runtime
+    return {"mcpServers": servers}
 
 
 def _tools() -> tuple[list[str], list[str]]:
@@ -130,7 +180,12 @@ def claude_command(executable: str, config_path: Path, model: str | None = None)
                "--mcp-config", str(config_path), "--strict-mcp-config", "--permission-mode", "default",
                "--append-system-prompt", SYSTEM_PROMPT,
                "--allowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in allowed], *CLAUDE_READ_TOOLS,
-               "--disallowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in gated]]
+               "--disallowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in gated],
+               "mcp__onshape_native__evaluate", "mcp__onshape_native__feature_studio", "mcp__onshape_native__api_read",
+               "mcp__onshape_native__api_write", "mcp__onshape_native__api_upload", "mcp__onshape_native__api_request"]
+    # An explicit allowlist keeps discovery/modeling available under strict MCP config.
+    index = command.index("--disallowedTools")
+    command[index:index] = [f"mcp__onshape_native__{tool}" for tool in NATIVE_TOOLS]
     if model:
         command += ["--model", model]
     return command
@@ -171,7 +226,7 @@ def codex_scope_overrides(project_root: Path, account_home: Path | None = None) 
         config = {}  # the CLI reports malformed account configuration itself
     overrides = []
     for name in sorted(config.get("mcp_servers", {})):
-        if name != MCP_SERVER:
+        if name not in (MCP_SERVER, "onshape_native"):
             overrides += ["-c", f"mcp_servers.{name}.enabled=false"]
     for name in sorted(config.get("plugins", {})):
         overrides += ["-c", f"plugins.{name}.enabled=false"]
@@ -213,6 +268,15 @@ def codex_command(executable: str, project_root: Path, config: dict[str, Any], m
                "-c", f'{prefix}.default_tools_approval_mode="prompt"',
                "-c", f"{prefix}.tools={_toml({tool: {'approval_mode': 'approve'} for tool in allowed})}",
                "-c", f"{prefix}.startup_timeout_sec=120", "-c", f"{prefix}.tool_timeout_sec={MCP_TOOL_TIMEOUT_S}"]
+    native = config["mcpServers"].get("onshape_native")
+    if native:
+        for key in ("command", "args", "env", "cwd"):
+            if key in native:
+                command += ["-c", f"mcp_servers.onshape_native.{key}={_toml(native[key])}"]
+        command += ["-c", "mcp_servers.onshape_native.enabled=true",
+                    "-c", f"mcp_servers.onshape_native.enabled_tools={_toml(NATIVE_TOOLS)}",
+                    "-c", f"mcp_servers.onshape_native.tools={_toml({tool: {'approval_mode': 'approve'} for tool in NATIVE_TOOLS})}",
+                    "-c", f"mcp_servers.onshape_native.tool_timeout_sec={MCP_TOOL_TIMEOUT_S}"]
     command += codex_scope_overrides(project_root)
     if model:
         command += ["--model", model]
@@ -354,8 +418,8 @@ class AgentSession:
     cancel_requested: bool = False
     _process: Any = None
     _calls: dict[str, dict[str, Any]] = field(default_factory=dict)
-    _spec_start: str = ""
-    _spec_last: str = ""
+    _spec_start: dict[str, str] = field(default_factory=dict)
+    _spec_last: dict[str, str] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def to_json(self) -> dict[str, Any]:
@@ -365,13 +429,20 @@ class AgentSession:
                 "transcript": str(self.directory / "transcript.jsonl") if self.directory else None}
 
 
-def _sha(text: str) -> str:
-    return hashlib.sha256(text.encode()).hexdigest()
+def _sha(texts: dict[str, str]) -> str:
+    return SpecFiles(Path("."), texts=texts).sha256
 
 
-def _diff(before: str, after: str) -> str:
-    return "".join(difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True),
-                                        "a/robot.yaml", "b/robot.yaml"))
+def _description(root: Path) -> dict[str, str]:
+    with spec_lock(root, shared=True):
+        return load_spec_files(root).texts
+
+
+def _diff(before: dict[str, str], after: dict[str, str]) -> str:
+    return "".join("".join(difflib.unified_diff(before.get(name, "").splitlines(keepends=True),
+                                              after.get(name, "").splitlines(keepends=True),
+                                              f"a/{name}", f"b/{name}"))
+                   for name in sorted(before.keys() | after.keys()))
 
 
 class AgentManager:
@@ -426,8 +497,7 @@ class AgentManager:
         else:
             session.command = codex_command(info["path"], Path(root), config, model)
             stdin = prompt
-        spec = Path(root) / "robot.yaml"
-        session._spec_start = session._spec_last = spec.read_text() if spec.exists() else ""
+        session._spec_start = session._spec_last = _description(Path(root))
         env = {**os.environ, **self.extra_env, "R3_PROJECT": str(root), "PYTHONPATH": r3_pythonpath(),
                "MCP_TOOL_TIMEOUT": str(MCP_TOOL_TIMEOUT_S * 1000), "MCP_TIMEOUT": "120000"}
         self._sessions[session.id] = session
@@ -545,8 +615,7 @@ class AgentManager:
         self._emit(session, kind, **payload)
 
     def _check_spec(self, session: AgentSession) -> None:
-        spec = session.root / "robot.yaml"
-        current = spec.read_text() if spec.exists() else ""
+        current = _description(session.root)
         with session._lock:
             if current == session._spec_last:
                 return

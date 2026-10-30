@@ -1,4 +1,4 @@
-"""Connectors stage on the bench: models, the Pi header against the official STEP, mated pairs."""
+"""Connectors stage on explicit native bench coupons: meshes, posts and mated pairs."""
 
 import json
 import shutil
@@ -6,7 +6,6 @@ from pathlib import Path
 
 import pytest
 
-from r3_connectors.models import ModelUnavailable, fetch_vendor
 from r3_connectors.stage import run
 from r3_model.project import Project
 
@@ -17,8 +16,16 @@ BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
 def stage(tmp_path_factory):
     root = tmp_path_factory.mktemp("bench")
     shutil.copytree(BENCH, root, dirs_exist_ok=True, ignore=shutil.ignore_patterns("build", "__pycache__", "_vendor"))
-    project = Project.load(root)
-    return root, run(project, render=False)
+    from pulled_fixture import instrumentation_pull, revise_project
+    from connector_native_fixture import box, compound, add_cables_to_pull
+    project = instrumentation_pull(root)
+    # Independently dimensioned 2x20, 2.54 mm pitch coupon. These are actual
+    # STEP solids, not a catalog-generated connector or a vendor download.
+    posts = [box((.64,.64,6), (-10 - 24.13 + 2.54 * col, 24.5 + row, 6.876))
+             for col in range(20) for row in (-1.27,1.27)]
+    project = revise_project(project, shapes={"pi": compound([box((85,56,1.6), (0,0,-.8)), *posts])})
+    add_cables_to_pull(project)
+    return root, run(Project.load(root), render=False)
 
 
 def test_connectors_json(stage):
@@ -35,17 +42,17 @@ def test_connectors_json(stage):
         assert pair["max_pin_lateral_error"] < 1e-6, pair
     assert not [d for d in result.diagnostics if d.code in ("connector_mate_misaligned", "connector_pose_mismatch")]
     for type_id, entry in data["types"].items():
-        assert entry["glb"] and (root / "build" / "connectors" / entry["glb"]).stat().st_size > 1000, type_id
+        assert entry["glb"] is None and entry["pins"], type_id
+    from r3_model.pulled import load_pulled
+    native = load_pulled(root)
+    assert set(data["components"]) == set(native.parts)
+    for name, entry in data["components"].items():
+        assert entry["source"] == "pulled", name
+        assert entry["glb"] and (root / "build" / "connectors" / entry["glb"]).stat().st_size > 1000, name
 
 
-def test_pi_header_matches_official_step(stage):
+def test_header_matches_explicit_native_step(stage):
     root, result = stage
-    from r3_catalog import load_catalog
-
-    try:
-        fetch_vendor(load_catalog().component("raspberry-pi-5-8gb").model)
-    except ModelUnavailable as error:
-        pytest.skip(f"official Raspberry Pi 5 STEP unavailable: {error}")
     data = json.loads((root / "build" / "connectors" / "connectors.json").read_text())
     check = data["checks"]["pi.J8_model"]
     assert check["posts_found"] == 40 and check["max_pin_error"] < 5e-5

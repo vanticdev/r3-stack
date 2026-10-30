@@ -1,8 +1,27 @@
 # @@NAME@@
 
-R3 robot project. `robot.yaml` describes the robot once; the R3 pipeline
-derives CAD, PCBs, 3D wiring and deployable software from it and validates the
-result in a multi-domain digital twin.
+R3 robot project. `robot.yaml` indexes the complete local robot description.
+Part metadata lives in `parts/<id>.yaml`; electrical and software descriptions
+live in `electrical/system.yaml` and `software/system.yaml`. For example:
+
+```yaml
+components:
+  link: {$include: parts/link.yaml}
+electrical: {$include: electrical/system.yaml}
+software: {$include: software/system.yaml}
+```
+
+Includes replace a complete value and use project-relative paths. The pipeline
+resolves them into one spec for every stage. Model parts, mate connectors and
+mates directly in Onshape; R3 reads a pinned local CAD copy under `cad/pulled/`.
+Git does not preserve read-only bits: after checkout run `find cad/pulled -type f -exec chmod a-w {} +`;
+the pipeline still verifies every pinned checksum and derived description field. CI restores these permissions.
+Part `pulled` fields and root `attachments` are owned by pull and must not be
+edited. `r3_get_spec` returns every source file; `r3_patch_spec` routes changes
+to their owning files and requires the SHA-256 of the complete description.
+
+R3 validates the description, electrical design, wiring and deployable software
+in a multi-domain digital twin.
 
 ## Quick start
 
@@ -33,7 +52,6 @@ env = { R3_PROJECT = "/path/to/@@NAME@@" }
 `.github/workflows/r3.yml` validates every push and pull request inside the
 R3 worker image (KiCad, ngspice, MuJoCo, Freerouting; fully headless), uploads
 `build/` as an artifact and posts a job summary. Optional secrets:
-`ONSHAPE_ACCESS_KEY` / `ONSHAPE_SECRET_KEY` (CAD sync with Onshape API keys),
 `R3_WORKER_IMAGE_TOKEN` (private worker image) and `R3_PLATFORM_TOKEN` (private
 platform repository). Run `r3 doctor` to see which stages can run headless.
 

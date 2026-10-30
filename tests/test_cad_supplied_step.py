@@ -3,8 +3,6 @@ import numpy as np
 import pytest
 
 from r3_connectors.frames import Frame
-from r3_onshape.geometry import PartPlan
-from r3_onshape.parts import LocalPart, world_manifold
 from r3_onshape.step_geometry import read_step
 
 
@@ -33,13 +31,6 @@ def test_supplied_plate_keeps_real_thickness_hole_and_seat_faces(tmp_path, monke
     assert any(f.origin[2] == pytest.approx(.041) and f.direction[2] > .99
                for f in part.faces_of("PLANE"))
 
-    # An empty purchased fallback plan must still produce the real supplied solid.
-    monkeypatch.setattr(models, "resolve_step", lambda ref: path)
-    ref = ModelRef(source="vendor", placement={"origin": frame.origin.tolist(), "x": frame.x.tolist(), "z": frame.z.tolist()})
-    local = LocalPart("fixture", "fixture", "fixture", "sensor",
-                     PartPlan("fixture", "purchased", "board", 0), source_model=ref)
-    solid = world_manifold(local, np.eye(4))
-    assert solid.volume() == pytest.approx(part.manifold().volume(), rel=1e-6)
 
 
 def test_supplied_sphere_keeps_center_and_radius_after_placement(tmp_path):

@@ -1,6 +1,7 @@
 # Headless operation
 
-Every R3 stage runs on a server with no display and no interactive browser.
+R3 validation stages consume the pinned pull on a server with no display or interactive browser.
+Native CAD authoring and pull need the signed-in onshape-native browser/companion.
 The supported server environment is the R3 worker image
 ([`docker/r3-worker`](../../docker/r3-worker/README.md)). CI uses the same image:
 `.github/workflows/r3-platform.yml` for this repository, and the scaffolded
@@ -17,7 +18,7 @@ Onshape transport, and Sionna RT, with versions.
 | Stage | Display/browser dependency | Headless path |
 | --- | --- | --- |
 | `model` | matplotlib layout plot | Agg backend, forced in `model_stage.py`. |
-| `cad` | Onshape. The `onshape-native` bridge needs a logged-in browser. | Official API keys (`ONSHAPE_ACCESS_KEY`/`ONSHAPE_SECRET_KEY`, HMAC-signed requests). Images come from the REST shaded-view endpoints and are written to `build/cad/views/{iso,front,top,right}.png`, plus `assembly_*.png` when the document has an Assembly. Without keys, a current `cad_model.json` is reused; otherwise downstream stages fall back to catalog geometry. |
+| `cad` | No browser for validation. Native modeling/pull needs a signed-in browser companion. | Validate `cad/pulled` headlessly with OCP/STL. Missing, modified or incomplete pulls fail; no catalog fallback. |
 | `pcb` | KiCad GUI for the IPC API | `kicad-cli` covers ERC/DRC, Gerbers, STEP/GLB, SVG/PDF and `pcb render` (3D PNG, no display needed). IPC API steps run under Xvfb through `r3-kicad-headless`. |
 | `pcb` routing | Freerouting GUI | `freerouting -de board.dsn -do board.ses` (`--gui.enabled=false`, `java.awt.headless`). DSN export uses pcbnew's SWIG module (`/usr/bin/python3`). |
 | `wiring` | matplotlib renders, MuJoCo cable | Agg is forced in `r3_wiring/render.py`. Cable physics needs no GL. |
@@ -53,16 +54,17 @@ unaffected.
 
 ## Onshape
 
-* `R3_ONSHAPE_TRANSPORT`: `auto` (default: the bridge when connected, else API
-  keys), `api-keys`, `native` or `none`. CI sets `api-keys`.
-* `ONSHAPE_API_AUTH`: `hmac` (default) or `basic`. Onshape's API-key docs
-  describe basic auth as "for local testing only". The request signature
-  (`Authorization: On <access>:HmacSHA256:<sig>`, with `Date` and `On-Nonce`
-  headers) is used by default. Each redirect hop is signed again, as the docs
-  require.
-* `ONSHAPE_BASE_URL` for enterprise domains (default `https://cad.onshape.com`).
-* `R3_CAD_VIEWS=0` skips the shaded views.
-* Every request still passes `r3_onshape.policy.check_request` (no FeatureScript).
+Agents model native parts, mate connectors and assemblies through onshape-native. Pull uses
+its authenticated loopback `/native/api/v17` UI export backend for STL/STEP and local/editor
+routes for metadata and viewport capture. Public `/api` endpoints, API-key/session transports,
+bodydetails, tessellatedfaces, massproperties, shadedviews and public translations are unavailable.
+The updated extension and restarted companion are required; unsupported operations fail explicitly.
+
+Select/create an immutable version before pulling. Only STL supports microversions; STEP
+requires a version. A server without a native browser session can validate and simulate a
+previously pulled, pinned copy. It cannot author or refresh CAD. Missing data remains an error.
+Set `ONSHAPE_NATIVE_RUNTIME` to the paired bridge runtime. Agent sessions reuse the installed
+plugin launcher; `R3_ONSHAPE_NATIVE_MCP_CONFIG` can supply its `.mcp.json` explicitly.
 
 ## KiCad IPC API under Xvfb
 
@@ -84,9 +86,8 @@ r3-kicad-headless -- python -c "from kipy import KiCad; print(KiCad().get_versio
 
 ## What still needs care
 
-* **Onshape without API keys.** The browser bridge cannot run on a server. CI
-  without keys reuses the committed or cached `cad_model.json`, or falls back
-  to catalog geometry (`cad_geometry_estimated`).
+* **Onshape without a native browser session.** Consume an existing verified `cad/pulled`
+  copy; new authoring/export is unavailable. Never fall back to public APIs or catalog shapes.
 * **Firmware containers** need a Docker daemon. GitHub-hosted container jobs mount
   the runner's socket. Elsewhere, mount `/var/run/docker.sock` or run a
   `docker:dind` sidecar. linux/arm64 images on amd64 hosts need
@@ -104,45 +105,9 @@ r3-kicad-headless -- python -c "from kipy import KiCad; print(KiCad().get_versio
 > (`python3-pcbnew` from the KiCad PPA on Linux), and checks, netlists and
 > exports use `kicad-cli`. `r3 doctor` reports this as `kicad-pcbnew`.
 
-## Onshape document organization (phase B)
+## Native CAD organization
 
-The organized robot document (`r3_onshape.organized`) is built over REST with the
-headless session or API keys. Everything that defines the CAD, places it and verifies it is
-headless. Organizational edits that Onshape exposes only in its editor protocol are not.
-
-**Headless over REST (server):**
-
-* documents, Part Studios, Assemblies and versions: create, delete, version;
-* the Variable Studio (`createVariableStudio`, `setVariables`) and its references from each
-  Part Studio (`setVariableStudioReferences`); features use `#name` expressions;
-* standard features (sketch, extrude with start offset, revolve, Hole, Mirror, mate
-  connector) and part metadata (name, appearance, material, mass override, part number);
-* assembly instances (including the linked parts-library version), occurrence transforms
-  and mates. The solved occurrence transforms are read back from the assembly definition and
-  compared with the compiled poses;
-* `bodydetails`, fine tessellations and mass properties for the fit checks; shaded views for
-  every Part Studio, subassembly and the top level;
-* organization-check reads: feature names, types and expressions (`getPartStudioFeatures`),
-  sketch solve status (`getSketchInfo` returns `sketchSolveStatus`, so `cad_unconstrained_sketch`
-  is exact), part names, mate names, construction-plane counts, and document tab folders
-  (`getDocumentContents` returns the `BTElementGroup` tree).
-
-**Not in the REST API (done through the onshape-native bridge on a developer machine):**
-
-| Operation | Native message | REST gap |
-| --- | --- | --- |
-| Create tab folders, move tabs into them | `ui.document.GBTUiEditElementGroups` | REST reads folders but cannot create or move them |
-| Part Studio feature folders | `partstudiofolders.GBTUiCreateFolder` | `getPartStudioFeatures` omits folder nodes, so folder membership (`cad_feature_not_in_folder`) can only be read in the editor |
-| Assembly instance and mate folders | `ui.assembly.GBTUiCreateAssemblyFolder` | the assembly definition has no sidebar folders (`cad_assembly_unfoldered` needs the editor) |
-| Hide planes, sketches and mate connectors | `ui.GBTSetFeatureVisibility` inside `ui.assembly.GBTUiBatchVisibilityChange` | REST has no visibility field for Part Studio features; assembly visibility is read with the bridge's `display_state` |
-| Flexible subassemblies | none found (REST or captured native) | subassemblies are inserted rigid; steering motion is verified by the linkage solver and the MuJoCo animation |
-
-Sketches consumed by a feature are hidden by Onshape itself, so even a headless build shows
-no sketch clutter. The phase B builder creates no construction planes at all:
-`cad_excess_construction_planes` counts them over REST, and the only plane features are
-Onshape's three default planes.
-
-On a server without the bridge, the build and every REST check still run. The organization
-writes are skipped and recorded in `cad_model.json` (`organization.organize.skipped`). The check
-emits `cad_organization_check_partial`, listing the codes it could not evaluate. It does not
-report them as passing.
+The agent manages document tabs/folders, feature folders and assembly sidebars with
+onshape-native's document and sidebar tools. These edits happen in Onshape and are never
+regenerated from YAML. Pull reads the resulting solved assembly, native mates and connectors.
+It does not create documents, geometry, interfaces or assembly placement from local plans.
