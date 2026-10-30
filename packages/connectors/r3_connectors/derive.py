@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import yaml
 
 from r3_catalog import DATA_DIR
 
@@ -151,83 +152,83 @@ KICAD: dict[str, KicadSpec] = {
         "footprint origin, contact axis at mid-height 1.28 mm; contacts start about 1.5 mm inside", "#e8e4c9"),
 }
 
-XT30_FEMALE = dict(insert=[8.2, 4.2, 5.6], body=[10.2, 5.2, 5.0], contact_d=2.0)
-PROXIES: dict[str, ProxySpec] = {
-    "xt30pw-male": ProxySpec(
-        [("1", -2.5, 0.0), ("2", 2.5, 0.0)], "xt_male_pcb_ra",
-        {"shell": [10.2, 5.2, 10.6], "cavity": [8.4, 4.4, 5.8], "contact_d": 1.0, "height": 3.1, "pad_row": 13.4,
-         "pegs": [[-5.5, -10.0], [5.5, -10.0]]},
-        13.4, 0.0, (10.2, 5.2, 13.4), -1.0, "bullet", 1.0,
-        "Amass XT30PW-M datasheet outline (10.2 x 5.2 mm shell, 5.0 mm contact pitch) on the KiCad "
-        "AMASS_XT30PW-M footprint (pads, pegs, courtyard); no KiCad or vendor 3D model exists (proxy)",
-        "#d9a21b", footprint="Connector_AMASS:AMASS_XT30PW-M_1x02_P2.50mm_Horizontal", wire_entry=False),
-    "xt30-female": ProxySpec(
-        [("1", -2.5, 0.0), ("2", 2.5, 0.0)], "xt_female", {**XT30_FEMALE, "cup": 3.0},
-        8.0, 5.6, (10.2, 5.2, 13.6), 5.0, "socket", 2.0,
-        "Amass XT30U-F datasheet: 10.2 x 5.2 mm body, 5.0 mm pitch, insert 5.6 mm (proxy)", "#d9a21b"),
-    "xt30-male": ProxySpec(
-        [("1", -2.5, 0.0), ("2", 2.5, 0.0)], "xt_male", {"shell": [10.2, 5.2, 10.6], "cavity": [8.4, 4.4, 5.8],
-                                                          "contact_d": 1.0, "cup": 3.0},
-        13.6, 0.0, (10.2, 5.2, 13.6), -1.0, "bullet", 1.0,
-        "Amass XT30U-M datasheet: 10.2 x 5.2 x 10.6 mm shell, 5.0 mm pitch (proxy)", "#d9a21b"),
-    "bullet-3.5-male": ProxySpec(
-        [("1", 0.0, 0.0)], "bullet_male", {"pin_d": 3.5, "pin_length": 9.0, "cup_d": 4.4, "cup_length": 5.0},
-        5.0, 9.0, (4.4, 4.4, 14.0), 9.0, "bullet", 3.5,
-        "3.5 mm gold bullet: 9 mm split pin, 5 mm solder cup (hobby vendor drawings; proxy)", "#d9b54a"),
-    "bullet-3.5-female": ProxySpec(
-        [("1", 0.0, 0.0)], "bullet_female", {"od": 5.0, "socket_depth": 9.5, "length": 16.0},
-        16.0, 0.0, (5.0, 5.0, 16.0), -0.5, "socket", 3.5,
-        "3.5 mm gold bullet socket: 5 mm OD, 16 mm long incl. solder cup (hobby vendor drawings; proxy)",
-        "#d9b54a"),
-    "jst-xh-3-housing": ProxySpec(
-        [("1", -2.5, 0.0), ("2", 0.0, 0.0), ("3", 2.5, 0.0)], "housing",
-        {"width": 9.9, "thickness": 5.75, "length": 7.0, "cavity": 1.6},
-        7.0, 0.0, (9.9, 5.75, 7.0), 0.0, "crimp", 1.0,
-        "JST XH datasheet (eXH.pdf) XHP-3: 2.50 mm pitch, 9.9 mm wide (2.5(n-1)+4.9); SXH-001T-P0.6 crimps "
-        "(proxy)", "#f2efdc"),
-    "jst-gh-4-housing": ProxySpec(
-        [("1", -1.875, 0.0), ("2", -0.625, 0.0), ("3", 0.625, 0.0), ("4", 1.875, 0.0)], "housing",
-        {"width": 6.25, "thickness": 4.25, "length": 4.5, "cavity": 0.8},
-        4.5, 0.0, (6.25, 4.25, 4.5), 0.0, "crimp", 0.6,
-        "JST GH datasheet (eGH.pdf) GHR-04V-S: 1.25 mm pitch, 6.25 mm wide; SSHL-002T-P0.2 crimps (proxy)",
-        "#f2efdc"),
-    "xt90h-male": ProxySpec(
-        [("1", -4.95, 0.0), ("2", 4.95, 0.0)], "housing",
-        {"width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5},
-        29.7, 0.0, (20.8, 11.7, 29.7), 0.0, "solder_cup", 4.5,
-        "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; "
-        "conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf",
-        "#d9a21b"),
-    "xt90h-female": ProxySpec(
-        [("1", -4.95, 0.0), ("2", 4.95, 0.0)], "housing",
-        {"width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5},
-        29.7, 0.0, (20.8, 11.7, 29.7), 0.0, "solder_cup", 4.5,
-        "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; "
-        "conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf",
-        "#d9a21b"),
-    "servo-3-female": ProxySpec(
-        [("1", -2.54, 0.0), ("2", 0.0, 0.0), ("3", 2.54, 0.0)], "housing",
-        {"width": 7.6, "thickness": 2.6, "length": 14.0, "cavity": 1.0},
-        14.0, 0.0, (7.6, 2.6, 14.0), 0.0, "socket", 1.0,
-        "Futaba J / 2.54 mm 1x3 crimp housing: 7.6 x 2.6 x 14 mm (vendor listings; proxy)", "#1d1d1d"),
-    # Flat-cable ends: the stiffened FFC end with exposed contacts on one face; no wires (the cable is the conductor).
-    "fpc-22p-0.5mm-cable": ProxySpec(
-        [(str(n), -5.25 + 0.5 * (n - 1), 0.0) for n in range(1, 23)], "ffc_end",
-        {"width": 11.5, "thickness": 0.3, "stiffener": 4.0, "contact_width": 0.3},
-        4.0, 0.0, (11.5, 0.3, 4.0), 0.0, "blade", 0.3,
-        "Raspberry Pi 22-way 0.5 mm camera FFC: 11.5 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable "
-        "listings; proxy)", "#d9a441", wire_entry=False),
-    "fpc-15p-1.0mm-cable": ProxySpec(
-        [(str(n), -7.0 + 1.0 * (n - 1), 0.0) for n in range(1, 16)], "ffc_end",
-        {"width": 16.0, "thickness": 0.3, "stiffener": 4.0, "contact_width": 0.6},
-        4.0, 0.0, (16.0, 0.3, 4.0), 0.0, "blade", 0.6,
-        "Raspberry Pi 15-way 1.0 mm camera FFC: 16 mm wide, 0.3 mm thick, 4 mm stiffener (Raspberry Pi cable "
-        "listings; proxy)", "#d9a441", wire_entry=False),
-}
+def load_proxy_specs(path: Path = DATA_DIR / "connector_proxies.yaml") -> dict[str, ProxySpec]:
+    """Read part-specific dimensions and provenance from the component catalog."""
+    raw = yaml.safe_load(path.read_text())
+    return {name: ProxySpec(**values) for name, values in raw["proxies"].items()}
 
 
-# Same housing geometry with heavier crimp terminals; retain it when regenerating.
-PROXIES["servo-3-female-hd"] = PROXIES["servo-3-female"]
+PROXIES = load_proxy_specs()
+
+# Crimp housing dimensions are used for occupancy, independently of display CAD.
+# Harwin's downloadable CAD requires TraceParts registration. Use the existing
+# KiCad socket as an explicitly labelled contact-grid reference, never sculpt a
+# purchased housing. Width/depth come from the vendor drawings, not that model.
+HOUSING_SOURCE = "https://www.harwin.com/products/M20-1060300"
+HOUSING_DRAWING = "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf"
+DOUBLE_HOUSING_SOURCE = "https://www.harwin.com/products/M20-1070300"
+
+
+def housing_specs() -> dict[str, KicadSpec]:
+    """All 1xN/2xN crimp contact arrays, derived through official KiCad pads."""
+    out = {}
+    for rows in (1, 2):
+        for length in range(1, 21):
+            name = f"PinSocket_{rows}x{length:02d}_P2.54mm_Vertical"
+            out[f"dupont-{rows}x{length}"] = KicadSpec(
+                f"Connector_PinSocket_2.54mm:{name}", f"Connector_PinSocket_2.54mm.3dshapes/{name}.step",
+                (0.0 if rows == 1 else -1.27, -1.27 * (length - 1), 8.5),
+                (0, -1, 0), (0, 0, 1), rows == 1, -1.1, "socket", 1.0,
+                "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. "
+                "Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration.")
+    return out
+
+
+def derive_housings(footprints: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    out = {}
+    for identifier, spec in housing_specs().items():
+        g = derive_kicad(identifier, spec, footprints[spec.footprint])
+        rows, length = map(int, identifier.removeprefix("dupont-").split("x"))
+        # M20-106: 2.54*N + 0.20 wide, 2.50 thick, 14.00 deep.
+        # M20-107: 2.54*N wide, 5.10 thick, 14.00 deep.
+        g["envelope"] = np.array([2.54 * length + (0.2 if rows == 1 else 0.),
+                                  2.5 if rows == 1 else 5.1, 14.])
+        g["depth"], g["reach"] = 14., 0.
+        g["provenance"] = {
+            "status": "derived" if length <= 12 else "estimated",
+            "source": f"{HOUSING_DRAWING}; {DOUBLE_HOUSING_SOURCE}; KiCad pads: {spec.footprint}",
+            "notes": "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, "
+                     "availability must be checked. Wire-entry depth approximated by the 14 mm body length. "
+                     "Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+        for pin in g["pins"].values():
+            pin["wire_entry"] = np.array([*pin["position"][:2], -14.])
+            pin["wire_axis"] = np.array([0., 0., -1.])
+        out[identifier] = g
+    return out
+
+
+def write_housing_types() -> None:
+    """Append generated type metadata without rewriting existing catalog entries."""
+    path = DATA_DIR / "connectors.yaml"
+    text = path.read_text().split("# BEGIN GENERATED CRIMP HOUSINGS")[0].rstrip() + "\n"
+    lines = ["# BEGIN GENERATED CRIMP HOUSINGS (r3_connectors.derive --write)"]
+    for rows in (1, 2):
+        for length in range(1, 21):
+            width = 2.54 * length + (0.2 if rows == 1 else 0.)
+            source = HOUSING_SOURCE if rows == 1 else DOUBLE_HOUSING_SOURCE
+            lines.extend([
+                f"  - id: dupont-{rows}x{length}",
+                "    family: 2.54 mm crimp housing (Dupont-style)",
+                "    gender: female", "    mates_with: []", f"    pin_count: {rows * length}",
+                "    header_pitch: 2.54 mm", "    current_rating_per_pin: 3", "    voltage_rating: 250",
+                "    contact_resistance: 20 mohm", "    awg_min: 22", "    awg_max: 30",
+                f"    body_size: [{width:.2f} mm, {2.5 if rows == 1 else 5.1} mm, 14 mm]",
+                "    provenance: {status: estimated, source: " + json.dumps(source) +
+                ', notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. '
+                'N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}',
+            ])
+    path.write_text(text + "\n".join(lines) + "\n")
+
 
 def _round(v: float, nd: int = 4) -> float:
     r = round(float(v), nd)
@@ -391,13 +392,14 @@ def to_yaml(geometry: dict[str, dict[str, Any]]) -> str:
 
 
 def derive_all() -> dict[str, dict[str, Any]]:
-    names = [s.footprint for s in KICAD.values()] + [s.footprint for s in PROXIES.values() if s.footprint]
+    names = [s.footprint for s in [*KICAD.values(), *housing_specs().values()]] + [s.footprint for s in PROXIES.values() if s.footprint]
     footprints = library_footprints(names)
     out: dict[str, dict[str, Any]] = {}
     for type_id, spec in KICAD.items():
         out[type_id] = derive_kicad(type_id, spec, footprints[spec.footprint])
     for type_id, spec in PROXIES.items():
         out[type_id] = derive_proxy(type_id, spec, footprints.get(spec.footprint) if spec.footprint else None)
+    out.update(derive_housings(footprints))
     return dict(sorted(out.items()))
 
 
@@ -408,6 +410,7 @@ def main(argv: list[str] | None = None) -> int:
     text = to_yaml(derive_all())
     if args.write:
         OUT.write_text(text)
+        write_housing_types()
         print(f"wrote {OUT}")
     else:
         print(text)

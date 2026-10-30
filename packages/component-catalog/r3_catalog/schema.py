@@ -57,12 +57,15 @@ class ConnectorInstance(_Model):
     (pin 1 toward the last pin). See :class:`ConnectorGeometry`."""
 
     type: str
+    flexible_end: bool = Field(default=False, description="Free end of a flexible cable; its installed frame is derived "
+                                                        "from its direct mate, independently of the cable's retained end.")
     position: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
     direction: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0], description="Unit vector of cable exit.")
     x: Vector | None = Field(default=None, description="Pin-row axis of the connector frame (perpendicular to direction).")
     pins: dict[str, str] = Field(description="connector pin number -> component pin name.")
     embedded: bool = Field(default=False, description="The connector body is part of the component's own 3D model.")
     source: str = Field(default="", description="Where the pose comes from, e.g. 'kicad:J5' or 'step:J8 pin 1'.")
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 
 FeatureKind = Literal["bore", "d_bore", "shaft", "d_shaft", "tapped_hole", "clearance_hole", "spline", "face", "slot",
@@ -149,6 +152,8 @@ class Mechanical(_Model):
                                                         "derived from the fasteners and interfaces that use it.")
     solids: list[Solid] = Field(default_factory=list, description="Custom geometry; empty means the box/cylinder envelope.")
     features: list[Feature] = Field(default_factory=list, description="Datasheet interfaces realized on the envelope.")
+    proxy_holes_from: list[str] = Field(default_factory=list, description="Explicit hole-pattern interfaces used by a "
+                                      "missing-model proxy. Never modifies an imported purchased model.")
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 
@@ -327,7 +332,7 @@ class ConnectorGeometry(_Model):
     footprint: str = ""
     footprint_placement: Placement | None = None
     pins: dict[str, ConnectorPin]
-    pin_shape: Literal["square_post", "socket", "blade", "crimp", "bullet", "solder_cup", "coax"] = "square_post"
+    pin_shape: Literal["square_post", "socket", "blade", "crimp", "bullet", "solder_cup", "coax", "pad"] = "square_post"
     pin_size: Quantity = 0.00064
     envelope: Vector | None = None
     depth: Quantity = 0.0
@@ -352,7 +357,28 @@ class ConnectorType(_Model):
     locking: bool = False
     body_size: Vector = Field(default_factory=lambda: [0.01, 0.01, 0.01])
     geometry: ConnectorGeometry | None = None
+    header_pitch: Quantity | None = Field(default=None, description="Crimp housing accepts partial unshrouded headers of this pitch.")
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
+
+
+class ConnectionSite(_Model):
+    """A derived mating option, never authored independently of its geometry.
+
+    ``frame`` is in the component frame, z toward the cable exit and x along
+    the pin row. A cable housing uses its mated frame (opposite z). Envelope
+    bounds are in this site's frame, on the cable side of the mating face.
+    ``pin_map`` maps housing pin numbers to component connector pin numbers.
+    """
+
+    id: str
+    start_pin: str | None = None
+    pins: list[str]
+    pin_map: dict[str, str]
+    frame: Placement
+    envelope_min: Vector
+    envelope_max: Vector
+    compatible_types: list[str]
+    blocks: list[str] = Field(default_factory=list)
 
 
 class WireGauge(_Model):
@@ -506,6 +532,12 @@ class Catalog(_Model):
     print_fits: dict[str, PrintFit] = Field(default_factory=dict)
     materials: dict[str, Material] = Field(default_factory=dict)
     printers: dict[str, Printer] = Field(default_factory=dict)
+
+    def connection_sites(self, instance: ConnectorInstance) -> list[ConnectionSite]:
+        """Compute fresh options from the current geometry and connector pose."""
+        from .sites import connection_sites
+
+        return connection_sites(self, instance)
 
     def material(self, text: str) -> Material | None:
         """The material entry for a material id or a catalog ``mechanical.material`` string (None if unknown)."""

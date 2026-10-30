@@ -48,7 +48,8 @@ import yaml
 from r3_model.diagnostics import Diagnostic
 from r3_model.units import to_si
 
-from .geometry import polyline_length, resample_polyline
+from .geometry import polyline_length, project_to_polyline, resample_polyline
+from .grid import FIELD_CUTOFF
 from .obstacles import Obstacle, ObstacleSet
 from .witness import exact_closest
 
@@ -63,6 +64,9 @@ CANDIDATE_TILT = math.radians(35.0)
 # m: how far the second planning pass may pull the bundle onto a support (it re-plans the bundle through
 # the support centre; a pull that makes the route infeasible gets the support re-placed or dropped).
 MAX_PULL = 0.020
+_PLACEMENT = yaml.safe_load(DATA.read_text())["placement"]
+HINT_MATCH = to_si(_PLACEMENT["requested_match"])
+WIRE_CAPTURE_ALLOWANCE = to_si(_PLACEMENT["wire_capture_allowance"])
 POST_MAX_DIAMETER = 0.012  # m: posts / standoffs a tie can loop around
 FLATNESS = 0.0003  # m: footprint corners must lie this close to the face
 STRUCTURE_REACH = 0.022  # m: candidate structure within this of the bundle surface (MAX_PULL + mount height)
@@ -234,6 +238,8 @@ def _access(stype: SupportType, host: Obstacle, mount: np.ndarray, normal: np.nd
     if stype.kind == "post_tie":
         # The tie loops around the post and the bundle: its path must be free of other parts.
         if post is not None:
+            if np.linalg.norm(normal - (normal @ post.axis) * post.axis) < 1e-6:
+                return False, {"tie_loop": {"ok": False, "reason": "an end face cannot retain a side-loop tie"}}
             loop = _tie_loop(post, mount, normal, r)
         else:
             loop = np.asarray([mount + normal * r + (normal * math.cos(a) + b * math.sin(a)) * (2 * r + 0.004)
@@ -344,8 +350,8 @@ def _tie_loop(post: Post, mount: np.ndarray, normal: np.ndarray, r: float, thick
     tangent = math.acos(float(np.clip((big - small) / max(distance, 1e-9), -1.0, 1.0)))  # external tangent angle
     points = []
     for angle in np.linspace(tangent, 2 * math.pi - tangent, 24):  # far side of the post
-        points.append(c_post + big * (-math.cos(angle) * n + math.sin(angle) * b))
-    for angle in np.linspace(-(math.pi - tangent), math.pi - tangent, 12):  # far side of the bundle
+        points.append(c_post + big * (math.cos(angle) * n + math.sin(angle) * b))
+    for angle in np.linspace(-tangent, tangent, 12):  # far side of the bundle
         points.append(c_bundle + small * (math.cos(angle) * n + math.sin(angle) * b))
     return np.asarray(points)
 
@@ -364,10 +370,22 @@ def place_supports(project: Any, obstacles: ObstacleSet, routing: Any,
     limits: dict[str, float] = {}
     connector_exits = {h: [n.exit for n in nodes.values() if n.kind == "connector" and n.exit is not None]
                        for h, nodes in routing.nodes.items()}
+    requested = {h.id: [np.asarray(p, float) for p in h.route.tie_points]
+                 for h in project.spec.electrical.harnesses}
     for harness_id, route in routing.harnesses.items():
         wires = [routing.wires[w] for w in route.wires if w in routing.wires and not routing.wires[w].failed]
         if not wires:
             continue
+        # A branch harness can have several segments near a requested anchor. Assign it to
+        # the nearest segment once; it must not pin unrelated branches to the same point.
+        hints_by_segment: dict[int, list[np.ndarray]] = {}
+        for hint in requested.get(harness_id, []):
+            choices = [(float(project_to_polyline(np.asarray(s["points"], float), hint[None])[0]), i)
+                       for i, s in enumerate(route.segments) if len(s["points"]) >= 2]
+            if choices:
+                distance, index = min(choices)
+                if distance <= MAX_PULL:
+                    hints_by_segment.setdefault(index, []).append(hint)
         for index, seg in enumerate(route.segments):
             seg_wires = [routing.wires[w] for w in seg["wires"] if w in routing.wires]
             if not seg_wires:
@@ -383,20 +401,50 @@ def place_supports(project: Any, obstacles: ObstacleSet, routing: Any,
                 continue
             r = float(seg["od"]) / 2
             candidates = _candidates(pts, total, r, structures, obstacles, types, float(seg["od"]), mass,
-                                     limit, connector_exits.get(harness_id, []), posts)
+                                     limit, connector_exits.get(harness_id, []), posts,
+                                     hints_by_segment.get(index, []))
             banned = [p for h, p in (exclude or []) if h == harness_id]
             candidates = [c for c in candidates
                           if all(np.linalg.norm(c["path"] - p) > EXCLUDE_RADIUS for p in banned)]
             # Ends at a connector, splice or mated pair (fan-out breakouts) hold the bundle; a via or branch
             # junction does not, so the span through it continues into the next segment.
             held = [b is not None for b in (seg.get("breakouts") or [None, None])]
-            for c in _greedy(candidates, total, SPAN_PLACEMENT_FRACTION * limit, held[0], held[-1]):
+            mandatory = [c for c in candidates if c.get("requested") is not None]
+            automatic = _greedy([c for c in candidates if c.get("requested") is None], total,
+                                SPAN_PLACEMENT_FRACTION * limit, held[0], held[-1])
+            chosen = mandatory + [c for c in automatic
+                                  if all(abs(c["arc"] - m["arc"]) >= MIN_SPACING for m in mandatory)]
+            for c in sorted(chosen, key=lambda c: c["arc"]):
                 support = Support(f"{harness_id}.S{len([s for s in supports if s.harness == harness_id]) + 1}",
                                   harness_id, c["type"], c["position"], c["path"], c["mount"], c["normal"], c["t"],
                                   c["host"], [w.wire_id for w in seg_wires], float(seg["od"]), index, c["arc"],
                                   c["required"], c["pull"], c["checks"])
                 supports.append(support)
     return SupportReport(supports, diagnostics, [], limits)
+
+
+def check_requested_supports(project: Any, report: SupportReport, routing: Any) -> None:
+    """An authored tie point requires checked hardware, including after planner retries.
+
+    Never retain a simulation pin when installation access, retention or routing made
+    its physical support impossible. The normal span and dynamic checks still apply.
+    """
+    for harness in project.spec.electrical.harnesses:
+        for hint in harness.route.tie_points:
+            point = np.asarray(hint, float)
+            installed = [s for s in report.supports if s.harness == harness.id]
+            distances = [float(np.linalg.norm(s.position - point)) for s in installed]
+            holding = [s for s in installed if np.linalg.norm(s.position - point) <= HINT_MATCH and
+                       all(w in routing.wires and not routing.wires[w].failed and
+                           project_to_polyline(routing.wires[w].path, s.position[None])[0] <= s.bundle_od / 2 + WIRE_CAPTURE_ALLOWANCE
+                           for w in s.wires)]
+            if not holding:
+                report.diagnostics.append(Diagnostic.error(
+                    "cable_support_unplaceable", f"{harness.id}: requested tie has no installed support holding its wires",
+                    subjects=[harness.id], data={"position": point.tolist(), "required_match": HINT_MATCH,
+                                                "nearest_support": min(distances) if distances else None,
+                                                "units": "m"},
+                    hint="Place a real saddle or tie post within reach and keep its installation access clear."))
 
 
 def check_spans(project: Any, routing: Any, report: SupportReport) -> None:
@@ -437,25 +485,33 @@ def _face_mounts(host: Obstacle, p: np.ndarray, reach: float) -> list[tuple[np.n
 
 def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstacle], obstacles: ObstacleSet,
                 types: tuple[SupportType, ...], od: float, mass_per_m: float, limit: float,
-                exits: list[np.ndarray], posts: dict[str, list[Post]]) -> list[dict[str, Any]]:
+                exits: list[np.ndarray], posts: dict[str, list[Post]],
+                requested: list[np.ndarray] | None = None) -> list[dict[str, Any]]:
     dense, arc = resample_polyline(pts, CANDIDATE_STEP)
     keep = (arc >= END_KEEPOUT) & (arc <= total - END_KEEPOUT)
     dense, arc = dense[keep], arc[keep]
     out: list[dict[str, Any]] = []
     if not len(dense):
         return out
+    probes = [(p, float(s), None) for p, s in zip(dense, arc)]
+    for number, hint in enumerate(requested or []):
+        distance, s = project_to_polyline(pts, hint[None])
+        if distance <= MAX_PULL and END_KEEPOUT <= s <= total - END_KEEPOUT:
+            probes.append((hint, float(s), number))
+    probe_points = np.asarray([p for p, _, _ in probes])
     near_hosts = []
     for host in structures:
-        d = host.shape.sdf_bounded(dense, 0.05) - r
+        d = host.shape.sdf_bounded(probe_points, FIELD_CUTOFF) - r
         if float(d.min()) <= STRUCTURE_REACH:
             near_hosts.append((host, d))
-    for i, (p, s) in enumerate(zip(dense, arc)):
+    for i, (p, s, requested_index) in enumerate(probes):
         k = min(max(int(np.searchsorted(arc, s)), 1), len(dense) - 1)
         tangent = dense[k] - dense[k - 1]
         tangent = tangent / max(float(np.linalg.norm(tangent)), 1e-12)
         near_connector = any(np.linalg.norm(p - e) <= STRAIN_RELIEF_REACH for e in exits)
         load = SAFETY_FACTOR * mass_per_m * limit * PEAK_ACCEL_G * G + (HANDLING_PULL if near_connector else 0.0)
-        # Mount options: the nearest point of the nearest host, then flat faces of every host in reach.
+        # Round posts have no flat side faces. Consider each post in reach even
+        # when a plate is closer: the plate may lack installation clearance.
         options: list[tuple[Obstacle, np.ndarray, np.ndarray]] = []
         best = None
         for host, d in near_hosts:
@@ -464,6 +520,8 @@ def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstac
             closest = exact_closest(host.shape, p[None])[0]
             if closest.distance <= 0:
                 continue
+            if _post_at(posts, host.component, closest.point) is not None:
+                options.append((host, closest.point, (p - closest.point) / closest.distance))
             if best is None or closest.distance < best[1].distance:
                 best = (host, closest)
         if best is None:
@@ -485,8 +543,11 @@ def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstac
                 if (stype.kind == "post_tie") != on_post:
                     continue  # ties loop around posts; mounts and clips need a face
                 centre = mount + normal * (stype.height + r)
-                pull = float(np.linalg.norm(centre - p))
+                path_point = _point_at(pts, s) if requested_index is not None else p
+                pull = float(np.linalg.norm(centre - path_point))
                 if pull > MAX_PULL:
+                    continue
+                if requested_index is not None and np.linalg.norm(centre - p) > HINT_MATCH:
                     continue
                 if stype.kind == "post_tie":
                     flat, error = True, 0.0
@@ -501,11 +562,14 @@ def _candidates(pts: np.ndarray, total: float, r: float, structures: list[Obstac
                 if not clear:
                     continue
                 checks.update(flatness_error=error, strain_relief=near_connector)
-                option = {"arc": float(s), "type": stype, "position": centre, "path": p.copy(),
+                option = {"arc": float(s), "type": stype, "position": centre, "path": path_point.copy(),
                           "tilt": abs(float(tangent @ normal)), "mount": mount.copy(), "normal": normal, "t": t,
-                          "host": host.component, "required": load, "pull": pull, "checks": checks}
+                          "host": host.component, "required": load, "pull": pull, "checks": checks,
+                          "requested": requested_index}
                 # The support type and mount that move the routed bundle least (saddle heights differ).
-                if found is None or pull < found["pull"]:
+                score = float(np.linalg.norm(centre - p)) if requested_index is not None else pull
+                if found is None or score < found["score"]:
+                    option["score"] = score
                     found = option
         if found:
             out.append(found)
@@ -565,7 +629,7 @@ def _span_check(routing: Any, supports: list[Support], limits: dict[str, float],
         for support in supports:
             if wire.wire_id in support.wires:
                 d, s = project_to_polyline(wire.path, support.position[None])
-                if d < support.bundle_od / 2 + 0.002:
+                if d < support.bundle_od / 2 + WIRE_CAPTURE_ALLOWANCE:
                     held.append((s, support.id))
         held.sort()
         gauge = catalog.wire(wire.awg)

@@ -45,14 +45,14 @@ from r3_model.project import Project
 from r3_model.spec import Harness
 
 from r3_connectors.frames import Frame
-from r3_connectors.pins import (PinEnd, component_connector_frame, floating_pair_frame, geometry_of, pigtail_ends,
+from r3_connectors.pins import (PinEnd, mating_site_frame, floating_pair_frame, geometry_of, pigtail_ends,
                                 pin_end, wire_entry_depth)
 
 from .bodies import ROOT
 from .geometry import bundle_diameter, polyline_length, project_to_polyline, resample_polyline
-from .grid import Fields, VoxelGrid, compute_fields
+from .grid import FIELD_CUTOFF, Fields, VoxelGrid, compute_fields
 from .obstacles import ObstacleSet, cable_obstacles
-from .planner import plan_routing
+from .planner import bundle_bend_radius, plan_routing
 from .smoothing import curvature_radius, make_segment, relax
 from .terminations import (body_width, exit_offset, mated_pair_length, termination_allowance)
 
@@ -102,6 +102,7 @@ class NodePoint:
     lead_length: float = 0.0
     frame: Frame | None = None  # this half's connector frame (robot frame); z points at the mating half
     fan_length: float = 0.0  # arc length over which conductors converge from their pins into the bundle
+    entry_radius: float = 0.0  # pin-row envelope reserved before other harnesses are routed
 
     @property
     def ref(self) -> str:
@@ -386,18 +387,81 @@ class HarnessRouter:
         The posed SDF cache avoids re-tessellating or querying unchanged bodies.
         """
         centers = self.grid.centers()
-        out = np.full(self.grid.size, 0.05)
+        out = np.full(self.grid.size, FIELD_CUTOFF)
         for body in cable_obstacles(self.project, nodes):
             node = body.node
             key = (body.component, body.source, tuple(node.exit),
                    None if node.frame is None else tuple(node.frame.matrix().ravel()))
             if key not in self._cable_fields:
-                self._cable_fields[key] = body.shape.sdf_bounded(centers, 0.05) - body.keepout
+                self._cable_fields[key] = body.shape.sdf_bounded(centers, FIELD_CUTOFF) - body.keepout
             raw = self._cable_fields[key]
             if node.harness in harnesses:
-                raw = np.where(body.entry_mask(centers), 0.05, raw)
+                raw = np.where(body.entry_mask(centers), FIELD_CUTOFF, raw)
             np.minimum(out, raw, out=out)
+        # A later, smaller harness still needs its fixed conductor exits. Reserve
+        # the straight strain-relief run before assigning the large bundles;
+        # otherwise they can occupy a signal header's only escape corridor.
+        for group in nodes.values():
+            for node in group.values():
+                if (node.harness in harnesses or node.kind != "connector" or node.exit is None
+                        or node.lead_end is None or node.lead_length <= 0):
+                    continue
+                radius = max(node.entry_radius, node.od / 2)
+                key = ("termination", node.ref, tuple(node.exit), tuple(node.lead_end), radius)
+                if key not in self._cable_fields:
+                    delta = node.lead_end - node.exit
+                    along = np.clip((centers - node.exit) @ delta / max(float(delta @ delta), 1e-20), 0, 1)
+                    distance = np.linalg.norm(centers - node.exit - along[:, None] * delta, axis=1)
+                    self._cable_fields[key] = np.minimum(distance - radius, FIELD_CUTOFF)
+                np.minimum(out, self._cable_fields[key], out=out)
+        # Required ties are fixed destinations just like connector exits. A
+        # larger bundle must not consume their space before that harness is
+        # planned. Include the permitted support-placement match distance;
+        # placement/access checks still have to find real hardware there.
+        from .supports import HINT_MATCH
+        from .bundles import SEPARATION, TERMINATION_ZONE, category
+        from .planner import CROSSING_GAP
+
+        current_categories = {category(w.signal, w.awg) for h in self.spec.electrical.harnesses
+                              if h.id in harnesses for w in h.wires}
+        termination = np.zeros(self.grid.size, dtype=bool)
+        for group in nodes.values():
+            for node in group.values():
+                if node.harness in harnesses and node.kind == "connector" and node.exit is not None:
+                    termination |= np.linalg.norm(centers - node.exit, axis=1) <= TERMINATION_ZONE
+
+        for harness in self.spec.electrical.harnesses:
+            if harness.id in harnesses or not harness.route.tie_points:
+                continue
+            future_categories = {category(w.signal, w.awg) for w in harness.wires}
+            separation = max((SEPARATION.get(frozenset({a, b}), 0.0)
+                              for a in current_categories for b in future_categories), default=0.0)
+            # Reserve the same margin that occupancy_field will later require
+            # at this fixed support. Reserving only the wire radius lets an
+            # earlier bundle make the later harness infeasible at its own tie.
+            radius = (bundle_diameter(self._wire_od(w.awg) for w in harness.wires) / 2
+                      + HINT_MATCH + CROSSING_GAP)
+            for number, point in enumerate(harness.route.tie_points):
+                key = ("required_support", harness.id, number, tuple(point), radius)
+                if key not in self._cable_fields:
+                    self._cable_fields[key] = np.minimum(np.linalg.norm(centers - point, axis=1) - radius, FIELD_CUTOFF)
+                margin = np.where(termination, 0.0, separation) if separation else 0.0
+                np.minimum(out, self._cable_fields[key] - margin, out=out)
         return out
+
+    def _nonincident_hardware(self, harness: str, terminals: tuple[str, str], radius: float) -> np.ndarray:
+        """A branch cannot borrow another branch's connector/splice entry aperture."""
+        blocked = np.zeros(self.grid.size, dtype=bool)
+        for body in self.obstacles.cable_bodies:
+            node = body.node
+            if node.harness != harness or node.name in terminals:
+                continue
+            key = (body.component, body.source, tuple(node.exit),
+                   None if node.frame is None else tuple(node.frame.matrix().ravel()))
+            if key not in self._cable_fields:
+                self._cable_fields[key] = body.shape.sdf_bounded(self.grid.centers(), FIELD_CUTOFF) - body.keepout
+            blocked |= self._cable_fields[key] < radius
+        return blocked
 
     # ----------------------------------------------------------------- nodes
     def _wire_od(self, awg: int) -> float:
@@ -431,13 +495,14 @@ class HarnessRouter:
                 od = bundle_diameter(self._wire_od(a) for a in awgs.get(name, [])) if awgs.get(name) else 0.0
                 endpoint = self.graph.endpoints.get(conn.mates) if conn.mates else None
                 if endpoint is not None and endpoint.owner_kind == "component":
+                    board_half = mating_site_frame(self.project, ref, conn)
                     component = conn.mates.split(".")[0]
-                    direction = endpoint.direction / np.linalg.norm(endpoint.direction)
+                    face = board_half.origin if conn.at is not None else endpoint.position
+                    direction = board_half.z if conn.at is not None else endpoint.direction / np.linalg.norm(endpoint.direction)
                     offset = exit_offset(self.catalog, conn.type)
-                    node = NodePoint(harness.id, name, "connector", endpoint.position + direction * offset, direction,
+                    node = NodePoint(harness.id, name, "connector", face + direction * offset, direction,
                                      conn.type, conn.mates, component, self.kin.body_of(component),
-                                     {component}, endpoint.position.copy(), offset, od)
-                    board_half = component_connector_frame(self.project, conn.mates)
+                                     {component}, face.copy(), offset, od)
                     # A pigtail leaves the component's own connector frame; a mated half is turned about x.
                     node.frame = board_half if conn.type == "integral" else board_half.mated()
                 elif ref in floating:
@@ -456,6 +521,17 @@ class HarnessRouter:
             for node in nodes.values():
                 if node.kind == "connector":
                     self._lead(node, awgs.get(node.name, []))
+                    # Integral pigtails and connector pins fan out in a row,
+                    # which can be wider than the packed bundle diameter.
+                    by_pin = {ref.split(".", 1)[1]: self._wire_od(w.awg)
+                              for w in harness.wires for ref in (w.from_, w.to)
+                              if ref.startswith(node.name + ".")}
+                    for pin, diameter in by_pin.items():
+                        end = self._pin_end(node, f"{node.name}.{pin}", by_pin)
+                        if end is not None:
+                            offset = end.position - node.exit
+                            lateral = offset - float(offset @ node.direction) * node.direction
+                            node.entry_radius = max(node.entry_radius, float(np.linalg.norm(lateral)) + diameter / 2)
                 elif node.exit is not None:
                     node.lead_end = node.exit.copy()
             out[harness.id] = nodes
@@ -470,9 +546,17 @@ class HarnessRouter:
             node.lead_end = None if node.exit is None else node.exit.copy()
             return
         r = node.od / 2
-        r_min = self._bend_factor(awgs or [22]) * node.od
+        harness = next(h for h in self.spec.electrical.harnesses if h.id == node.harness)
+        by_pin = {ref.split(".", 1)[1]: self._wire_od(w.awg)
+                  for w in harness.wires for ref in (w.from_, w.to)
+                  if ref.startswith(node.name + ".")}
+        self._fan_length(node, by_pin)
+        r_min = bundle_bend_radius(self.catalog, awgs or [22], node.od, harness.jacket != "none")
         r_pref = self.opt.bend_margin * r_min
-        target = r_pref + node.od
+        # Keep the pin fan-out straight before the first bundle turn. A loose
+        # bundle can bend more tightly than a jacketed one, but that must not
+        # shorten the conductor convergence region into the corner fillet.
+        target = r_pref + max(node.od, node.fan_length)
         ts = np.arange(0.0005, target + 1e-9, 0.0005)
         points = node.exit + node.direction[None] * ts[:, None]
         static, _ = self.obstacles.min_distance(points, self.obstacles.static, keepout=True, exclude=node.exempt)
@@ -609,6 +693,15 @@ class HarnessRouter:
                 distance = np.linalg.norm(self.grid.centers() - hint, axis=1)
                 distance[~np.isfinite(total)] = np.inf
                 order = np.argsort(distance)
+            requested_axes = [sign * np.asarray(conn.direction, float)
+                              for sign, conn in ((-1, harnesses[ha].connectors[ca]),
+                                                 (1, harnesses[hb].connectors[cb])) if conn.direction is not None]
+            requested_axes = [axis / np.linalg.norm(axis) for axis in requested_axes]
+            if len(requested_axes) == 2 and float(requested_axes[0] @ requested_axes[1]) < 1 - 1e-6:
+                self.diagnostics.append(Diagnostic.error(
+                    "floating_mate_axis_conflict", f"{ref_a} / {ref_b}: mating halves need opposite wire exit axes",
+                    subjects=[ref_a, ref_b]))
+                continue
             chosen = fallback = None
             # Cheapest first. The first 400 voxels (a ~2 cm cube around the optimum) are searched for a
             # lead-clear placement; if no pair body fits there at all, the search continues outward.
@@ -619,7 +712,7 @@ class HarnessRouter:
                     break
                 center = self.grid.center(int(voxel))
                 pa, pb = self._walk(preds_a, int(voxel), 7), self._walk(preds_b, int(voxel), 7)
-                axis = pb - pa
+                axis = requested_axes[0].copy() if requested_axes else pb - pa
                 if np.linalg.norm(axis) < 1e-9:
                     continue
                 axis /= np.linalg.norm(axis)
@@ -650,9 +743,10 @@ class HarnessRouter:
                 node.direction = sign * axis
                 node.exit = center + sign * axis * (length / 2)
                 node.body_length = float(np.linalg.norm(node.exit - face))
-                node.lead_length = 0.0
-                node.lead_end = node.exit.copy()
                 node.frame = frame
+                gauges = [w.awg for w in harnesses[node.harness].wires
+                          if any(ref.startswith(node.name + ".") for ref in (w.from_, w.to))]
+                self._lead(node, gauges)
             placed.append(FloatingMate(ref_a, ref_b, na.connector_type, nb.connector_type, center, axis, length, width, cost))
         return placed
 
@@ -786,8 +880,15 @@ class HarnessRouter:
                 terminals.append(voxel)
             stops = [terminals[0]]
             stop_dirs: list[np.ndarray | None] = [a.direction]
-            if index == 0:
-                for via in vias:
+            branch_vias = vias if index == 0 else []
+            for wire in branches[key]:
+                if wire.id in harness.route.wire_via:
+                    points = harness.route.wire_via[wire.id]
+                    branch_vias = points if node_name(wire.from_) == key[0] else points[::-1]
+                    break
+            if branch_vias:
+                for via in branch_vias:
+                    via = np.asarray(via, dtype=float)
                     voxel, escape = self._free_voxel(via, ctx)
                     for v in escape:
                         blocked[v] = 0
@@ -795,6 +896,10 @@ class HarnessRouter:
                     stops.append(voxel)
                     stop_dirs.append(None)
             stops.append(terminals[1])
+            # Reclose unrelated entry zones even when an earlier branch opened
+            # their voxels. Only the incident conductors may enter a splice.
+            for voxel in np.flatnonzero(self._nonincident_hardware(harness.id, key, r)):
+                blocked[voxel] = 1
             voxels: list[int] = []
             ok = True
             for leg in range(len(stops) - 1):
@@ -803,7 +908,18 @@ class HarnessRouter:
                 if leg > 0 and voxels and len(voxels) > 1:
                     start_dir = self.grid.center(voxels[-1]) - self.grid.center(voxels[-2])
                     start_dir = start_dir / (np.linalg.norm(start_dir) or 1.0)
-                path = self._astar(stops[leg], stops[leg + 1], ctx, blocked, used, start_dir, goal_dir)
+                    # A waypoint must carry the conductor through a corridor,
+                    # not walk it out and back along the same occupied voxels.
+                    # Repeated edges create a folded wire and an ambiguous
+                    # bundle graph that the planner cannot reconstruct.
+                    for visited in voxels[:-1]:
+                        blocked[visited] = 1
+                leg_blocked = bytearray(blocked)
+                # Do not consume a later waypoint/terminal on the way to this
+                # one: the returning leg must still be able to reach it.
+                for future in stops[leg + 2:]:
+                    leg_blocked[future] = 1
+                path = self._astar(stops[leg], stops[leg + 1], ctx, leg_blocked, used, start_dir, goal_dir)
                 if path is None:
                     ok = False
                     break
@@ -820,7 +936,7 @@ class HarnessRouter:
             for v in voxels:
                 used[v] = 1
             sequences[key] = self._sequence(harness.id, key, a, b, voxels, ctx, positions, harness_holes,
-                                            via_voxels=stops[1:-1] if index == 0 else [])
+                                            via_voxels=stops[1:-1])
 
         # ---- bundle graph and segments
         adjacency: dict[Any, set] = {}
@@ -853,7 +969,7 @@ class HarnessRouter:
             awgs = list(segment["awgs"].values())
             segment["od"] = bundle_diameter(self._wire_od(a) for a in awgs)
             segment["conductors"] = len(awgs)
-            segment["r_min"] = self._bend_factor(awgs) * segment["od"]
+            segment["r_min"] = bundle_bend_radius(self.catalog, awgs, segment["od"], harness.jacket != "none")
             r = segment["od"] / 2
             ctx = self.context(min(r, max(self._wire_od(a) for a in awgs) / 2) if awgs else r, keep_away)
             points = np.array([positions[k] for k in canon])
@@ -905,7 +1021,10 @@ class HarnessRouter:
                 key_ = canon[0] if end == 0 else canon[-1]
                 node = nodes.get(key_[2:]) if isinstance(key_, str) and key_.startswith("N:") else None
                 pts = segment["points"] if end == 0 else segment["points"][::-1]
-                bo = self._breakout(node, pts) if node is not None else None
+                opposite_key = canon[-1] if end == 0 else canon[0]
+                opposite = nodes.get(opposite_key[2:]) if isinstance(opposite_key, str) and opposite_key.startswith("N:") else None
+                both_ends = opposite is not None and opposite.kind in ("connector", "floating") and opposite.fan_length > 0
+                bo = self._breakout(node, pts, opposite_fanout=both_ends) if node is not None else None
                 if bo is not None:
                     breakouts[(node.name, canon)] = bo
                 bos.append(bo)
@@ -992,16 +1111,17 @@ class HarnessRouter:
         node.fan_length = max(0.006, 3.0 * lateral + 2.0 * node.od)
 
     @staticmethod
-    def _breakout(node: NodePoint, points: np.ndarray) -> dict[str, Any] | None:
+    def _breakout(node: NodePoint, points: np.ndarray, *, opposite_fanout: bool = True) -> dict[str, Any] | None:
         """Breakout of ``node``'s conductors on a bundle segment (``points`` start at the
-        node exit): the point at the node's fan length along the segment (at most 45 %
-        of it), and the segment tangent there, pointing away from the node."""
+        node exit): the point at the node's fan length along the segment and its
+        outward tangent. Reserve 10% for the core; share the remaining length
+        only when the opposite end also has a pin fan-out."""
         if node.kind not in ("connector", "floating") or node.fan_length <= 0 or len(points) < 2:
             return None
         arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))])
         if arc[-1] < 1e-6:
             return None
-        b = min(node.fan_length, 0.45 * float(arc[-1]))
+        b = min(node.fan_length, (0.45 if opposite_fanout else 0.90) * float(arc[-1]))
         delta = min(0.001, b, float(arc[-1]) - b)
         at = lambda s: np.array([np.interp(s, arc, points[:, a]) for a in range(3)])  # noqa: E731
         q = at(b)
@@ -1255,6 +1375,15 @@ class HarnessRouter:
         out, out_r, out_c = [pts[0]], [radius[0]], [count[0]]
         bends: list[Bend] = []
         for k in range(1, n - 1):
+            if phi[k] >= math.pi - 1e-3:
+                # A folded-back polyline has no finite tangent fillet in this
+                # corner. Do not combine the capped tangent used by r_fit with
+                # the uncapped near-pi angle in _arc: that sends millimetre
+                # routes tens of metres away. Preserve the failed bend for the
+                # planner/checker instead of inventing a giant loop.
+                out.append(pts[k]); out_r.append(radius[k]); out_c.append(count[k])
+                bends.append(Bend(pts[k].copy(), 0.0, float(rmin[k]), int(count[k]), float(2 * radius[k])))
+                continue
             if phi[k] <= self.opt.fillet_min_angle:
                 # Already smooth: keep the vertex, record its discrete radius.
                 out.append(pts[k]); out_r.append(radius[k]); out_c.append(count[k])
@@ -1291,7 +1420,7 @@ class HarnessRouter:
 
     @staticmethod
     def _arc(corner: np.ndarray, u_in: np.ndarray, u_out: np.ndarray, phi: float, radius: float) -> np.ndarray:
-        if radius <= 0:
+        if radius <= 0 or phi >= math.pi - 1e-3:
             return corner[None]
         t = radius * math.tan(phi / 2)
         start, finish = corner - u_in * t, corner + u_out * t

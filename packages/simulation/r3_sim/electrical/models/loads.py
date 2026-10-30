@@ -435,7 +435,9 @@ class ServoPwm(BehaviorModel):
         emf = f"{fmt(self.ke)}*abs(v(speed))"
         cap = softplus(f"({v}-{emf})/{fmt(self.r)}", 0.01)
         i_m = f"max(0,{smooth_min(f'abs(v(torque))/{fmt(self.kt)}', cap, 0.01)})"
-        idle = f"({v} >= {self.V_KNEE} ? {fmt(self.idle)} : {fmt(self.idle)}*max({v},0)/{self.V_KNEE})"
+        # Use the same smooth low-voltage continuation as the other current
+        # loads: a hard knee stalls ngspice while a disconnected rail decays.
+        idle = constant_current(self.idle, self.V_KNEE, v)
         lines = [
             f"bim im 0 v = {i_m}",
             "vsin vin vs2 dc 0",

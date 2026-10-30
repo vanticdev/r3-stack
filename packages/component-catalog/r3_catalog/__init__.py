@@ -9,7 +9,8 @@ from typing import Any
 
 import yaml
 
-from .schema import Catalog, ComponentType, ConnectorGeometry, ConnectorType, FastenerType, JointCoefficient, Material, Printer, PrintFit, WireGauge
+from .schema import (Catalog, ComponentType, ConnectionSite, ConnectorGeometry, ConnectorType,
+                     FastenerType, JointCoefficient, Material, Printer, PrintFit, WireGauge)
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -28,7 +29,19 @@ def _component_entries(paths: list[Path], raw_by_id: dict[str, dict[str, Any]]) 
     """Component entries of one catalog folder with ``extends: <id>`` resolved (a variant such as
     another RAM size repeats only what differs from its base). Bases may be in any file of this
     folder or of a folder loaded earlier."""
-    pending = [(path, entry) for path in paths for entry in yaml.safe_load(path.read_text())["components"]]
+    documents = [(path, yaml.safe_load(path.read_text())) for path in paths]
+    pending = [(path, entry) for path, document in documents for entry in document["components"]]
+    # Physical refinements live with the vendor family, independently of legacy
+    # example catalogs. Apply before extends so every RAM variant inherits them.
+    # The final merged entry still passes the strict ComponentType schema below.
+    for path, document in documents:
+        for identifier, refinement in document.get("refinements", {}).items():
+            matches = [i for i, (_, entry) in enumerate(pending) if entry["id"] == identifier]
+            if len(matches) != 1 or "id" in refinement or "extends" in refinement:
+                raise ValueError(f"{path}: invalid component refinement {identifier!r}")
+            i = matches[0]
+            original_path, entry = pending[i]
+            pending[i] = (original_path, _merge(entry, refinement))
     local = {entry["id"]: entry for _, entry in pending if "extends" not in entry}
     resolved: dict[str, dict[str, Any]] = {}
 
@@ -107,6 +120,8 @@ def load_catalog(*extra_dirs: Path) -> Catalog:
             if component.id in catalog.components and root == DATA_DIR:
                 raise ValueError(f"duplicate component id {component.id!r} in {path}")
             catalog.components[component.id] = component
+    from .patterns import resolve_patterns
+    resolve_patterns(catalog)
     # A dataset link is resolved through the existing typed ModelRef. No second
     # component schema or project configuration format is introduced.
     from .modelbank import ModelBank
@@ -123,4 +138,4 @@ def default_catalog() -> Catalog:
     return load_catalog()
 
 
-__all__ = ["Catalog", "ComponentType", "ConnectorGeometry", "ConnectorType", "FastenerType", "Material", "Printer", "PrintFit", "WireGauge", "default_catalog", "load_catalog"]
+__all__ = ["Catalog", "ComponentType", "ConnectionSite", "ConnectorGeometry", "ConnectorType", "FastenerType", "Material", "Printer", "PrintFit", "WireGauge", "default_catalog", "load_catalog"]

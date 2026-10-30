@@ -203,8 +203,31 @@ def connector_scene(catalog: Catalog, connector_type: str) -> trimesh.Scene:
         raise ModelUnavailable(f"{connector_type} has no geometry")
     if geometry.model.source == "proxy":
         return proxy_scene(geometry)
-    glb = step_to_glb(resolve_step(geometry.model), CONNECTOR_TOLERANCE)
-    return _posed(trimesh.load(glb, force="scene"), Frame.from_placement(geometry.model.placement))
+    # A vendor assembly may be the only published model of its connector. Keep
+    # its real surfaces, selected in the vendor frame; never replace them with
+    # a sculpted purchased-part proxy. Bounds are SI, before model placement.
+    extraction = geometry.model.params.get("extract_bounds")
+    glb = step_to_glb(resolve_step(geometry.model), BOARD_TOLERANCE if extraction else CONNECTOR_TOLERANCE)
+    scene = trimesh.load(glb, force="scene")
+    if extraction:
+        selected = trimesh.Scene()
+        lo, hi = np.asarray(extraction)
+        for node in scene.graph.nodes_geometry:
+            pose, name = scene.graph[node]
+            mesh = scene.geometry[name].copy()
+            mesh.apply_transform(pose)
+            if np.any(mesh.bounds[1] < lo) or np.any(mesh.bounds[0] > hi):
+                continue
+            for axis in range(3):
+                normal = np.eye(3)[axis]
+                mesh = mesh.slice_plane(lo, normal)
+                mesh = mesh.slice_plane(hi, -normal)
+            if len(mesh.faces):
+                selected.add_geometry(mesh, node_name=node)
+        if not selected.geometry:
+            raise ModelUnavailable(f"{connector_type}: vendor extraction contains no geometry")
+        scene = selected
+    return _posed(scene, Frame.from_placement(geometry.model.placement))
 
 
 # KiCad's STEP export carries copper (tracks, zones, pads) but no solder mask: copper is shown under a

@@ -92,6 +92,24 @@ gives that pin (`null` at splices) and `fanout` the leading/trailing vertices wh
 the conductor converges from its pin into the shared bundle core. Wires of one
 bundle share the core exactly (`r3_wiring.mujoco_cables.core_path`).
 
+An authored `route.tie_points` entry requests a bundle centre on real support
+hardware. The placement pass checks the mounting face or post, strap loop,
+installation access, retention and reach; it then plans through the selected
+support. The requested centre must be within 20 mm of the initial route and
+within 4 mm of the installed support. Unplaceable or subsequently dropped
+requests report `cable_support_unplaceable` and block manufacturing release.
+Only installed supports become simulation pins; an unverified coordinate never
+anchors a cable in free air. A post end face cannot retain a side-loop tie.
+
+`route.via` guides the first (largest) branch. For a branched loom,
+`route.wire_via` maps wire IDs to ordered waypoints, from the named wire's
+`from` terminal toward its `to` terminal. For example,
+`wire_via: {W_MOT_A: [[60 mm, 53 mm, 95 mm]]}` guides that motor branch
+independently of its return. Conductors between the same pair of terminals
+share a corridor; conflicting waypoint lists or unknown wire IDs are rejected.
+These coordinates guide routing, never substitute for installed supports, and
+remain subject to the existing collision and bend-radius checks.
+
 ### Connector geometry and `build/connectors/connectors.json`
 
 Each catalog connector type has exact geometry (`r3_catalog` `connector_geometry.yaml`,

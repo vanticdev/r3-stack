@@ -15,11 +15,21 @@ def _pts(points: np.ndarray) -> list[list[float]]:
     return [[round(float(c), 6) for c in p] for p in np.asarray(points)]
 
 
+def _wire_path(points: np.ndarray) -> list[list[float]]:
+    path = _pts(points)
+    # Interior display vertices may be quantized to micrometres. Terminations
+    # must remain on their exact pin planes, including rotated pigtail exits.
+    if path:
+        path[0] = np.asarray(points[0], dtype=float).tolist()
+        path[-1] = np.asarray(points[-1], dtype=float).tolist()
+    return path
+
+
 def end_json(end: PinEnd | None) -> dict[str, Any] | None:
     if end is None:
         return None
-    return {"connector": end.connector, "pin": end.pin, "kind": end.kind, "position": _pts([end.position])[0],
-            "direction": _pts([end.direction])[0], "contact": _pts([end.contact])[0]}
+    return {"connector": end.connector, "pin": end.pin, "kind": end.kind, "position": end.position.tolist(),
+            "direction": end.direction.tolist(), "contact": end.contact.tolist()}
 
 
 def routes_json(result: RoutingResult, clearances: list[dict[str, Any]]) -> dict[str, Any]:
@@ -30,7 +40,7 @@ def routes_json(result: RoutingResult, clearances: list[dict[str, Any]]) -> dict
     mating contact). ``fanout`` counts the leading/trailing path vertices where
     the conductor converges from its pin into the shared bundle core."""
     return {
-        "wires": {w.wire_id: {"harness": w.harness, "awg": w.awg, "path": _pts(w.path),
+        "wires": {w.wire_id: {"harness": w.harness, "awg": w.awg, "path": _wire_path(w.path),
                               "routed_length": round(w.routed_length, 6), "cut_length": round(w.cut_length, 6),
                               "bundle_radius": [round(float(r), 7) for r in w.bundle_radius],
                               "ends": [end_json(e) for e in w.ends], "fanout": list(w.fanout)}

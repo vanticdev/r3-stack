@@ -487,6 +487,22 @@ class ModelChecker:
                         hint="Strap one device to an alternate address or move it to a second I2C bus."))
         return summary
 
+    def check_mount_estimates(self) -> None:
+        """Owned parts with estimated mounting holes still require measurement."""
+        for cid, comp in self.spec.components.items():
+            if not comp.owned or comp.type not in self.catalog.components:
+                continue
+            mechanical = self.catalog.component(comp.type).mechanical
+            holes = [f for f in mechanical.features if f.kind == "clearance_hole"
+                     and f.provenance.status == "estimated"]
+            if mechanical.fabricated or not holes:
+                continue
+            self.add(Diagnostic.warning(
+                "mount_geometry_estimated",
+                f"{cid}: {len(holes)} mounting holes use estimated geometry; measure the owned part before releasing its mount",
+                subjects=[cid], data={"holes": [f.model_dump(mode="json") for f in holes]},
+                hint="Confirm the hole centres and diameters, then update their catalog provenance."))
+
     # ------------------------------------------------------------ flat cables
     def _connector_point(self, ref: str) -> np.ndarray | None:
         cid, _, name = ref.partition(".")
@@ -518,6 +534,12 @@ class ModelChecker:
                 continue
             span, limit = float(np.linalg.norm(points[0] - points[1])), to_si(length)
             data = {"span": span, "length": limit, "slack_fraction": (limit - span) / limit}
+            if any(c.flexible_end for c in ctype.connectors.values()):
+                self.add(Diagnostic.warning(
+                    "flat_cable_route_estimated", f"{cid}: flexible ends are seated, but socket separation alone "
+                    "does not verify the ribbon's installed bends, restraints or swept clearance",
+                    subjects=[cid, *ends], data=data,
+                    hint="Validate the installed ribbon route and its supports before fabrication release."))
             if span > limit:
                 self.add(Diagnostic.error("cable_too_short", f"{cid} ({limit * 1e3:.0f} mm) cannot reach from {ends[0]} to {ends[1]} "
                                                              f"({span * 1e3:.0f} mm straight)", subjects=[cid, *ends], data=data,
@@ -898,6 +920,7 @@ def run(project: Project) -> StageResult:
     checker.check_roles()
     rails = checker.check_voltages()
     buses = checker.check_i2c()
+    checker.check_mount_estimates()
     checker.check_cable_reach()
     solids = checker.solids()
     overlaps = checker.check_interference(solids)

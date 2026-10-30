@@ -52,7 +52,7 @@ from .passthroughs import add_cad_pass_throughs
 from .planner import plan_routing
 from .render import render_routes, render_slack
 from .router import HarnessRouter, RouterOptions
-from .supports import check_spans, place_supports, support_constraints
+from .supports import check_requested_supports, check_spans, place_supports, support_constraints
 from .witness import audit_cad, verify_clearances
 
 STAGE = "wiring"
@@ -99,9 +99,8 @@ def route_and_check(project: Project, options: RouterOptions | None = None, *, p
         planning.stats["first_pass"] = first.stats
         planning_diagnostics = planning.diagnostics
         for harness_id, harness in routing.harnesses.items():
-            hints = [np.asarray(t, float) for h in project.spec.electrical.harnesses if h.id == harness_id
-                     for t in h.route.tie_points]
-            harness.tie_points = [s.position.copy() for s in supports.supports if s.harness == harness_id] + hints
+            harness.tie_points = [s.position.copy() for s in supports.supports if s.harness == harness_id]
+        check_requested_supports(project, supports, routing)
         add_cad_pass_throughs(project, routing)  # grommeted slots in the CAD hold the bundles passing through
         check_spans(project, routing, supports)
         cuts = compute_cut_lengths(project, routing, supports.spans, obstacles.kinematics)

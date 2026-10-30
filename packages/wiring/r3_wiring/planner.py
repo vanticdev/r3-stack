@@ -703,6 +703,19 @@ class _Problem:
         g, _, _ = self.constraints(x)
         return float(max(0.0, np.max(-g - self.tolerance, initial=0.0)))
 
+    def fixed_clearance_lower_bound(self) -> float:
+        """Residual that no decision variable can change at a fixed point.
+
+        Inspect the affine point layout, not a zero local gradient: a movable
+        point at the centre of an obstacle may also have a zero gradient.
+        """
+        fixed = (self.p_var < 0) & (self.p_pos < 0)
+        axis_points = np.flatnonzero(self.p_axis >= 0)
+        fixed[axis_points] &= self.a_off[self.p_axis[axis_points]] < 0
+        rows = self.clear["row"][fixed[self.clear["point"]]]
+        g, _, _ = self.constraints(self.x0_array)
+        return float(max(0.0, np.max(-g[rows] - self.tolerance[rows], initial=0.0)))
+
 
 # ------------------------------------------------------------------ solve
 def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields: ClearanceField,
@@ -713,6 +726,20 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     spacing = {k: float(np.clip(seg.r_min / 3.0, 0.0015, 0.004)) for k, seg in enumerate(segments)}
     problem = _Problem(segments, junctions, fields, requirement, spacing)
     x0 = problem.x0_array.copy()
+    # The distance fields are defined only on this routing volume. In an
+    # infeasible layout an unbounded elastic solve can otherwise send a point
+    # tens of metres away, marginally reduce its largest residual, and win the
+    # candidate comparison. Keep positional variables in the modelled domain;
+    # include their authored initial position when an exit sits on its edge.
+    lower, upper = np.full(problem.n, -np.inf), np.full(problem.n, np.inf)
+    low = fields.grid.origin
+    high = low + (np.asarray(fields.grid.shape) - 1) * fields.grid.voxel
+    positions = {int(i) for i in problem.p_var if i >= 0}
+    positions.update(i for i in problem.jpos.values() if i is not None)
+    for offset in positions:
+        lower[offset:offset + 3] = np.minimum(low, x0[offset:offset + 3])
+        upper[offset:offset + 3] = np.maximum(high, x0[offset:offset + 3])
+    bounds = list(zip(lower, upper))
     stats: dict[str, Any] = {"variables": problem.n, "points": problem.n_points}
     if problem.n == 0:
         return _result(problem, x0, segments, junctions, stats, obstacles)
@@ -730,7 +757,8 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     v0 = violation(x0)
     x1, iterations1 = x0, 0
     for weight in PENALTY_WEIGHTS:
-        step = minimize(penalty, x1, args=(weight,), jac=True, method="L-BFGS-B", options={"maxiter": 400})
+        step = minimize(penalty, x1, args=(weight,), jac=True, method="L-BFGS-B", bounds=bounds,
+                        options={"maxiter": 400})
         iterations1 += int(step.nit)
         if violation(step.x) <= violation(x1) + 1e-12 or weight == PENALTY_WEIGHTS[0]:
             x1 = step.x
@@ -739,6 +767,32 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     if violation(x1) > v0:
         x1 = x0
     stats.update(initial_violation=v0, penalty_iterations=iterations1, penalty_violation=violation(x1))
+
+    # A blocked fixed exit/via is a layout failure. Once the best possible
+    # maximum residual is reached, dense elastic/polish iterations cannot make
+    # this group feasible. Return the full audit and keep every failure.
+    fixed_bound = problem.fixed_clearance_lower_bound()
+    if fixed_bound > 0.0 and violation(x1) <= fixed_bound + 1e-10:
+        stats.update(best_phase="penalty", fixed_clearance_lower_bound=fixed_bound,
+                     slsqp_iterations=0, slsqp_message="Skipped: fixed clearance lower bound reached",
+                     final_violation=violation(x1),
+                     initial_length=float(sum(polyline_length(p) for p in problem.points(x0))),
+                     planned_length=float(sum(polyline_length(p) for p in problem.points(x1))))
+        return _result(problem, x1, segments, junctions, stats, obstacles)
+
+    # The routing objective is a buildable cable. Once the bounded penalty
+    # solve satisfies every constraint, a dense elastic solve cannot improve
+    # feasibility and can spend hundreds of iterations polishing its length.
+    # Keep the same final constraint audit before accepting this early result.
+    if violation(x1) == 0.0:
+        accepted_stats = {**stats, "best_phase": "penalty", "slsqp_iterations": 0,
+                          "slsqp_message": "Skipped: penalty solution satisfies all constraints",
+                          "final_violation": 0.0,
+                          "initial_length": float(sum(polyline_length(p) for p in problem.points(x0))),
+                          "planned_length": float(sum(polyline_length(p) for p in problem.points(x1)))}
+        accepted = _result(problem, x1, segments, junctions, accepted_stats, obstacles)
+        if accepted.feasible:
+            return accepted
 
     # Phase 2: elastic SLSQP. One slack t >= 0 relaxes every constraint (g + t >= 0) and
     # costs ELASTIC_WEIGHT per unit, so SLSQP always has a feasible point and converges to
@@ -763,6 +817,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     z1 = np.concatenate([x1, [max(0.0, -float(g1.min())) + 1e-3]])
     try:
         result = minimize(fun, z1, jac=jac, method="SLSQP",
+                          bounds=[*bounds, (0.0, np.inf)],
                           constraints=[{"type": "ineq", "fun": cons, "jac": cons_jac}],
                           options={"maxiter": max_iterations, "ftol": 1e-10})
         x2, message, iterations = result.x[:-1], str(result.message), int(result.nit)
@@ -773,7 +828,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     x3 = x2
     try:
         polish = minimize(lambda x: problem.objective(x)[0], x2, jac=lambda x: problem.objective(x)[1],
-                          method="SLSQP", options={"maxiter": 2 * max_iterations, "ftol": 1e-10},
+                          method="SLSQP", bounds=bounds, options={"maxiter": 2 * max_iterations, "ftol": 1e-10},
                           constraints=[{"type": "ineq", "fun": lambda x: problem.constraints(x)[0],
                                         "jac": problem.jacobian_dense}])
         x3 = polish.x
@@ -969,16 +1024,24 @@ CROSSING_GAP = 0.0005  # m between the surfaces of two harnesses that cross or r
 
 
 def occupancy_field(grid: VoxelGrid, occupied: list[tuple[np.ndarray, float, set[str]]],
-                    categories: set[str]) -> np.ndarray:
-    """Distance field of bundles already planned (other harnesses), less their radius,
-    the EMC segregation distance between the categories involved and a crossing gap:
-    the next harness group must keep this field >= its own radius."""
+                    categories: set[str], *, termination_exits: list[np.ndarray] | None = None) -> np.ndarray:
+    """Reserve earlier bundle radii and a crossing gap everywhere, plus EMC
+    segregation outside short connector fan-outs. The next harness group must
+    keep this field >= its own radius; the separate EMC audit is unchanged."""
     from scipy.spatial import cKDTree
 
-    from .bundles import SEPARATION
+    from .bundles import SEPARATION, TERMINATION_ZONE
 
     centers = grid.centers()
     out = np.full(grid.size, FIELD_CUTOFF)
+    # The EMC audit applies segregation to parallel runs of at least 30 mm.
+    # Applying that long-run spacing at a fixed connector's short fan-out can
+    # make adjacent, physically clear headers impossible to route. Preserve
+    # full physical occupancy and the crossing gap everywhere; only the extra
+    # EMC routing margin stops at the existing 12 mm termination boundary.
+    termination = np.zeros(grid.size, dtype=bool)
+    for point in termination_exits or []:
+        termination |= np.linalg.norm(centers - point, axis=1) <= TERMINATION_ZONE
     seen: set[tuple] = set()
     for points, radius, cats in occupied:
         separation = max([SEPARATION.get(frozenset({a, b}), 0.0) for a in categories for b in cats if a != b] + [0.0])
@@ -991,7 +1054,8 @@ def occupancy_field(grid: VoxelGrid, occupied: list[tuple[np.ndarray, float, set
                       axis=1)
         d = np.full(len(centers), FIELD_CUTOFF)
         d[near], _ = cKDTree(points).query(centers[near], distance_upper_bound=FIELD_CUTOFF)
-        np.minimum(out, np.minimum(d, FIELD_CUTOFF) - radius - separation - CROSSING_GAP, out=out)
+        margin = np.where(termination, 0.0, separation) if separation else 0.0
+        np.minimum(out, np.minimum(d, FIELD_CUTOFF) - radius - margin - CROSSING_GAP, out=out)
     return out
 
 
@@ -1048,8 +1112,10 @@ def build_problem(project: Any, router: Any, routing: Any, harnesses: list[str],
     fanned: set[str] = set()  # node refs whose conductors fan out from their pins
     jacket = {h.id: h.jacket for h in project.spec.electrical.harnesses}
     for pair in routing.floating:
-        if not {pair.a.split(".")[0], pair.b.split(".")[0]} & set(harnesses):
-            continue  # unrelated pairs must not acquire free optimisation variables in this group
+        # Other groups must not move this pair after its pin fan-outs were
+        # fixed by its own planner pass. Their segments do not constrain it.
+        if pair.a.split(".", 1)[0] not in harnesses or pair.b.split(".", 1)[0] not in harnesses:
+            continue
         key = f"F:{pair.a}|{pair.b}"
         from .terminations import body_width
 
@@ -1064,7 +1130,8 @@ def build_problem(project: Any, router: Any, routing: Any, harnesses: list[str],
         nodes = routing.nodes[harness]
         failed = {w for w, r in routing.wires.items() if r.harness == harness and r.failed}
         hole_centers = {f"H:{i}": routing.holes[i] for i in route.holes}
-        vias = [np.asarray(v, float) for h in project.spec.electrical.harnesses if h.id == harness for v in h.route.via]
+        vias = [np.asarray(v, float) for h in project.spec.electrical.harnesses if h.id == harness
+                for points in [h.route.via, *getattr(h.route, "wire_via", {}).values()] for v in points]
 
         def identify(point: np.ndarray) -> tuple[str, float | None]:
             for node in nodes.values():
@@ -1334,7 +1401,9 @@ def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str,
         fields.hardware = router.cable_field(routing.nodes, set(group))
         categories = _group_categories(project, group)
         if occupied:
-            occupancy = occupancy_field(router.grid, occupied, categories)
+            exits = [node.exit for harness in group for node in routing.nodes[harness].values()
+                     if node.kind == "connector" and node.exit is not None]
+            occupancy = occupancy_field(router.grid, occupied, categories, termination_exits=exits)
             np.minimum(fields.static, occupancy, out=fields.static)
             np.minimum(fields.hardware, occupancy, out=fields.hardware)
         segments, junctions = build_problem(project, router, routing, group, supports)

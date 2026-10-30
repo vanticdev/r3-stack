@@ -36,9 +36,12 @@ def test_every_connector_type_has_geometry(catalog):
         if g is None:
             continue
         assert sorted(g.pins, key=int) == [str(n) for n in range(1, ctype.pin_count + 1)], type_id
-        assert g.model.source in ("kicad", "proxy"), type_id
+        assert g.model.source in ("kicad", "proxy", "vendor"), type_id
         if g.model.source == "proxy":
             assert g.model.provenance.status == "estimated" and "proxy" in g.model.provenance.source
+        elif g.model.source == "vendor":
+            assert g.model.url.startswith("https://") and len(g.model.sha256) == 64
+            assert g.model.license and g.model.params["extract_bounds"]
         else:
             assert g.model.license and g.model.path.startswith("${KICAD10_3DMODEL_DIR}/")
         for pin in g.pins.values():
@@ -107,14 +110,15 @@ def project():
 
 
 def test_component_connectors_mate_in_place(project):
-    """The HAT socket sits on the Pi header: same x/y, faces 0.22 mm apart, pin 1 on pin 1."""
+    """The shimmed stack preserves its declared socket seating gap and pin grid."""
     j8 = component_connector_frame(project, "pi.J8")
     socket = component_connector_frame(project, "hat.J_GPIO")
     catalog = project.catalog
     header, sock = catalog.connector("header-2x20-2.54").geometry, catalog.connector("socket-2x20-2.54").geometry
     d = socket.origin - j8.origin
     assert np.linalg.norm(d - (d @ j8.z) * j8.z) < 1e-6
-    assert 0.0 <= d @ j8.z < 5e-4
+    join = next(j for j in project.spec.assembly.joins if j.join_id == "gpio_header")
+    assert float(d @ j8.z) == pytest.approx(float(join.offset), abs=1e-15)
     assert np.dot(j8.z, socket.z) < -0.9999 and np.dot(j8.x, socket.x) > 0.9999
     for number in header.pins:
         delta = socket.point(sock.pins[number].position) - j8.point(header.pins[number].position)

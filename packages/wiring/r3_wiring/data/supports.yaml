@@ -15,6 +15,12 @@
 #                    press (adhesive) or a driver line [diameter, length] (screw)
 # provenance:        MPNs and dimensions follow the vendor catalogues as listed; values marked
 #                    estimated are engineering estimates, not datasheet numbers.
+placement:
+  requested_match: 4 mm
+  wire_capture_allowance: 2 mm
+  provenance:
+    status: estimated
+    source: Generic support placement and wire capture allowances; unchanged from the support checks.
 ties:
   - id: plt1m
     mpn: PLT1M-C

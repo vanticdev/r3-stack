@@ -67,6 +67,7 @@ class LocalPart:
     properties: dict[str, str] = field(default_factory=dict)
     instances: list[str] = field(default_factory=list)
     bank_model: dict[str, Any] | None = None
+    source_model: Any = None  # supplied geometry when the catalog has no authored fallback solids
 
 
 def _digest(value: Any) -> str:
@@ -202,8 +203,8 @@ def component_ops(project: Project, type_id: str, params: dict[str, Any], mirror
             op.folder = _folder_for(op, "bore" if feature.kind in ("bore", "d_bore", "shaft", "d_shaft", "spline") else "feature")
             op.name = feature.id.replace("_", " ")
             ops.append(op)
-    if mech.fabricated:
-        for iface in _resolved_interfaces(project, type_id, mirror):
+    for iface in _resolved_interfaces(project, type_id, mirror):
+        if mech.fabricated or iface.name in mech.proxy_holes_from:
             ops.extend(_interface_ops(project, iface))
     if not ops or getattr(ops[0], "op", "add") == "remove" or isinstance(ops[0], Hole):
         raise PlanError(f"{type_id}: first operation must add material")
@@ -297,6 +298,9 @@ def build_part_catalog(project: Project) -> tuple[dict[str, LocalPart], dict[str
             parts[key] = LocalPart(key=key, name=name, studio=ctype.cad_family or cad_name(ctype), type=type_id, plan=plan,
                                    connectors=interface_connectors(project, type_id, mirror),
                                    library=not mech.fabricated and ctype.kind != "pcb", mirror=mirror, properties=props)
+            if (not mech.fabricated and mech.shape == "custom" and not mech.solids
+                    and ctype.model and ctype.model.source in {"vendor", "kicad"}):
+                parts[key].source_model = ctype.model.model_copy(deep=True)
         if not ctype.mechanical.fabricated and ctype.kind != "pcb":
             from .purchased import bank_entry
             entry = bank_entry(ctype)
@@ -370,6 +374,9 @@ def world_manifold(part: LocalPart, pose: np.ndarray):
     """The part's plan solid moved to ``pose`` (offline exact-interference checks)."""
     from .geometry import plan_manifold
 
+    if part.source_model is not None:
+        from .step_geometry import supplied_geometry
+        return supplied_geometry(part).manifold().transform(np.asarray(pose)[:3, :4])
     return plan_manifold(part.plan).transform(np.asarray(pose)[:3, :4])
 
 

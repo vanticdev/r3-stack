@@ -32,17 +32,23 @@ components:
       # so_rl sits behind the motor's bullet terminals, out of the motor-lead corridor (x 40-100 mm, y 37-60 mm robot frame).
       so_rl: {kind: hole_pattern, origin: [-99 mm, 47 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_rr: {kind: hole_pattern, origin: [-52 mm, -45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
-      so_fl: {kind: hole_pattern, origin: [65 mm, 28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      so_fl: {kind: hole_pattern, origin: [60 mm, 39 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_fr: {kind: hole_pattern, origin: [65 mm, -28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       arm_fl: {kind: hole_pattern, origin: [130 mm, 31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
       arm_fr: {kind: hole_pattern, origin: [130 mm, -31 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 4 mm, 3.4 mm, clearance, 3 mm], [0, -4 mm, 3.4 mm, clearance, 3 mm]]}}
       post_a: {kind: hole_pattern, origin: [110.05 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
       post_b: {kind: hole_pattern, origin: [159.55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3.4 mm, clearance, 3 mm], [0, -5 mm, 3.4 mm, clearance, 3 mm]]}}
+      motor_lead_post: {kind: hole_pattern, origin: [-50 mm, 60 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      power_lead_post: {kind: hole_pattern, origin: [50 mm, -44 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_motor_lead_post: {kind: adhesive_pad, origin: [-50 mm, 60 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      cap_power_lead_post: {kind: adhesive_pad, origin: [50 mm, -44 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      encoder_lead_post: {kind: hole_pattern, origin: [-78.20718 mm, -62 mm, 3 mm], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}, x: [1, 0, 0], z: [0, 0, 1]}
+      cap_encoder_lead_post: {kind: adhesive_pad, origin: [-78.20718 mm, -62 mm, 0], x: [1, 0, 0], z: [0, 0, -1]}
       # ESC beside the battery (left), clear of the motor's bullet terminals, which point +y off the end bell.
       esc_pad: {kind: adhesive_pad, origin: [-7 mm, 47 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {area: 1408 mm^2}}
       # Battery 17 mm aft of the servo posts' line: its 12 AWG lead (16 mm bend radius) turns back clear of post A.
-      battery_seat: {kind: face_mount, origin: [11 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      strap_slots: {kind: strap_slot, origin: [11 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {width: 22 mm, slots: [[-11 mm, -25.5 mm, 11 mm, -23 mm], [-11 mm, 23 mm, 11 mm, 25.5 mm]]}, description: "Two 22 x 2.5 mm slots either side of the battery for the hook-and-loop strap"}
+      battery_seat: {kind: face_mount, origin: [11 mm, 0, 3 mm], z: [0, 0, 1], x: [0.984807753, 0.173648178, 0]}
+      strap_slots: {kind: strap_slot, origin: [11 mm, 0, 0], z: [0, 0, -1], x: [0.984807753, 0.173648178, 0], params: {width: 22 mm, slots: [[-11 mm, -25.5 mm, 11 mm, -23 mm], [-11 mm, 23 mm, 11 mm, 25.5 mm]]}, description: "Two 22 x 2.5 mm slots either side of the battery for the hook-and-loop strap"}
       # Fuse holder on the right of the battery, along x: input (J1) forward from the splices, output (J2) aft,
       # turning back under the deck to the HAT feed slot.
       fuse_seat: {kind: face_mount, origin: [26 mm, -37 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
@@ -74,23 +80,134 @@ components:
     # Deck frame: bottom center; top face z = 3 mm. PETG: hole clearances from the FDM print-fit table.
       so_rl: {kind: hole_pattern, origin: [-89 mm, 47 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_rr: {kind: hole_pattern, origin: [-42 mm, -45 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
-      so_fl: {kind: hole_pattern, origin: [75 mm, 28 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      so_fl: {kind: hole_pattern, origin: [70 mm, 39 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       so_fr: {kind: hole_pattern, origin: [75 mm, -28 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       cap_so_rl: {kind: adhesive_pad, origin: [-89 mm, 47 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       cap_so_rr: {kind: adhesive_pad, origin: [-42 mm, -45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
-      cap_so_fl: {kind: adhesive_pad, origin: [75 mm, 28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_so_fl: {kind: adhesive_pad, origin: [70 mm, 39 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       cap_so_fr: {kind: adhesive_pad, origin: [75 mm, -28 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       pi_1: {kind: hole_pattern, origin: [-49 mm, -24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       pi_2: {kind: hole_pattern, origin: [9 mm, -24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       pi_3: {kind: hole_pattern, origin: [-49 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       pi_4: {kind: hole_pattern, origin: [9 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
-      imu_seat: {kind: adhesive_pad, origin: [-5 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], description: "Provisional rigid epoxy-bonded IMU pedestal; layout lane finalises placement"}
-      rx_pad: {kind: adhesive_pad, origin: [70 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      imu_seat: {kind: adhesive_pad, origin: [29 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], description: "Rigid IMU pedestal outside the Pi IO block; board axes remain chassis aligned"}
+      imu_south_post: {kind: hole_pattern, origin: [15 mm, -72 mm, 3 mm], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}, x: [1, 0, 0], z: [0, 0, 1]}
+      imu_outboard_post: {kind: hole_pattern, origin: [40 mm, -8 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      imu_corner_post: {kind: hole_pattern, origin: [46 mm, -40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_imu_south_post: {kind: adhesive_pad, origin: [15 mm, -72 mm, 0], x: [1, 0, 0], z: [0, 0, -1]}
+      cap_imu_outboard_post: {kind: adhesive_pad, origin: [40 mm, -8 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      cap_imu_corner_post: {kind: adhesive_pad, origin: [46 mm, -40 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      rx_pad: {kind: adhesive_pad, origin: [-24.5 mm, -85 mm, 3 mm], z: [0, 0, 1], x: [0, -1, 0]}
       gps_pad: {kind: adhesive_pad, origin: [-65 mm, 30 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       # RTCM correction radio, case on edge along the right deck edge (antenna jack forward).
       rtk_radio_pad: {kind: adhesive_pad, origin: [46.5 mm, -49.15 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       lead_post: {kind: hole_pattern, origin: [-22 mm, -51.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      sensor_lead_post: {kind: hole_pattern, origin: [-60 mm, -45 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_sensor_lead_post: {kind: adhesive_pad, origin: [-60 mm, -45 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      cap_lead_post: {kind: adhesive_pad, origin: [-22 mm, -51.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       mast: {kind: hole_pattern, origin: [55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
+      camera_mount:
+        kind: hole_pattern
+        origin:
+        - 75 mm
+        - 5 mm
+        - 3 mm
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 4 mm
+            - 3.4 mm
+            - clearance
+            - 3 mm
+          - - 0
+            - -4 mm
+            - 3.4 mm
+            - clearance
+            - 3 mm
+      cap_camera_mount_1:
+        kind: adhesive_pad
+        origin:
+        - 75 mm
+        - 1 mm
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+      cap_camera_mount_2:
+        kind: adhesive_pad
+        origin:
+        - 75 mm
+        - 9 mm
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+      servo_approach_post: {kind: hole_pattern, origin: [-41.87017 mm, -100 mm, 3 mm], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_servo_approach_post: {kind: adhesive_pad, origin: [-41.87017 mm, -100 mm, 0], z: [0, 0, -1]}
+      servo_climb_post:
+        kind: hole_pattern
+        origin:
+        - 39.6546 mm
+        - -74.7829 mm
+        - 3 mm
+        params:
+          holes:
+          - - 0
+            - 0
+            - 3.4 mm
+            - clearance
+            - 3 mm
+      cap_servo_climb_post:
+        kind: adhesive_pad
+        origin:
+        - 39.6546 mm
+        - -74.7829 mm
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+      servo_upper_post:
+        kind: hole_pattern
+        origin:
+        - -2.5468 mm
+        - -111.9125 mm
+        - 3 mm
+        params:
+          holes:
+          - - 0
+            - 0
+            - 3.4 mm
+            - clearance
+            - 3 mm
+      cap_servo_upper_post:
+        kind: adhesive_pad
+        origin:
+        - -2.5468 mm
+        - -111.9125 mm
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
   - id: standoff-m3-47
     kind: structure
     cad_name: Deck standoff M3x47
@@ -223,8 +340,8 @@ components:
       M_POS: {role: motor, voltage_max: 8.4, current_max: 70}
       M_NEG: {role: motor, voltage_max: 8.4, current_max: 70}
     connectors:
-      J_POS: {type: bullet-3.5-male, position: [0, 26 mm, 10 mm], direction: [0, 1, 0], pins: {"1": M_POS}}
-      J_NEG: {type: bullet-3.5-male, position: [0, 26 mm, -10 mm], direction: [0, 1, 0], pins: {"1": M_NEG}}
+      J_POS: {type: integral, position: [0, 26 mm, 10 mm], direction: [0.3686878264946124, 0.8191520442889918, -0.43938504177070503], pins: {"1": M_POS}}
+      J_NEG: {type: integral, position: [0, 26 mm, -10 mm], direction: [0.27165378227418446, 0.9063077870366499, -0.3237443709670646], pins: {"1": M_NEG}}
     behavior:
       model: motor.dc_brushed
       params: {kv_rpm_per_v: 2100, resistance: 0.11, inductance: 60 uH, no_load_current: 1.6, rotor_inertia: 1.2e-5, brush_drop: 0.2, max_rpm: 21000}
@@ -306,6 +423,9 @@ components:
     connectors:
       J_PWR: {type: integral, position: [-23 mm, 8 mm, 10 mm], direction: [-1, 0, 0], pins: {"1": VIN, "2": GND}}
       J_MOT: {type: integral, position: [23 mm, 0, 10 mm], direction: [1, 0, 0], pins: {"1": M_A, "2": M_B}}
+      # Separate wire exits retain the original 14 AWG pigtail centres; flexible leads are clocked outward.
+      J_MOT_A: {type: integral, position: [23 mm, -1.65 mm, 10 mm], direction: [0.70710678, -0.5, 0.5], pins: {"1": M_A}}
+      J_MOT_B: {type: integral, position: [23 mm, 1.65 mm, 10 mm], direction: [0.8660254, 0.5, 0], pins: {"1": M_B}}
       J_SIG: {type: integral, position: [-23 mm, -10 mm, 20 mm], direction: [-1, 0, 0], pins: {"1": SIG, "2": BEC, "3": GND}}
     behavior:
       model: esc.brushed
@@ -390,7 +510,7 @@ components:
     cad_name: Raspberry Pi 5
     name: Raspberry Pi 5 (8 GB)
     manufacturer: Raspberry Pi Ltd
-    description: Frame at the PCB bottom centre; 85 x 56 mm board outline. Overall size includes connector overhangs and underside parts, measured from the official STEP. Mount seats retain the nominal 1.6 mm stack pending physical-board review.
+    description: Frame at the vendor STEP XY board centre and source Z=0; the actual laminate underside is at Z=0.030 mm; 85 x 56 mm board outline. Overall size includes connector overhangs and underside parts, measured from the official STEP. Mount seats follow the official STEP laminate thickness of 1.276 mm; the assembly adds discrete shims below the HAT standoffs.
     mechanical:
       shape: custom
       size: [88.500 mm, 57.630352 mm, 18.976 mm]
@@ -400,17 +520,17 @@ components:
       color: "#1a7f37"
       mount_holes: [[-39 mm, -24.5 mm, 0], [19 mm, -24.5 mm, 0], [-39 mm, 24.5 mm, 0], [19 mm, 24.5 mm, 0]]
       solids:
-        - {kind: box, name: pcb, position: [0, 0, 0.8 mm], size: [85 mm, 56 mm, 1.6 mm]}
+        - {kind: box, name: pcb, position: [0, 0, 0.668 mm], size: [85 mm, 56 mm, 1.276 mm]}
         - {kind: box, name: components, position: [-10 mm, 0, 3.1 mm], size: [52 mm, 43 mm, 3 mm]}
         - {kind: box, name: usb ethernet, position: [33.75 mm, 0, 9.6 mm], size: [21.5 mm, 53 mm, 16 mm]}
-        - {kind: box, name: gpio header base, position: [-10 mm, 24.5 mm, 2.85 mm], size: [50.8 mm, 5.08 mm, 2.5 mm]}
-        - {kind: box, name: gpio pins, position: [-10 mm, 24.5 mm, 7.1 mm], size: [50.4 mm, 4.7 mm, 6 mm]}
+        - {kind: box, name: gpio header base, position: [-10 mm, 24.5 mm, 2.61 mm], size: [50.8 mm, 5.08 mm, 2.54 mm]}
+        - {kind: box, name: gpio pins, position: [-10 mm, 24.5 mm, 6.88 mm], size: [50.4 mm, 4.7 mm, 6 mm]}
       features:
-        - {id: hole_1, kind: clearance_hole, position: [-39 mm, -24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.6 mm}
-        - {id: hole_2, kind: clearance_hole, position: [19 mm, -24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.6 mm}
-        - {id: hole_3, kind: clearance_hole, position: [-39 mm, 24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.6 mm}
-        - {id: hole_4, kind: clearance_hole, position: [19 mm, 24.5 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.6 mm}
-      provenance: {status: datasheet, source: "Raspberry Pi 5 mechanical drawing: 85 x 56 board, 58 x 49 M2.5 holes; overall envelope from official RP-010083-CA-1 STEP. Solids and 1.6 mm mounting stack remain nominal proxies."}
+        - {id: hole_1, kind: clearance_hole, position: [-39 mm, -24.5 mm, 1.306 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
+        - {id: hole_2, kind: clearance_hole, position: [19 mm, -24.5 mm, 1.306 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
+        - {id: hole_3, kind: clearance_hole, position: [-39 mm, 24.5 mm, 1.306 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
+        - {id: hole_4, kind: clearance_hole, position: [19 mm, 24.5 mm, 1.306 mm], axis: [0, 0, -1], diameter: 2.7 mm, depth: 1.276 mm}
+      provenance: {status: datasheet, source: "Raspberry Pi 5 mechanical drawing: 85 x 56 board, 58 x 49 M2.5 holes; overall envelope from official RP-010083-CA-1 STEP. Laminate 1.276 mm and GPIO insulator faces 1.34/3.88 mm measured from the vendor STEP; other catalog solids remain labelled proxies."}
     model:
       source: vendor
       url: "https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip"
@@ -419,18 +539,18 @@ components:
       license: "MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without guarantee of accuracy."
       units: mm
       placement: {origin: [-42.5 mm, -28 mm, 0], x: [1, 0, 0], z: [0, 0, 1]}
-      provenance: {status: datasheet, source: "Raspberry Pi Ltd official Raspberry Pi 5 3D STEP (RP-010083-CA-1, no graphics), product information portal pip.raspberrypi.com", notes: "STEP origin at the PCB bottom-left corner; its PCB is 1.31 mm thick (catalog solids assume 1.6 mm, see .r3-agents/requests/connectors.md)"}
+      provenance: {status: datasheet, source: "Raspberry Pi Ltd official Raspberry Pi 5 3D STEP (RP-010083-CA-1, no graphics), product information portal pip.raspberrypi.com", notes: "STEP origin at the PCB bottom-left corner; its PCB is 1.276 mm thick; header plastic is 1.34–3.88 mm above the PCB bottom"}
     interfaces:
     # Mounting holes (58 x 49 mm M2.5 pattern) as single-hole seats on both board faces, and the 2x20 header.
-      h1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
-      h2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
-      h3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
-      h4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
-      t1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
-      t2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
-      t3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
-      t4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.6 mm]]}}
-      J8: {kind: header, origin: [-10 mm, 24.5 mm, 4.1 mm], z: [0, 0, 1], x: [1, 0, 0], params: {pitch: 2.54 mm, rows: 2, cols: 20, pin1: [-24.13 mm, -1.27 mm]}, description: "Top of the header base; pin 1 at the -x end on the inner row"}
+      h1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 0.030 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      h2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 0.030 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      h3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 0.030 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      h4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 0.030 mm], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      t1: {kind: hole_pattern, origin: [-39 mm, -24.5 mm, 1.306 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      t2: {kind: hole_pattern, origin: [19 mm, -24.5 mm, 1.306 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      t3: {kind: hole_pattern, origin: [-39 mm, 24.5 mm, 1.306 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      t4: {kind: hole_pattern, origin: [19 mm, 24.5 mm, 1.306 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.7 mm, clearance, 1.276 mm]]}}
+      J8: {kind: header, origin: [-10 mm, 24.5 mm, 3.88 mm], z: [0, 0, 1], x: [1, 0, 0], params: {pitch: 2.54 mm, rows: 2, cols: 20, pin1: [-24.13 mm, -1.27 mm]}, description: "Top of the header base; pin 1 at the -x end on the inner row"}
     pins:
       5V: {role: power_in, voltage_nominal: 5.1, voltage_min: 4.75, voltage_max: 5.5, current_max: 5.0}
       3V3: {role: power_out, voltage_nominal: 3.3, current_max: 0.5}
@@ -823,7 +943,7 @@ components:
       OUT: {role: gpio, logic_level: 3.3}
       GND: {role: ground}
     connectors:
-      J1: {type: integral, position: [-6 mm, 3 mm, 2 mm], direction: [-1, 0, 0], pins: {"1": VCC, "2": OUT, "3": GND}}
+      J1: {type: integral, position: [-6 mm, 3 mm, 2 mm], direction: [-0.707106781, 0.707106781, 0], pins: {"1": VCC, "2": OUT, "3": GND}}
     behavior:
       model: encoder.hall
       params: {pulses_per_wheel_rev: 4, output: open_drain_active_low, jitter: 20 us, die_depth: 0.5 mm, b_op_max: 0.0175,
@@ -1105,44 +1225,131 @@ components:
     kind: structure
     cad_name: Servo post B
     name: Servo mounting post with servo-lead pocket, 6061 aluminum, 9 x 20 x 27.5 mm
-    description: >
-      Front servo post. The DS3218 lead leaves the case end 0.5 mm in front of this post, so a 9 mm pocket between the
-      bottom and top threads runs through the post and opens on its +y side: the lead turns inside the post's
-      footprint and runs aft below the linkage. The 7 x 9 mm web left beside the pocket carries the ear load
-      (~40 N per ear at servo stall: ~10 MPa bending). Base threads 6 mm (M3 x 8 through the 3 mm plate engages 5 mm).
+    description: 'Front servo post. The DS3218 lead leaves the case end 0.5 mm in front
+      of this post, so an 11 mm pocket between the bottom and top threads runs through
+      the post and opens on its +y side: the lead turns inside the post''s footprint
+      and runs aft below the linkage. The 5 x 8 mm web left beside the pocket carries
+      the ear load (~40 N per ear at servo stall: ~25 MPa bending). Base threads 5 mm
+      (M3 x 8 through the 3 mm plate engages 5 mm).
+
+      '
     mechanical:
       shape: custom
-      size: [9 mm, 20 mm, 27.5 mm]
-      mass: 0.011
+      size:
+      - 54.5 mm
+      - 56 mm
+      - 27.5 mm
+      mass: 0.025572
       material: Aluminum 6061-T6
       density: 2700
-      color: "#a9b0b8"
+      color: '#a9b0b8'
       fabricated: true
       solids:
-        - {kind: box, name: post, position: [0, 0, 13.75 mm], size: [9 mm, 20 mm, 27.5 mm]}
-        - {kind: box, op: remove, name: lead pocket, position: [0, 4 mm, 12 mm], size: [10 mm, 14 mm, 9 mm]}
+      - kind: box
+        name: post
+        position:
+        - 0
+        - 0
+        - 13.75 mm
+        size:
+        - 9 mm
+        - 20 mm
+        - 27.5 mm
+      - kind: box
+        name: front lead saddle shelf
+        position:
+        - -25 mm
+        - 19 mm
+        - 1 mm
+        size:
+        - 50 mm
+        - 54 mm
+        - 2 mm
+      - kind: box
+        op: remove
+        name: lead pocket
+        position:
+        - 0
+        - 3 mm
+        - 12 mm
+        size:
+        - 10 mm
+        - 16 mm
+        - 11 mm
+      envelope_offset:
+      - -22.75 mm
+      - 18 mm
+      - 0
     interfaces:
-      base: {kind: hole_pattern, origin: [0.25 mm, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 6 mm], [0, -5 mm, 3 mm, tapped, 6 mm]]}}
-      top: {kind: hole_pattern, origin: [0.25 mm, 0, 27.5 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 5 mm, 3 mm, tapped, 8 mm], [0, -5 mm, 3 mm, tapped, 8 mm]]}}
+      base:
+        kind: hole_pattern
+        origin:
+        - 0.25 mm
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 5 mm
+            - 3 mm
+            - tapped
+            - 5 mm
+          - - 0
+            - -5 mm
+            - 3 mm
+            - tapped
+            - 5 mm
+      top:
+        kind: hole_pattern
+        origin:
+        - 0.25 mm
+        - 0
+        - 27.5 mm
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 5 mm
+            - 3 mm
+            - tapped
+            - 8 mm
+          - - 0
+            - -5 mm
+            - 3 mm
+            - tapped
+            - 8 mm
   - id: lead-post-petg
     kind: structure
     cad_name: Lead post
-    name: Printed cable tie post, PETG, 7 mm x 38 mm
+    name: Printed cable tie post, PETG, 7 mm x 15 mm
     description: >
-      Tie post beside the deck's lead slot. The ESC and servo leads plug into the HAT's top-entry headers, so they
-      climb ~45 mm above the deck; a cable tie around this post holds them halfway up (the climb alone exceeds
-      their unsupported-span limit). Screwed from below the deck into a 9 mm M3 thread.
+      Short tie post below the HAT south-facing cable exits. Screwed from below the deck into a 9 mm M3 thread.
     mechanical:
       shape: cylinder
       axis: z
-      size: [7 mm, 38 mm]
-      mass: 0.0019
+      size: [7 mm, 15 mm]
+      mass: 0.00075
       material: PETG
       density: 1270
       color: "#2c6e9e"
       fabricated: true
       solids:
-        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 38 mm}
+        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 15 mm}
     interfaces:
       base: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 9 mm]]}}
   - id: servo-horn-al7075
@@ -1240,23 +1447,23 @@ components:
   - id: antenna-mast-petg
     kind: structure
     cad_name: Antenna mast
-    name: Antenna mast, PETG, 24 mm flange and 6/4 mm tube, 80 mm
+    name: Antenna mast, PETG, 24 mm flange and 6/4 mm tube, 110 mm
     description: Frame at the flange bottom center; mounting holes come from its fasteners.
     mechanical:
       shape: custom
-      size: [24 mm, 24 mm, 83 mm]
-      mass: 0.004
+      size: [24 mm, 24 mm, 113 mm]
+      mass: 0.0046
       material: PETG
       density: 1270
       color: "#2c6e9e"
       fabricated: true
       solids:
         - {kind: cylinder, name: flange, position: [0, 0, 0], axis: [0, 0, 1], diameter: 24 mm, length: 3 mm}
-        - {kind: cylinder, name: tube, position: [0, 0, 3 mm], axis: [0, 0, 1], diameter: 6 mm, length: 80 mm}
-        - {kind: cylinder, op: remove, name: coax bore, position: [0, 0, 0], axis: [0, 0, 1], diameter: 4 mm, length: 83 mm}
+        - {kind: cylinder, name: tube, position: [0, 0, 3 mm], axis: [0, 0, 1], diameter: 6 mm, length: 110 mm}
+        - {kind: cylinder, op: remove, name: coax bore, position: [0, 0, 0], axis: [0, 0, 1], diameter: 4 mm, length: 113 mm}
     interfaces:
       flange: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
-      antenna_seat: {kind: adhesive_pad, origin: [0, 0, 83 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      antenna_seat: {kind: adhesive_pad, origin: [0, 0, 113 mm], z: [0, 0, 1], x: [1, 0, 0]}
   - id: elrs-t-antenna
     kind: antenna
     cad_name: ELRS T-antenna
@@ -1449,19 +1656,869 @@ components:
       seat: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
              params: {cap_for: shcs-m3, inner_d: 6.1 mm, inner_h: 3.3 mm, process: fdm}}
 
+  - id: shim-din988-3x6x0.3
+    kind: structure
+    cad_name: Shim DIN 988 3x6x0.3
+    name: DIN 988 shim washer, 3 x 6 x 0.3 mm
+    manufacturer: norelem
+    part_number: 07522-0306030
+    description: Purchased shim under each HAT standoff; bore clears the M2.5 stud. No modification of the purchased part.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [6 mm, 0.3 mm]
+      mass: 0.000050
+      material: Steel
+      density: 7850
+      color: "#b8bcc2"
+      features:
+        - {id: bore, kind: clearance_hole, position: [0, 0, 0.3 mm], axis: [0, 0, -1], diameter: 3 mm, depth: 0.3 mm}
+      provenance: {status: datasheet, source: "norelem 07522-0306030, DIN 988: D1=3, D2=6, H=0.3 mm; https://www.norelem.com/"}
+    interfaces:
+      bottom: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, clearance, 0.3 mm]]}}
+      top: {kind: hole_pattern, origin: [0, 0, 0.3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, clearance, 0.3 mm]]}}
+
+  - id: encoder-lead-post-petg
+    extends: lead-post-petg
+    cad_name: Encoder cable post
+    name: Printed encoder lead tower with raised return rail and tie collars
+    description: Capped chassis-mounted tower holds the Hall lead clear of the gearbox
+      lid under vibration.
+    mechanical:
+      size:
+      - 11 mm
+      - 57 mm
+      - 110 mm
+      mass: 0.008
+      solids:
+      - kind: cylinder
+        name: tower
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 110 mm
+      - kind: cylinder
+        name: upper lead rail
+        position:
+        - 0
+        - 0
+        - 92 mm
+        axis:
+        - 0
+        - 1
+        - 0
+        diameter: 7 mm
+        length: 50 mm
+      - kind: cylinder
+        name: tie collar 1
+        position:
+        - 0
+        - 0
+        - 29.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+      - kind: cylinder
+        name: tie collar 2
+        position:
+        - 0
+        - 0
+        - 75.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+      - kind: cylinder
+        name: rail tie collar
+        position:
+        - 0
+        - 36.4 mm
+        - 92 mm
+        axis:
+        - 0
+        - 1
+        - 0
+        diameter: 11 mm
+        length: 1.2 mm
+      shape: custom
+      envelope_offset:
+      - 0
+      - 25 mm
+      - 0
+  - id: sensor-lead-post-petg
+    extends: lead-post-petg
+    cad_name: Sensor cable post
+    name: Printed RTK cable tie post, PETG, 7 x 28 mm
+    description: Tie post on the rear deck for the GNSS-to-radio lead, above the gearbox and motor.
+    mechanical:
+      size: [7 mm, 28 mm]
+      mass: 0.0014
+      solids:
+        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 28 mm}
+  - id: gnss-riser-petg
+    kind: structure
+    cad_name: GNSS riser
+    name: Printed GNSS riser with GPS saddle shelf
+    description: Bonded lid riser supports the GPS lead; the nearby radio has a short
+      direct pigtail.
+    mechanical:
+      shape: custom
+      size:
+      - 68 mm
+      - 44 mm
+      - 8.946 mm
+      mass: 0.02
+      material: PETG
+      density: 1270
+      color: '#2c6e9e'
+      fabricated: true
+      envelope_offset:
+      - 17 mm
+      - 0
+      - 0
+      solids:
+      - kind: box
+        name: lid riser
+        position:
+        - 0
+        - 0
+        - 4.473 mm
+        size:
+        - 34 mm
+        - 44 mm
+        - 8.946 mm
+      - kind: box
+        name: GPS tie saddle shelf
+        position:
+        - 33 mm
+        - 5.75 mm
+        - 6.946 mm
+        size:
+        - 36 mm
+        - 18 mm
+        - 4 mm
+    interfaces:
+      bottom:
+        kind: adhesive_pad
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+      top:
+        kind: adhesive_pad
+        origin:
+        - 0
+        - -2.25 mm
+        - 8.946 mm
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+
+  - id: motor-lead-post-petg
+    extends: lead-post-petg
+    cad_name: Motor cable post
+    name: Printed motor cable tie post, PETG, 7 x 38 mm
+    description: Chassis-mounted cable tie post with a capped underside mounting screw.
+    mechanical:
+      size: [7 mm, 38 mm]
+      mass: 0.001862
+      solids:
+        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 38 mm}
+
+  - id: power-lead-post-petg
+    extends: lead-post-petg
+    cad_name: Power cable post
+    name: Printed power cable tie post, PETG, 7 x 35 mm
+    description: Chassis-mounted cable tie post with a capped underside mounting screw.
+    mechanical:
+      size:
+      - 7 mm
+      - 35 mm
+      mass: 0.001715
+      solids:
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 35 mm
+      - kind: cylinder
+        name: tie stand-off collar
+        position:
+        - 0
+        - 0
+        - 33.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+  - id: receiver-riser-petg
+    kind: structure
+    cad_name: Receiver riser
+    name: Printed receiver riser, PETG, 12 x 10 x 22.446 mm
+    description: Bonded riser under the receiver tape; aligns the purchased receiver pigtail with the south-facing HAT J_RX exit.
+    mechanical:
+      shape: box
+      size: [12 mm, 10 mm, 22.446 mm]
+      mass: 0.00342
+      material: PETG
+      density: 1270
+      color: "#2c6e9e"
+      fabricated: true
+    interfaces:
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      top: {kind: adhesive_pad, origin: [0, 0, 22.446 mm], z: [0, 0, 1], x: [1, 0, 0]}
   - id: imu-pedestal-petg
     kind: structure
     cad_name: GY-521 rigid pedestal
-    name: Printed PETG rigid GY-521 pedestal, epoxy bonded to deck
+    name: Printed rigid GY-521 pedestal, 35 mm, epoxy bonded to deck
     mechanical:
-      shape: box
-      size: [25 mm, 20 mm, 8 mm]
-      mass: 0.0051
+      shape: custom
+      size: [25 mm, 20 mm, 35 mm]
+      mass: 0.0061
       material: PETG
       density: 1270
       fabricated: true
-      color: "#50585c"
+      color: '#50585c'
+      solids:
+      - {kind: box, name: base, position: [0, 0, 1.5 mm], size: [25 mm, 20 mm, 3 mm]}
+      - {kind: cylinder, name: pillar -7.6, position: [-7.6 mm, 5.5 mm, 3 mm], axis: [0, 0, 1], diameter: 7 mm, length: 30 mm}
+      - {kind: cylinder, name: pillar 7.6, position: [7.6 mm, 5.5 mm, 3 mm], axis: [0, 0, 1], diameter: 7 mm, length: 30 mm}
+      - {kind: box, name: board seat, position: [0, 0, 34 mm], size: [25 mm, 20 mm, 2 mm]}
     interfaces:
-      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], description: "Rigid cured epoxy bond (not vibration-isolating foam)"}
-      imu: {kind: hole_pattern, origin: [0, 0, 8 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7.6 mm, 5.5 mm, 2.5 mm, tapped, 7 mm], [-7.6 mm, 5.5 mm, 2.5 mm, tapped, 7 mm]]}}
-    provenance: {status: estimated, source: "Provisional near-CoM rigid GY-521 mounting fixture; verify owned board hole spacing before fabrication"}
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], description: Rigid cured epoxy bond (not vibration-isolating foam)}
+      imu: {kind: hole_pattern, origin: [0, 0, 35 mm], z: [0, 0, 1], x: [1, 0, 0],
+            params: {holes_from: gy-521-mpu6050.mount, hole_transform: [[1, 0], [0, -1]],
+                     hole_kind: tapped, hole_diameter: 2.5 mm, hole_depth: 7 mm}}
+    provenance: {status: estimated, source: Rigid GY-521 fixture with pillars under the screws; board hole spacing remains an estimate requiring measurement.}
+  - id: imu-lead-post-petg
+    extends: lead-post-petg
+    name: IMU cable support post, 7 x 40 mm
+    cad_name: IMU lead post
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [11 mm, 40 mm]
+      mass: 0.0022
+      solids:
+      - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 40 mm}
+      - {kind: cylinder, name: IMU tie stand-off collar, position: [0, 0, 35.9 mm], axis: [0, 0, 1], diameter: 11 mm, length: 2 mm}
+  - id: imu-screw-cap-1-petg
+    kind: structure
+    cad_name: IMU screw cap 1
+    cad_family: Screw caps
+    name: IMU M2.5 screw cap with relieved overhanging rim
+    description: Standard cap cavity and roof; bottom rim is relieved beyond the board edges and above nearby populated components, preserving a bonded bearing face on the PCB.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [6.7 mm, 3.8 mm]
+      mass: 8.0e-05
+      material: PETG
+      density: 1270
+      color: '#2c6e9e'
+      fabricated: true
+      solids:
+      - {kind: cylinder, name: cap, position: [0, 0, 0], axis: [0, 0, 1], diameter: 6.7 mm, length: 3.8 mm}
+      - {kind: cylinder, op: remove, name: head pocket, position: [0, 0, 0], axis: [0, 0, 1], diameter: 5.1 mm, length: 2.8 mm}
+      - {kind: box, op: remove, name: outboard rim relief, position: [-6.9 mm, 0, -0.35 mm], size: [10 mm, 20 mm, 1.3 mm]}
+      - {kind: box, op: remove, name: rear rim relief, position: [0, 6.9 mm, -0.35 mm], size: [20 mm, 10 mm, 1.3 mm]}
+      - {kind: box, op: remove, name: component-side rim relief, position: [0, -6.45 mm, -0.175 mm], size: [20 mm, 10 mm, 1.65 mm]}
+    interfaces:
+      seat: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {cap_for: shcs-m2.5, inner_d: 5.1 mm, inner_h: 2.8 mm, process: fdm}}
+  - id: imu-screw-cap-2-petg
+    kind: structure
+    cad_name: IMU screw cap 2
+    cad_family: Screw caps
+    name: IMU M2.5 screw cap with relieved overhanging rim
+    description: Standard cap cavity and roof; bottom rim is relieved beyond the board edges and above nearby populated components, preserving a bonded bearing face on the PCB.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [6.7 mm, 3.8 mm]
+      mass: 8.0e-05
+      material: PETG
+      density: 1270
+      color: '#2c6e9e'
+      fabricated: true
+      solids:
+      - {kind: cylinder, name: cap, position: [0, 0, 0], axis: [0, 0, 1], diameter: 6.7 mm, length: 3.8 mm}
+      - {kind: cylinder, op: remove, name: head pocket, position: [0, 0, 0], axis: [0, 0, 1], diameter: 5.1 mm, length: 2.8 mm}
+      - {kind: box, op: remove, name: outboard rim relief, position: [6.9 mm, 0, -0.35 mm], size: [10 mm, 20 mm, 1.3 mm]}
+      - {kind: box, op: remove, name: rear rim relief, position: [0, 6.9 mm, -0.35 mm], size: [20 mm, 10 mm, 1.3 mm]}
+      - {kind: box, op: remove, name: component-side rim relief, position: [0, -5.55 mm, -0.175 mm], size: [20 mm, 10 mm, 1.65 mm]}
+    interfaces:
+      seat: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {cap_for: shcs-m2.5, inner_d: 5.1 mm, inner_h: 2.8 mm, process: fdm}}
+
+  - id: sensor-rtk-mast-petg
+    extends: lead-post-petg
+    cad_name: RTK radio mast
+    name: Printed RTK radio mast and cable tie post
+    description: Deck-mounted mast places the SiK radio above the GNSS receiver with
+      its UART exit downward; short leads avoid the Pi and gearbox.
+    mechanical:
+      size:
+      - 48 mm
+      - 52 mm
+      - 110 mm
+      mass: 0.014658
+      solids:
+      - kind: cylinder
+        name: mast
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 83.5 mm
+      - kind: cylinder
+        name: aft arm
+        position:
+        - 0
+        - 0
+        - 83.5 mm
+        axis:
+        - -1
+        - 0
+        - 0
+        diameter: 7 mm
+        length: 37.1 mm
+      - kind: cylinder
+        name: side arm
+        position:
+        - -37.1 mm
+        - 0
+        - 83.5 mm
+        axis:
+        - 0
+        - 1
+        - 0
+        diameter: 7 mm
+        length: 36.75 mm
+      - kind: box
+        name: radio tape seat
+        position:
+        - -37.1 mm
+        - 36.75 mm
+        - 83.5 mm
+        size:
+        - 7 mm
+        - 22 mm
+        - 52 mm
+      shape: custom
+      envelope_offset:
+      - -20 mm
+      - 18 mm
+      - 0
+    interfaces:
+      radio_pad:
+        kind: adhesive_pad
+        origin:
+        - -33.6 mm
+        - 36.75 mm
+        - 83.5 mm
+        z:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - 0
+        - 1
+
+  - id: rc-camera-mount-petg
+    kind: structure
+    cad_name: Front camera bracket
+    name: Printed front-facing UC-717 camera bracket
+    mechanical:
+      shape: custom
+      size:
+      - 23 mm
+      - 65 mm
+      - 69 mm
+      envelope_offset:
+      - 3.5 mm
+      - -24.5 mm
+      - 0
+      mass: 0.03
+      material: PETG
+      density: 1270
+      fabricated: true
+      color: '#2c6e9e'
+      solids:
+      - kind: box
+        name: base
+        position:
+        - 0
+        - 0
+        - 4 mm
+        size:
+        - 16 mm
+        - 16 mm
+        - 8 mm
+      - kind: box
+        name: column
+        position:
+        - 0
+        - 0
+        - 20.5 mm
+        size:
+        - 10 mm
+        - 10 mm
+        - 25 mm
+      - kind: box
+        name: side arm
+        position:
+        - 0
+        - -15.5 mm
+        - 29 mm
+        size:
+        - 10 mm
+        - 40 mm
+        - 8 mm
+      - kind: box
+        name: front arm
+        position:
+        - 4.2 mm
+        - -35 mm
+        - 29 mm
+        size:
+        - 18.4 mm
+        - 8 mm
+        - 8 mm
+      - kind: box
+        name: FPC backing
+        position:
+        - 12.4 mm
+        - -35 mm
+        - 26 mm
+        size:
+        - 2 mm
+        - 14 mm
+        - 4 mm
+      - kind: box
+        name: camera seat
+        position:
+        - 11 mm
+        - -35 mm
+        - 48.55 mm
+        size:
+        - 8 mm
+        - 44 mm
+        - 40.9 mm
+    interfaces:
+      base:
+        kind: hole_pattern
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 4 mm
+            - 3 mm
+            - tapped
+            - 7 mm
+          - - 0
+            - -4 mm
+            - 3 mm
+            - tapped
+            - 7 mm
+      camera:
+        kind: hole_pattern
+        origin:
+        - 15 mm
+        - -35 mm
+        - 47 mm
+        z:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - 1
+        - 0
+        params:
+          holes_from: arducam-b0445-imx296.mount
+          hole_kind: tapped
+          hole_diameter: 2 mm
+          hole_depth: 7 mm
+      cable_pad:
+        kind: adhesive_pad
+        origin:
+        - 13.4 mm
+        - -35 mm
+        - 26 mm
+        z:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - 1
+        - 0
+  - id: screw-cap-m2-petg
+    kind: structure
+    cad_name: Screw cap M2
+    cad_family: Screw caps
+    name: Printed M2 screw cap, 0.3 mm FDM clearance
+    description: M2 socket head 3.8 x 2 mm, 0.3 mm radial and axial clearance, 0.8 mm wall and 1 mm roof.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 6 mm
+      - 3.3 mm
+      mass: 6.0e-05
+      material: PETG
+      density: 1270
+      color: '#2c6e9e'
+      fabricated: true
+      solids:
+      - kind: cylinder
+        name: cap
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 6 mm
+        length: 3.3 mm
+      - kind: cylinder
+        op: remove
+        name: head pocket
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 4.4 mm
+        length: 2.3 mm
+    interfaces:
+      seat:
+        kind: adhesive_pad
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          cap_for: shcs-m2
+          inner_d: 4.4 mm
+          inner_h: 2.3 mm
+          process: fdm
+  - id: fuse-atc-7.5a
+    kind: fuse
+    cad_name: Fuse holder ATC 7.5A
+    name: Inline ATC/ATO blade fuse holder with 7.5 A fuse
+    mechanical:
+      shape: box
+      size:
+      - 30 mm
+      - 12 mm
+      - 22 mm
+      mass: 0.008
+    pins:
+      A:
+        role: passive
+        current_max: 7.5
+      B:
+        role: passive
+        current_max: 7.5
+    connectors:
+      J1:
+        type: integral
+        position:
+        - -15 mm
+        - 0
+        - 11 mm
+        direction:
+        - -1
+        - 0
+        - 0
+        pins:
+          '1': A
+      J2:
+        type: integral
+        position:
+        - 15 mm
+        - 0
+        - 11 mm
+        direction:
+        - 1
+        - 0
+        - 0
+        pins:
+          '1': B
+    internal_links:
+    - a: A
+      b: B
+      kind: fuse
+      value: 7.5
+    behavior:
+      model: fuse.blade
+      params:
+        rating: 7.5
+        cold_resistance: 10.91 mohm
+        i2t_melt: 60
+      provenance:
+        status: datasheet
+        source: 'Littelfuse 028707.5 ATOF: 7.5 A, 10.91 mOhm, typical melting I2t 60
+          A2s; https://www.littelfuse.com/assetdocs/littelfuse-datasheet-287-atof?assetguid=43dcdce8-8ca2-426f-8998-7e566f048d40'
+    interfaces:
+      bottom:
+        kind: face_mount
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+      tie_path:
+        kind: strap_slot
+        origin:
+        - 0
+        - 0
+        - 22 mm
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          width: 4 mm
+    manufacturer: Littelfuse
+    part_number: '028707.5'
+
+  - id: servo-south-post-petg
+    extends: lead-post-petg
+    name: South servo lead tie post with stand-off collar
+    cad_name: IMU lead post
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 7 mm
+      - 40 mm
+      mass: 0.002
+      solids:
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 40 mm
+      - kind: cylinder
+        name: tie stand-off collar
+        position:
+        - 0
+        - 0
+        - 34.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+      - kind: cylinder
+        name: IMU tie stand-off collar
+        position:
+        - 0
+        - 0
+        - 26.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+
+  - id: servo-approach-post-petg
+    extends: lead-post-petg
+    name: Servo HAT approach tie post
+    cad_name: IMU lead post
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 11 mm
+      - 60 mm
+      mass: 0.0032
+      solids:
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 60 mm
+      - kind: cylinder
+        name: tie stand-off collar
+        position:
+        - 0
+        - 0
+        - 49.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+
+  - id: servo-climb-post-petg
+    extends: lead-post-petg
+    name: servo climb post
+    cad_name: Servo lower climb support
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 11 mm
+      - 11 mm
+      - 15 mm
+      mass: 0.0015
+      solids:
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 15 mm
+      - kind: cylinder
+        name: tie collar
+        position:
+        - 0
+        - 0
+        - 5.985999999999999 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+    description: Collared PETG cable tie support, mounted through a capped M3 screw
+      join.
+
+  - id: servo-upper-post-petg
+    extends: lead-post-petg
+    name: servo upper post
+    cad_name: Servo upper climb support
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 11 mm
+      - 11 mm
+      - 65 mm
+      mass: 0.0042
+      solids:
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 65 mm
+      - kind: cylinder
+        name: tie collar
+        position:
+        - 0
+        - 0
+        - 56.83860000000001 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+    description: Collared PETG cable tie support, mounted through a capped M3 screw
+      join.

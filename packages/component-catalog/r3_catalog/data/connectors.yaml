@@ -15,7 +15,7 @@ connectors:
     awg_min: 10
     awg_max: 12
     mating_cycles: 1000
-    body_size: [20.8 mm, 11.7 mm, 29.7 mm]
+    body_size: [20.8 mm, 11.7 mm, 30.7 mm]
     provenance: {status: datasheet, source: "AMASS XT90H V1.2: 45 A rated / 90 A momentary, 0.30 mOhm; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf", notes: "10 AWG recommended; 12 AWG solder termination retained at the existing lead. Body envelope includes insulating cap."}
   - id: xt90h-female
     family: Amass XT90H
@@ -283,3 +283,524 @@ connectors:
     awg_max: 32
     body_size: [5 mm, 5 mm, 5 mm]
     provenance: {status: estimated, notes: "Represents the permanent attachment of a component's own lead; the wire is the limit."}
+# BEGIN GENERATED CRIMP HOUSINGS (r3_connectors.derive --write)
+  - id: dupont-1x1
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 1
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [2.74 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x2
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 2
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [5.28 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x3
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 3
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [7.82 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x4
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 4
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [10.36 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x5
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 5
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [12.90 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x6
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 6
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [15.44 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x7
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 7
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [17.98 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x8
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 8
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [20.52 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x9
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 9
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [23.06 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x10
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 10
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [25.60 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x11
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 11
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [28.14 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x12
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 12
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [30.68 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x13
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 13
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [33.22 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x14
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 14
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [35.76 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x15
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 15
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [38.30 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x16
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 16
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [40.84 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x17
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 17
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [43.38 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x18
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 18
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [45.92 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x19
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 19
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [48.46 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-1x20
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 20
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [51.00 mm, 2.5 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1060300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x1
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 2
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [2.54 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x2
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 4
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [5.08 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x3
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 6
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [7.62 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x4
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 8
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [10.16 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x5
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 10
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [12.70 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x6
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 12
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [15.24 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x7
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 14
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [17.78 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x8
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 16
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [20.32 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x9
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 18
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [22.86 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x10
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 20
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [25.40 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x11
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 22
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [27.94 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x12
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 24
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [30.48 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x13
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 26
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [33.02 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x14
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 28
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [35.56 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x15
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 30
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [38.10 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x16
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 32
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [40.64 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x17
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 34
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [43.18 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x18
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 36
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [45.72 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x19
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 38
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [48.26 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
+  - id: dupont-2x20
+    family: 2.54 mm crimp housing (Dupont-style)
+    gender: female
+    mates_with: []
+    pin_count: 40
+    header_pitch: 2.54 mm
+    current_rating_per_pin: 3
+    voltage_rating: 250
+    contact_resistance: 20 mohm
+    awg_min: 22
+    awg_max: 30
+    body_size: [50.80 mm, 5.1 mm, 14 mm]
+    provenance: {status: estimated, source: "https://www.harwin.com/products/M20-1070300", notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}
