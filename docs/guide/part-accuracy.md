@@ -2,9 +2,13 @@
 
 The connector stage now measures mating geometry **during each robot build**. It
 uses the component's own placed STEP mesh (or a current, checksum-checked Onshape
-CAD export), and the harness connector's sourced mesh. It does not substitute a
-catalog connector model for missing geometry on a purchased board. Procedural
-connector proxies remain useful for rendering but cannot verify purchased parts.
+CAD export), and the harness connector's sourced mesh. An `embedded: true`
+connector must appear in its owner mesh. A non-embedded connector is supplied
+separately: the check searches its placed connector-type model **and** the
+component mesh. It keeps the component body for interference checking and
+collapses duplicate coincident section loops when an export contains both.
+Procedural connector proxies remain useful for rendering but cannot verify
+purchased contacts.
 No model-bank pass/fail cache is used by this check.
 
 `build/connectors/connectors.json`, `checks.mesh_mates`, records every pair that
@@ -28,7 +32,10 @@ and `connector_body_interference`. Every error blocks the existing release gate;
 regression tests exercise that gate for all five codes. The lateral limit stays
 0.1 mm. Insertion uses the catalog's nominal contact overlap, overridden by the
 matching mechanical join's `verify.min_insertion`. Missing source geometry produces
-`connector_unverifiable`, naming the side and owner. The check never replaces that
+`connector_unverifiable`, naming the side and owner. The same warning applies
+when a model has surfaces but no resolvable contacts. `connector_empty` requires
+an actually empty search location with no missing/proxy model supplier that
+could account for it. The check never replaces that
 warning with an inferred pass. Supplied physical measurements must be recorded in
 catalog provenance and reviewed; no override is silently generated.
 
@@ -36,6 +43,21 @@ A soldered lead uses its routed conductor ends, not a purchased plug proxy. Each
 occupied GY-521 pad must have a unique measured hole under the conductor end;
 unoccupied pads need no conductor. This checks geometric termination, not solder
 wetting or electrical continuity.
+
+## Generality
+
+The mesh check has no robot ID, component ID, component-kind gate or fixed
+purchased-part placement. Pair discovery comes from the project spec; frames,
+contact arrays, envelopes, insertion requirements and model suppliers come from
+the catalog and current build. Embedded post checks apply to any component kind
+and accept arbitrary pin names. Pad/conductor dispatch uses `pin_shape: pad`, a
+harness owner and the partner's `gender: none`, not a connector-name prefix.
+Unsupported or simplified contact geometry produces a named unverifiable warning.
+
+Synthetic tests exercise posts, sockets, pads, empty locations, insertion,
+interference, duplicate exports and nested housings without loading a robot
+example. Additional stage-level fixtures verify a custom actuator with named
+contacts and a custom sensor's permanent termination with arbitrary type IDs.
 
 ## Raspberry Pi 5 evidence
 

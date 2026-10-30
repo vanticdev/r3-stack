@@ -55,6 +55,7 @@ class Detection:
     geometry_present: bool = False
     reason: str = ""
     source: str = ""
+    supplier_unverifiable: bool = False
 
     def signature(self) -> dict[str, Any]:
         if not self.contacts:
@@ -84,6 +85,7 @@ class Detection:
             "geometry_present": self.geometry_present,
             "reason": self.reason,
             "source": self.source,
+            "supplier_unverifiable": self.supplier_unverifiable,
         }
 
 
@@ -213,7 +215,11 @@ def detect(
                     # A component's rectangular body is not a contact. Circular
                     # bores and sockets may be wider than a header post.
                     if opening or max(size) <= 1.3 or shape == "round":
-                        loops.append((centre, size, shape, opening))
+                        if not any(sh == shape and op == opening and
+                                   np.linalg.norm(cc - centre) < 1e-5 and
+                                   np.linalg.norm(ss - size) < 1e-5
+                                   for cc, ss, sh, op in loops):
+                            loops.append((centre, size, shape, opening))
         slices.append((z, loops))
     # Repeated cross-section sizes distinguish the contact array from latches,
     # shield tabs, board edges, and mounting holes.
@@ -376,6 +382,33 @@ def classify(
     return sorted(found)
 
 
+def detect_supplied(
+    owner_bodies: list[trimesh.Trimesh],
+    connector_bodies: list[trimesh.Trimesh],
+    frame: Frame,
+    geometry: ConnectorGeometry,
+    source: str = "",
+    supplier_unverifiable: bool = False,
+    proxy_bodies: list[trimesh.Trimesh] | None = None,
+) -> Detection:
+    """Search all sourced suppliers; a missing/proxy supplier cannot prove absence.
+
+    Coincident contacts can be exported both in an assembly and a separate
+    connector model. Deduplicate section loops in detect, not physical pins.
+    """
+    result = detect([*owner_bodies, *connector_bodies], frame, geometry, source)
+    # Query the proxy at its actual placement for occupancy, but never use its
+    # invented contacts or solids as physical verification evidence.
+    if proxy_bodies:
+        proxy = detect(proxy_bodies, frame, geometry)
+        result.geometry_present |= proxy.geometry_present
+        supplier_unverifiable = True
+    result.supplier_unverifiable = supplier_unverifiable
+    if not result.contacts and supplier_unverifiable:
+        result.reason = "Separate connector model is missing or an unverified proxy; physical measurement required."
+    return result
+
+
 def check_side(
     ref: str,
     detection: Detection,
@@ -388,8 +421,9 @@ def check_side(
     diagnostics = []
     if not detection.contacts:
         diagnostics.append(
-            Diagnostic.error(
-                "connector_empty", f"{ref}: {detection.reason}", subjects=[ref]
+            (Diagnostic.warning if detection.geometry_present or detection.supplier_unverifiable else Diagnostic.error)(
+                "connector_unverifiable" if detection.geometry_present or detection.supplier_unverifiable else "connector_empty",
+                f"{ref}: {detection.reason}", subjects=[ref]
             )
         )
     elif declared not in labels:
@@ -597,8 +631,9 @@ def check_solder(
     }
     if not pads.contacts:
         diagnostics.append(
-            Diagnostic.error(
-                "connector_empty", f"{part}: {pads.reason}", subjects=[part, lead]
+            (Diagnostic.warning if pads.geometry_present or pads.supplier_unverifiable else Diagnostic.error)(
+                "connector_unverifiable" if pads.geometry_present or pads.supplier_unverifiable else "connector_empty",
+                f"{part}: {pads.reason}", subjects=[part, lead]
             )
         )
     elif routes is None:

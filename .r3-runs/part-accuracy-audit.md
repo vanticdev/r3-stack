@@ -10,14 +10,14 @@ This report does not certify unknown hardware. No parts outside Pi 5, GY-521 and
 |---|---|---|---:|---:|---|
 | battery.J1 ↔ battery_lead.A | unverifiable | battery.J1: unavailable, battery_lead.A: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
 | battery_lead.B ↔ power_y.P1 | unverifiable | battery_lead.B: unavailable, power_y.P1: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
-| hat.J_BATT ↔ power_y.P3 | failed | hat.J_BATT: 0, power_y.P3: unavailable | — | — / — | connector_unverifiable, connector_empty |
+| hat.J_BATT ↔ power_y.P3 | unverifiable | hat.J_BATT: 0, power_y.P3: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
 | fuse.J1 ↔ power_y.F1 | unverifiable | fuse.J1: unavailable, power_y.F1: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
 | fuse.J2 ↔ power_y.F2 | unverifiable | fuse.J2: unavailable, power_y.F2: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
 | esc.J_PWR ↔ esc_power.A | unverifiable | esc.J_PWR: unavailable, esc_power.A: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
 | power_y.P2 ↔ esc_power.B | failed | power_y.P2: 2, esc_power.B: 2 | 0.000000 | 7.250000 / 6.300000 | connector_body_interference, connector_unverifiable |
 | esc.J_MOT ↔ esc_motor.A | unverifiable | esc.J_MOT: unavailable, esc_motor.A: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
-| motor.J_POS ↔ esc_motor.BP | failed | motor.J_POS: 0, esc_motor.BP: unavailable | — | — / — | connector_unverifiable, connector_empty |
-| motor.J_NEG ↔ esc_motor.BN | failed | motor.J_NEG: 0, esc_motor.BN: unavailable | — | — / — | connector_unverifiable, connector_empty |
+| motor.J_POS ↔ esc_motor.BP | unverifiable | motor.J_POS: 0, esc_motor.BP: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
+| motor.J_NEG ↔ esc_motor.BN | unverifiable | motor.J_NEG: 0, esc_motor.BN: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
 | esc.J_SIG ↔ esc_signal.A | unverifiable | esc.J_SIG: unavailable, esc_signal.A: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
 | hat.J_ESC ↔ esc_signal.B | unverifiable | hat.J_ESC: 3, esc_signal.B: unavailable | — | — / — | connector_unverifiable |
 | servo.J1 ↔ servo_lead.A | unverifiable | servo.J1: unavailable, servo_lead.A: unavailable | — | — / — | connector_unverifiable, connector_unverifiable |
@@ -34,25 +34,56 @@ This report does not certify unknown hardware. No parts outside Pi 5, GY-521 and
 | imu.J1 ↔ imu_lead.B | passed | imu.J1: 8 | 0.000000 | — / — | none |
 | pi.J8 ↔ hat.J_GPIO | unverifiable | pi.J8: 40, hat.J_GPIO: 40 | 0.000003 | 6.085000 / 5.500000 | connector_unverifiable |
 
-Pair totals: {'unverifiable': 20, 'failed': 4, 'passed': 1}.
+Pair totals: **1 passed, 1 failed, 23 unverifiable** (25 pairs). Previously 1 passed, 4 failed, 20 unverifiable.
 
 The Pi/HAT has 40 contacts on each side and clears 5.5 mm insertion; open source surfaces prevent a complete housing-volume certification. The GY-521 has eight measured pads and all four occupied pads pass against the new routed wire ends. No old wire endpoints were reused for the final result.
 
-Blocking mesh findings:
+### Corrected model suppliers and empty diagnostics
 
-- hat.J_BATT: No part surface intersects the connector search volume.
-- power_y.P2 / esc_power.B: housings/part bodies intersect by 7.468 mm^3 outside contact channels
-- motor.J_POS: Part geometry is present but no contact posts, rings or entry openings can be resolved.
-- motor.J_NEG: Part geometry is present but no contact posts, rings or entry openings can be resolved.
+`hat.J_BATT` is `xt30pw-male`, explicitly `embedded: false`. The connector is
+supplied separately by that type's `xt_male_pcb_ra` model, which the catalog marks
+`source: proxy`. `motor.J_POS` and `motor.J_NEG` are `bullet-3.5-male`, with the
+schema default `embedded: false`; their separate `bullet_male` model is also a
+proxy. The motor body export does not supply resolved bullet contacts.
 
-The two motor entries have body surfaces but no resolved contacts in their declared mating volumes. These are missing-geometry findings, not proof that the physical motor lacks terminals. The XT60 models have some open surfaces; 7.468 mm³ is the measured closed-solid overlap outside contact corridors, and the total collision check remains incomplete.
+The previous three `connector_empty` errors were lookup/detail artefacts. The
+stage now searches the component **plus the placed separate connector model**
+for non-embedded connectors. Sourced contact geometry can verify a mate;
+procedural proxy contacts cannot certify the purchased hardware. A simplified
+model with surfaces but no resolvable contacts, or a missing/proxy supplier,
+produces `connector_unverifiable`. A sourced model genuinely empty at the
+specified location still produces blocking `connector_empty`. Embedded connectors
+still require geometry in their owner mesh. No numeric threshold changed.
+
+### XT60 housing collision: confirmed in the supplied models
+
+The sole blocking pair is `power_y.P2` / `esc_power.B`. Its contact insertion is
+**7.25 mm ≥ 6.30 mm**; that check passes. The independent housing test performs
+solid intersection, not an insertion-depth comparison or envelope overlap.
+
+Isolating only the two closed housing solids from the sourced KiCad STEP models
+reproduces **7.467788 mm³** at their robot-frame placement. A second Boolean in
+connector-local millimetres gives **8.3600 mm³**, concentrated at a central key/rib:
+X = −0.5…+0.5 mm, Y = 2.0…3.3 mm, Z = 1.5…8.7 mm in the female connector frame.
+Independent planar intersections at Z=2, 4 and 6 mm each give **1.3000 mm²** of
+housing material overlap; at Z=8 mm they give **0.3000 mm²**. This confirms solid
+material intersection beyond numerical face contact. The difference in Boolean
+volume reflects tessellation/coordinate numerical sensitivity; both are far
+above the unchanged 0.001 mm³ threshold. The ordinary nested shell walls do not
+account for this volume. A regression fixture with properly nested hollow
+housings returns zero overlap.
+
+This establishes a real overlap **in the supplied models and placement**, not a
+caliper-certified defect in the physical XT60 parts. Other open surfaces keep
+the whole-pair collision completeness unverifiable. No XT60 geometry or layout
+was changed; the blocking collision remains visible.
 
 ## Every purchased component with connectors
 
 | Component | Connector(s) | Evidence / result |
 |---|---|---|
 | servo (servo-digital-20kg) | J1 | servo.J1: unverifiable |
-| motor (motor-540-brushed) | J_POS, J_NEG | motor.J_POS: failed; motor.J_NEG: failed |
+| motor (motor-540-brushed) | J_POS, J_NEG | motor.J_POS: unverifiable; motor.J_NEG: unverifiable |
 | encoder (hall-encoder-a1120) | J1 | encoder.J1: unverifiable |
 | esc (esc-brushed-60a) | J_PWR, J_MOT, J_SIG | esc.J_PWR: unverifiable; esc.J_MOT: unverifiable; esc.J_SIG: unverifiable |
 | battery (lipo-2s-5000-25c) | J1 | battery.J1: unverifiable |
@@ -92,6 +123,18 @@ J8 connector origin: (-10,24.5,3.880) → (-10,24.5,3.876) mm. Mechanical join Z
 
 ## Stage diagnostics before / after
 
+The follow-up reran `run_stage(Project.load(path), name)` for model, wiring and
+connectors after recomposition. Relative to the previous part-accuracy handoff:
+
+| Stage | Before follow-up: errors / warnings | After follow-up: errors / warnings |
+|---|---:|---:|
+| model | 0 / 0 | 0 / 0 |
+| wiring | 82 / 55 | 82 / 55 |
+| connectors | 4 / 48 | 1 / 51 |
+
+Only three connector empty errors change to three unverifiable warnings. The
+full branch comparison to original integration `13dc2ff` follows:
+
 | Stage | Severity / code | Before | After |
 |---|---|---:|---:|
 | model | errors / warnings | 0 / 0 | 0 / 0 |
@@ -108,10 +151,10 @@ J8 connector origin: (-10,24.5,3.880) → (-10,24.5,3.876) mm. Mechanical join Z
 | wiring | warning: excess_slack_loop | 69 | 45 |
 | wiring | warning: wire_bend_radius_violation | 10 | 8 |
 | connectors | error: connector_body_interference | 0 | 1 |
-| connectors | error: connector_empty | 0 | 3 |
+| connectors | error: connector_empty | 0 | 0 |
 | connectors | warning: component_model_dimension_mismatch | 1 | 1 |
 | connectors | warning: component_model_unavailable | 1 | 1 |
-| connectors | warning: connector_unverifiable | 0 | 37 |
+| connectors | warning: connector_unverifiable | 0 | 40 |
 | connectors | warning: wire_display_merged | 5 | 9 |
 
 Changed-code explanations:
@@ -119,27 +162,111 @@ Changed-code explanations:
 - `route_infeasible` 38→40, unsupported spans 9→11, bend errors 19→21: the HAT moved with the measured J8 datum; the IMU termination changed from packed pigtail conductors to four distinct pads on the 2.54 mm row. Fresh routing changes endpoint tangents, support spans and obstacle paths. These failures remain blocking; the routing/layout lane must resolve them.
 - Bend warnings 10→8 and slack warnings 69→45: fresh routes change the curvature/slack samples; some bends now meet the error threshold instead. No threshold changed.
 - Dynamic-clearance errors 2→3: moving wheel/gearbox clearance in the rerouted servo, encoder and RTK leads. Full diagnostic messages below preserve the affected wires and measured values.
-- New connector errors and 37 unverifiable warnings are additional physical geometry checks. Frame alignment checks still produce no errors; no wire-endpoint errors remain after fresh routing.
+- The XT60 connector error and 40 unverifiable warnings are additional physical geometry checks. Frame alignment checks still produce no errors; no wire-endpoint errors remain after fresh routing.
 - Display-overlap warnings 5→9 reflect changed paths. They concern the rendered conductor separation; actual clearance diagnostics are listed independently.
 - Existing unavailable servo model and Pi PCB-thickness warnings remain (one each).
 
-## Mechanical integration blockers (checks retained)
+## Recomposition comparison and mechanical handoff
 
-- `hole_pattern_mismatch`: IMU mount/board centres differ by 0.358 mm; allowed 0.250 mm. Do not fabricate this mount until the owned board is measured.
-- Four `assembly_misfit` errors: HAT/standoff loops miss by 0.224 mm; allowed 0.050 mm. The mechanical lane must shorten/reconcile its standoff stack with the measured header datum.
-- Recomposition reports 17 CAD errors, including HAT/Pi/standoff interference, fastener seating/thread evidence and retention. No layout, router, standoff or `rc_car.yaml` edit was made here.
-- Two existing `test_cad_phaseb` cleanliness tests fail on these real assembly defects. Their assertions and tolerances remain unchanged.
+Identical command in each source snapshot, using the same recorded Onshape CAD
+inputs: `python -m r3_onshape.recompose examples/robots/rc-car`.
+All three record source microversion `da62aa95171993d1aa890647` and recorded
+generator digest `6a04f840408f5a07`.
+
+| Source | Existing CAD errors | New versus base |
+|---|---:|---:|
+| Original integration base `13dc2ff` | 0 | 0 |
+| Integration `c8802ea` | 0 | 0 |
+| `r3/part-accuracy` | 17 | 17 |
+
+The later integration commit `8aa8b3e` changes only the generality policy in
+`.r3-agents/COMMON.md`; its code and design inputs are identical to `c8802ea`.
+
+All 17 errors below are introduced by this branch's part data changes; none were
+present on either integration baseline. The follow-up checker correction does
+not alter the 17. No layout, router, standoff or `rc_car.yaml` edit was made.
+
+| # | New code | Subjects | Measurement / message |
+|---:|---|---|---|
+| 1 | `fastener_head_not_seated` | fastener:imu_screws_1, imu | imu_screws_1: head/bearing face contact on imu is 0.00 mm^2 (< 30 % of 11.00 mm^2) |
+| 2 | `thread_geometry_missing` | fastener:imu_screws_1, fastener:imu_screws_1, imu_mount | imu_screws_1: no coaxial thread bore in imu_mount or shank on fastener:imu_screws_1 |
+| 3 | `fastener_head_not_seated` | fastener:imu_screws_2, imu | imu_screws_2: head/bearing face contact on imu is 0.00 mm^2 (< 30 % of 11.00 mm^2) |
+| 4 | `thread_geometry_missing` | fastener:imu_screws_2, fastener:imu_screws_2, imu_mount | imu_screws_2: no coaxial thread bore in imu_mount or shank on fastener:imu_screws_2 |
+| 5 | `fastener_joint_gap` | fastener:hat_1, hat, pi_standoff_1 | hat_1: hat and pi_standoff_1 are not in face contact around the fastener (0.000 mm^2) |
+| 6 | `fastener_joint_gap` | fastener:hat_2, hat, pi_standoff_2 | hat_2: hat and pi_standoff_2 are not in face contact around the fastener (0.000 mm^2) |
+| 7 | `fastener_joint_gap` | fastener:hat_3, hat, pi_standoff_3 | hat_3: hat and pi_standoff_3 are not in face contact around the fastener (0.000 mm^2) |
+| 8 | `fastener_joint_gap` | fastener:hat_4, hat, pi_standoff_4 | hat_4: hat and pi_standoff_4 are not in face contact around the fastener (0.000 mm^2) |
+| 9 | `connector_misaligned` | pi, hat | gpio_header: header collides with the socket |
+| 10 | `cad_interference` | fastener:imu_screws_1, imu | fastener:imu_screws_1 and imu intersect by 22.625 mm^3 |
+| 11 | `cad_interference` | fastener:imu_screws_2, imu | fastener:imu_screws_2 and imu intersect by 22.625 mm^3 |
+| 12 | `cad_interference` | hat, pi | hat and pi intersect by 5.365 mm^3 |
+| 13 | `cad_interference` | hat, pi_standoff_1 | hat and pi_standoff_1 intersect by 3.520 mm^3 |
+| 14 | `cad_interference` | hat, pi_standoff_2 | hat and pi_standoff_2 intersect by 3.520 mm^3 |
+| 15 | `cad_interference` | hat, pi_standoff_3 | hat and pi_standoff_3 intersect by 3.520 mm^3 |
+| 16 | `cad_interference` | hat, pi_standoff_4 | hat and pi_standoff_4 intersect by 3.520 mm^3 |
+| 17 | `part_not_retained` | cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, fastener:hat_1, fastener:hat_2, fastener:hat_3, fastener:hat_4, fastener:imu_screws_1, fastener:imu_screws_2, hat, imu | 12 parts are not held to chassis by verified attachments: ['cap_hat_1', 'cap_hat_2', 'cap_hat_3', 'cap_hat_4', 'fastener:hat_1', 'fastener:hat_2', 'fastener:hat_3', 'fastener:hat_4', 'fastener:imu_screws_1', 'fastener:imu_screws_2', 'hat', 'imu'] |
+
+The HAT follows the corrected mechanical J8 datum down **0.224 mm**. This causes
+four `fastener_joint_gap` errors, `connector_misaligned` on `gpio_header`, and
+five HAT/Pi/standoff `cad_interference` errors (10 diagnostics). The GY-521 model
+replacement and changed mounting pattern cause two head-seat, two thread-bore,
+and two screw/board-interference errors (6 diagnostics). Its nominal hole spacing
+is **15.5 mm**, but the sourced STEP has **16.35 mm**; the 15.5 mm value remains
+estimated. These six cannot honestly be attributed to hole pitch alone: board
+thickness, pad datum and actual model holes changed too. The final
+`part_not_retained` diagnostic aggregates 12 affected objects from both groups.
+
+Assembly compilation separately reports four `assembly_misfit` errors at 0.224 mm
+against a 0.050 mm limit and one `hole_pattern_mismatch` at 0.358 mm against a
+0.250 mm allowance. They are not extra entries in the 17 recomposition errors.
+The two unchanged CAD cleanliness tests expose these defects. The mechanical lane
+owns their correction; no skips, xfails or relaxed limits were introduced.
+
+## Generality audit
+
+Read the generality policy added on integration at `8aa8b3e`. The pair checker
+and embedded-post verifier have no robot/component IDs or component-kind gate.
+Removed the solder type-name prefix dispatch and the assumed pin name `"1"`.
+Solder dispatch now uses pad geometry, a harness owner and catalog gender `none`;
+post verification accepts arbitrary pin identifiers. Removed Pi/HAT-specific
+stage assumption text. No car/vehicle concepts determine mesh-check behavior.
+
+The final synthetic suite has **22 passing cases**, including a custom actuator
+with nonnumeric contacts and a custom sensor with arbitrarily named solder
+termination types. It requires no rc-car model for those geometry checks.
+The five release-gate tests continue to use the existing project-copy helper.
 
 ## Validation
 
-- Baseline full suite: **734 passed**, 1783.00 s, immutable source snapshot of 13dc2ff.
-- New geometry, purchased-part, catalog-refinement and release-gate tests: **44 passed**.
-- Full after run: **775 passed, 3 failed**, 6 warnings, 1570.16 s. Two failures are the unchanged mechanical assembly cleanliness checks above. The third was an obsolete generic-FPC type assertion, imported before that test was corrected to require the measured vertical socket and +Z exit. Its complete catalog test file was rerun: **26 passed**.
-- Final catalog/accuracy checks after the spring-end data refinement: **33 passed**.
-- Final rerun of all three full-suite failures: **1 passed, 2 failed** (10.02 s). The FPC expectation is fixed; only the two unchanged mechanical assembly tests remain failing.
-- Fresh CAD / stale catalog-revision smoke check: passed; stale placed exports are not accepted as current contact evidence.
-- GY-521 model-bank validator: successful bbox validation; status remains **unverified**, no key-feature pass fabricated.
-- Added runtime dependency: Shapely (2.2.0 installed in the shared venv). SciPy, rtree and manifold3d are declared in the models extra alongside existing trimesh/cascadio dependencies.
+Full command: `python -m pytest -q -p no:randomly tests`.
+
+| Source | Passed | Failed | Warnings | Seconds |
+|---|---:|---:|---:|---:|
+| Original integration base `13dc2ff` | 734 | 0 | 0 | 1783.00 |
+| Integration snapshot `c8802ea` (same code/tests as policy-only `8aa8b3e`) | 778 | 0 | 0 | 1746.56 |
+| Final `r3/part-accuracy` follow-up, including generality tests | 784 | 2 | 8 | 1413.85 |
+
+The branches contain different added test suites; totals are not a test-for-test
+comparison. The final run collected 786 tests. Its only failures are:
+
+- `tests/test_cad_phaseb.py::test_rc_car_compiles_with_every_object_joined`
+- `tests/test_cad_phaseb.py::test_exact_interference_and_seats_are_clean`
+
+Both expose the mechanical integration defects listed above. Their assertions
+remain unchanged; the lookup/generality correction introduces no additional
+failing test. Targeted mesh regressions: **22 passed**, 8 warnings, 17.46 s.
+The eight warnings come from trimesh's volume/centroid calculation on empty
+Boolean results, not additional R3 diagnostics.
+
+Fresh model/wiring/connectors stages and the final connector-only rerun confirm
+the per-pair and diagnostic counts above. Final source review confirms no
+robot/component ID or component-kind gate in either mesh-check module. No
+protected layout, router, connection-site or deployment-version file changed.
+
+Earlier evidence remains valid: model-bank bbox validation succeeded with the
+GY-521 status kept **unverified**; fresh-CAD/stale-catalog checks reject stale
+contact evidence. The original implementation added Shapely to the models extra
+alongside SciPy, rtree and manifold3d. This follow-up adds no dependencies.
 
 ## Changed wiring messages
 

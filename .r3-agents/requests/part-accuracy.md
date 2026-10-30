@@ -23,15 +23,26 @@ Mechanical lane action is required; checks were not weakened:
 - `test_cad_phaseb::test_rc_car_compiles_with_every_object_joined` and
   `test_exact_interference_and_seats_are_clean` expose these assembly defects.
   They remain unchanged. No skips/xfails/tolerance changes conceal them.
-- Recomposition reports 17 CAD errors. Fresh wiring adds routing/support/bend and
+- Identical recomposition commands report 0 CAD errors on both original base
+  `13dc2ff` and current integration `c8802ea`, versus 17 here: all 17 are newly
+  introduced by the accuracy data changes. The audit lists each one, distinguishing
+  10 HAT/Pi/standoff findings, 6 IMU findings and 1 aggregate retention finding.
+  Fresh wiring adds routing/support/bend and
   dynamic-clearance failures after the endpoint moves. Detailed before/after
   codes and per-wire messages are in `.r3-runs/part-accuracy-audit.md`.
 
-The general mesh check finds no HAT battery connector geometry at its declared
-mating volume, no resolved bullet contacts at the motor's two terminals, and
-closed-solid interference in the floating XT60 pair. These parts are outside
-this lane's correction scope. Many other bought parts/plug halves have no
-sourced contact mesh; each is named as `connector_unverifiable`.
+The follow-up corrects the non-embedded model lookup. `hat.J_BATT` uses a separate
+`xt30pw-male` proxy; `motor.J_POS` and `motor.J_NEG` use separate `bullet-3.5-male`
+proxies. Their previous `connector_empty` errors were artefacts, now correctly
+`connector_unverifiable`. Non-embedded sourced models are searched alongside
+component geometry; true empty models remain blocking errors.
+
+Corrected pair totals: **1 passed, 1 failed, 23 unverifiable**. The remaining
+failure is actual housing-material overlap in the supplied floating XT60 models,
+isolated to the central key/rib. Contact insertion passes (7.25 ≥ 6.30 mm).
+Closed housing intersection is 7.468 mm³ in the robot frame; an independent
+millimetre/local-coordinate Boolean and planar sections confirm the collision.
+Legitimate hollow housing nesting is covered by a passing regression fixture.
 
 Pi J8 has 40/40 physical contacts and passes the 5.5 mm insertion gate; open model
 surfaces leave the housing completeness unverified. The four active GY-521 lead
@@ -41,7 +52,15 @@ could not be obtained. See `docs/guide/part-accuracy.md` for sources and the ful
 caliper checklist, including GY-521 sensor pin-1/axis orientation.
 
 Implementation commits: `3bf3444`, `baf7103`; isolated harness edit: `c6ef763`.
-Full validation: 734 passed before; 775 passed / 3 failed after. The obsolete FPC
-type expectation was corrected and its whole 26-test file passed on rerun. The
-two mechanical cleanliness failures above remain for the mechanical lane.
-Final rerun of the three failures: 1 passed, 2 failed; only those two mechanical tests remain.
+Final full validation: original base **734 passed**; current integration snapshot
+**778 passed**; this branch **784 passed, 2 failed, 8 warnings** (786 collected).
+Only the two unchanged mechanical cleanliness tests above fail. Targeted mesh
+regressions: **22 passed**. Final model/wiring/connectors counts are **0/0**, **82/55**,
+and **1/51** errors/warnings respectively. The follow-up changes only three empty
+errors into three unverifiable warnings; all other stage counts are unchanged.
+
+Generality follow-up: no computer-kind or robot/component-ID gate remains.
+Solder mates use catalog metadata instead of a type-name prefix; embedded posts
+accept arbitrary pin identifiers. Custom actuator/sensor fixtures and the other
+synthetic mesh cases pass (22 tests). Unrecognized geometry remains explicitly
+unverifiable for any robot rather than receiving an inferred pass.

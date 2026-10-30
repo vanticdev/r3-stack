@@ -174,3 +174,134 @@ def test_post_must_fit_physical_socket_opening(setup):
             [housing, box([0.4, 0.4, 8], [x, 0, -3])], engine="manifold"
         )
     assert "connector_type_mismatch" in codes(run_pair((g, s, pins, [housing])))
+
+
+@pytest.mark.parametrize("supplier", ["sourced", "proxy", "simplified", "empty"])
+def test_nonembedded_connector_searches_placed_model(setup, supplier):
+    from types import SimpleNamespace
+    from r3_connectors.stage import ConnectorStage
+    from r3_model.diagnostics import StageResult
+
+    g, s, pins, socket = setup
+    g.model.source = "proxy" if supplier == "proxy" else "kicad"
+    s.model.source = "kicad"
+    for pin in g.pins.values():
+        pin.tip = 0.006
+    for pin in s.pins.values():
+        pin.tip = -0.0005
+    stage = ConnectorStage.__new__(ConnectorStage)
+    stage.result = StageResult(stage="connectors")
+    stage.spec = SimpleNamespace(components={"part": SimpleNamespace(type="board")}, assembly=None)
+    stage.catalog = SimpleNamespace(
+        connectors={"header": SimpleNamespace(geometry=g), "socket": SimpleNamespace(geometry=s)},
+        component=lambda _: SimpleNamespace(id="board", model=None),
+    )
+    # Exercise placement, not just coincident identity frames.
+    origin = np.array([0.04, 0.03, 0.02])
+    stage.graph = SimpleNamespace(component_pose=lambda _: (origin, np.eye(3)))
+    stage.component_scenes = {"board": trimesh.Scene(box([12, 8, 1.6], [0, 0, -0.8]))}
+    own = [box([10, 3, 6], [0, 0, 3])] if supplier in {"proxy", "simplified"} else pins
+    if supplier == "empty":
+        own = [box([10, 3, 6], [100, 0, 3])]
+        stage.component_scenes = {"board": trimesh.Scene(box([12, 8, 1.6], [100, 0, -0.8]))}
+    stage.scenes = {"header": trimesh.Scene(own), "socket": trimesh.Scene(socket)}
+    stage._mesh_bodies = {}
+    stage.routes = None
+    stage.data = {"checks": {}, "connectors": {
+        "part.J": {"owner": "component", "component": "part", "embedded": False, "type": "header",
+                   "frame": {"origin": origin.tolist(), "x": [1, 0, 0], "z": [0, 0, 1]}},
+        "lead.A": {"owner": "harness", "type": "socket",
+                   "frame": {"origin": origin.tolist(), "x": [1, 0, 0], "z": [0, 0, -1]}},
+    }}
+    stage.mesh_pair("part.J", "lead.A", "harness-component")
+    result = stage.data["checks"]["mesh_mates"]["part.J|lead.A"]
+    found = {d.code for d in stage.result.diagnostics}
+    if supplier == "sourced":
+        assert result["status"] == "passed"
+        assert result["sides"]["part.J"]["count"] == 3
+        assert not found
+    elif supplier == "empty":
+        assert "connector_empty" in found
+    else:
+        assert result["status"] == "unverifiable"
+        assert found == {"connector_unverifiable"}
+        assert result["sides"]["part.J"]["geometry_present"]
+
+
+def test_duplicate_exported_contacts_are_not_extra_pins(setup):
+    from r3_connectors.mesh_mates import detect_supplied
+    g, _, pins, _ = setup
+    result = detect_supplied(pins, [p.copy() for p in pins], Frame.identity(), g)
+    assert len(result.contacts) == 3
+
+
+def test_nested_housings_do_not_count_as_interference():
+    from r3_connectors.mesh_mates import Detection, body_intersection
+    outer = trimesh.boolean.difference(
+        [box([12, 8, 8], [0, 0, 0]), box([10, 6, 10], [0, 0, 0])], engine="manifold")
+    inner = trimesh.boolean.difference(
+        [box([9, 5, 8], [0, 0, 0]), box([7, 3, 10], [0, 0, 0])], engine="manifold")
+    volume, complete = body_intersection(Detection(bodies=[outer]), Detection(bodies=[inner]),
+                                         Frame.identity(), Frame.identity())
+    assert complete
+    assert volume == 0
+
+
+def test_embedded_posts_do_not_require_computer_kind_or_numeric_pin_names(setup):
+    from types import SimpleNamespace
+    from r3_connectors.stage import ConnectorStage
+    from r3_model.diagnostics import StageResult
+
+    g, _, pins, _ = setup
+    g.pins = {f"contact_{i}": pin for i, pin in enumerate(g.pins.values())}
+    instance = SimpleNamespace(type="arbitrary-contact-array", embedded=True,
+                               position=[0, 0, 0], direction=[0, 0, 1], x=[1, 0, 0])
+    component = SimpleNamespace(kind="actuator", connectors={"service": instance},
+                                mechanical=SimpleNamespace(solids=[]))
+    stage = ConnectorStage.__new__(ConnectorStage)
+    stage.spec = SimpleNamespace(components={"axis_module": SimpleNamespace(type="custom-actuator")})
+    stage.catalog = SimpleNamespace(component=lambda _: component, connector=lambda _: SimpleNamespace(geometry=g))
+    stage.component_scenes = {"custom-actuator": trimesh.Scene(pins)}
+    stage.data = {"checks": {}}
+    stage.result = StageResult(stage="connectors")
+    stage.verify_embedded_posts()
+    assert not stage.result.diagnostics
+    assert stage.data["checks"]["axis_module.service_model"]["posts_found"] == 3
+
+
+def test_solder_mate_dispatch_does_not_depend_on_connector_type_name(setup):
+    from types import SimpleNamespace
+    from r3_connectors.stage import ConnectorStage
+    from r3_model.diagnostics import StageResult
+
+    g, _, _, _ = setup
+    g.pin_shape = "pad"
+    g.depth = 0.001
+    board = box([10, 3, 1], [0, 0, -0.5])
+    for x in (-2.54, 0, 2.54):
+        drill = trimesh.creation.cylinder(radius=0.0005, height=0.003, sections=64)
+        drill.apply_translation([x * 0.001, 0, -0.0005])
+        board = trimesh.boolean.difference([board, drill], engine="manifold")
+    stage = ConnectorStage.__new__(ConnectorStage)
+    stage.result = StageResult(stage="connectors")
+    stage.spec = SimpleNamespace(components={"instrument": SimpleNamespace(type="custom-sensor")}, assembly=None)
+    stage.catalog = SimpleNamespace(
+        connectors={"custom-lands": SimpleNamespace(geometry=g),
+                    "bare-termination": SimpleNamespace(geometry=None, gender="none")},
+        component=lambda _: SimpleNamespace(id="custom-sensor", model=None),
+    )
+    stage.graph = SimpleNamespace(component_pose=lambda _: (np.zeros(3), np.eye(3)))
+    stage.component_scenes = {"custom-sensor": trimesh.Scene(board)}
+    stage.scenes = {}
+    stage._mesh_bodies = {}
+    frame = {"origin": [0, 0, 0], "x": [1, 0, 0], "z": [0, 0, 1]}
+    stage.data = {"checks": {}, "connectors": {
+        "instrument.terminals": {"owner": "component", "component": "instrument", "embedded": True,
+                                 "type": "custom-lands", "frame": frame},
+        "cable.end": {"owner": "harness", "type": "bare-termination", "frame": frame},
+    }}
+    stage.routes = {"wires": {"signal": {"path": [[0, 0, 0.01], [0, 0, 0]],
+                                         "ends": [None, {"connector": "cable.end", "pin": "centre"}]}}}
+    stage.mesh_pair("instrument.terminals", "cable.end", "harness-component")
+    assert not stage.result.diagnostics
+    assert stage.data["checks"]["mesh_mates"]["instrument.terminals|cable.end"]["status"] == "passed"

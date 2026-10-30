@@ -2,8 +2,8 @@
 
     python -m r3_connectors <project dir> [--no-render]
 
-Reads the catalog connector geometry, the component models (official Raspberry
-Pi 5 STEP, the KiCad stage's ``board.step``) and, when present, the wiring
+Reads catalog connector geometry, sourced component models and board exports,
+and, when present, the wiring
 stage's ``routes.json``/``routing_detail.json``. Writes ``build/connectors/``:
 
 * ``models/connectors/<type>.glb``: every used connector type in its connector frame;
@@ -11,7 +11,7 @@ stage's ``routes.json``/``routing_detail.json``. Writes ``build/connectors/``:
 * ``connectors.json``: robot-frame frames of every component connector and harness
   half, every pin (contact, tip, wire entry, signal, net, bindings), mated pairs
   with their alignment, and the wire endpoints checked against their pins;
-* ``*_closeup.png``: reviewer renders (Pi header, XT60 pair, JST GH, servo plug);
+* ``*_closeup.png``: reviewer renders of available connector geometry;
 * ``result.json``.
 """
 
@@ -297,12 +297,12 @@ class ConnectorStage:
                 "contact_overlap_mm": pair["contact_overlap"] * 1e3}
 
     def mesh_pair(self, a: str, b: str, kind: str) -> None:
-        """Check the placed *owner* meshes, not a replacement catalog connector.
+        """Check owner geometry plus the placed model of non-embedded connectors.
 
-        A missing vendor model remains a visible warning. A present model with
-        nothing at its declared connector is a blocking geometric error.
+        Embedded connectors must exist in the owner mesh. Non-embedded ones
+        have a separate model supplier; proxies cannot verify real contacts.
         """
-        from .mesh_mates import check_pair, check_side, detect, scene_bodies
+        from .mesh_mates import check_pair, check_side, detect_supplied, scene_bodies
 
         checks = self.data["checks"].setdefault("mesh_mates", {})
         key = f"{a}|{b}"
@@ -345,17 +345,39 @@ class ConnectorStage:
                 source = geometry.model.url or geometry.model.path if geometry else ""
                 if geometry is not None and geometry.model.source == "proxy":
                     scene = None  # invented contacts cannot verify a bought plug
-            if scene is None or geometry is None or frame is None:
-                reason = "No sourced owner mesh/contact geometry available; physical measurement required."
-                record["sides"][ref] = {"declared_type": info["type"], "status": "unverifiable", "reason": reason}
+            # Cache owner meshes separately from connector instances: two ports
+            # on the same component have different placed supplemental models.
+            bodies = []
+            if scene is not None:
+                owner_key = info.get("component", ref)
+                if owner_key not in self._mesh_bodies:
+                    self._mesh_bodies[owner_key] = scene_bodies(scene, transform)
+                bodies = self._mesh_bodies[owner_key]
+            supplied = []
+            proxy_bodies = []
+            supplier_missing = False
+            if info["owner"] == "component" and not info.get("embedded", False):
+                connector = self.scenes.get(info["type"])
+                if geometry is not None and frame is not None and connector is not None:
+                    supplier_key = f"connector:{ref}"
+                    if supplier_key not in self._mesh_bodies:
+                        self._mesh_bodies[supplier_key] = scene_bodies(connector, frame.matrix())
+                    if geometry.model.source != "proxy":
+                        supplied = self._mesh_bodies[supplier_key]
+                        source += f"; placed connector: {geometry.model.url or geometry.model.path}"
+                    else:
+                        proxy_bodies = self._mesh_bodies[supplier_key]
+                        source += "; placed connector is an unverified proxy"
+                else:
+                    supplier_missing = True
+            if (scene is None and not supplied and not proxy_bodies) or geometry is None or frame is None:
+                reason = "No sourced owner/connector contact geometry available; physical measurement required."
+                record["sides"][ref] = {"declared_type": info["type"], "status": "unverifiable", "reason": reason,
+                                       "source": source}
                 diagnostics.append(Diagnostic.warning("connector_unverifiable", f"{ref}: {reason}", subjects=[a, b, ref]))
                 detections.append(None)
                 continue
-            owner_key = info.get("component", ref)
-            if owner_key not in self._mesh_bodies:
-                self._mesh_bodies[owner_key] = scene_bodies(scene, transform)
-            bodies = self._mesh_bodies[owner_key]
-            detection = detect(bodies, frame, geometry, source)
+            detection = detect_supplied(bodies, supplied, frame, geometry, source, supplier_missing, proxy_bodies)
             record["sides"][ref] = detection.json()
             detections.append(detection)
         # Bare conductors are fabricated from the routed wire, not a sourced
@@ -365,7 +387,9 @@ class ConnectorStage:
             geometry = geometries.get(info["type"])
             if geometry and geometry.pin_shape == "pad" and detections[index] is not None:
                 partner = (a, b)[1-index]
-                if self.data["connectors"][partner]["type"].startswith("solder-wire-"):
+                partner_info = self.data["connectors"][partner]
+                partner_type = self.catalog.connectors[partner_info["type"]]
+                if partner_info["owner"] == "harness" and partner_type.gender == "none":
                     from .mesh_mates import check_solder
                     measured, solder_diagnostics = check_solder(
                         ref, partner, self._frame(ref), detections[index], self.routes)
@@ -495,11 +519,12 @@ class ConnectorStage:
                     rows, cols = linear_sum_assignment(distances)
                     worst = float(distances[rows, cols].max())
                 tips = [frame.point(c.centre + [0, 0, c.high])[2] for c in detection.contacts]
+                first_pin = next(iter(g.pins.values()))
                 self.data["checks"][f"{cid}.{name}_model"] = {
                     "posts_found": len(found), "max_pin_error": worst,
                     "post_tip_z": float(np.median(tips)) if tips else None,
-                    "pin_map_tip_z": float(frame.point(np.asarray(g.pins["1"].position) +
-                                                   np.asarray(g.pins["1"].axis)*g.pins["1"].tip)[2])}
+                    "pin_map_tip_z": float(frame.point(np.asarray(first_pin.position) +
+                                                   np.asarray(first_pin.axis)*first_pin.tip)[2])}
                 if worst is None or worst > 5e-5 or len(found) != len(expected):
                     self.result.add(Diagnostic.error("connector_model_pin_mismatch",
                         f"{cid}.{name}: embedded contact array differs from the owner model",
@@ -576,11 +601,10 @@ def run(project: Project, render: bool = True) -> StageResult:
     stage.run(render)
     result.assume("geometry", "Connector frame: origin at the centre of the contact array on the mating face, z toward "
                               "the mating half, x from pin 1; mated halves share origin and x with opposite z.")
-    result.assume("geometry", "Board-side pin maps and bodies come from the KiCad library (footprints via pcbnew, STEP "
-                              "models via cascadio); mating faces were measured on those models. Cable-side housings "
-                              "without free vendor CAD are datasheet proxies.")
-    result.assume("geometry", "The Raspberry Pi 5 is the official Raspberry Pi Ltd STEP (MIT); the HAT is the KiCad "
-                              "stage's board.step. Their connector poses are taken from those models.")
+    result.assume("geometry", "Model sources, transforms and provenance come from the catalog and build artifacts. "
+                              "Proxy geometry records occupancy but cannot verify purchased contacts.")
+    result.assume("geometry", "Embedded connectors use their component model; non-embedded connectors also use "
+                              "their separately placed catalog model. Sources and verification limits are recorded per pair.")
     result.duration_s = time.time() - started
     result.write(stage.out / "result.json")
     return result
