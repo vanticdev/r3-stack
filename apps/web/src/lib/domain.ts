@@ -401,6 +401,14 @@ export function parseUnifiedDiff(text: string): (DiffLine | null)[] {
   return out;
 }
 
+/** Keep file boundaries when showing a multi-file description change. */
+export function specDiffFiles(diff: string): { file: string; lines: (DiffLine | null)[] }[] {
+  return diff.split(/(?=^--- a\/)/m).filter(Boolean).map((chunk) => ({
+    file: chunk.match(/^--- a\/(.+)$/m)?.[1] ?? "robot.yaml",
+    lines: parseUnifiedDiff(chunk),
+  }));
+}
+
 // ------------------------------------------------------------------ wiring
 
 export interface WireRow {

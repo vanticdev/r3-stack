@@ -29,6 +29,7 @@ from mcp.types import ToolAnnotations, CallToolResult, ImageContent, TextContent
 from . import api, spec_ops
 from .cli import configure_headless
 from r3_catalog.modelbank.schema import Category
+from r3_model.spec_files import SpecError
 
 INSTRUCTIONS = """R3 robot project tools. robot.yaml is the single source of truth.
 New robot: r3_guide (read it first), r3_create_project(template="blank"), then grow the spec component by component.
@@ -75,6 +76,8 @@ def _guard(call: Any) -> dict[str, Any]:
     """Turn expected failures into structured results instead of protocol errors."""
     try:
         return call()
+    except SpecError as error:
+        return error.payload()
     except api.ProjectNotFound as error:
         return {"ok": False, "code": "project_not_found", "message": str(error)}
     except KeyError as error:
@@ -129,16 +132,17 @@ def r3_diagnose(project: str = "", errors_only: bool = False) -> dict[str, Any]:
 
 @_tool(_READ)
 def r3_get_spec(project: str = "", section: str = "") -> dict[str, Any]:
-    """Read robot.yaml (optionally one dotted section such as `software.bindings`). Returns `sha256`,
-    which r3_patch_spec requires as `expected_sha256`."""
+    """Read the merged description (optionally a dotted section). Returns all source files and paths,
+    pull-owned read_only paths, and sha256 covering every included file for r3_patch_spec."""
     return _guard(lambda: spec_ops.get_spec(api.resolve_project(project or None), section or None))
 
 
 @_tool(_EDIT)
 def r3_patch_spec(patch: dict[str, Any], expected_sha256: str, project: str = "", dry_run: bool = False) -> dict[str, Any]:
-    """Apply an RFC 7386 JSON merge patch to robot.yaml. Objects merge, null deletes, lists replace.
-    Rejected with `spec_conflict` if robot.yaml no longer has `expected_sha256` (someone else edited it),
-    or `spec_invalid` (with errors) if the result fails the r3/robot@1 schema. Comments are preserved."""
+    """Apply an RFC 7386 merge patch to the merged spec; edits go to the owning files with comments preserved.
+    New split-project components go to parts/<id>.yaml. sha256 covers every included file.
+    Rejects spec_conflict, spec_invalid (file/path diagnostics), or spec_read_only for components.*.pulled.
+    Only the CAD pull path may refresh Onshape-derived fields."""
     return _guard(lambda: spec_ops.patch_spec(api.resolve_project(project or None), patch, expected_sha256, dry_run=dry_run))
 
 

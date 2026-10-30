@@ -1,0 +1,8 @@
+robot:
+  name: synthetic-native-fixture
+  mobility: stationary
+components:
+  body: {$include: parts/body.yaml}
+cad:
+  source: https://cad.onshape.com/documents/doc/w/workspace/e/assembly
+  version_id: version

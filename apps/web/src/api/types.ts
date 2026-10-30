@@ -233,6 +233,9 @@ export interface ProjectDetail {
 }
 
 export interface SpecDocument {
+  files?: Record<string, { sha256: string; yaml: string }>;
+  sources?: { path: (string | number)[]; file: string; source_path: (string | number)[] }[];
+  read_only?: string[];
   yaml: string;
   sha256: string;
   spec: RobotSpec;
@@ -240,6 +243,7 @@ export interface SpecDocument {
 }
 
 export interface SpecPatchResponse {
+  files_changed?: string[];
   ok: boolean;
   dry_run?: boolean;
   changed?: boolean;

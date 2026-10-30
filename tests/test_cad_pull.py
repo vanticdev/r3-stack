@@ -156,3 +156,78 @@ def test_missing_material_does_not_use_catalog_estimate(native_snapshot):
     with pytest.raises(PullError) as error:
         describe(native_snapshot, target('https://cad.onshape.com/documents/doc/v/version/e/assembly'), {})
     assert error.value.code == 'cad_pull_material_unavailable'
+
+
+@pytest.fixture
+def project(tmp_path):
+    import shutil
+    from r3_model.project import Project
+
+    root = tmp_path / 'project'
+    shutil.copytree(Path(__file__).parent / 'fixtures/native-pull', root)
+    return Project.load(root)
+
+
+def fake_transport(geometry, snapshot):
+    step, stl = geometry
+
+    class FakeTransport:
+        def assembly(self, url):
+            assert '/v/version/' in url
+            return copy.deepcopy(snapshot)
+
+        def stl(self, *args):
+            return stl
+
+        def step(self, *args):
+            return step
+
+        def capture(self, url):
+            return b'\x89PNG\r\n\x1a\nfixture', {'microversion': snapshot['microversion']}
+
+    return FakeTransport()
+
+
+def test_complete_pull_refreshes_split_description_and_integrity(project, geometry, native_snapshot):
+    from r3_model.description import check_pulled
+    from r3_model.project import Project
+    from r3_onshape.pull import pull
+    from r3_orchestrator.spec_ops import get_spec, patch_spec
+
+    result = pull(project, transport=fake_transport(geometry, native_snapshot))
+    assert result['ok'], result
+    assert result['version_id'] == 'version' and result['parts'] == 1
+    model = load_pulled(project.root)
+    check_pulled(project.root, model)
+    reloaded = Project.load(project.root)
+    assert reloaded.spec.components['body'].pulled.mass == pytest.approx(.006)
+    assert reloaded.spec.components['body'].pulled.material == 'Synthetic material'
+    assert (project.root / 'parts/body.yaml').read_text().count('pulled:') == 1
+    assert '$include' in (project.root / 'robot.yaml').read_text()
+    document = get_spec(project.root)
+    changed = patch_spec(project.root, {'components': {'body': {'pulled': {'mass': 100}}}}, document['sha256'])
+    assert not changed['ok'] and changed['code'] == 'spec_read_only'
+
+
+def test_failed_description_refresh_restores_complete_previous_pull(project, geometry, native_snapshot, monkeypatch):
+    from r3_onshape.pull import pull
+    from r3_model.description import check_pulled
+
+    transport = fake_transport(geometry, native_snapshot)
+    assert pull(project, transport=transport)['ok']
+    manifest_path = project.root / 'cad/pulled/pull.json'
+    before_manifest = manifest_path.read_bytes()
+    before_lock = (project.root / 'r3.lock.yaml').read_bytes()
+    before_part = (project.root / 'parts/body.yaml').read_bytes()
+
+    def reject(*args):
+        raise PullError('cad_pull_invalid', 'synthetic description validation failure')
+    monkeypatch.setattr('r3_model.description.refresh_pulled', reject)
+    result = pull(project, transport=transport)
+    assert result['ok'] is False and result['code'] == 'cad_pull_invalid'
+    assert manifest_path.read_bytes() == before_manifest
+    assert (project.root / 'r3.lock.yaml').read_bytes() == before_lock
+    assert (project.root / 'parts/body.yaml').read_bytes() == before_part
+    assert not (project.root / 'cad/.pulled-previous').exists()
+    assert not list((project.root / 'cad').glob('.pull-*'))
+    check_pulled(project.root, load_pulled(project.root))

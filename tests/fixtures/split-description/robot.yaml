@@ -1,0 +1,10 @@
+# A synthetic stationary mechanism, with no robot-specific package assumptions.
+schema: r3/robot@1
+robot: {name: split-fixture, mobility: stationary}
+requirements: {max_mass: 4 kg}
+components:
+  base: {$include: parts/base.yaml}
+  link: {$include: parts/link.yaml}
+cad: {provider: onshape, source: https://cad.onshape.com/documents/example/w/workspace/e/assembly}
+electrical: {$include: electrical/system.yaml}
+software: {$include: software/system.yaml}

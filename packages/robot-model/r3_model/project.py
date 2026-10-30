@@ -2,7 +2,9 @@
 
 Layout of an R3 project (also the layout of its GitHub repository)::
 
-    robot.yaml              unified spec (source of truth)
+    robot.yaml              description index (source of truth)
+    parts/<name>.yaml       part descriptions included by the index
+    electrical/ software/   included domain descriptions
     r3.lock.yaml            pinned external revisions (Onshape microversion, PCB hashes)
     catalog/                optional project-local catalog additions
     cad/                    CAD notes and source mapping; geometry lives in Onshape
@@ -23,6 +25,7 @@ from typing import Any
 import yaml
 
 from .spec import RobotSpec
+from .spec_files import load_spec_files, spec_lock
 
 
 @dataclass
@@ -34,8 +37,8 @@ class Project:
     @classmethod
     def load(cls, root: str | Path) -> "Project":
         root = Path(root).resolve()
-        spec_path = root / "robot.yaml"
-        spec = RobotSpec.model_validate(yaml.safe_load(spec_path.read_text()))
+        with spec_lock(root, shared=True):
+            spec = load_spec_files(root).validate()
         lock_path = root / "r3.lock.yaml"
         lock = yaml.safe_load(lock_path.read_text()) if lock_path.exists() else {}
         project = cls(root=root, spec=spec, lock=lock or {})
@@ -109,7 +112,8 @@ class Project:
 
     def fingerprint(self) -> dict[str, str]:
         """Revision fingerprints of authored inputs, recorded on every result."""
-        digest = hashlib.sha256((self.root / "robot.yaml").read_bytes()).hexdigest()[:16]
+        with spec_lock(self.root, shared=True):
+            digest = load_spec_files(self.root).sha256[:16]
         result = {"robot_yaml_sha256": digest}
         from r3_catalog.revision import catalog_modelbank_revision
 

@@ -5,13 +5,13 @@ import { Link, useParams } from "react-router-dom";
 import { agentProviders, api } from "../api/client.ts";
 import { invalidateProject, keys, useAgentSessions, useDiagnostics, useDoctor, useSpec } from "../api/hooks.ts";
 import { streamEvents, type StreamHandle } from "../api/sse.ts";
-import type { AgentEvent, AgentProvider, AgentStatus } from "../api/types.ts";
+import type { AgentEvent, AgentProvider, AgentStatus, SpecDocument } from "../api/types.ts";
 import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { Details, ErrorBox, Segmented, Tabs } from "../components/ui.tsx";
 import { AGENT_NAMES } from "../lib/environment.ts";
 import { diagnosticHeadline, plural } from "../lib/labels.ts";
-import { diffHunks, diffLines, parseUnifiedDiff, type DiffLine } from "../lib/domain.ts";
+import { parseUnifiedDiff, specDiffFiles, unifiedDiff, type DiffLine } from "../lib/domain.ts";
 import { timeAgo } from "../lib/units.ts";
 
 interface Session {
@@ -20,7 +20,12 @@ interface Session {
   provider: string;
   events: AgentEvent[];
   status: string;
-  baseline: string;
+  baseline: Record<string, string> | null;
+}
+
+function descriptionFiles(document: SpecDocument): Record<string, string> {
+  return document.files ? Object.fromEntries(Object.entries(document.files).map(([name, source]) => [name, source.yaml]))
+    : { "robot.yaml": document.yaml };
 }
 
 type TranscriptEntry =
@@ -45,7 +50,7 @@ export function transcriptEntries(events: readonly AgentEvent[]): TranscriptEntr
   return out;
 }
 
-/** What a session achieved: robot.yaml lines changed, checks run, errors left. */
+/** What a session achieved: description lines changed, checks run, errors left. */
 export function sessionOutcome(events: readonly AgentEvent[]): { changedLines: number; runs: number; failedRuns: number; errorsRemaining: number | null; diff: string | null } {
   const diff = [...events].reverse().find((e) => typeof e.cumulative_diff === "string")?.cumulative_diff as string | undefined;
   const changedLines = diff ? parseUnifiedDiff(diff).filter((l) => l && l.op !== " ").length : 0;
@@ -92,7 +97,7 @@ const EventEntry = memo(function EventEntry({ event }: { event: AgentEvent }) {
           {event.counts?.error ? <span className="muted">· {plural(event.counts.error, "error")} remaining</span> : null}</div>
       );
     case "spec_changed":
-      return <div className="row small"><Icon name="code" size={12} />Edited robot.yaml</div>;
+      return <div className="row small"><Icon name="code" size={12} />Edited robot description</div>;
     case "stderr":
       return <div className="small mono" style={{ color: "var(--critical)" }}>{event.line}</div>;
     case "session_started":
@@ -114,7 +119,7 @@ function Outcome({ session }: { session: Session }) {
     <div className={`agent-result${failed ? " failed" : ""}`} data-testid="agent-outcome">
       <div className="summary-line">
         <strong>{failed ? "The agent stopped with an error" : finished.status === "cancelled" ? "Cancelled" : "Done"}</strong>
-        <span>{o.changedLines ? `changed ${plural(o.changedLines, "line")} of robot.yaml` : "robot.yaml unchanged"}</span>
+        <span>{o.changedLines ? `changed ${plural(o.changedLines, "line")} of the description` : "description unchanged"}</span>
         <span>{o.runs ? `${plural(o.runs, "check run")}${o.failedRuns ? `, ${o.failedRuns} failed` : ", all passed"}` : "no checks run"}</span>
         {o.errorsRemaining !== null && <span>{o.errorsRemaining ? `${plural(o.errorsRemaining, "error")} remaining` : "no errors remaining"}</span>}
       </div>
@@ -188,7 +193,7 @@ export function AgentPage() {
       ? `Follow-up to the previous task: "${previous.prompt}".${previousResult ? `\nIts result: ${String(previousResult).slice(0, 1200)}` : ""}\n\nNow: ${visible}`
       : visible;
     try {
-      const baseline = spec.data?.yaml ?? "";
+      const baseline = spec.data ? descriptionFiles(spec.data) : null;
       const { session_id } = await api.startAgent(pid, { prompt: full, provider, ...(model ? { model } : {}) });
       const session: Session = { id: session_id, prompt: visible, provider, events: [{ type: "message", role: "user", text: visible }], status: "starting", baseline };
       setThread((list) => (mode === "reply" ? [...list, session] : [session]));
@@ -203,7 +208,7 @@ export function AgentPage() {
   const open = (s: AgentStatus) => {
     for (const h of streams.current.values()) h.close();
     streams.current.clear();
-    setThread([{ id: s.session_id, prompt: s.prompt, provider: s.provider, events: [{ type: "message", role: "user", text: s.prompt }], status: s.status, baseline: "" }]);
+    setThread([{ id: s.session_id, prompt: s.prompt, provider: s.provider, events: [{ type: "message", role: "user", text: s.prompt }], status: s.status, baseline: null }]);
     follow(s.session_id);
   };
 
@@ -212,17 +217,20 @@ export function AgentPage() {
     try { await api.cancelAgent(current.id); } catch (e) { setError(e); }
   };
 
-  const lines = useMemo<(DiffLine | null)[]>(() => {
+  const files = useMemo(() => {
     if (!thread.length) return [];
-    // One session: the API's cumulative diff. Several (replies): diff from the thread's start to now.
+    // One session: the API's cumulative diff. Replies: compare every source file.
     if (thread.length === 1) {
       const diff = sessionOutcome(thread[0]!.events).diff;
-      if (diff) return parseUnifiedDiff(diff);
+      if (diff) return specDiffFiles(diff);
     }
     const base = thread[0]!.baseline;
-    return base && spec.data ? diffHunks(diffLines(base, spec.data.yaml)) : [];
+    if (!base || !spec.data) return [];
+    const current = descriptionFiles(spec.data);
+    return specDiffFiles([...new Set([...Object.keys(base), ...Object.keys(current)])].sort()
+      .map((name) => unifiedDiff(base[name] ?? "", current[name] ?? "", name)).join(""));
   }, [thread, spec.data]);
-  const changes = lines.filter((l) => l && l.op !== " ").length;
+  const changes = files.flatMap((f) => f.lines).filter((l) => l && l.op !== " ").length;
   const info = agentProviders(doctor.data).find((p) => p.provider === provider);
   // Suggest the most specific errors: codes that occur once or twice (a brownout) before mass findings (34 bend radii).
   const suggestions = useMemo(() => {
@@ -284,7 +292,7 @@ export function AgentPage() {
       {!thread.length ? (
         <div className="agent-start">
           <h1>What should change?</h1>
-          <p className="secondary">Describe a robot change. The agent edits robot.yaml and runs the checks.</p>
+          <p className="secondary">Describe a robot change. The agent edits the robot description and runs the checks.</p>
           {composer}
           {error ? <ErrorBox error={error} /> : null}
           {suggestions.length > 0 && (
@@ -321,8 +329,11 @@ export function AgentPage() {
               <>
                 <div className="splitter" role="separator" aria-orientation="vertical" aria-label="Resize" onPointerDown={dragSplit} />
                 <div className="agent-changes">
-                  <div className="changes-head"><strong>robot.yaml</strong><span className="muted small">{plural(changes, "changed line")}</span></div>
-                  <DiffView lines={lines} />
+                  <div className="changes-head"><strong>Robot description</strong><span className="muted small">{plural(changes, "changed line")}</span></div>
+                  {files.map((f) => <div key={f.file}>
+                    <div className="changes-head"><strong>{f.file}</strong></div>
+                    <DiffView lines={f.lines} />
+                  </div>)}
                 </div>
               </>
             )}

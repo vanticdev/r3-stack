@@ -88,10 +88,12 @@ def test_spec_patch_preserves_comments_and_layout(project):
 
 def test_spec_patch_reports_dangling_connectors(project):
     read = m.r3_get_spec(project=project)
-    # Removing the fuse is schema-valid but leaves the Y-harness fuse connectors unmated.
+    # Removing a referenced object is rejected, including in single-file projects.
     result = m.r3_patch_spec({"components": {"fuse": None}}, read["sha256"], project=project, dry_run=True)
-    assert result["ok"] and {d["code"] for d in result["graph_diagnostics"]} == {"unknown_connector"}
-    assert {d["subjects"][0] for d in result["graph_diagnostics"]} == {"fuse.J1", "fuse.J2"}
+    assert result["code"] == "spec_invalid"
+    assert result["errors"][0]["code"] == "spec_reference_undefined"
+    assert result["errors"][0]["file"] == "robot.yaml"
+    assert m.r3_get_spec(project=project)["sha256"] == read["sha256"]
 
 
 def test_catalog_and_artifacts(project):

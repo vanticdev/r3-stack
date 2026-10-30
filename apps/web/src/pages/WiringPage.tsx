@@ -231,11 +231,11 @@ export function WiringPage() {
             <div style={{ padding: 10 }}>
               <ErrorBox error={save.error} />
               {save.error instanceof ApiError && save.error.code === "spec_conflict" && (
-                <button className="small" style={{ marginTop: 6 }} onClick={() => { void spec.refetch(); save.reset(); }}>Reload robot.yaml</button>
+                <button className="small" style={{ marginTop: 6 }} onClick={() => { void spec.refetch(); save.reset(); }}>Reload description</button>
               )}
             </div>
           )}
-          {save.isSuccess && <div style={{ padding: "8px 14px" }} className="small">Saved robot.yaml; the wiring stage is re-running.</div>}
+          {save.isSuccess && <div style={{ padding: "8px 14px" }} className="small">Saved wiring description; the wiring stage is re-running.</div>}
         </Card>
       </div>
 
