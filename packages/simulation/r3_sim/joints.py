@@ -578,7 +578,7 @@ def separate_parts(
             body2=b,
             solref="0.002 1",
             solimp="0.9999 0.9999 0.001",
-            active="true" if min(c.axial, c.shear) > 0 else "false",
+            active="true" if c.capacity_known and min(c.axial, c.shear) > 0 else "false",
         )
         # Spherical sockets hold position and permit free rotation.
         if c.kind == "ball_joint" and not a.startswith("mount:") and not b.startswith("mount:"):
@@ -660,6 +660,7 @@ class JointState:
     peak_utilization: float = 0.0
     preload_fraction: float = 1.0
     failed: bool = False
+    capacity_unknown: bool = False
     peak_axial_n: float = 0.0
     peak_shear_n: float = 0.0
     peak_torque_nm: float = 0.0
@@ -734,8 +735,20 @@ class JointMonitor:
             rel = data.xmat[b].reshape(3, 3).T @ (data.xpos[a] - data.xpos[b])
             rel_rot = data.xmat[b].reshape(3, 3).T @ data.xmat[a].reshape(3, 3)
             self.bindings.append((c, eq, a, b, dof, rel, rel_rot))
-            if not data.eq_active[eq]:
+            if not c.capacity_known:
+                # Fail closed for exploratory dynamics without pretending that
+                # unavailable data proves a physically zero-strength release.
+                self.states[c.id].failed = True
+                self.states[c.id].capacity_unknown = True
+                data.eq_active[eq] = False
+                message = f"{c.id}: capacity unknown; missing {', '.join(c.missing_data)}. Motion is unqualified."
+                self.events.append(dict(t=float(data.time), event="joint_capacity_unknown", joint=c.id,
+                                        parts=[c.a, c.b], mode="unknown", load=None, capacity=None,
+                                        cause="missing capacity data", message=message))
+                self.diagnostics.append(Diagnostic.error("joint_capacity_unknown", message, subjects=[c.id, c.a, c.b]))
+            elif not data.eq_active[eq]:
                 self.fail(c, eq, 0, "axial", 0, "zero capacity: " + c.cause)
+        self._refresh_contacts()
         self.detached = set()
         self._row_cache_key = None
         self._row_cache = {}
@@ -995,8 +1008,9 @@ class JointMonitor:
             c.id: {
                 **c.as_dict(),
                 **asdict(self.states[c.id]),
+                "failed": self.states[c.id].failed if c.capacity_known else None,
                 "peak_utilization": self.states[c.id].peak_utilization
-                if math.isfinite(self.states[c.id].peak_utilization)
+                if c.capacity_known and math.isfinite(self.states[c.id].peak_utilization)
                 else None,
                 "failures": [e for e in self.events if e.get("joint") == c.id],
             }

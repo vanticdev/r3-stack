@@ -3,9 +3,14 @@
 A mount sets a nominal pose; it does not glue parts together. `r3_model.connections.compile_connections`
 compiles the resolved assembly joins, mechanical fasteners and interfaces into SI capacities before simulation.
 `model/connections.json` records each connection, its inputs, sources, estimates and static errors.
-Missing nuts, female threads, engaged material or qualified retention cause `joint_capacity_zero`.
+An absent nut/female thread or demonstrably empty engagement causes `joint_capacity_zero`.
+Missing material allowables, invalid coefficients or unqualified purchased-mechanism
+retention instead cause `joint_capacity_unknown`. Unknown capacities serialize as
+`null` with the missing inputs listed; they are not zero-strength design findings.
+Their constraints stay inactive for fail-closed exploratory motion, with a separate
+missing-data event. Such motion cannot establish physical failure or qualification.
 An assembly torque above proof, stripping or punching capacity causes `joint_assembly_overload`.
-Neither diagnostic can pass the release gate.
+All of these errors block the release gate.
 
 `r3_sim.assembly.build_assembly_model` and `r3_sim.dynamics.RobotDynamics` are the public generic
 assembly builder and monitored runtime. They support passive structures, articulated arms and other

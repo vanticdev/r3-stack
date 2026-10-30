@@ -561,6 +561,8 @@ def _finish(
         },
         "events": kernel.recorder.events,
         "connections": kernel.vehicle.joints.report(),
+        "capacity_data_complete": all(c.capacity_known for c in kernel.vm.connections.connections),
+        "joint_capacity_unknown_count": sum(not c.capacity_known for c in kernel.vm.connections.connections),
         "estimated_joint_inputs": kernel.vm.connections.estimated,
         "firmware_logs": kernel.recorder.logs[:200],
         "diagnostics": [d.model_dump(mode="json") for d in diagnostics],

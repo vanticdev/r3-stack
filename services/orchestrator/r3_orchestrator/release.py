@@ -342,7 +342,7 @@ def _scenario_items(ctx: _Context) -> list[Item]:
         joint_item = Item(f"scenario.{scenario.id}.joint_integrity", "scenario_expectation", scenario.id, "no joint errors")
         if summary is not None and "connections" in summary:
             errors = [d for d in summary.get("diagnostics", []) if d.get("severity") == "error" and d.get("code") in
-                      ("joint_failed", "part_detached", "joint_capacity_zero", "joint_assembly_overload", "joint_fit_yield", "joint_coefficient_invalid", "joint_simulation_unstable", "scenario_incomplete", "load_case_not_exercised", "impact_speed_missing")]
+                      ("joint_failed", "part_detached", "joint_capacity_zero", "joint_capacity_unknown", "joint_assembly_overload", "joint_fit_yield", "joint_coefficient_invalid", "joint_simulation_unstable", "scenario_incomplete", "load_case_not_exercised", "impact_speed_missing")]
             joint_item.evidence = [ctx.scenario_evidence(scenario.id, summary, "joint_integrity",
                                    {"pass": not errors, "measured":len(errors), "expected":0})]
         else:

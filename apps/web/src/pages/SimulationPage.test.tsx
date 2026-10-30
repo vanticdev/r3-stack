@@ -19,4 +19,14 @@ describe("joint failure playback", () => {
   it("marks future events without hiding their diagnosis", () => {
     expect(renderToStaticMarkup(<JointFailures events={[failure]} t={0} seek={() => {}} />)).toContain("Upcoming");
   });
+  it("shows missing capacity data without presenting it as zero strength", () => {
+    const unknown = { event: "joint_capacity_unknown", t: 0, joint: "arm_mount", load: null, capacity: null,
+      message: "arm_mount: capacity unknown; missing bearing material data" };
+    expect(jointFailures([unknown])).toEqual([unknown]);
+    const html = renderToStaticMarkup(<JointFailures events={[unknown]} t={0} seek={() => {}} />);
+    expect(html).toContain("Missing data");
+    expect(html).toContain("Recorded motion is unqualified");
+    expect(html).not.toContain("holds 0");
+    expect(html).not.toContain("Released");
+  });
 });

@@ -726,7 +726,7 @@ def test_anonymous_strength_is_a_structured_blocking_error(tmp_path):
     p=fixture_project(tmp_path,connection="tape")
     p.spec.mechanical.interfaces[0].params["physics"]["shear_strength"]=1e9
     cm=compile_connections(p)
-    assert {"joint_coefficient_invalid","joint_capacity_zero"}<={d.code for d in cm.diagnostics}
+    assert {"joint_coefficient_invalid","joint_capacity_unknown"}<={d.code for d in cm.diagnostics}
 
 
 def test_unretained_cad_subpart_cannot_escape_detachment_checks(tmp_path):
@@ -746,8 +746,42 @@ def test_missing_fastener_strength_never_inherits_anonymous_defaults(tmp_path):
     p=fixture_project(tmp_path)
     p.catalog.fasteners["shcs-m3"].joint_physics={}
     model=compile_connections(p)
-    assert any(d.code=="joint_capacity_zero" for d in model.diagnostics)
-    assert model.estimated and any("Missing joint input" in v["source"] for v in model.estimated.values())
+    assert any(d.code=="joint_capacity_unknown" for d in model.diagnostics)
+    assert not any(d.code=="joint_capacity_zero" for d in model.diagnostics)
+    assert all(not c.capacity_known for c in model.connections)
+    assert all(c.as_dict()["axial"] is None for c in model.connections)
+
+
+def test_unknown_material_is_blocking_missing_data_and_not_a_zero_strength_release(tmp_path):
+    p = fixture_project(tmp_path)
+    p.catalog.component("plate").mechanical.material = "Unqualified coupon material"
+    cm = compile_connections(p)
+    assert {d.code for d in cm.diagnostics if d.severity.value == "error"} == {"joint_capacity_unknown"}
+    assert all(c.missing_data and c.as_dict()["axial"] is None for c in cm.connections)
+    robot = vehicle_for(p, "gravity_inverted")
+    run_steps(robot, 20)
+    events = robot.joints.events
+    assert any(e["event"] == "joint_capacity_unknown" and e["capacity"] is None for e in events)
+    assert not any(e["event"] == "joint_failed" for e in events)
+    assert all(c["failed"] is None and c["peak_utilization"] is None for c in robot.joints.report().values())
+
+
+def test_release_blocks_unknown_capacity_for_a_non_vehicle_project(tmp_path):
+    from r3_orchestrator.release import evaluate
+
+    p = arm_project(tmp_path)
+    folder = p.build_dir("sim") / "gravity_upright"
+    folder.mkdir()
+    (folder / "summary.json").write_text(json.dumps({
+        "scenario": "gravity_upright", "passed": False, "inputs": p.fingerprint(),
+        "connections": {}, "checks": [], "metrics": {},
+        "diagnostics": [{"severity": "error", "code": "joint_capacity_unknown",
+                         "message": "arm_mount: bearing strength missing"}],
+    }))
+    gate = evaluate(p)
+    item = next(i for i in gate["items"] if i["id"] == "scenario.gravity_upright.joint_integrity")
+    assert item["status"] == "failed"
+    assert item["id"] in gate["blocking"]
 
 
 def test_slender_links_keep_positive_inertia_without_changing_assembly_mass(tmp_path):

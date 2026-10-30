@@ -163,6 +163,8 @@ class Connection:
     coefficients: dict[str, dict[str, Any]] = field(default_factory=dict)
     details: dict[str, float] = field(default_factory=dict)
     group: str | None = None
+    capacity_known: bool = True
+    missing_data: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         axis = np.asarray(self.axis, dtype=float)
@@ -172,7 +174,15 @@ class Connection:
         self.axis = (axis / norm).tolist()
 
     def as_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        result = asdict(self)
+        if not self.capacity_known:
+            # Internal zeros disable an unqualified constraint; they are not
+            # measured zero strengths. Preserve positive, independently known
+            # bounds in details, while serializing unknown results as null.
+            for name in ("axial", "shear", "torque", "bending", "slip", "preload"):
+                result[name] = None
+            result["details"] = {k: v if v != 0 else None for k, v in self.details.items()}
+        return result
 
 
 @dataclass
@@ -183,7 +193,7 @@ class ConnectionModel:
 
 
 def compile_connections(project: Project) -> ConnectionModel:
-    """No robot-specific rules. Missing data is an explicit zero-capacity error.
+    """No robot-specific rules. Missing data is a blocking unknown-capacity error.
 
     ``interface.params.physics`` accepts sourced SI values (value/status/source).
     Catalog defaults are estimates and are listed individually in diagnostics.
@@ -224,7 +234,7 @@ def compile_connections(project: Project) -> ConnectionModel:
     ) -> float:
         raw = inputs[key] if key in inputs else defaults.get(fallback or key)
         if raw is None:
-            used[key] = dict(value=0.0, status="estimated", source="Missing joint input; zero capacity assumed")
+            used[key] = dict(value=None, status="missing", source="Missing joint input; capacity unqualified")
             return 0.0
         if hasattr(raw, "model_dump"):
             raw = raw.model_dump()
@@ -238,7 +248,7 @@ def compile_connections(project: Project) -> ConnectionModel:
         except (ValueError, TypeError, KeyError) as error:
             model.diagnostics.append(Diagnostic.error(
                 "joint_coefficient_invalid", f"{key}: {error}", subjects=[key]))
-            used[key] = dict(value=0.0, status="estimated", source="Rejected invalid coefficient; no capacity assumed")
+            used[key] = dict(value=None, status="missing", source="Rejected invalid coefficient; capacity unqualified")
             return 0.0
         used[key] = {**raw, "value": number}
         return number
@@ -254,7 +264,14 @@ def compile_connections(project: Project) -> ConnectionModel:
         for k, v in c.coefficients.items():
             if v["status"] == "estimated":
                 model.estimated[f"{c.id}.{k}"] = v
-        if c.kind != "resting" and (c.axial <= 0 or c.shear <= 0):
+        if not c.capacity_known:
+            model.diagnostics.append(Diagnostic.error(
+                "joint_capacity_unknown",
+                f"{c.id}: capacity unknown; missing data: {', '.join(c.missing_data)}",
+                subjects=[c.id, c.a, c.b],
+                data={"missing_data": c.missing_data, "capacity_known": False},
+            ))
+        elif c.kind != "resting" and (c.axial <= 0 or c.shear <= 0):
             model.diagnostics.append(
                 Diagnostic.error(
                     "joint_capacity_zero",
@@ -431,6 +448,18 @@ def compile_connections(project: Project) -> ConnectionModel:
             if engagement <= 0
             else "preload / proof / female thread / pull-through limit"
         )
+        missing = [name for name, coefficient in used.items() if coefficient["status"] == "missing"]
+        if threaded:
+            if female_shear <= 0 and not (f.nut or ft.kind == "nut"):
+                missing.append(f"female-thread material strength: {f.thread_into}")
+            if plate_shear <= 0 and plate is None:
+                missing.append(f"bearing/pull-through material strength: {stack[0] if stack else f.thread_into}")
+            if f.nut and stack and material(stack[-1]) is None:
+                missing.append(f"nut-side pull-through material strength: {stack[-1]}")
+        # A demonstrably absent retainer or rejected/empty engagement is a
+        # construction failure even when unrelated catalog inputs are missing.
+        if not threaded or engagement <= 0:
+            missing = []
         for n, (a, b) in enumerate(dict.fromkeys(pairs)):
             # The outer race of an internally rotating bearing is not rigid to
             # the fastener/shaft on its inner race.
@@ -463,6 +492,8 @@ def compile_connections(project: Project) -> ConnectionModel:
                     dict(used),
                     cap,
                     group=f.id,
+                    capacity_known=not missing,
+                    missing_data=list(dict.fromkeys(missing)),
                 )
             )
 
@@ -528,16 +559,21 @@ def compile_connections(project: Project) -> ConnectionModel:
             )
         axial = shear = torsion = bending = 0.0
         details = {}
+        missing = []
+        required = []
         if i.kind == "resting":
             pass
         elif i.kind == "adhesive":
+            required = ["area", "shear_strength", "peel_strength", "radius"]
             shear = value(inp, "shear_strength", used, "adhesive_shear") * area
             axial = value(inp, "peel_strength", used, "adhesive_peel") * area
             torsion, bending = shear * radius, axial * radius
         elif i.kind == "strap":
+            required = ["rated_tension", "radius"]
             axial = shear = value(inp, "rated_tension", used, "strap_tension")
             torsion = bending = axial * radius
         elif i.kind == "connector_retention":
+            required = ["retention_force", "unmating_force", "shear_force", "radius"]
             axial = min(
                 value(inp, "retention_force", used, "connector_retention"),
                 value(inp, "unmating_force", used, "connector_retention"),
@@ -545,9 +581,11 @@ def compile_connections(project: Project) -> ConnectionModel:
             shear = value(inp, "shear_force", used, "connector_retention")
             torsion, bending = shear * radius, axial * radius
         elif i.kind == "ball_joint":
+            required = ["retention_force"]
             axial = shear = value(inp, "retention_force", used, "ball_retention")
             torsion = bending = 0.0  # ball connection carries no moment
         elif i.kind == "snap_fit":
+            required = ["youngs_modulus", "width", "thickness", "length", "deflection", "strength", "radius"]
             axial = snap_capacity(
                 *(
                     value(inp, name, used)
@@ -564,6 +602,7 @@ def compile_connections(project: Project) -> ConnectionModel:
             shear = axial
             torsion = bending = axial * radius
         elif i.kind == "press_fit":
+            required = ["friction", "radius", "outer_diameter"]
             ma, mb = material(a), material(b)
             interference = i.params.get("interference", [0, 0])
             delta = min(to_si(v) for v in interference) if isinstance(interference, list) else to_si(interference)
@@ -625,6 +664,8 @@ def compile_connections(project: Project) -> ConnectionModel:
                 details["pressure_pa"] = pressure
                 shear = min(ma.z_strength, mb.z_strength) / math.sqrt(3) * d * length
                 torsion, bending = axial * radius, shear * length / 2
+            else:
+                missing.append("shaft/hub material elastic and strength data")
         elif i.kind in {"revolute_fit", "drive_flat", "spline"}:
             # Radial bearing/flat load from projected bearing area and weakest
             # material; axial retention comes ONLY from a real retainer.
@@ -638,21 +679,33 @@ def compile_connections(project: Project) -> ConnectionModel:
                     "Weakest material TDS XY/Z ultimate; bearing approximation",
                 )
                 shear = strength * 2 * radius * to_si(i.params.get("min_engagement", 0))
+            elif "shear_force" not in inp:
+                missing.append("bearing material strength")
             retainers = set(i.params.get("retainers", []))
             retained = [c for c in model.connections if retainers & {c.a, c.b}]
             axial = min((c.axial for c in retained), default=0.0)
             # A clamp stack on this shaft is a valid retention path.
             if not retainers:
+                retained = [c for c in model.connections if c.kind == "screw" and {a, b} & {c.a, c.b}]
                 axial = min(
-                    (c.axial for c in model.connections if c.kind == "screw" and {a, b} & {c.a, c.b}),
+                    (c.axial for c in retained),
                     default=0.0,
                 )
             if "retention_force" in inp:
                 axial = value(inp, "retention_force", used)
+                required.append("retention_force")
+            elif not retained:
+                missing.append("axial retention rating or qualified retainer path")
+            elif any(not c.capacity_known for c in retained):
+                missing.append("retainer path capacity: " + ", ".join(c.id for c in retained if not c.capacity_known))
             if "shear_force" in inp:
                 shear = value(inp, "shear_force", used)
+                required.append("shear_force")
             torsion = 0.0 if i.kind == "revolute_fit" else shear * radius
             bending = shear * radius
+        elif i.kind != "resting":
+            missing.append(f"capacity model for interface kind {i.kind}")
+        missing.extend(name for name in required if used.get(name, {}).get("status") == "missing")
         add(
             Connection(
                 i.id,
@@ -671,6 +724,8 @@ def compile_connections(project: Project) -> ConnectionModel:
                 else "catalog/interface capacity",
                 coefficients=used,
                 details=details,
+                capacity_known=not missing,
+                missing_data=list(dict.fromkeys(missing)),
             )
         )
         # A strap only holds its load when it is also anchored through a support.
