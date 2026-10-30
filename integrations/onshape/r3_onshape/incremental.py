@@ -236,6 +236,7 @@ def _work(project: Project, parts: dict[str, LocalPart], state: dict[str, Any]) 
             recorded = json.load(handle)["parts"]
         wanted.update(key for key, part in parts.items() if key not in reused and
                       (key not in recorded or not same_solid(part.plan, recorded[key])[0]))
+    from .purchased import public_source
     work = []
     grouped: dict[tuple[str, str, str | None], list[str]] = {}
     for key in sorted(wanted - reused):
@@ -247,6 +248,17 @@ def _work(project: Project, parts: dict[str, LocalPart], state: dict[str, Any]) 
             if len(old["part_ids"]) == 1 and not (set(old["part_ids"]) & set(parts)):
                 old_name = part.studio
         name = old_name or part.studio
+        if part.bank_model:
+            # Imports always get their own translated studio, including parts
+            # previously sharing a native family with unaffected siblings.
+            name = part.studio
+            occupied = name in refs and not (name == old_name and set(refs[name]["part_ids"]) == {key})
+            if occupied or any(i["name"] == name and i["document"] == ("library" if part.library else "robot") for i in work):
+                name += " import " + hashlib.sha256(key.encode()).hexdigest()[:6]
+            work.append({"document": "library" if part.library else "robot", "name": name,
+                         "parts": [key], "pending": [key], "existing": copy.deepcopy(refs.get(old_name)),
+                         "action": "public" if public_source(part) else "import"})
+            continue
         if old_name is None and name in refs:
             name += " additions " + hashlib.sha256(key.encode()).hexdigest()[:6]
         grouped.setdefault(("library" if part.library else "robot", name, old_name), []).append(key)
@@ -255,11 +267,9 @@ def _work(project: Project, parts: dict[str, LocalPart], state: dict[str, Any]) 
         ref = refs.get(old_name) if old_name else None
         members = list(keys)
         if ref:
-            members = sorted(set(keys) | (set(ref["part_ids"]) & set(parts)))
+            members = sorted(set(keys) | {key for key in set(ref["part_ids"]) & set(parts) if not parts[key].bank_model})
             if any(parts[key].mirror_of for key in members):
                 raise ValueError(f"{name}: mirrored family topology needs --full")
-        if any(parts[key].bank_model for key in members):
-            raise ValueError(f"{name}: vendor import replacement needs --full")
         work.append({"document": doc, "name": name, "parts": members, "pending": keys,
                      "existing": copy.deepcopy(ref), "action": "update" if ref else "create"})
     return work, sorted(reused)
@@ -289,11 +299,11 @@ def _mate_changes(plan: AssemblyPlan, state: dict[str, Any], replaced: set[str])
 def _replacement_iids(work: list[dict[str, Any]], plan: AssemblyPlan, state: dict[str, Any],
                       robot: DocumentInfo | None = None, library: DocumentInfo | None = None) -> set[str]:
     # New sources and edited version-pinned library sources need new instances.
-    keys = {key for item in work if item["action"] == "create" or item["document"] == "library" for key in item["pending"]}
+    keys = {key for item in work if item["action"] != "update" or item["document"] == "library" for key in item["pending"]}
     if robot is not None and library is not None:
         for item in work:
             ref = item["existing"]
-            if not ref:
+            if not ref or item["action"] == "public":
                 continue
             doc = library if item["document"] == "library" else robot
             for key in item["parts"]:
@@ -318,7 +328,7 @@ def incremental_plan(project: Project) -> dict[str, Any]:
     studios = []
     # Common verification reads all pinned studios (including retired variants),
     # plus each assembly twice. Only edited studios need a pre-write diff read.
-    new_studios = sum(i["action"] == "create" for i in work)
+    new_studios = sum(i["action"] in ("create", "import") for i in work)
     reads = (len(state["robot"]["studios"]) + len((project.lock.get("cad_library") or {}).get("studios", {}))
              + new_studios + len(plan.levels) * 2 + sum(i["action"] == "update" for i in work))
     calls = reads + len(deletes) + len(mates)
@@ -331,7 +341,7 @@ def incremental_plan(project: Project) -> dict[str, Any]:
         old_count = sum(len(ids) for ids in (item["existing"] or {}).get("folders", {}).values())
         # Without a /features read, use all candidate sketch updates plus one
         # parameter batch per solid as a conservative estimate (flushes may split it).
-        estimate = count if item["action"] == "create" else count + 2 * max(0, count - old_count) + max(0, old_count - count)
+        estimate = count if item["action"] != "update" else count + 2 * max(0, count - old_count) + max(0, old_count - count)
         calls += estimate
         candidates += count
         studios.append({**{k: v for k, v in item.items() if k != "existing"}, **detail,
@@ -360,11 +370,59 @@ def _document(data: dict[str, Any]) -> DocumentInfo:
     return doc
 
 
+def _retire_sources(api: Transport, doc: DocumentInfo, item: dict[str, Any]) -> None:
+    """Retain editable history, but remove replaced bodies from active sourcing.
+
+    A shared studio keeps its siblings and feature history. Retired bodies and
+    empty studios are explicitly named; no active part/connector lookup can
+    resolve them, and assembly replacement removes their old occurrences.
+    All remote changes use the studio journal before its checkpoint is saved.
+    """
+    from .studio import metadata_property_ids
+
+    old = item["existing"]
+    if not old:
+        return
+    name, ref = next((n, s) for n, s in doc.studios.items() if s.element_id == old["element_id"])
+    for key in item["pending"]:
+        pid = ref.part_ids.pop(key, None)
+        if pid is None and len(ref.part_ids) == 1 and not (set(ref.part_ids) & set(item["parts"])):
+            # The planner may match a renamed, single-part catalog variant.
+            old_key, pid = next(iter(ref.part_ids.items()))
+            del ref.part_ids[old_key]
+            ref.connectors.pop(old_key, None)
+        if pid is None:
+            continue
+        metadata = metadata_property_ids(api, doc.did, doc.wid, ref.element_id, pid)
+        api.json("POST", f"/metadata/d/{doc.did}/w/{doc.wid}/e/{ref.element_id}/p/{quote(pid, safe='')}",
+                 body={"jsonType": "metadata-part", "partId": pid,
+                       "properties": [{"propertyId": metadata["Name"], "value": f"Retired {key}"}]})
+        ref.connectors.pop(key, None)
+    if not ref.part_ids:
+        retired = f"Retired {name} ({ref.element_id})"
+        api.json("POST", f"/elements/d/{doc.did}/w/{doc.wid}/e/{ref.element_id}", body={"name": retired})
+        del doc.studios[name]
+        ref.name = retired
+        doc.studios[retired] = ref
+
+
 def _edit_studio(api: Transport, doc: DocumentInfo, item: dict[str, Any], parts: dict[str, LocalPart],
-                 variables: Any, bindings: Any) -> tuple[StudioRef, dict[str, int]]:
+                 variables: Any, bindings: Any) -> tuple[StudioRef | None, dict[str, int]]:
     members = [parts[key] for key in item["parts"]]
+    if item["action"] in ("import", "public"):
+        ref = None
+        writes = {"creates": 0}
+        if item["action"] == "import":
+            from .purchased import import_studio
+            imported = copy.copy(members[0])
+            imported.studio = item["name"]
+            built = import_studio(api, doc.did, doc.wid, imported)
+            ref = StudioRef(item["name"], built.element_id, built.part_ids, built.connectors, built.folders)
+            writes["creates"] = built.features
+        _retire_sources(api, doc, item)
+        return ref, writes
     if item["existing"]:
-        ref = StudioRef(name=item["name"], **{k: v for k, v in item["existing"].items() if k != "name"})
+        ref = doc.studios[item["name"]]
         builder = IncrementalStudioBuilder(api, doc, ref, members, variables, bindings)
         populate_studio(builder, members)
         return builder.finish(), builder.writes
@@ -470,7 +528,8 @@ def sync_incremental(project: Project, api: Transport, result: StageResult) -> d
             journal = RequestJournal(api, root / f"{prefix}-studio-{index}.journal.json", digest)
             ref, writes = _edit_studio(journal, doc, item, parts, variables if doc is robot else None,
                                       bindings.get(parts[item["parts"][0]].studio) if doc is robot else None)
-            doc.studios[item["name"]] = ref
+            if ref is not None:
+                doc.studios[item["name"]] = ref
             cp["done"].append(index)
             cp["writes"][item["name"]] = writes
             cp["robot"], cp["library"] = asdict(robot), asdict(library)
@@ -504,7 +563,7 @@ def sync_incremental(project: Project, api: Transport, result: StageResult) -> d
         result.metrics["onshape_document"] = robot.url()
         report["feature_writes"] = cp["writes"]
         report["changed_keys"] = [key for i in cp["work"] for key in i["pending"]]
-        folder_work = [i["name"] for i in cp["work"] if i["action"] == "create" or
+        folder_work = [i["name"] for i in cp["work"] if i["action"] in ("create", "import") or
                        any(cp["writes"].get(i["name"], {}).get(k, 0) for k in ("creates", "deletes"))]
         if not cp.get("organization_complete") and (folder_work or _mate_changes(plan, cp["base"],
                 _replacement_iids(cp["work"], plan, cp["base"], robot, library)) != ([], [])):
