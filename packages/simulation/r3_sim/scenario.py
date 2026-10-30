@@ -303,6 +303,14 @@ def run_scenario(
         )
         if not kernel.recorder.channels:
             kernel._record(kernel.last_outputs, kernel.vehicle.position())
+    if kernel.t < duration - 1e-9:
+        diagnostics.append(Diagnostic.error(
+            "scenario_incomplete",
+            f"{scenario_id}: simulated {kernel.t:g} s of {duration:g} s; incomplete joint evidence cannot qualify",
+            subjects=[scenario_id], data={"simulated_s": kernel.t, "requested_s": duration},
+        ))
+    if not kernel.recorder.channels:
+        kernel._record(kernel.last_outputs, kernel.vehicle.position())
     software.kill("scenario_end")
     server.close()
     wall = time.monotonic() - wall_start

@@ -88,7 +88,7 @@ MuJoCo uses sparse Newton, pyramidal contact, exact constraint inertia, islands 
 integer number of native steps without changing electrical/software timing. Every native step runs
 capacity, detachment and cable contact checks. If a catalog-only model begins with rigid collision penetration beyond its fit tolerance, the runtime conservatively refines to at most 50 µs, reports `joint_timestep_reduced`, and records the estimated numerical setting. Qualified CAD models retain the requested maximum step. The first step half can overlap the electrical solve;
 with substeps the next electrical solve waits for all of them. Numerical instability is an error and
-an incomplete run never qualifies. No check or physical tolerance is disabled to improve speed.
+an incomplete run never qualifies. Early software/HAL shutdown also produces a blocking `scenario_incomplete` diagnostic, with requested and simulated durations. No check or physical tolerance is disabled to improve speed.
 
 ## Requirements and mandatory scenarios
 

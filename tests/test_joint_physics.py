@@ -736,3 +736,19 @@ def test_slender_links_keep_positive_inertia_without_changing_assembly_mass(tmp_
     assert np.all(model.body_inertia[model.body_mass > 0] > 0)
     assert any(key.startswith("solver.carrier_mass_fraction:") for key in vm.connections.estimated)
     assert sum(model.body_mass)==pytest.approx(vm.total_mass,rel=1e-10)
+
+
+def test_early_software_shutdown_cannot_qualify(tmp_path: Path) -> None:
+    """A future scenario must not pass by closing its HAL before the load ends."""
+    import sys
+    from r3_model.spec import Scenario
+    from r3_sim.scenario import run_scenario
+
+    project = fixture_project(tmp_path)
+    project.spec.simulation.scenarios.append(Scenario(id="early_exit", duration=0.2))
+    outcome = run_scenario(project, "early_exit", software_cmd=[sys.executable, "-c",
+        "from r3_hal import open_hal; hal = open_hal('fixture'); hal.close()"], render=False)
+    assert not outcome.passed
+    assert "scenario_incomplete" in {diagnostic.code for diagnostic in outcome.diagnostics}
+    assert outcome.summary["metrics"]["sim_time_s"] < 0.2
+    assert (project.root / "build/sim/early_exit/recording.npz").exists()
