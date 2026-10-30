@@ -59,3 +59,28 @@ def test_pattern_reference_cycle_is_rejected():
     camera.interfaces['mount'].params['holes_from'] = 'arducam-b0445-imx296.mount'
     with pytest.raises(ValueError, match='reference cycle'):
         resolve_patterns(catalog)
+
+
+def test_asymmetric_pattern_can_be_reflected_into_opposing_fixture_frame(tmp_path):
+    source = {'id': 'sensor-pad', 'kind': 'sensor', 'name': 'Asymmetric sensor',
+              'mechanical': {'size': ['20 mm', '18 mm', '1 mm'], 'mass': .002},
+              'interfaces': {'mount': {'kind': 'hole_pattern', 'z': [0, 0, -1],
+                             'params': {'holes': [['6 mm', '-4 mm', '3 mm', 'clearance', '1 mm'],
+                                                  ['-6 mm', '-4 mm', '3 mm', 'clearance', '1 mm']]}}}}
+    fixture = {'id': 'sensor-fixture', 'kind': 'structure', 'name': 'Fixture',
+               'mechanical': {'size': ['25 mm', '20 mm', '8 mm'], 'mass': .01, 'fabricated': True},
+               'interfaces': {'sensor': {'kind': 'hole_pattern', 'origin': [0, 0, '8 mm'],
+                              'params': {'holes_from': 'sensor-pad.mount',
+                                         'hole_transform': [[1, 0], [0, -1]], 'hole_kind': 'tapped',
+                                         'hole_diameter': '2.5 mm', 'hole_depth': '7 mm'}}}}
+    folder = tmp_path / 'catalog' / 'components'
+    folder.mkdir(parents=True)
+    (folder / 'sensor.yaml').write_text(yaml.safe_dump({'components': [source, fixture]}))
+    robot = {'schema': 'r3/robot@1', 'robot': {'name': 'Asymmetric fixture'},
+             'components': {'fixture': {'type': 'sensor-fixture'}, 'sensor': {'type': 'sensor-pad'}},
+             'assembly': {'root': 'fixture', 'joins': [{'a': 'fixture.sensor', 'b': 'sensor.mount',
+                          'clock': '0 deg', 'fasteners': {'type': 'M2.5x8'}}]}}
+    (tmp_path / 'robot.yaml').write_text(yaml.safe_dump(robot))
+    project = Project.load(tmp_path)
+    assert not project.assembly.errors
+    assert project.catalog.component('sensor-fixture').interfaces['sensor'].params['holes'][0][:2] == pytest.approx([.006, .004])
