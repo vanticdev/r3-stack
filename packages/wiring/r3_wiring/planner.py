@@ -1066,7 +1066,8 @@ def build_problem(project: Any, router: Any, routing: Any, harnesses: list[str],
         nodes = routing.nodes[harness]
         failed = {w for w, r in routing.wires.items() if r.harness == harness and r.failed}
         hole_centers = {f"H:{i}": routing.holes[i] for i in route.holes}
-        vias = [np.asarray(v, float) for h in project.spec.electrical.harnesses if h.id == harness for v in h.route.via]
+        vias = [np.asarray(v, float) for h in project.spec.electrical.harnesses if h.id == harness
+                for points in [h.route.via, *getattr(h.route, "wire_via", {}).values()] for v in points]
 
         def identify(point: np.ndarray) -> tuple[str, float | None]:
             for node in nodes.values():

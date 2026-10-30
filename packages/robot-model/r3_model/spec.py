@@ -240,6 +240,9 @@ class Wire(_Model):
 
 class RouteHint(_Model):
     via: list[Vector] = Field(default_factory=list, description="Ordered waypoints in the robot frame.")
+    wire_via: dict[str, list[Vector]] = Field(default_factory=dict, description="Branch waypoints keyed by a wire ID, "
+                                             "ordered from that wire's from terminal to its to terminal. Wires joining "
+                                             "the same terminal pair share these waypoints.")
     tie_points: list[Vector] = Field(default_factory=list, description="Requested bundle centres at real cable supports; "
                                    "placement validates mounting hardware, access and retention before pinning the bundle.")
     slack: Quantity = Field(default=0.015, description="Extra length added beyond the routed path.")
@@ -254,6 +257,22 @@ class Harness(_Model):
     wires: list[Wire]
     route: RouteHint = Field(default_factory=RouteHint)
     jacket: str = Field(default="none", description="none | braided-sleeve | heat-shrink")
+
+    @model_validator(mode="after")
+    def _branch_waypoints(self) -> "Harness":
+        wires = {wire.id: wire for wire in self.wires}
+        branches: dict[tuple[str, str], list[Vector]] = {}
+        for wire_id, points in self.route.wire_via.items():
+            if wire_id not in wires:
+                raise ValueError(f"wire_via names unknown wire {wire_id!r} in {self.id}")
+            wire = wires[wire_id]
+            a, b = (ref if ref in self.splices else ref.split(".")[0] for ref in (wire.from_, wire.to))
+            key = tuple(sorted((a, b)))
+            ordered = points if a <= b else points[::-1]
+            if key in branches and branches[key] != ordered:
+                raise ValueError(f"wire_via has conflicting waypoints for branch {key} in {self.id}")
+            branches[key] = ordered
+        return self
 
 
 class DirectMate(_Model):

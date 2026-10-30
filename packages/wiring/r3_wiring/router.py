@@ -838,8 +838,15 @@ class HarnessRouter:
                 terminals.append(voxel)
             stops = [terminals[0]]
             stop_dirs: list[np.ndarray | None] = [a.direction]
-            if index == 0:
-                for via in vias:
+            branch_vias = vias if index == 0 else []
+            for wire in branches[key]:
+                if wire.id in harness.route.wire_via:
+                    points = harness.route.wire_via[wire.id]
+                    branch_vias = points if node_name(wire.from_) == key[0] else points[::-1]
+                    break
+            if branch_vias:
+                for via in branch_vias:
+                    via = np.asarray(via, dtype=float)
                     voxel, escape = self._free_voxel(via, ctx)
                     for v in escape:
                         blocked[v] = 0
@@ -876,7 +883,7 @@ class HarnessRouter:
             for v in voxels:
                 used[v] = 1
             sequences[key] = self._sequence(harness.id, key, a, b, voxels, ctx, positions, harness_holes,
-                                            via_voxels=stops[1:-1] if index == 0 else [])
+                                            via_voxels=stops[1:-1])
 
         # ---- bundle graph and segments
         adjacency: dict[Any, set] = {}
