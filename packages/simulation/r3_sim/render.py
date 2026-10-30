@@ -1,4 +1,4 @@
-"""Offscreen MuJoCo renders (``mujoco.Renderer``) of recorded vehicle states.
+"""Offscreen MuJoCo renders (``mujoco.Renderer``) of recorded robot states.
 
 Headless: :mod:`r3_sim.headless` chooses the OpenGL backend before ``mujoco``
 is imported (``MUJOCO_GL=egl`` with a GPU or ``osmesa`` on Linux servers, ``cgl``
@@ -40,6 +40,22 @@ def _camera(lookat: np.ndarray, yaw: float, distance: float = 1.1, elevation: fl
     return cam
 
 
+def _root(model: mujoco.MjModel) -> int:
+    identifier=mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_TEXT,"r3_root")
+    if identifier>=0:
+        start=int(model.text_adr[identifier]);size=int(model.text_size[identifier])
+        name=model.text_data[start:start+size].rstrip(b"\0").decode()
+        return mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_BODY,name)
+    return next(i for i in range(1,model.nbody) if model.body_parentid[i]==0 and model.body_jntnum[i]>0)
+
+
+def _robot_camera(model: mujoco.MjModel,data: mujoco.MjData) -> mujoco.MjvCamera:
+    root=_root(model);center=data.xipos[root]
+    ids=np.flatnonzero(model.geom_bodyid>0)
+    radius=max((float(np.linalg.norm(data.geom_xpos[g]-center))+float(model.geom_rbound[g]) for g in ids),default=.1)
+    return _camera(center,_yaw(data.xquat[root]),max(.001,3*radius))
+
+
 def render_frames(model: mujoco.MjModel, times: list[float], qpos: list[np.ndarray], out_dir: Path, at: list[float],
                   width: int = 960, height: int = 640, prefix: str = "render") -> list[Path]:
     """Render stills at the snapshot closest to each time in ``at``."""
@@ -51,8 +67,7 @@ def render_frames(model: mujoco.MjModel, times: list[float], qpos: list[np.ndarr
             k = int(np.argmin(np.abs(np.asarray(times) - target)))
             data.qpos[:] = qpos[k]
             mujoco.mj_forward(model, data)
-            yaw = _yaw(data.qpos[3:7])
-            renderer.update_scene(data, camera=_camera(data.qpos[:3] + np.array([0.13, 0, 0.05]), yaw))
+            renderer.update_scene(data, camera=_robot_camera(model,data))
             path = out_dir / f"{prefix}_t{times[k]:07.2f}s.png"
             Image.fromarray(renderer.render()).save(path)
             paths.append(path)
@@ -77,7 +92,7 @@ def render_video(model: mujoco.MjModel, times: list[float], qpos: list[np.ndarra
                 break
             data.qpos[:] = qpos[k]
             mujoco.mj_forward(model, data)
-            renderer.update_scene(data, camera=_camera(data.qpos[:3] + np.array([0.13, 0, 0.05]), _yaw(data.qpos[3:7]), 1.6, -18.0))
+            renderer.update_scene(data, camera=_robot_camera(model,data))
             frames.append(renderer.render().copy())
     if not frames:
         return None

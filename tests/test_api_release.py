@@ -71,9 +71,10 @@ def test_evidence_from_results(root):
     assert "fallback" in gate["scenario.autonomous_course.brownouts"]["message"]
     assert gate["scenario.autonomous_course.laps_completed"]["status"] == "not_run"
     assert "did not evaluate" in gate["scenario.autonomous_course.laps_completed"]["message"]
-    # The owned camera's complete FFC route is explicitly unverified even though
-    # its connectors seat and its straight-line reach passes. Do not release it.
-    assert gate["stage.model"]["status"] == "estimated" and gate["stage.cad"]["status"] == "not_run"
+    # Unqualified retention blocks release. The owned camera's FFC route
+    # estimate also remains visible alongside the joint preflight errors.
+    assert gate["stage.model"]["status"] == "failed" and gate["stage.cad"]["status"] == "not_run"
+    assert gate["stage.model"]["evidence"][0]["value"] > 0
     model_result = json.loads((root / "build/model/result.json").read_text())
     assert any(d["code"] == "flat_cable_route_estimated" for d in model_result["diagnostics"])
     temperature = gate["requirement.max_component_temperature_c"]

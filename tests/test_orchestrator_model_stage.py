@@ -58,7 +58,7 @@ def test_graph_json_written(baseline):
     assert {r["source"] for r in graph["rails"]} >= {"battery.POS", "hat.5V", "pi.3V3", "esc.BEC"}
     assert any({d["address"] for d in bus["devices"]} == {0x40, 0x68} for bus in graph["i2c_buses"])
     assert (root / "build" / "model" / "layout.png").stat().st_size > 10_000
-    assert {a.path for a in result.artifacts} == {"model/graph.json", "model/layout.png"}
+    assert {a.path for a in result.artifacts} == {"model/graph.json", "model/layout.png", "model/connections.json"}
 
 
 def test_uart_tx_rx_swap(tmp_path):

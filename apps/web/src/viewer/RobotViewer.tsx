@@ -362,12 +362,12 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
   const last = useRef<Vector3 | null>(null);
   const { recording, t, follow } = playback;
   const frames = recording.frames!;
-  const root = frames.component_bodies?.chassis ?? (frames.bodies.chassis ? "chassis" : Object.keys(frames.bodies)[0] ?? null);
+  const root = frames.root_body ?? Object.keys(frames.bodies)[0] ?? null;
   const rest = useMemo(() => (root ? restPoses(frames, root) : {}), [frames, root]);
   const assignment = useMemo(() => {
     const bodies = new Set(Object.keys(frames.bodies));
-    const of = (id: string) => frames.component_bodies?.[id] ?? componentBody(data.tree, id, bodies, root);
-    return Object.fromEntries([...data.components.map((c) => [c.id, of(c.id)]), ...data.hardware.map((h) => [h.id, of(h.owner)])]);
+    const of = (id: string) => frames.component_bodies?.[id] ?? (bodies.has(id) ? id : componentBody(data.tree, id, bodies, root));
+    return Object.fromEntries([...data.components.map((c) => [c.id, of(c.id)]), ...data.hardware.map((h) => [h.id, frames.component_bodies?.[h.id] ?? (bodies.has(h.id) ? h.id : of(h.owner))])]);
   }, [data, frames, root]);
   useEffect(() => invalidate(), [t, invalidate]);
   useFrame(() => {

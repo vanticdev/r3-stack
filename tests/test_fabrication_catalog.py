@@ -23,6 +23,9 @@ def test_materials_load_with_datasheet_values(catalog):
     assert petg.youngs_modulus == pytest.approx(1.81e9)
     assert petg.hdt == pytest.approx(69.0)
     for material in catalog.materials.values():
+        if material.process != "fdm":
+            assert material.provenance.source and material.provenance.status == "estimated"
+            continue
         assert material.provenance.source.startswith(("Bambu", "eSUN")) and "http" in material.provenance.source
         assert material.z_strength < material.tensile_strength
         assert all(word == word.lower() for word in material.keywords)

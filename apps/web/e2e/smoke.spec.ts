@@ -199,7 +199,7 @@ test.describe("interactions", () => {
     await viewerReady(page);
     const locate = page.getByRole("button", { name: "Locate interference" });
     if (await locate.count()) { await locate.click(); await settle(page, 800); }
-    const harness = page.getByTestId("harness-list").getByRole("button", { name: /ESC motor/ });
+    const harness = page.getByTestId("harness-list").getByRole("button", { name: /^ESC motor 1 wire/ });
     if ((await harness.getAttribute("aria-pressed")) !== "true") await harness.click(); // Locate may already have selected it
     await expect(harness).toHaveAttribute("aria-pressed", "true");
     await page.getByRole("button", { name: "Edit route" }).click();

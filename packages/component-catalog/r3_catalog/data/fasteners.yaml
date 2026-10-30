@@ -7,6 +7,12 @@
 # Clearance holes: ISO 273 fine (close) / medium (normal) / coarse series.
 fasteners:
   - id: shcs-m2
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 0.12}
+      proof_stress: {source: 'ISO 898-1 table 5, property class 12.9/10.9', status: standard, value: 970000000.0}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: socket_head_screw
     name: Socket head cap screw M2, steel 12.9
     standard: ISO 4762
@@ -23,6 +29,12 @@ fasteners:
     clearance_coarse: 2.6 mm
     provenance: {status: datasheet, source: "ISO 4762:2004 table 1 (dk max 3.8, k max 2.0); ISO 724 (D1); ISO 2306 (tap drill); ISO 273"}
   - id: shcs-m2.5
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 0.25}
+      proof_stress: {source: 'ISO 898-1 table 5, property class 12.9/10.9', status: standard, value: 970000000.0}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: socket_head_screw
     name: Socket head cap screw M2.5, steel 12.9
     standard: ISO 4762
@@ -39,6 +51,12 @@ fasteners:
     clearance_coarse: 3.1 mm
     provenance: {status: datasheet, source: "ISO 4762:2004 table 1 (dk 4.5, k 2.5); ISO 724; ISO 2306; ISO 273"}
   - id: shcs-m3
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 0.5}
+      proof_stress: {source: 'ISO 898-1 table 5, property class 12.9/10.9', status: standard, value: 970000000.0}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: socket_head_screw
     name: Socket head cap screw M3, steel 12.9
     standard: ISO 4762
@@ -55,6 +73,12 @@ fasteners:
     clearance_coarse: 3.6 mm
     provenance: {status: datasheet, source: "ISO 4762:2004 table 1 (dk 5.5, k 3.0); ISO 724; ISO 2306; ISO 273"}
   - id: shcs-m4
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 1.2}
+      proof_stress: {source: 'ISO 898-1 table 5, property class 12.9/10.9', status: standard, value: 970000000.0}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: socket_head_screw
     name: Socket head cap screw M4, steel 12.9
     standard: ISO 4762
@@ -71,6 +95,12 @@ fasteners:
     clearance_coarse: 4.8 mm
     provenance: {status: datasheet, source: "ISO 4762:2004 table 1; ISO 724; ISO 2306; ISO 273"}
   - id: bhcs-m3
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 0.5}
+      proof_stress: {source: 'ISO 898-1 table 5, property class 12.9/10.9', status: standard, value: 830000000.0}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: button_head_screw
     name: Button head socket screw M3, steel 10.9
     standard: ISO 7380-1
@@ -87,6 +117,12 @@ fasteners:
     clearance_coarse: 3.6 mm
     provenance: {status: datasheet, source: "ISO 7380-1:2011 table 1 (dk max 5.7, k max 1.65); ISO 724; ISO 273"}
   - id: ball-stud-m3-5.8
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 0.5}
+      proof_stress: {value: 400000000.0, status: estimated, source: "R3 unspecified steel ball-stud proof estimate; no certified property class"}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: ball_stud
     name: Steel ball stud, M3 thread, 5.8 mm ball, hex collar
     thread: M3
@@ -104,6 +140,12 @@ fasteners:
     color: "#c0c4c8"
     provenance: {status: estimated, source: "Typical 1/10 RC 5.8 mm ball stud; hex collar modeled as a 5.5 mm cylinder; length = thread length below the collar"}
   - id: standoff-mf-m2.5-11
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 0.25}
+      proof_stress: {value: 200000000.0, status: estimated, source: "R3 brass CW614N proof estimate; temper unspecified"}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: standoff_mf
     name: Male-female hex standoff M2.5, 11 mm body, brass
     thread: M2.5
@@ -121,7 +163,14 @@ fasteners:
     color: "#c9a227"
     provenance: {status: estimated, source: "Common Raspberry Pi HAT stacking standoff (M2.5 x 11 + 6 mm male); 11 mm board-to-board per HAT mechanical guidance"}
   - id: nut-m3-nyloc
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 0.5}
+      proof_stress: {value: 500000000.0, status: estimated, source: "R3 conservative nut proof estimate; qualify supplied property class"}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: nut
+    locking: nyloc
     name: Prevailing-torque hex nut with nylon insert M3
     standard: ISO 10511 / DIN 985
     thread: M3
@@ -133,7 +182,14 @@ fasteners:
     height: 4.0 mm
     provenance: {status: datasheet, source: "DIN 985 (s 5.5, h max 4.0); ISO 10511 equivalent; modeled as a plain hexagonal prism"}
   - id: nut-m6-nyloc
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 3.0}
+      proof_stress: {value: 500000000.0, status: estimated, source: "R3 conservative nut proof estimate; qualify supplied property class"}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: nut
+    locking: nyloc
     name: Prevailing-torque hex nut with nylon insert M6
     standard: ISO 10511 / DIN 985
     thread: M6
@@ -145,7 +201,14 @@ fasteners:
     height: 6.0 mm
     provenance: {status: datasheet, source: "DIN 985 (s 10, h max 6.0); ISO 10511 equivalent; modeled as a plain hexagonal prism"}
   - id: nut-m4-nyloc
+    joint_physics:
+      nut_factor: {source: 'NASA RP-1228 torque/preload equation; assumed dry surface, qualify by torque-tension test', status: estimated, value: 0.2}
+      friction: {source: R3 dry joint friction estimate; surface pair unspecified, status: estimated, value: 0.2}
+      torque: {source: R3 conservative assembly torque estimate; replace with specified assembly torque, status: estimated, value: 1.2}
+      proof_stress: {value: 500000000.0, status: estimated, source: "R3 conservative nut proof estimate; qualify supplied property class"}
+      loosening_distance: {source: 'R3 empirical e-fold slip distance; Junker SAE 690055 criterion, rate requires test calibration', status: estimated, value: 0.001}
     kind: nut
+    locking: nyloc
     name: Prevailing-torque hex nut with nylon insert M4
     standard: ISO 10511 / DIN 985
     thread: M4
@@ -156,3 +219,16 @@ fasteners:
     across_flats: 7.0 mm
     height: 5.0 mm
     provenance: {status: datasheet, source: "DIN 985 (s 7, h max 5.0); ISO 10511 equivalent; modeled as a plain hexagonal prism"}
+
+# Defaults are explicit conservative estimates, never qualification data. Interface
+# physics inputs override these with sourced {value, status, source} records.
+joint_defaults:
+  friction: {source: R3 dry-contact estimate; qualify actual material pair, status: estimated, value: 0.2}
+  fit_tolerance: {source: R3 assembly pose tolerance estimate; override with interface fit tolerance, status: estimated, value: 0.0002}
+  adhesive_shear: {source: R3 unqualified adhesive estimate; product and cure unspecified, status: estimated, value: 100000.0}
+  adhesive_peel: {source: R3 unqualified normal/peel stress estimate; replace with product test data, status: estimated, value: 20000.0}
+  strap_tension: {source: R3 unqualified small strap/tie estimate; replace with rated tension, status: estimated, value: 50}
+  connector_retention: {source: R3 unqualified connector retention estimate; replace with datasheet, status: estimated, value: 10}
+  ball_retention: {source: R3 unqualified small ball socket pullout estimate; replace with datasheet, status: estimated, value: 20}
+
+  carrier_mass_fraction: {value: 0.0001, status: estimated, source: "R3 MuJoCo moving-frame numerical regularization; aggregate mass/COM/inertia preserved; small gyroscopic cross-term approximation while retained"}

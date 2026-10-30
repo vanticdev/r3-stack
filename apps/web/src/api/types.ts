@@ -701,6 +701,7 @@ export interface SimListResponse {
   overview_url?: string | null;
 }
 export interface PlaybackFrames {
+  root_body?: string;
   t: number[];
   format?: string;
   /** body -> per-frame world pose */

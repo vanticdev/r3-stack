@@ -46,13 +46,15 @@ def resolve_material(catalog: Any, text: str | None) -> Any | None:
     (so "plastic" is not PLA and "Aluminum plate" is not PLA); longest keyword wins."""
     if not text:
         return None
-    if text in catalog.materials:
+    if text in catalog.materials and catalog.materials[text].process == "fdm":
         return catalog.materials[text]
     lowered = text.lower()
-    if lowered in catalog.materials:
+    if lowered in catalog.materials and catalog.materials[lowered].process == "fdm":
         return catalog.materials[lowered]
     best: tuple[int, Any] | None = None
     for material in catalog.materials.values():
+        if material.process != "fdm":
+            continue
         for word in material.keywords:
             if re.search(rf"(?<![a-z0-9]){re.escape(word)}(?![a-z0-9])", lowered) and (best is None or len(word) > best[0]):
                 best = (len(word), material)

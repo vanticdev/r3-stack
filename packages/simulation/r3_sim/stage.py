@@ -19,7 +19,9 @@ def run(project: Project, scenarios: list[str] | None = None, software_cmd: list
     """Run the scenarios (all by default) and aggregate diagnostics, metrics and artifacts."""
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
     started = time.monotonic()
-    selected = [s for s in project.spec.simulation.scenarios if scenarios is None or s.id in scenarios]
+    from .load_cases import all_scenarios
+
+    selected = [s for s in all_scenarios(project) if scenarios is None or s.id in scenarios]
     if not selected:
         result.add(Diagnostic.warning("no_scenarios", "robot.yaml defines no matching simulation scenarios",
                                       data={"requested": len(scenarios or [])}))

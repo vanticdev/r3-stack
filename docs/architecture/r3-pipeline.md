@@ -202,6 +202,14 @@ Codes are stable snake_case identifiers. Each carries `subjects` (ids) and
 `data` with measured value, limit and units, e.g.
 `{"code": "wire_overcurrent", "subjects": ["W_Y_P_IN"], "data": {"current": 41.2, "ampacity": 35, "awg": 12}}`.
 
+## Universal assembly integrity
+
+Every simulation includes the generic per-part MuJoCo assembly and breakable connection layer.
+The model stage writes sourced connection capacities before simulation; gravity, drop, impact
+(where mobile) and vibration scenarios are mandatory release evidence for every robot.
+See [joint physics](joint-physics.md) for equations, default requirements, stationary fixtures,
+recording contracts and explicit estimates.
+
 ### Manufacturer-rated internal joints
 
 A purchased assembly can declare `mechanical.rated_internal_joints` in its

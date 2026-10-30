@@ -34,14 +34,21 @@ def test_bought_driveline_assembles_without_errors(printcar: Project) -> None:
     joints = {j.id for j in printcar.spec.mechanical.joints}
     assert {"spin_rl", "spin_rr", "spin_fl", "spin_fr"} <= joints
     model = stages.run_stage(printcar, "model")
-    assert model.ok and any(d.code == "interference_checked_by_assembly" for d in model.diagnostics)
+    assert not model.ok
+    assert any(d.code == "joint_capacity_zero" for d in model.errors)
+    assert any(d.code == "interference_checked_by_assembly" for d in model.diagnostics)
 
 
-def test_bought_driveline_drives_with_real_firmware(printcar: Project) -> None:
+def test_unqualified_driveline_is_rejected_with_real_firmware(printcar: Project) -> None:
     stages.run_stage(printcar, "assembly")
     result = stages.run_stage(printcar, "sim", scenarios=["straight"])
-    assert result.ok, [(d.code, d.message) for d in result.errors]
+    assert not result.ok
+    assert {"joint_capacity_zero", "joint_failed"} <= {d.code for d in result.errors}
     summary = json.loads((printcar.root / "build" / "sim" / "straight" / "summary.json").read_text())
-    assert summary["passed"] and summary["software"]["launches"][0]["connected"]
+    assert not summary["passed"] and summary["software"]["launches"][0]["connected"]
+    # Keep the original motion requirement. The unsafe fixture now fails it,
+    # rather than gaining rigid mounts from a pose declaration.
+    speed_check=next(c for c in summary["checks"] if c["key"]=="min_top_speed_mps")
+    assert speed_check["expected"] == 2.0 and not speed_check["pass"]
     metrics = summary["metrics"]
-    assert metrics["top_speed_mps"] > 2.0 and metrics["brownouts"] == 0 and metrics["min_rail_5v"] > 4.75
+    assert metrics["brownouts"] == 0 and metrics["min_rail_5v"] > 4.75

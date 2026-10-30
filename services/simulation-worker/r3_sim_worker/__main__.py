@@ -20,12 +20,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--scenario", action="append", help="scenario id (repeatable); default: all")
     parser.add_argument("--no-render", action="store_true", help="skip MuJoCo offscreen renders")
     parser.add_argument("--quiet", action="store_true")
+    parser.add_argument("--full-duration", action="store_true", help="Continue failed assemblies for the entire requested scenario duration")
     parser.add_argument("--software-cmd", nargs=argparse.REMAINDER, help="robot software command (rest of the line)")
     args = parser.parse_args(argv)
     from r3_sim.headless import configure
 
     configure()
     project = Project.load(args.project)
+    if args.full_duration:
+        project.spec.simulation.joint_failure_replay_duration = None
     from r3_sim.stage import run
 
     progress = None if args.quiet else (lambda message: print(message, file=sys.stderr, flush=True))

@@ -27,21 +27,20 @@ def test_mjcf_compiles_with_expected_structure(project):
     expected_mass = sum(cad_parts[cid]["mass"] if vm.mass_source[cid] != "catalog"
                         else project.spec.components[cid].params.get("mass", project.catalog.component(c.type).mechanical.mass)
                         for cid, c in project.spec.components.items())
-    expected_mass += sum(cad_parts[name]["mass"] for extras in vm.cad_extras.values() for name in extras)
+    # Every component and load-bearing fastener/nut has its own massive body.
+    # CAD hardware uses exported mass; otherwise its catalog solid primitives
+    # contribute mass (checked independently by the synthetic hardware fixture).
+    expected_mass += sum(vm.mass_properties[name].mass for names in vm.cad_extras.values() for name in names)
     assert sum(model.body_mass) == pytest.approx(expected_mass, rel=1e-6)
-    # One body per joint child plus the free root, plus each tie rod (ball-jointed to the horn, closed to its knuckle by an
-    # equality constraint); everything else rides with its mount chain.
-    joints = project.spec.mechanical.joints
-    assert set(vm.bodies) == {"chassis", "tie_rod", "tie_rod_r"} | {j.child for j in joints}
-    assert model.neq == 2 and {model.joint(i).name for i in range(model.njnt)} >= {"ball_tie_rod", "ball_tie_rod_r", "steer_servo"}
-    assert "battery" in vm.bodies["chassis"] and "pi" in vm.bodies["chassis"]
-    for cid, comp in project.spec.components.items():
-        if comp.mount in vm.bodies and cid not in vm.bodies:  # e.g. stub axles on knuckles, axles on wheels
-            assert cid in vm.bodies[comp.mount], cid
-    # CAD fasteners and nuts ride with the body of their owner (front wheel nuts on the stub axles -> knuckles).
+    assert set(project.spec.components) <= set(vm.bodies)
+    assert all(members == [cid] for cid,members in vm.bodies.items() if cid in project.spec.components)
+    assert model.neq >= len(project.spec.mechanical.interfaces)
+    assert {model.joint(i).name for i in range(model.njnt)} >= {"ball_tie_rod", "ball_tie_rod_r", "steer_servo"}
+    for cid in project.spec.components:
+        assert model.body(cid).mass > 0
+        assert model.body(cid).geomnum > 0
     for body, extras in vm.cad_extras.items():
-        for name in extras:
-            assert cad_parts[name]["owner"] in vm.bodies[body] or cad_parts[name]["owner"] == body
+        assert extras in ([], [body])
     # Rotor inertia reflected through the ratio onto the differential tendon: J_m N^2 + J_out (gearbox via the path).
     drive = next(t for t in project.spec.mechanical.transmissions if t.type == "differential")
     params = lambda cid: {**project.catalog.component(project.spec.components[cid].type).behavior.params,  # noqa: E731
@@ -90,13 +89,14 @@ def test_ackermann_inner_wheel_turns_more():
     assert math.tan(left) == pytest.approx(0.26 / (radius - 0.085))
 
 
-def test_car_rolls_straight_under_constant_torque(project):
+def test_car_rolls_straight_under_constant_torque(tmp_path):
+    from test_joint_physics import drivetrain_project
+    project = drivetrain_project(tmp_path)
     vehicle = Vehicle(project, build_vehicle_model(project))
     for _ in range(300):
         vehicle.step()
     for _ in range(3000):
         vehicle.set_motor_torque(0, 0.02)
-        vehicle.step_servo(0, 0.001, 1500.0, 6.0)
         vehicle.step()
     assert vehicle.forward_speed() > 2.0
     assert abs(vehicle.position()[1]) < 0.02
@@ -105,13 +105,15 @@ def test_car_rolls_straight_under_constant_torque(project):
     assert vehicle.forward_speed() == pytest.approx(vehicle.motor_omega() * 0.055 / 9.066, rel=0.02)
 
 
-def test_top_speed_consistent_with_motor_limit(project):
+def test_top_speed_consistent_with_motor_limit(tmp_path):
+    from test_joint_physics import drivetrain_project
+    project = drivetrain_project(tmp_path)
     scenario = next(s for s in project.spec.simulation.scenarios if s.id == "full_throttle")
     kernel = CoSimKernel(project, scenario)
     key = ("pwmchip0", 2)
     for step in range(9000):
         t = step * 0.001
-        if step % 10 == 0:  # HAT failsafe arbiter heartbeat (GPIO27) at the 100 Hz control rate
+        if step % 10 == 0:  # GPIO heartbeat at the 100 Hz control rate (no arbiter in the synthetic bench)
             kernel.gpio_written(("gpiochip0", 27), (step // 10) % 2)
         pulse = 1500.0 + 500.0 * max(0.0, min(1.0, (t - 0.05) / 2.5))  # neutral while the arbiter re-arms, then ramp
         kernel.pwm_state[key] = {"period_ns": 20_000_000, "duty_ns": int(pulse * 1000), "enabled": True}

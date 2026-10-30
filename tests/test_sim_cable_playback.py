@@ -74,8 +74,14 @@ def test_recorded_wire_mapping_diameter_fanouts_and_motion(cable_world, tmp_path
     q1 = q0.copy()
     # A translation and yaw exercise world/robot-frame conversion. Geometry must
     # move exactly with the car, including both pin-to-core fan-outs.
-    q1[:3] += [1.0, -0.5, 0.2]
-    q1[3:7] = [np.cos(0.2), 0, 0, np.sin(0.2)]
+    rotation=np.array([[np.cos(.4),-np.sin(.4),0],[np.sin(.4),np.cos(.4),0],[0,0,1]])
+    yaw=np.array([np.cos(.2),0,0,np.sin(.2)])
+    for j in range(model.njnt):
+        if model.jnt_type[j] != mujoco.mjtJoint.mjJNT_FREE:
+            continue
+        address=model.jnt_qposadr[j]
+        q1[address:address+3]=rotation@q0[address:address+3]+[1,-.5,.2]
+        mujoco.mju_mulQuat(q1[address+3:address+7],yaw,q0[address+3:address+7])
     npz = tmp_path / "recording.npz"
     np.savez_compressed(npz, t=[0., 1.], snapshot_t=[0., 1.], snapshot_qpos=[q0, q1],
                         cable_metadata=np.asarray(json.dumps(metadata)))
@@ -95,12 +101,28 @@ def test_recorded_wire_mapping_diameter_fanouts_and_motion(cable_world, tmp_path
 
 
 def test_pin_fanout_follows_its_joint_body(cable_world, tmp_path):
-    _, _, vm, model, _, monitor = cable_world
+    project, _, vm, model, _, monitor = cable_world
     data = mujoco.MjData(model)
     metadata = cable_metadata(monitor)
     qpos = np.tile(model.qpos0, (2, 1))
     joint = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, "steer")
     qpos[1, model.jnt_qposadr[joint]] = 0.3
+    # The connector is its own free body now. Pose its real fixed attachment
+    # along with the arm for this kinematics-only recording fixture.
+    mujoco.mj_forward(model,data)
+    arm=model.body("arm").id;old_position=data.xpos[arm].copy();old_rotation=data.xmat[arm].reshape(3,3).copy()
+    data.qpos[:]=qpos[1];mujoco.mj_kinematics(model,data)
+    rotation=data.xmat[arm].reshape(3,3)@old_rotation.T
+    translation=data.xpos[arm]-rotation@old_position
+    quat=np.zeros(4);mujoco.mju_mat2Quat(quat,rotation.ravel())
+    for cid,component in project.spec.components.items():
+        if component.mount != "arm":
+            continue
+        body=model.body(cid).id;j=model.body_jntadr[body]
+        assert model.jnt_type[j]==mujoco.mjtJoint.mjJNT_FREE
+        address=model.jnt_qposadr[j]
+        qpos[1,address:address+3]=rotation@qpos[0,address:address+3]+translation
+        mujoco.mju_mulQuat(qpos[1,address+3:address+7],quat,qpos[0,address+3:address+7])
     (tmp_path / "vehicle.xml").write_text(vm.xml)
     file = tmp_path / "recording.npz"
     np.savez_compressed(file, t=[0., 1.], snapshot_t=[0., 1.], snapshot_qpos=qpos,

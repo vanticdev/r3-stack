@@ -147,6 +147,8 @@ class _Context:
         inputs = summary.get("inputs") or {}
         fallbacks = summary.get("fallbacks") or {}
         estimated = [name for name, used in fallbacks.items() if used]
+        if summary.get("estimated_joint_inputs"):
+            estimated.append("joint inputs")
         passed = check.get("pass", check.get("passed"))
         return Evidence("sim", f"{scenario_id}.{key}", None if passed is None else bool(passed),
                         check.get("measured", check.get("value")), check.get("expected", check.get("limit")), summary["_path"],
@@ -276,7 +278,27 @@ def _temperature(ctx: _Context, limit: float) -> list[Evidence]:
                                f"hottest component {hottest}" + (" (estimated thermal parameters)" if estimated else ""))]
 
 
+def _mechanical_requirement(ctx: _Context, prefix: str) -> list[Evidence]:
+    from r3_sim.load_cases import required_scenarios
+
+    evidence = []
+    for scenario in required_scenarios(ctx.project):
+        if not scenario.id.startswith(prefix):
+            continue
+        summary = ctx.scenarios.get(scenario.id)
+        if summary is None or "connections" not in summary:
+            # Every generated case is required; absent evidence keeps the gate
+            # pending instead of treating a partial set as a qualified design.
+            return []
+        errors = sum(d.get("severity") == "error" for d in summary.get("diagnostics", []))
+        evidence.append(ctx.scenario_evidence(scenario.id, summary, "joint_integrity",
+                                             {"pass": errors == 0, "measured": errors, "expected": 0}))
+    return evidence
+
+
 REQUIREMENT_CHECKS: dict[str, Callable[[_Context, float], list[Evidence]]] = {
+    "drop_height": lambda ctx, limit: _mechanical_requirement(ctx, "drop_"),
+    "impact_speed": lambda ctx, limit: _mechanical_requirement(ctx, "wall_impact"),
     "max_mass": _max_mass,
     "top_speed": _top_speed,
     "min_runtime": _min_runtime,
@@ -294,7 +316,7 @@ def _requirement_items(ctx: _Context) -> list[Item]:
     requirements = ctx.project.spec.requirements
     items = []
     for name, value in requirements.model_dump(mode="json").items():
-        if name == "extra" or value is None:
+        if name in ("extra", "vibration") or value is None:
             continue
         check = REQUIREMENT_CHECKS.get(name)
         item = Item(f"requirement.{name}", "requirement", name, value)
@@ -302,6 +324,9 @@ def _requirement_items(ctx: _Context) -> list[Item]:
         if check is None:
             item.message = "no stage checks this requirement yet"
         items.append(item)
+    vibration = Item("requirement.vibration", "requirement", "vibration", "survive specified PSD and motor vibration")
+    vibration.evidence = _mechanical_requirement(ctx, "vibration_")
+    items.append(vibration)
     for name, value in (requirements.extra or {}).items():
         items.append(Item(f"requirement.extra.{name}", "requirement", name, value,
                           message="custom requirement: no stage checks it automatically"))
@@ -310,8 +335,19 @@ def _requirement_items(ctx: _Context) -> list[Item]:
 
 def _scenario_items(ctx: _Context) -> list[Item]:
     items = []
-    for scenario in ctx.project.spec.simulation.scenarios:
+    from r3_sim.load_cases import all_scenarios
+
+    for scenario in all_scenarios(ctx.project):
         summary = ctx.scenarios.get(scenario.id)
+        joint_item = Item(f"scenario.{scenario.id}.joint_integrity", "scenario_expectation", scenario.id, "no joint errors")
+        if summary is not None and "connections" in summary:
+            errors = [d for d in summary.get("diagnostics", []) if d.get("severity") == "error" and d.get("code") in
+                      ("joint_failed", "part_detached", "joint_capacity_zero", "joint_capacity_unknown", "joint_assembly_overload", "joint_fit_yield", "joint_coefficient_invalid", "joint_simulation_unstable", "scenario_incomplete", "load_case_not_exercised", "impact_speed_missing")]
+            joint_item.evidence = [ctx.scenario_evidence(scenario.id, summary, "joint_integrity",
+                                   {"pass": not errors, "measured":len(errors), "expected":0})]
+        else:
+            joint_item.message = "joint physics scenario has not run with the current assembly layer"
+        items.append(joint_item)
         for key, expected in (scenario.expect or {}).items():
             item = Item(f"scenario.{scenario.id}.{key}", "scenario_expectation", scenario.id, expected)
             check = _find_check(summary, key) if summary else None

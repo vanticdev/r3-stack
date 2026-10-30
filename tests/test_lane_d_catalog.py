@@ -168,6 +168,5 @@ def test_readiness(tmp_path: Path) -> None:
     shutil.copytree(FIXTURE, root)
     project = Project.load(root)
     assert precheck(project, "pcb").diagnostics[0].code == "not_applicable"
-    sim = precheck(project, "sim").diagnostics[0]
-    assert sim.code == "not_configured" and "scenarios" in sim.message
+    assert precheck(project, "sim") is None  # passive robots inherit mandatory mechanical scenarios
     assert precheck(project, "electrical") is None and precheck(project, "wiring") is None

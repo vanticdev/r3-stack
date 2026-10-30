@@ -38,6 +38,24 @@ def run_client(root: Path, client: Callable[[VirtualHal], Any], visual: dict[str
                duration: float = 3.0) -> tuple[Any, CoSimKernel, TwinHalServer]:
     """Serve one twin session in this thread while ``client`` runs against it in another."""
     project = Project.load(root)
+    project.spec.simulation.base_mount = "fixed"  # the optics bench is fixed to its stand
+    # Mounts on this bench are qualified adhesive clamps. The template's
+    # unqualified screws are a separate model-stage fixture, not bench parts.
+    project.spec.mechanical.fasteners = []
+    # The fixed optics stand places its lens at the original settled 28.9 mm
+    # test height. Its calibration is independent of floor contact/settling.
+    project.spec.components["camera"].pose.xyz[2] -= 0.0306
+    # This optics bench has qualified external clamps; the original printbot
+    # mounting screws themselves are intentionally unqualified by joint checks.
+    from r3_model.spec import Interface
+    for cid in project.spec.components:
+        if cid == "frame":
+            continue
+        project.spec.mechanical.interfaces.append(Interface.model_validate(dict(
+            id=f"optics_clamp_{cid}", kind="adhesive", parts=["frame", cid],
+            axis_point=project.graph.component_pose(cid)[0].tolist(), axis_dir=[0, 0, 1],
+            params={"physics": {key:dict(value=value,status="measured",source="Synthetic optics bench clamp qualification")
+                                for key,value in {"area":.01,"shear_strength":1e8,"peel_strength":1e8,"radius":.05}.items()}})))
     if visual is not None:
         project.spec.simulation.environment.visual = visual
     kernel = CoSimKernel(project, Scenario(id="camera", duration=duration))

@@ -76,7 +76,7 @@ const METRIC_GROUPS: { title: string; keys: string[] }[] = [
   { title: "Run", keys: ["sim_time_s", "wall_time_s", "realtime_factor", "radio_backend"] },
 ];
 const METRIC_LABEL: Record<string, string> = {
-  top_speed_mps: "Top speed", distance_m: "Distance", vehicle_mass_kg: "Vehicle mass", min_battery_voltage_v: "Lowest battery voltage",
+  top_speed_mps: "Top speed", distance_m: "Distance", vehicle_mass_kg: "Robot mass", min_battery_voltage_v: "Lowest battery voltage",
   final_soc: "Charge at the end", energy_wh: "Energy used", peak_battery_current_a: "Peak battery current", peak_motor_current_a: "Peak motor current",
   min_rail_5v: "Lowest 5 V rail", brownouts: "Brownouts", max_tx_distance_m: "Farthest from transmitter", min_rssi_dbm: "Weakest signal",
   link_lost: "Link lost at", link_margin_at_range_requirement_db: "Link margin at required range", packets_ok: "Packets received", packets_lost: "Packets lost",
@@ -136,6 +136,40 @@ function ClipPlayer({ url, playback, duration }: { url: string; playback: Playba
   return <video ref={video} src={url} muted playsInline preload="metadata" controls={false} style={{ width: "100%", borderRadius: 6, background: "#000" }} />;
 }
 
+export interface JointFailureEvent {
+  t: number;
+  event: "joint_failed" | "part_detached" | "joint_capacity_unknown";
+  joint: string;
+  message: string;
+  load: number | null;
+  capacity: number | null;
+}
+
+export function jointFailures(events: unknown[] | undefined): JointFailureEvent[] {
+  return (events ?? []).filter((e): e is JointFailureEvent => {
+    if (!e || typeof e !== "object") return false;
+    const v = e as Record<string, unknown>;
+    const known = (v.event === "joint_failed" || v.event === "part_detached") && typeof v.load === "number" && typeof v.capacity === "number";
+    const unknown = v.event === "joint_capacity_unknown" && v.load === null && v.capacity === null;
+    return (known || unknown) && typeof v.t === "number" && typeof v.joint === "string" && typeof v.message === "string";
+  });
+}
+
+export function JointFailures({ events, t, seek }: { events: unknown[] | undefined; t: number; seek: (t: number) => void }) {
+  const failures = jointFailures(events);
+  if (!failures.length) return null;
+  return <Card title="Joint integrity" subtitle="Release blocked · select an event to replay">
+    {failures.some(e => e.event === "joint_capacity_unknown") && <p>Capacity data is incomplete. Recorded motion is unqualified and cannot establish actual joint strength.</p>}
+    <div className="check-list" data-testid="joint-failures">
+      {failures.map((e, i) => <CheckRow key={`${e.joint}-${i}`} outcome="failed" title={e.joint}
+        result={e.event === "joint_capacity_unknown" ? "Missing data" : e.t <= t ? "Released" : "Upcoming"}
+        action={<button className="small ghost" onClick={() => seek(e.t)}>t = {e.t.toFixed(3)} s</button>}>
+        <p>{e.message}</p>
+      </CheckRow>)}
+    </div>
+  </Card>;
+}
+
 function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; response: ScenarioResponse; item: ScenarioListItem; onRun: () => void; busy: boolean }) {
   const { data } = useRobotScene(pid);
   const recording = response.recording;
@@ -157,12 +191,15 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
   const passed = checks.filter((c) => c.pass).length;
   const failed = checks.length - passed;
   const name = partLabel(item.id);
+  const integrityEvents = jointFailures(recording?.events);
+  const released = integrityEvents.filter(e => e.event !== "joint_capacity_unknown").length;
+  const unknown = integrityEvents.filter(e => e.event === "joint_capacity_unknown").length;
 
   return (
     <div className="stack" style={{ gap: 16 }}>
       <div className="readiness">
         <div className="summary-line">
-          <span className="lead">{last?.stale ? "Previous run: " : ""}{failed ? `${plural(failed, "check")} failed` : `${plural(passed, "check")} passed`}{failed && passed ? `, ${passed} passed` : ""}</span>
+          <span className="lead">{last?.stale ? "Previous run: " : ""}{unknown ? `${plural(unknown, "connection")} missing capacity data` : released ? `${plural(released, "connection failure")}` : failed ? `${plural(failed, "check")} failed` : `${plural(passed, "check")} passed`}{failed && passed ? `, ${passed} passed` : ""}</span>
           {last?.stale && <span className="tag outdated"><Icon name="clock" size={11} />Inputs changed since this run</span>}
           <Markdown inline className="secondary">{item.description}</Markdown>
           <span className="spacer" style={{ flex: 1 }} />
@@ -180,7 +217,7 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
       <div className="grid side" style={{ alignItems: "start" }}>
         <div className="stack" style={{ gap: 16 }}>
           {has3d ? (
-            <Card flush title="Playback" actions={<label className="check small"><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />Follow vehicle</label>}>
+            <Card flush title="Playback" actions={<label className="check small"><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />Follow robot</label>}>
               {last?.stale && (
                 // Playback draws today's CAD at the recorded body poses, but the wires are the recorded cable
                 // simulation, so an old run shows old routes and slack over the current layout.
@@ -212,6 +249,7 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
           )}
         </div>
         <div className="stack" style={{ gap: 16 }}>
+          <JointFailures events={recording?.events} t={playback.t} seek={seek} />
           <Card title="Checks">
             <div className="check-list" data-testid="sim-checks">
               {checks.map((c) => {

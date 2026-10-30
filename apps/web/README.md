@@ -168,6 +168,8 @@ e2e/            Playwright smoke test;  tests/  Node loader test used by tests/t
   partial streaming input. `e2e/markdown.spec.ts` intercepts the Agent API with a deterministic
   transcript and saves `test-results/screenshots/agent-markdown-{1600,390}-{light,dark}.png`.
 - **E2E:** `npm run test:e2e`. It builds the app and serves it with `vite preview` on the mock API.
+  Chromium runs in modern headless mode, using Metal on macOS and SwiftShader on Linux/server hosts.
+  Set `R3_E2E_ANGLE=swiftshader` or another supported ANGLE backend to override it.
   It loads every page at 1600 px and 390 px in the dark and light themes and checks for console
   errors. It also drives the status summary and the mobile drawer, the create dialog, the 3D parts
   list, layers, joints and exploded view, the diagnostic selection, locating a wiring failure and

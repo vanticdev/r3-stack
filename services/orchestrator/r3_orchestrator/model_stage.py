@@ -906,6 +906,14 @@ def _plot_layout(path: Any, geometry: dict[str, Any], overlaps: list[dict[str, A
 def run(project: Project) -> StageResult:
     start = time.time()
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
+    from r3_model.connections import compile_connections
+
+    connections = compile_connections(project)
+    result.extend(connections.diagnostics)
+    result.metrics["connections"] = len(connections.connections)
+    result.artifact("model/connections.json", "json", "Sourced assembly connection capacities and explicit estimates")
+    project.build_dir("model").joinpath("connections.json").write_text(json.dumps(
+        {"connections": [c.as_dict() for c in connections.connections], "estimated": connections.estimated}, indent=2))
     checker = ModelChecker(project, result)
     checker.check_connectors()
     checker.check_bindings()

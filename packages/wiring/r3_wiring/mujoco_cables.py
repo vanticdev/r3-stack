@@ -300,14 +300,26 @@ def _damping(bundle_ei: float, mass_per_m: float, radius: float, length: float, 
 
 def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet | None = None, *,
                 segment_length: float = SEGMENT_LENGTH, timestep: float | None = None,
-                margin: float = CLEARANCE_MARGIN) -> CablePlan:
+                margin: float = CLEARANCE_MARGIN, individual_parts: bool = False) -> CablePlan:
     """Bundles, spans and part collision geometry for every routed wire."""
     obstacles = obstacles or build_obstacles(project)[0]
     kin = obstacles.kinematics
+    if individual_parts:
+        # Only the dynamic twin requests this: static routing retains its
+        # articulated kinematic tree, but cable pins follow their real part.
+        import copy
+        kin = copy.copy(kin)
+        kin.body_of = lambda component: component if component in project.spec.components else ROOT
+        from dataclasses import replace
+        obstacles = replace(obstacles, kinematics=kin,
+                            obstacles=[replace(o, body=o.component) for o in obstacles.obstacles])
     catalog = project.catalog
     dt = float(timestep if timestep is not None else project.spec.simulation.timestep)
     wires = _wire_index(project)
     plan = CablePlan([], part_geoms(project, obstacles), margin, dt)
+    if individual_parts:
+        for part in plan.parts:
+            part.body = part.component
     connector_file = project.root / "build" / "connectors" / "connectors.json"
     display_wires = json.loads(connector_file.read_text()).get("wires", {}) if connector_file.exists() else {}
 
@@ -490,7 +502,9 @@ def _split(piece: Any, depth: int, out: list[tuple[np.ndarray, bool]]) -> None:
             _split(half, depth + 1, out)
 
 
-@functools.lru_cache(maxsize=64)
+# Both the rigid-part builder and cable builder request the same assembly.
+# Keep a bounded working set large enough to reuse ordinary multipart models.
+@functools.lru_cache(maxsize=256)
 def _convex_pieces_cached(key: str, vertices_bytes: bytes, faces_bytes: bytes) -> tuple[tuple[np.ndarray, ...], int]:
     vertices = np.frombuffer(vertices_bytes, dtype=float).reshape(-1, 3)
     faces = np.frombuffer(faces_bytes, dtype=np.int64).reshape(-1, 3)
