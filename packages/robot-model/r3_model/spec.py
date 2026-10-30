@@ -214,6 +214,14 @@ class HarnessConnector(_Model):
     type: str
     mates: str | None = Field(default=None, description="<component|harness>.<connector> this plugs into.")
     position: Vector | None = Field(default=None, description="Free-end position when not mated (robot frame).")
+    direction: Vector | None = Field(default=None, min_length=3, max_length=3,
+                                    description="Wire exit axis for a floating in-line connector half (robot frame).")
+
+    @model_validator(mode="after")
+    def _exit_axis(self) -> "HarnessConnector":
+        if self.direction is not None and sum(v * v for v in self.direction) < 1e-12:
+            raise ValueError("connector direction must be non-zero")
+        return self
 
 
 class Splice(_Model):

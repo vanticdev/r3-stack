@@ -637,6 +637,15 @@ class HarnessRouter:
                 distance = np.linalg.norm(self.grid.centers() - hint, axis=1)
                 distance[~np.isfinite(total)] = np.inf
                 order = np.argsort(distance)
+            requested_axes = [sign * np.asarray(conn.direction, float)
+                              for sign, conn in ((-1, harnesses[ha].connectors[ca]),
+                                                 (1, harnesses[hb].connectors[cb])) if conn.direction is not None]
+            requested_axes = [axis / np.linalg.norm(axis) for axis in requested_axes]
+            if len(requested_axes) == 2 and float(requested_axes[0] @ requested_axes[1]) < 1 - 1e-6:
+                self.diagnostics.append(Diagnostic.error(
+                    "floating_mate_axis_conflict", f"{ref_a} / {ref_b}: mating halves need opposite wire exit axes",
+                    subjects=[ref_a, ref_b]))
+                continue
             chosen = fallback = None
             # Cheapest first. The first 400 voxels (a ~2 cm cube around the optimum) are searched for a
             # lead-clear placement; if no pair body fits there at all, the search continues outward.
@@ -647,7 +656,7 @@ class HarnessRouter:
                     break
                 center = self.grid.center(int(voxel))
                 pa, pb = self._walk(preds_a, int(voxel), 7), self._walk(preds_b, int(voxel), 7)
-                axis = pb - pa
+                axis = requested_axes[0].copy() if requested_axes else pb - pa
                 if np.linalg.norm(axis) < 1e-9:
                     continue
                 axis /= np.linalg.norm(axis)
@@ -678,9 +687,10 @@ class HarnessRouter:
                 node.direction = sign * axis
                 node.exit = center + sign * axis * (length / 2)
                 node.body_length = float(np.linalg.norm(node.exit - face))
-                node.lead_length = 0.0
-                node.lead_end = node.exit.copy()
                 node.frame = frame
+                gauges = [w.awg for w in harnesses[node.harness].wires
+                          if any(ref.startswith(node.name + ".") for ref in (w.from_, w.to))]
+                self._lead(node, gauges)
             placed.append(FloatingMate(ref_a, ref_b, na.connector_type, nb.connector_type, center, axis, length, width, cost))
         return placed
 
