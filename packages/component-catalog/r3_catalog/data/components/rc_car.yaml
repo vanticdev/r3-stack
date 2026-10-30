@@ -1182,7 +1182,7 @@ components:
       and runs aft below the linkage. The 5 x 8 mm web left beside the pocket carries
       the ear load (~40 N per ear at servo stall: ~25 MPa bending). Base threads 5 mm
       (M3 x 8 through the 3 mm plate engages 5 mm).
-  
+
       '
     mechanical:
       shape: custom
@@ -1398,23 +1398,23 @@ components:
   - id: antenna-mast-petg
     kind: structure
     cad_name: Antenna mast
-    name: Antenna mast, PETG, 24 mm flange and 6/4 mm tube, 80 mm
+    name: Antenna mast, PETG, 24 mm flange and 6/4 mm tube, 110 mm
     description: Frame at the flange bottom center; mounting holes come from its fasteners.
     mechanical:
       shape: custom
-      size: [24 mm, 24 mm, 83 mm]
-      mass: 0.004
+      size: [24 mm, 24 mm, 113 mm]
+      mass: 0.0046
       material: PETG
       density: 1270
       color: "#2c6e9e"
       fabricated: true
       solids:
         - {kind: cylinder, name: flange, position: [0, 0, 0], axis: [0, 0, 1], diameter: 24 mm, length: 3 mm}
-        - {kind: cylinder, name: tube, position: [0, 0, 3 mm], axis: [0, 0, 1], diameter: 6 mm, length: 80 mm}
-        - {kind: cylinder, op: remove, name: coax bore, position: [0, 0, 0], axis: [0, 0, 1], diameter: 4 mm, length: 83 mm}
+        - {kind: cylinder, name: tube, position: [0, 0, 3 mm], axis: [0, 0, 1], diameter: 6 mm, length: 110 mm}
+        - {kind: cylinder, op: remove, name: coax bore, position: [0, 0, 0], axis: [0, 0, 1], diameter: 4 mm, length: 113 mm}
     interfaces:
       flange: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
-      antenna_seat: {kind: adhesive_pad, origin: [0, 0, 83 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      antenna_seat: {kind: adhesive_pad, origin: [0, 0, 113 mm], z: [0, 0, 1], x: [1, 0, 0]}
   - id: elrs-t-antenna
     kind: antenna
     cad_name: ELRS T-antenna
