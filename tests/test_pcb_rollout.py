@@ -80,13 +80,30 @@ def test_isolated_esc_lead_carries_no_motor_return(project):
     system.close()
 
 
-def test_model_stage_understands_the_arbiter_and_failsafe_chain(project):
+def test_model_stage_understands_the_arbiter_and_failsafe_chain(bench_fresh):
+    import yaml
+    from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
+    from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
+    from pulled_fixture import box, instrumentation_pull, revise_project
     from r3_orchestrator import model_stage
 
+    source = bench_fresh / "robot.yaml"
+    data = yaml.safe_load(source.read_text())
+    # Install the battery clear of the upright pivot post before publication.
+    data["components"]["battery"]["pose"]["xyz"] = [0, -.1, .03]
+    source.write_text(yaml.safe_dump(data, sort_keys=False))
+    project = instrumentation_pull(bench_fresh)
+    # The native pivot is a 10 mm post rooted in the base with a 10.2 mm
+    # through-bore in the arm: 0.1 mm radial clearance and 12 mm engagement.
+    post = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(-100, -100, 6), gp_Dir(0, 0, 1)), 5, 236).Shape()
+    drill = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, -1), gp_Dir(0, 0, 1)), 5.1, 14).Shape()
+    project = revise_project(project, shapes={
+        "base": BRepAlgoAPI_Fuse(box((360, 320, 6)), post).Shape(),
+        "arm": BRepAlgoAPI_Cut(box((80, 12, 12)), drill).Shape()})
     result = model_stage.run(project)
-    # Electrical/binding/failsafe checks; static interference needs the CAD B-rep (a source-only copy has no CAD export,
-    # so the stage falls back to coarse envelopes) and is covered by the CAD fit tests.
-    errors = [d for d in result.diagnostics if d.severity.value == "error" and d.code != "component_interference"]
+    # The electrical checks and native shaft/bore verification must both pass.
+    errors = [d for d in result.diagnostics if d.severity.value == "error"]
     assert errors == [], [d.message for d in errors]
     chain = next(d for d in result.diagnostics if d.code == "failsafe_chain")
     timeouts = list(chain.data.values())
@@ -176,7 +193,8 @@ def test_unpowered_arbiter_outputs_no_pulses_and_reboots_in_failsafe():
 
 
 def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(bench_fresh):
-    project = Project.load(bench_fresh)  # no stale build/wiring cables in the kernel
+    from pulled_fixture import instrumentation_pull
+    project = instrumentation_pull(bench_fresh)  # fresh native bodies, no stale routed cables
     scenario = next(s for s in project.spec.simulation.scenarios if s.id == "pi_hang")
     kernel = CoSimKernel(project, scenario)
     assert kernel.freeze_at == pytest.approx(15.0)
