@@ -13,7 +13,7 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
-from api_helpers import copy_bench, write_sim_scenario, write_stage_outputs  # noqa: E402
+from api_helpers import copy_bench, write_sim_scenario, write_stage_outputs, write_bench_pull  # noqa: E402
 from r3_orchestrator import api  # noqa: E402
 from r3_orchestrator.api.agents import AgentManager  # noqa: E402
 from r3_orchestrator.api.server import create_app  # noqa: E402
@@ -34,6 +34,7 @@ def built_template(tmp_path_factory):
     data["simulation"]["scenarios"].append({"id": "low_battery", "duration": "1 s", "expect": {"min_cell_voltage_v": 3.0}})
     (root / "robot.yaml").write_text("# Robot frame: synthetic instrument fixture\n" + yaml.safe_dump(data, sort_keys=False))
     (root / "r3.lock.yaml").write_text(yaml.safe_dump({"cad": {"provider": "onshape", "document_id": "d1", "workspace_id": "w1", "element_id": "e1", "url": "https://cad.onshape.com/documents/d1/w/w1/e/e1"}}))
+    write_bench_pull(root)
     api.validate(root, ["assembly", "model"])
     write_stage_outputs(root)
     write_sim_scenario(root, fingerprint=api.load_project(root).fingerprint())
@@ -117,7 +118,7 @@ def test_project_detail_with_release_matrix(client):
     gate = body["release"]
     items = {i["id"]: i for i in gate["items"]}
     assert gate["fabrication_ready"] is False
-    assert items["requirement.max_mass"]["status"] == "estimated"  # catalog masses are mostly estimates
+    assert items["requirement.max_mass"]["status"] == "verified"  # explicit pulled masses
     assert items["scenario.full_throttle.min_top_speed_mps"]["status"] == "failed"
     assert items["scenario.full_throttle.brownouts"]["status"] == "verified"
     assert items["scenario.low_battery.min_cell_voltage_v"]["status"] == "not_run"
@@ -197,9 +198,18 @@ def test_model(client):
 
 def test_cad(client):
     body = client.get(f"/api/projects/{PID}/cad").json()
-    assert body["meshes"]["base"] == f"/api/projects/{PID}/artifacts/cad/meshes/base.stl"
-    assert body["onshape"]["part_studio"] == "https://cad.onshape.com/documents/d1/w/w1/e/e1"
-    assert client.get(body["meshes"]["base"]).text.startswith("solid base")
+    import io
+    import trimesh
+
+    assert body["authority"]["ready"] is True
+    assert body["cad_model"]["source"] == {"provider": "pulled", "document_id": "synthetic-document", "version_id": "synthetic-version"}
+    assert body["meshes"]["base"].startswith(f"/api/projects/{PID}/artifacts/cad/pulled-meshes/")
+    response = client.get(body["meshes"]["base"])
+    assert response.status_code == 200
+    mesh = trimesh.load_mesh(io.BytesIO(response.content), file_type="stl")
+    assert mesh.volume == pytest.approx(0.004 ** 3, rel=1e-5)
+    # The stale generated cad/meshes/base.stl fixture cannot override the pull.
+    assert response.content != b"solid base\nendsolid base\n"
 
 
 def test_wiring(client):

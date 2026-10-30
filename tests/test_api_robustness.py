@@ -245,3 +245,24 @@ def test_reload_flags_are_exclusive_and_serve_keeps_its_signature(uvicorn_calls,
     server.serve("127.0.0.1", 8400, [str(tmp_path)], str(tmp_path / "dist"))  # positional, as existing callers use it
     (args, kwargs), = uvicorn_calls
     assert isinstance(args[0], FastAPI) and kwargs == {"host": "127.0.0.1", "port": 8400, "log_level": "info"}
+
+
+def test_cached_views_recheck_native_authority_and_never_use_stale_generated_cad(client, projects):
+    from api_helpers import write_bench_pull, write_stage_outputs
+
+    root = projects / PID
+    write_stage_outputs(root)  # Legacy generated CAD exists, but cannot establish authority.
+    missing = client.get(f"/api/projects/{PID}/model").json()
+    assert missing["graph"] is None and missing["compiled"] is False
+    assert client.get(f"/api/projects/{PID}/cad").json()["authority"]["code"] == "cad_pull_missing"
+
+    write_bench_pull(root)
+    ready = client.get(f"/api/projects/{PID}/model").json()
+    assert ready["compiled"] is True
+    assert all(component["shape"] == "mesh" for component in ready["graph"]["components"].values())
+    # Rechecking a cached Project must notice the missing immutable manifest.
+    (root / "cad/pulled/pull.json").unlink()
+    missing_again = client.get(f"/api/projects/{PID}/model").json()
+    assert missing_again["graph"] is None and missing_again["assembly"] is None
+    cad = client.get(f"/api/projects/{PID}/cad").json()
+    assert cad["authority"]["code"] == "cad_pull_missing" and cad["meshes"] == {}

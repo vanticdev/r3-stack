@@ -10,6 +10,8 @@ from typing import Any
 
 import numpy as np
 
+from orchestrator_helpers import write_bench_pull
+
 ROOT = Path(__file__).resolve().parents[1]
 BENCH = ROOT / "tests" / "fixtures" / "bench"
 TESTS = Path(__file__).resolve().parent

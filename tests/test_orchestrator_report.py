@@ -17,7 +17,7 @@ WEB_TEST = ROOT / "apps" / "web" / "tests" / "loader.test.mjs"
 
 @pytest.fixture
 def built(tmp_path):
-    root = make_project(tmp_path)
+    root = make_project(tmp_path, with_pull=True)
     # A scenario result and an extra plot, as the sim stage would write them.
     scenario = root / "build" / "sim" / "full_throttle"
     scenario.mkdir(parents=True)
@@ -43,7 +43,7 @@ def test_summary_json(built):
 
 def test_index_html_is_self_contained(built):
     html = (built / "build" / "report" / "index.html").read_text()
-    assert html.startswith("<!doctype html>") and "component_interference" in html
+    assert html.startswith("<!doctype html>") and "cad_interference" in html
     assert "data:image/png;base64," in html  # layout.png embedded
     assert "full_throttle" in html and "Assumptions" in html
     assert "<script" not in html

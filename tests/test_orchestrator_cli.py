@@ -21,7 +21,7 @@ def r3(capsys, *argv: str) -> tuple[int, dict]:
 
 @pytest.fixture
 def project(tmp_path: Path) -> Path:
-    return make_project(tmp_path)
+    return make_project(tmp_path, with_pull=True)
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def clean_project(tmp_path: Path) -> Path:
         spec["electrical"] = {}
         spec["software"] = {}
         spec["pcb"] = {}
-    return make_project(tmp_path, fix, name="clean")
+    return make_project(tmp_path, fix, name="clean", with_pull=True)
 
 
 def test_validate_model_json(capsys, project):
@@ -113,7 +113,9 @@ def test_status_and_diagnose(capsys, project):
     subjects = {g["subject"] for g in diagnosis["subjects"]}
     assert "block_a" in subjects
     group = next(g for g in diagnosis["subjects"] if g["subject"] == "block_a")
-    assert group["diagnostics"][0]["hint"] and group["diagnostics"][0]["also"] == ["block_b"]
+    assert group["diagnostics"][0]["code"] == "cad_interference"
+    assert group["diagnostics"][0]["also"] == ["block_b"]
+    assert group["diagnostics"][0]["data"]["intersection_volume"] > 0
     # Human output is grouped by subject too.
     assert cli.main(["diagnose", "-C", str(project)]) == cli.EXIT_ERRORS
     assert "block_a: 1 errors" in capsys.readouterr().out
@@ -178,3 +180,14 @@ def test_python_dash_m_entrypoint(tmp_path):
                          env={"PYTHONPATH": env_path, "PATH": "/usr/bin:/bin"}, check=True)
     for command in ("validate", "cad", "pcb", "wiring", "sim", "report", "status", "diagnose", "deploy", "create"):
         assert command in out.stdout
+
+
+@pytest.mark.parametrize("stage", ["assembly", "model"])
+def test_geometry_stages_require_a_pull(capsys, tmp_path, stage):
+    root = make_project(tmp_path)
+    code, payload = r3(capsys, "validate", "--stage", stage, "-C", str(root), "--json")
+    assert code == cli.EXIT_ERRORS
+    diagnostic, = payload["diagnostics"]
+    assert diagnostic["code"] == "cad_pull_missing" and diagnostic["stage"] == stage
+    assert not (root / "build/model/graph.json").exists()
+    assert not (root / "build/model/assembly.json").exists()
