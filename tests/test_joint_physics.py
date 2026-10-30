@@ -23,6 +23,7 @@ from r3_sim.load_cases import FACES, LoadCase, all_scenarios, configure_model
 from r3_sim.assembly import build_assembly_model
 from r3_sim.dynamics import RobotDynamics
 from r3_sim.joints import loosen_preload
+from pulled_fixture import box, cylinder, publish_project, fixture_attachments, screw_coupons, revise_project
 
 
 def fixture_project(tmp_path: Path, connection: str = "screw", nut: bool = True) -> Project:
@@ -102,7 +103,11 @@ def fixture_project(tmp_path: Path, connection: str = "screw", nut: bool = True)
             )
         )
     )
-    return Project.load(tmp_path)
+    shapes = {name: box((60, 60, 5)) for name in ("base", "part")}
+    masses = dict(base=.1, part=.1)
+    screw_coupons(tmp_path, shapes, masses)
+    project = Project.load(tmp_path)
+    return publish_project(project, shapes, mass=masses, attachments=fixture_attachments(project))
 
 
 def vehicle_for(p: Project, case: str) -> RobotDynamics:
@@ -334,7 +339,14 @@ def drivetrain_project(tmp_path: Path) -> Project:
     import shutil
     source = Path(__file__).parent / "fixtures/drive_bench"
     shutil.copytree(source, tmp_path, dirs_exist_ok=True, ignore=shutil.ignore_patterns("build", "__pycache__"))
-    return Project.load(tmp_path)
+    project = Project.load(tmp_path)
+    shapes = {"base": box((240, 200, 4)), "battery": box((140, 47, 25)),
+              "motor": cylinder(18, 50, (1, 0, 0)), "esc": box((40, 30, 20)),
+              "controller": box((20, 20, 10)),
+              **{name: cylinder(70, 25, (0, 1, 0)) for name in ("roller_left", "roller_right", "roller_idler")}}
+    masses = dict(base=1., battery=.3, motor=.16, esc=.06, controller=.02,
+                  roller_left=.04, roller_right=.04, roller_idler=.04)
+    return publish_project(project, shapes, mass=masses, attachments=fixture_attachments(project))
 
 
 def arm_project(tmp_path: Path, nut: bool = True) -> Project:
@@ -446,7 +458,12 @@ def arm_project(tmp_path: Path, nut: bool = True) -> Project:
         },
     }
     tmp_path.joinpath("robot.yaml").write_text(yaml.safe_dump(spec))
-    return Project.load(tmp_path)
+    shapes = {"foundation": box((80, 60, 5)), "mount": box((60, 40, 5)),
+              "upper": box((100, 20, 10)), "forearm": box((100, 20, 10))}
+    masses = dict(foundation=.2, mount=.1, upper=.05, forearm=.05)
+    screw_coupons(tmp_path, shapes, masses)
+    project = Project.load(tmp_path)
+    return publish_project(project, shapes, mass=masses, attachments=fixture_attachments(project))
 
 
 @pytest.mark.parametrize("nut", [True, False])
@@ -482,12 +499,12 @@ def test_stationary_wall_impact_skips_with_diagnostic_and_drop_releases_base(tmp
 
     # A non-vehicle tower higher than the old finite wall still hits it. Native
     # contact forces, rather than a geometry-type assertion, prove the fixture.
-    mobile = fixture_project(tmp_path / "tower")
+    mobile = fixture_project(tmp_path / "tower", connection="resting")
     mobile.spec.components.pop("part")
     mobile.spec.mechanical.fasteners = []
     mobile.spec.robot.mobility = "mobile"
     mobile.spec.requirements.impact_speed = 0.2
-    mobile.catalog.component("plate").mechanical.size = [0.1, 0.1, 6.0]
+    mobile = revise_project(mobile, shapes={"base": box((100, 100, 6000))})
     case = next(s for s in all_scenarios(mobile) if s.id == "wall_impact")
     model = build_assembly_model(mobile)
     configure_model(model, case, mobile)
@@ -503,20 +520,15 @@ def test_stationary_wall_impact_skips_with_diagnostic_and_drop_releases_base(tmp
 @pytest.mark.parametrize("face,detaches", [("upright", False), ("inverted", True)])
 def test_unretained_payload_in_a_real_pocket(tmp_path, face, detaches):
     p = fixture_project(tmp_path, connection="resting")
-    from r3_catalog.schema import Solid
-    base = p.catalog.component("plate").mechanical
-    # Four walls are part of the same pocket body. The payload has clearance,
-    # a supporting floor, and no lid, retainer or equality constraint.
-    solids = [dict(kind="box", name="floor", position=[0,0,.0025], size=[.08,.08,.005])]
+    from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse
+    # Four real walls, a supporting floor, clearance, and no lid or retainer.
+    pocket = box((80, 80, 5))
     for axis in range(2):
-        for sign in (-1,1):
-            center=[0.,0.,.015];center[axis]=sign*.034
-            size=[.068,.068,.02];size[axis]=.004
-            solids.append(dict(kind="box",name=f"wall_{axis}_{sign}",position=center,size=size))
-    # Give the pocket a distinct catalog entry so the payload remains a plate.
-    pocket=p.catalog.component("plate").model_copy(deep=True)
-    pocket.id="pocket";pocket.mechanical.solids=[Solid.model_validate(v) for v in solids]
-    p.catalog.components["pocket"]=pocket;p.spec.components["base"].type="pocket"
+        for sign in (-1, 1):
+            center = [0., 0., 5.]; center[axis] = sign * 34
+            size = [68., 68., 20.]; size[axis] = 4.
+            pocket = BRepAlgoAPI_Fuse(pocket, box(size, center)).Shape()
+    p = revise_project(p, shapes={"base": pocket})
     v=vehicle_for(p,"gravity_"+face)
     assert not v.vm.joint_bindings
     run_steps(v,600)
@@ -528,9 +540,11 @@ def test_moving_carrier_preserves_part_mass_com_and_inertia(tmp_path):
     vm=build_assembly_model(p)
     m=mujoco.MjModel.from_xml_string(vm.xml);d=mujoco.MjData(m)
     mujoco.mj_forward(m,d)
-    from r3_sim.assembly import catalog_mass_properties
+    from r3_model.pulled_view import cad_view
+    from r3_sim.assembly import cad_mass_properties
+    parts = cad_view(p, mass_required=True)["parts"]
     for cid in vm.moving_joints:
-        part=catalog_mass_properties(p,cid)
+        part=cad_mass_properties(parts[cid])
         ids=[m.body(cid).id,m.body("mount:"+cid).id]
         masses=m.body_mass[ids]
         com=np.average(d.xipos[ids],axis=0,weights=masses)
@@ -552,11 +566,10 @@ def test_anonymous_strength_is_a_structured_blocking_error(tmp_path):
 
 def test_unretained_cad_subpart_cannot_escape_detachment_checks(tmp_path):
     p=fixture_project(tmp_path,connection="resting")
-    # A separate CAD part cannot inherit its owner's rigidity without a join.
-    cad={"parts":{"loose_coupon":{"owner":"base","mass":.01,"com":[0,0,.05],
-          "inertia":[1e-7,1e-7,1e-7,0,0,0],
-          "bbox_min":[-.005,-.005,.045],"bbox_max":[.005,.005,.055]}}}
-    (p.build_dir("cad")/"cad_model.json").write_text(json.dumps(cad))
+    # A separately declared native part cannot inherit rigidity without a mate.
+    from r3_model.spec import ComponentInstance, Pose
+    p.spec.components["loose_coupon"] = ComponentInstance(type="plate", pose=Pose(xyz=[0,0,.045]))
+    p = revise_project(p, shapes={"loose_coupon": box((10,10,10))})
     v=vehicle_for(p,"gravity_upright")
     assert "loose_coupon" in v.vm.bodies
     run_steps(v,100)
@@ -575,7 +588,7 @@ def test_missing_fastener_strength_never_inherits_anonymous_defaults(tmp_path):
 
 def test_unknown_material_is_blocking_missing_data_and_not_a_zero_strength_release(tmp_path):
     p = fixture_project(tmp_path)
-    p.catalog.component("plate").mechanical.material = "Unqualified coupon material"
+    p = revise_project(p, materials={"base": "Unqualified coupon material", "part": "Unqualified coupon material"})
     cm = compile_connections(p)
     assert {d.code for d in cm.diagnostics if d.severity.value == "error"} == {"joint_capacity_unknown"}
     assert all(c.missing_data and c.as_dict()["axial"] is None for c in cm.connections)
@@ -622,7 +635,7 @@ def test_missing_fit_geometry_is_unknown_rather_than_zero_strength(tmp_path, kin
 
 def test_slender_links_keep_positive_inertia_without_changing_assembly_mass(tmp_path):
     p=arm_project(tmp_path)
-    p.catalog.component("arm-link").mechanical.size=[1,.0003,.0003]
+    p = revise_project(p, shapes={name: box((1000,.3,.3)) for name in ("upper", "forearm")})
     vm=build_assembly_model(p)
     model=mujoco.MjModel.from_xml_string(vm.xml)
     assert np.all(model.body_inertia[model.body_mass > 0] > 0)
