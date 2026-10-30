@@ -14,7 +14,7 @@ from r3_catalog.schema import ConnectorInstance, ConnectorPin
 from r3_catalog.sites import SiteError, select_site
 from r3_connectors.connection_points import connection_points
 from r3_connectors.frames import Frame
-from r3_connectors.pins import component_connector_frame, mating_site_frame, pin_end
+from r3_connectors.pins import component_connector_frame, mating_site_frame, pin_end, instance_frame
 from r3_connectors.stage import ConnectorStage
 from r3_model.diagnostics import StageResult
 from r3_model.graph import RobotGraph, rpy_matrix
@@ -49,7 +49,29 @@ def make_project(tmp_path, catalog, connectors=None, *, direct_mates=None):
     (tmp_path / "robot.yaml").write_text(yaml.safe_dump(raw))
     project = Project(tmp_path, RobotSpec.model_validate(raw))
     project._catalog = catalog
+    publish_site_pull(project)
     return project
+
+
+def publish_site_pull(project, *, obstacle=None, hardware=False, floating_frame=None):
+    from connector_native_fixture import box, compound, placed, pull
+    from r3_model.pulled_view import apply_pulled
+    # The coordinate fixture deliberately lacks modeled individual contacts.
+    # A solid header housing is evidence of presence, never a verified pin map.
+    local = instance_frame(project.catalog.component("test-header-board").connectors["J"]).matrix()
+    shapes = {"board": compound([box((50,30,1.6), (0,0,-.8)), placed(box((52,5,6), (0,0,3)), local)])}
+    poses = {"board": Frame(rpy_matrix(project.spec.components["board"].pose.rpy),
+                             np.asarray(project.spec.components["board"].pose.xyz)).matrix()}
+    if obstacle is not None:
+        shapes["obstacle"] = box((10,20,20))
+        poses["obstacle"] = np.eye(4)
+        poses["obstacle"][:3,3] = obstacle
+    if hardware:
+        from connector_native_fixture import cable_coupons
+        cable_coupons(project, shapes, poses, floating_frame=floating_frame)
+    (project.root / "robot.yaml").write_text(yaml.safe_dump(project.spec.model_dump(mode="json", by_alias=True, exclude_none=True)))
+    model = pull(project.root, shapes, poses=poses)
+    apply_pulled(project, model)
 
 
 @pytest.mark.parametrize("length", range(1, 21))
@@ -131,6 +153,7 @@ def test_contacts_wire_exits_graph_and_stage_use_the_same_site(tmp_path, catalog
         assert np.linalg.norm(end.contact - contact) < 1e-6
         assert np.linalg.norm(end.position - (contact + .014 * board.z)) < 1e-6
         assert project.graph.connected(f"H:lead.B.{number}", f"C:board.PIN{target}")
+    publish_site_pull(project, hardware=True)
     stage = ConnectorStage(project, StageResult(stage="connectors"))
     stage.component_connectors()
     stage.harness_connectors()
@@ -152,7 +175,7 @@ def test_moving_component_moves_sites_and_wire_ends(tmp_path, catalog):
     before = connection_points(project)["connection_points"]
     pose = project.spec.components["board"].pose
     pose.xyz, pose.rpy = [.1, -.2, .3], [.3, -.4, .7]
-    project._graph = RobotGraph(project.spec, project.catalog)
+    publish_site_pull(project)
     rotation, offset = rpy_matrix(pose.rpy), np.asarray(pose.xyz)
     after = connection_points(project)["connection_points"]
     for old, new in zip(before, after):
@@ -174,17 +197,13 @@ def test_inventory_occupancy_and_access(tmp_path, catalog):
     assert points["dupont-1x1@8"]["blocked_by"][0]["by"] == "lead.B"
     assert points["dupont-1x1@1"]["status"] == "free"
     assert all(p["free_access_reach"] is None for p in points.values())  # only owning part exists
-    # Add a known collision envelope whose near face is 50 mm along this port's +x exit.
-    directory = project.build_dir("cad")
+    # Native obstacle near face is exactly 50 mm along this port's +x exit.
     p = np.asarray(used["origin"])
-    obstacle = project.spec.components["board"].model_copy(deep=True)
-    project.spec.components["obstacle"] = obstacle
-    (directory / "cad_model.json").write_text(json.dumps({"parts": {
-        "obstacle": {"bbox_min": (p + [.05, -.01, -.01]).tolist(), "bbox_max": (p + [.06, .01, .01]).tolist()}}}))
-    project._graph = RobotGraph(project.spec, project.catalog)
+    project.spec.components["obstacle"] = project.spec.components["board"].model_copy(deep=True)
+    publish_site_pull(project, obstacle=p + [.055,0,0])
     used = next(p for p in connection_points(project)["connection_points"] if p["id"] == used["id"])
     assert used["free_access_reach"] == pytest.approx(.05, abs=1e-9)
-    assert used["access_blocker"] == "obstacle" and used["access_geometry"] == "cad_aabb"
+    assert used["access_blocker"] == "obstacle" and used["access_geometry"] == "pulled_aabb"
 
 
 def test_bench_stage_writes_every_site(tmp_path):
@@ -193,7 +212,10 @@ def test_bench_stage_writes_every_site(tmp_path):
 
     source = Path(__file__).resolve().parents[1] / "tests/fixtures/bench"
     shutil.copytree(source, tmp_path, dirs_exist_ok=True, ignore=shutil.ignore_patterns("build", "__pycache__", "_vendor"))
-    project = Project.load(tmp_path)
+    from pulled_fixture import instrumentation_pull
+    project = instrumentation_pull(tmp_path)
+    from connector_native_fixture import add_cables_to_pull
+    add_cables_to_pull(project)
     result = run_stage(project, "connectors", render=False)
     assert not [d for d in result.diagnostics if d.code == "stage_crashed"]
     points = json.loads((tmp_path / "build/connectors/connection_points.json").read_text())["connection_points"]
@@ -206,6 +228,9 @@ def test_bench_stage_writes_every_site(tmp_path):
     assert next(p for p in pi if p["site"] == "full")["occupied_by"] == "controller.J_GPIO"
     assert all(p["status"] != "free" for p in pi)
     assert any(a.path == "connectors/connection_points.json" for a in result.artifacts)
+    scene = json.loads((tmp_path / "build/connectors/connectors.json").read_text())
+    assert all(entry.get("glb") is None for entry in scene["types"].values())
+    assert all(entry["source"] == "pulled" for entry in scene["components"].values())
 
 
 def test_mcp_filters_and_read_only_registration(tmp_path, catalog, monkeypatch):
@@ -250,6 +275,7 @@ def test_router_resolves_partial_site_and_each_conductor(tmp_path, catalog):
     from r3_wiring.router import HarnessRouter, RouterOptions
 
     project = make_project(tmp_path, catalog)
+    publish_site_pull(project, hardware=True)
     obstacles, _ = build_obstacles(project)
     router = HarnessRouter(project, obstacles, RouterOptions(voxel=.01, plan=False))
     node = router._resolve_nodes()["lead"]["B"]
@@ -286,17 +312,21 @@ def test_failed_direct_mate_reserves_neither_side(tmp_path, catalog):
     assert project.graph.occupied_sites["board.J"] == {"dupont-1x3@8": "lead.B"}
 
 
-def test_floating_pair_inventory_uses_authored_and_solved_centres(tmp_path, catalog):
+def test_floating_pair_inventory_uses_native_mating_frame(tmp_path, catalog):
     project = make_project(tmp_path, catalog, {"A": {"type": "xt60-male", "mates": "lead.B", "position": [.1, .2, .3]},
                                                "B": {"type": "xt60-female", "mates": "lead.A"}})
+    native = Frame.from_axes([.4,.5,.6], [0,1,0], [1,0,0])
+    publish_site_pull(project, hardware=True, floating_frame=native)
     points = [p for p in connection_points(project)["connection_points"] if p["component"] is None]
     assert len(points) == 1 and points[0]["pair"] == ["lead.A", "lead.B"]
-    assert points[0]["origin"] == [.1, .2, .3]
+    assert points[0]["origin"] == [.4,.5,.6] and points[0]["exit_direction"] == [1,0,0]
+    assert points[0]["placement"] == "pulled"
     directory = project.build_dir("wiring")
     (directory / "routing_detail.json").write_text(json.dumps({"nodes": {"lead.A": {
-        "frame": {"origin": [.4, .5, .6], "x": [0, 1, 0], "z": [1, 0, 0]}}}}))
+        "frame": {"origin": [.7,.8,.9], "x": [1,0,0], "z": [0,0,1]}}}}))
+    # A stale route cannot move a native cable part or its connection inventory.
     point = next(p for p in connection_points(project)["connection_points"] if p["component"] is None)
-    assert point["origin"] == [.4, .5, .6] and point["exit_direction"] == [1, 0, 0]
+    assert point["origin"] == [.4,.5,.6] and point["exit_direction"] == [1,0,0]
 
 
 @pytest.mark.parametrize("direction", [[0, 0, 1], [1, 0, 0], [.95, .31, 0]])

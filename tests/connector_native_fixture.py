@@ -64,7 +64,7 @@ def pull(root: Path, shapes: dict[str, Any], *, poses=None):
     return load_pulled(root)
 
 
-def cable_coupons(project, shapes, poses, *, floating_frame=None) -> None:
+def cable_coupons(project: Any, shapes: dict[str, Any], poses: dict[str, np.ndarray], *, floating_frame=None) -> None:
     """Declare simple native cable housings for frame/inventory tests only.
 
     These solid coupons intentionally have no contact recesses. Their geometry
@@ -98,7 +98,7 @@ def cable_coupons(project, shapes, poses, *, floating_frame=None) -> None:
     project.__dict__.pop("_graph", None)
 
 
-def add_cables_to_pull(project) -> None:
+def add_cables_to_pull(project: Any) -> None:
     """Add native cable coupons to an already explicit instrumentation pull."""
     import yaml
     from r3_model.pulled import load_pulled
