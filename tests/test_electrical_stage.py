@@ -1,5 +1,7 @@
 """Run the electrical stage on the reference bench and print its diagnostics."""
 
+from pulled_fixture import instrumentation_pull
+
 import json
 import shutil
 
@@ -14,7 +16,7 @@ pytestmark = pytest.mark.skipif(find_library() is None, reason="libngspice not i
 
 
 def _run_and_check(root, routed: bool):
-    project = Project.load(root)
+    project = instrumentation_pull(root)
     result = run(project)
     print(f"\nelectrical stage ok={result.ok} in {result.duration_s:.1f} s")
     for d in result.diagnostics:
@@ -49,7 +51,7 @@ def test_electrical_stage_uses_routed_wire_lengths(tmp_path):
     """With the wiring stage's routes.json the lengths (and installed ampacity) come from routing."""
     root = copy_bench(tmp_path / "bench")
     (root / "build" / "wiring").mkdir(parents=True)
-    project = Project.load(root)
+    project = instrumentation_pull(root)
     # A synthetic measured route per conductor exercises the hand-off independently
     # of router optimization and cable dynamics (which have their own fixtures).
     routes = {"wires": {w.id: {"cut_length": .2, "installed_ampacity": project.catalog.wire(w.awg).ampacity}

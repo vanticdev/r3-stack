@@ -9,6 +9,7 @@ import shutil
 import sys
 import threading
 import types
+import yaml
 from pathlib import Path
 from typing import Any, Callable
 
@@ -31,6 +32,29 @@ TRACK = {"ground": "grass", "track": {"points": [[0, 0], [6, 0], [8, 3], [6, 6],
 def printbot(tmp_path: Path) -> Path:
     root = tmp_path / "printbot"
     shutil.copytree(FIXTURE, root)
+    from pulled_fixture import box, publish_project, fixture_attachments
+    data = yaml.safe_load((root / "robot.yaml").read_text())
+    data["assembly"] = {"root": "frame"}
+    # Explicit native optics stand: lens points +X, image up is +Z, at 28.9 mm
+    # after the simulator's 0.5 mm initial ground clearance.
+    poses = dict(frame=([0,0,0], [0,0,0]), pi=([-.03,0,.01], [0,0,0]),
+                 camera=([.08,0,.0284], [np.pi/2,0,np.pi/2]),
+                 csi_cable=([-.02,0,.025], [0,0,0]), battery=([-.03,0,-.03], [0,0,0]),
+                 bec=([.03,.035,.01], [0,0,0]))
+    for name, (xyz, rpy) in poses.items():
+        data["components"][name]["pose"] = dict(xyz=xyz, rpy=rpy)
+    data["simulation"] = {"base_mount": "fixed"}
+    data["mechanical"] = {"interfaces": [dict(
+        id=f"optics_clamp_{name}", kind="adhesive", parts=["frame", name],
+        axis_point=xyz, axis_dir=[0,0,1], params={"physics": {
+            key: dict(value=value, status="measured", source="Synthetic optics bench clamp qualification")
+            for key,value in dict(area=.01,shear_strength=1e8,peel_strength=1e8,radius=.05).items()}})
+        for name,(xyz,_) in poses.items() if name != "frame"]}
+    (root / "robot.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    project = Project.load(root)
+    shapes = {name: box(size) for name,size in dict(frame=(160,110,4), pi=(85,56,8),
+              camera=(38,38,2), csi_cable=(20,40,.3), battery=(90,40,20), bec=(20,20,3)).items()}
+    publish_project(project, shapes, attachments=fixture_attachments(project))
     return root
 
 
@@ -38,24 +62,6 @@ def run_client(root: Path, client: Callable[[VirtualHal], Any], visual: dict[str
                duration: float = 3.0) -> tuple[Any, CoSimKernel, TwinHalServer]:
     """Serve one twin session in this thread while ``client`` runs against it in another."""
     project = Project.load(root)
-    project.spec.simulation.base_mount = "fixed"  # the optics bench is fixed to its stand
-    # Mounts on this bench are qualified adhesive clamps. The template's
-    # unqualified screws are a separate model-stage fixture, not bench parts.
-    project.spec.mechanical.fasteners = []
-    # The fixed optics stand places its lens at the original settled 28.9 mm
-    # test height. Its calibration is independent of floor contact/settling.
-    project.spec.components["camera"].pose.xyz[2] -= 0.0306
-    # This optics bench has qualified external clamps; the original printbot
-    # mounting screws themselves are intentionally unqualified by joint checks.
-    from r3_model.spec import Interface
-    for cid in project.spec.components:
-        if cid == "frame":
-            continue
-        project.spec.mechanical.interfaces.append(Interface.model_validate(dict(
-            id=f"optics_clamp_{cid}", kind="adhesive", parts=["frame", cid],
-            axis_point=project.graph.component_pose(cid)[0].tolist(), axis_dir=[0, 0, 1],
-            params={"physics": {key:dict(value=value,status="measured",source="Synthetic optics bench clamp qualification")
-                                for key,value in {"area":.01,"shear_strength":1e8,"peel_strength":1e8,"radius":.05}.items()}})))
     if visual is not None:
         project.spec.simulation.environment.visual = visual
     kernel = CoSimKernel(project, Scenario(id="camera", duration=duration))
@@ -147,8 +153,9 @@ def test_camera_errors(printbot: Path) -> None:
 
 
 def test_unwired_camera_is_not_served(printbot: Path) -> None:
-    text = (printbot / "robot.yaml").read_text().replace("    - {a: csi_cable.B, b: pi.CAM0}\n", "")
-    (printbot / "robot.yaml").write_text(text)
+    data = yaml.safe_load((printbot / "robot.yaml").read_text())
+    data["electrical"]["direct_mates"] = [mate for mate in data["electrical"]["direct_mates"] if mate["b"] != "pi.CAM0"]
+    (printbot / "robot.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
 
     def client(hal: VirtualHal) -> str:
         try:
