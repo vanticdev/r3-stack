@@ -102,6 +102,7 @@ class NodePoint:
     lead_length: float = 0.0
     frame: Frame | None = None  # this half's connector frame (robot frame); z points at the mating half
     fan_length: float = 0.0  # arc length over which conductors converge from their pins into the bundle
+    entry_radius: float = 0.0  # pin-row envelope reserved before other harnesses are routed
 
     @property
     def ref(self) -> str:
@@ -397,6 +398,22 @@ class HarnessRouter:
             if node.harness in harnesses:
                 raw = np.where(body.entry_mask(centers), 0.05, raw)
             np.minimum(out, raw, out=out)
+        # A later, smaller harness still needs its fixed conductor exits. Reserve
+        # the straight strain-relief run before assigning the large bundles;
+        # otherwise they can occupy a signal header's only escape corridor.
+        for group in nodes.values():
+            for node in group.values():
+                if (node.harness in harnesses or node.kind != "connector" or node.exit is None
+                        or node.lead_end is None or node.lead_length <= 0):
+                    continue
+                radius = max(node.entry_radius, node.od / 2)
+                key = ("termination", node.ref, tuple(node.exit), tuple(node.lead_end), radius)
+                if key not in self._cable_fields:
+                    delta = node.lead_end - node.exit
+                    along = np.clip((centers - node.exit) @ delta / max(float(delta @ delta), 1e-20), 0, 1)
+                    distance = np.linalg.norm(centers - node.exit - along[:, None] * delta, axis=1)
+                    self._cable_fields[key] = np.minimum(distance - radius, 0.05)
+                np.minimum(out, self._cable_fields[key], out=out)
         return out
 
     # ----------------------------------------------------------------- nodes
@@ -456,6 +473,17 @@ class HarnessRouter:
             for node in nodes.values():
                 if node.kind == "connector":
                     self._lead(node, awgs.get(node.name, []))
+                    # Integral pigtails and connector pins fan out in a row,
+                    # which can be wider than the packed bundle diameter.
+                    by_pin = {ref.split(".", 1)[1]: self._wire_od(w.awg)
+                              for w in harness.wires for ref in (w.from_, w.to)
+                              if ref.startswith(node.name + ".")}
+                    for pin, diameter in by_pin.items():
+                        end = self._pin_end(node, f"{node.name}.{pin}", by_pin)
+                        if end is not None:
+                            offset = end.position - node.exit
+                            lateral = offset - float(offset @ node.direction) * node.direction
+                            node.entry_radius = max(node.entry_radius, float(np.linalg.norm(lateral)) + diameter / 2)
                 elif node.exit is not None:
                     node.lead_end = node.exit.copy()
             out[harness.id] = nodes
