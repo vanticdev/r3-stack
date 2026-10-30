@@ -166,7 +166,7 @@ The local copy is immutable and all physical qualification uses that pull.
   * `--choose N|ID` pins a candidate;
   * `r3 source --all [--choose 1]` handles every slot; already-pinned slots are skipped (re-source
     them explicitly by name);
-  * `--unpin`, `--bom` (prices the PCB BOM MPNs through the distributors), `--import-cad`.
+  * `--unpin`, `--bom` (prices the PCB BOM MPNs through the distributors).
 * **MCP:**
   * `r3_source_slots` (read);
   * `r3_source_search` (design tier, open world; writes only `build/sourcing/`);

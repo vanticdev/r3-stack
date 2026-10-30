@@ -183,6 +183,7 @@ def fake_transport(geometry, snapshot):
             return step
 
         def capture(self, url):
+            assert "/v/version/" in url
             return b'\x89PNG\r\n\x1a\nfixture', {'microversion': snapshot['microversion']}
 
     return FakeTransport()
