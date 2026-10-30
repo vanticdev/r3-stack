@@ -130,6 +130,11 @@ reads. These are conservative estimates before the live diff, rather than a
 promise that every candidate feature will be written. Solid parameter changes
 batch; sketches with changed entities/constraints use the single-feature update
 API. Unchanged features, connector IDs and unaffected assembly IDs survive.
+The report also lists `import_blockers`: missing/unverified model-bank interface
+evidence and incompatible placement frames. A successful dry run is a write plan,
+not approval to bypass these checks. Native import rejects known prerequisites
+before uploading; translated geometry still receives its normal independent
+bounding-box validation.
 
 The lock must match `build/cad/build_state.json`. Restore that pinned build if it
 is missing; incremental mode fails closed rather than silently starting a full
@@ -147,10 +152,22 @@ the shared solved-pose, exact fit and motion checks still run. Library/CAD pins 
 published only after successful verification. Existing documents are never
 trashed by incremental mode, even after failure.
 
-Current full-only operations are replacing vendor imports, changing a mirrored
-family, adding/removing subassembly levels, and moving instances between levels.
-Retired source parts stay in their existing studios; their unused instances and
-mates can be removed without deleting source history.
+Vendor/model-bank parts are translated into separate Part Studios in the pinned
+workspace using the same import, geometry/frame validation, connectors and mass
+override as full builds. Verified public versions use direct insertion. Replaced
+bodies are labelled `Retired` and removed from active part/connector lookup; an
+empty source studio is also renamed `Retired`. Shared source studios keep their
+unaffected siblings and editable history. Only affected instances and mates are
+replaced. Uploads, translation polling and retirement writes are journaled too,
+so resuming does not repeat an acknowledged import.
+
+Mirrored native families update their standard Mirror features and retain body
+and connector IDs when topology permits; changed body IDs trigger instance and
+mate replacement. New subassembly levels use native assembly creation/insertion;
+removed levels are emptied, detached and labelled `Retired`. Instances moving
+between levels are reinserted only at their new level, with affected mates
+recreated against the new occurrence paths. These operations share the assembly
+journal and checkpoint, including resumes after quota failures.
 
 Folder creation/movement remains an Onshape API limitation: the public REST API
 can read tab folders but cannot create/move tab folders or feature/mate folders.

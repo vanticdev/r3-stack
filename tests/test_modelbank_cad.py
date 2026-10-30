@@ -63,8 +63,43 @@ def test_unreviewed_interface_never_becomes_a_mate(tmp_path,monkeypatch):
     step=tmp_path/'part.step';step.write_text('ISO-10303-21;')
     monkeypatch.setattr(purchased,'acquire',lambda s:(step,s))
     p=part();p.bank_model['interface_frames']={}
+    api=ImportAPI()
     with pytest.raises(StudioBuildError,match='model_features_unverified'):
-        purchased.import_studio(ImportAPI(),'doc','workspace',p)
+        purchased.import_studio(api,'doc','workspace',p)
+    assert api.calls==[]
+
+
+@pytest.mark.parametrize('case,code', [('missing','model_features_unverified'),
+                                     ('mismatch','model_datasheet_mismatch'),
+                                     ('rotation','model_frame_unverified'),
+                                     ('validation','model_features_unverified')])
+def test_import_prerequisites_report_and_reject_before_upload(monkeypatch,case,code):
+    p=part()
+    if case=='missing': p.bank_model['interface_frames']={}
+    if case=='mismatch': p.bank_model['interface_frames']['mc_mount']['origin']=[1,0,0]
+    if case=='rotation': p.bank_model['placement']['x']=[0,1,0]
+    if case=='validation': p.bank_model['validation']['status']='unverified'
+    monkeypatch.setattr(purchased,'acquire',lambda *_:pytest.fail('acquired an invalid import'))
+    blockers=purchased.import_blockers(p)
+    assert blockers[0]['code']==code
+    if case=='missing': assert blockers[-1]['missing_connectors']==['mc_mount']
+    if case=='mismatch': assert blockers[-1]['mismatched_connectors']==['mc_mount']
+    api=ImportAPI()
+    with pytest.raises(StudioBuildError,match=code):
+        purchased.import_studio(api,'doc','workspace',p)
+    assert api.calls==[]
+
+
+def test_bank_interface_name_resolves_without_inventing_hole_seat_evidence():
+    p=part()
+    p.bank_model['interface_frames']['mount']=p.bank_model['interface_frames'].pop('mc_mount')
+    assert purchased.import_blockers(p)==[]
+    p.connectors.append(ConnectorSpec('mc_mount_h1',np.eye(4),'mount',hole=0))
+    blockers=purchased.import_blockers(p)
+    assert blockers==[{'code':'model_features_unverified','missing_connectors':['mc_mount_h1'],
+                       'reason':'missing geometry-derived frames: mc_mount_h1'}]
+    p.bank_model['interface_frames']['mount']['origin']=[1,0,0]
+    assert purchased.import_blockers(p)[-1]['mismatched_connectors']==['mc_mount']
 
 
 def test_public_insert_uses_immutable_version():

@@ -66,6 +66,54 @@ def bank_entry(component: Any) -> ModelEntry | None:
     return ModelBank().resolve(component)
 
 
+def _interface_frame(entry: ModelEntry, connector: Any) -> dict[str, list[float]] | None:
+    frame = entry.interface_frames.get(connector.name)
+    if frame is None and connector.hole is None and connector.name == f'mc_{connector.interface}':
+        # Bank records may use the authored interface name; mc_ is the native
+        # feature label. Hole-seat connectors need their own measured evidence,
+        # never the parent interface's frame. Numeric checks remain identical.
+        frame = entry.interface_frames.get(connector.interface)
+    return frame
+
+
+def import_blockers(part: Any) -> list[dict[str, Any]]:
+    """Offline prerequisites for the same frame checks used by native import.
+
+    Do not invent geometry-derived frames from catalog envelopes. Missing
+    evidence must be reviewed in the model bank.
+    """
+    from r3_connectors.frames import Frame
+
+    entry = ModelEntry.model_validate(part.bank_model)
+    blockers = []
+    if entry.validation.status == 'mismatch':
+        blockers.append({'code': 'model_datasheet_mismatch', 'reason': entry.validation.notes})
+    if not entry.placement:
+        blockers.append({'code': 'model_frame_unverified', 'reason': 'record the real model placement before inserting it'})
+    else:
+        placement = Frame.from_placement(type('Placement', (), entry.placement)()).matrix()
+        if not np.allclose(placement[:3, :3], np.eye(3)):
+            blockers.append({'code': 'model_frame_unverified', 'reason': 'nontrivial orientation requires a reviewed native Transform'})
+    if entry.validation.status != 'passed' or not entry.interface_frames:
+        blockers.append({'code': 'model_features_unverified', 'validation_status': entry.validation.status,
+                         'reason': 'inspect real holes/faces and record interface_frames + key-feature evidence'})
+    missing, mismatched = [], []
+    for connector in part.connectors:
+        frame = _interface_frame(entry, connector)
+        if frame is None:
+            missing.append(connector.name)
+        elif not np.allclose(Frame.from_placement(type('Placement', (), frame)()).matrix(), connector.frame,
+                             atol=entry.validation.tolerance_m):
+            mismatched.append(connector.name)
+    if missing:
+        blockers.append({'code': 'model_features_unverified', 'missing_connectors': missing,
+                         'reason': 'missing geometry-derived frames: ' + ', '.join(missing)})
+    if mismatched:
+        blockers.append({'code': 'model_datasheet_mismatch', 'mismatched_connectors': mismatched,
+                         'reason': 'model interfaces differ from catalog: ' + ', '.join(mismatched)})
+    return blockers
+
+
 def import_studio(api: Any, did: str, wid: str, part: Any) -> Any:
     """Import a bank STEP, orient its actual bodies, validate, then add native mate connectors and mass.
 
@@ -79,10 +127,9 @@ def import_studio(api: Any, did: str, wid: str, part: Any) -> Any:
     from r3_connectors.frames import Frame
 
     entry = ModelEntry.model_validate(part.bank_model)
-    if entry.validation.status == 'mismatch':
-        raise StudioBuildError(part.name, 'model_datasheet_mismatch', entry.validation.notes)
-    if not entry.placement:
-        raise StudioBuildError(part.name, 'model_frame_unverified', 'record the real model placement before inserting it')
+    blockers = import_blockers(part)
+    if blockers:
+        raise StudioBuildError(part.name, blockers[0]['code'], blockers[0]['reason'])
     failures = []
     for source in sorted(entry.sources, key=lambda s: {'vendor_step': 0, 'kicad_3d': 1, 'database': 2, 'local': 3, 'onshape_public': 4}[s.kind]):
         if source.kind == 'onshape_public' or source.format not in ('step', 'stp', 'stp.zip', 'stp.rar'):
@@ -128,17 +175,8 @@ def import_studio(api: Any, did: str, wid: str, part: Any) -> Any:
     verdict = validate(entry, bbox)
     if verdict.status == 'mismatch':
         raise StudioBuildError(part.name, 'model_datasheet_mismatch', json.dumps(verdict.model_dump()))
-    # Bbox is insufficient to establish real mounting frames. Do not attach an
-    # unreviewed catalog frame to a vendor body just because its envelope fits.
-    if entry.validation.status != 'passed' or not entry.interface_frames:
-        raise StudioBuildError(part.name, 'model_features_unverified', 'inspect real holes/faces and record interface_frames + key-feature evidence')
-    for connector in part.connectors:
-        frame = entry.interface_frames.get(connector.name)
-        if frame is None:
-            raise StudioBuildError(part.name, 'model_features_unverified', f'missing geometry-derived frame {connector.name}')
-        measured = Frame.from_placement(type('Placement', (), frame)()).matrix()
-        if not np.allclose(measured, connector.frame, atol=entry.validation.tolerance_m):
-            raise StudioBuildError(part.name, 'model_datasheet_mismatch', f'{connector.name}: model interface differs from catalog')
+    # Geometry-derived interface evidence was checked before any upload. The
+    # actual translated bounding box above remains an independent live check.
     builder.out.part_ids[part.key] = pid
     builder.connectors(part)
     builder.properties(part, metadata_property_ids(api, did, wid, eid, pid))
@@ -178,7 +216,7 @@ def public_source(part: Any) -> Any:
         if not entry.placement or not np.allclose(Frame.from_axes(**entry.placement).matrix(), np.eye(4)):
             return None
         for connector in part.connectors:
-            frame = entry.interface_frames.get(connector.name)
+            frame = _interface_frame(entry, connector)
             if connector.name not in entry.onshape_connectors or not frame:
                 return None
             if not np.allclose(Frame.from_axes(**frame).matrix(), connector.frame, atol=entry.validation.tolerance_m):
