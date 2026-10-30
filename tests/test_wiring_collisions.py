@@ -13,6 +13,7 @@ from r3_wiring.geometry import Box, MeshShape
 from r3_wiring.obstacles import Obstacle, ObstacleSet, cable_obstacles
 from r3_wiring.router import HarnessRouter, NodePoint, RouterOptions
 from test_wiring_support import write_project
+from native_wiring_fixture import publish_wiring_pull
 
 
 def _wire(name, harness, path, start="A", end="B", radius=0.001):
@@ -26,7 +27,9 @@ def _node(harness, name, point, kind="free", **kwargs):
 
 
 def _checker(tmp_path, wires, nodes, segments=None, obstacles=None):
-    project = Project.load(write_project(tmp_path, block=False))
+    root = write_project(tmp_path, block=False)
+    publish_wiring_pull(root, nodes)
+    project = Project.load(root)
     obstacles = ObstacleSet(obstacles or [], Kinematics(project.spec))
     harnesses = {h: SimpleNamespace(segments=(segments or {}).get(h, [])) for h in nodes}
     routing = SimpleNamespace(nodes=nodes, wires={w.wire_id: w for w in wires}, holes=[], harnesses=harnesses)
@@ -34,9 +37,9 @@ def _checker(tmp_path, wires, nodes, segments=None, obstacles=None):
 
 
 def test_inline_xt_pair_blocks_another_harness_entering_top_face(tmp_path):
-    # XT30 proxy shell occupies x=+-8, y=+-4, z=-12.5..0 mm.
+    # Synthetic native XT30 shell occupies x=+-8, y=+-4, z=-13.6..0 mm.
     frame = Frame.identity()
-    half = _node("power", "XT", [0, 0, -0.0125], "floating", connector_type="xt30-male",
+    half = _node("power", "XT", [0, 0, -0.0136], "floating", connector_type="xt30-male",
                  face=np.zeros(3), frame=frame, direction=np.array([0., 0., -1.]), od=0.004)
     partner = _node("battery", "XT", [0, 0, 0.012], "floating", connector_type="xt30-female",
                     face=np.zeros(3), frame=frame.mated(), direction=np.array([0., 0., 1.]), od=0.004)
@@ -49,18 +52,18 @@ def test_inline_xt_pair_blocks_another_harness_entering_top_face(tmp_path):
                    d.data["connector"] == "power.XT")
     assert finding.data["penetration"] > 0.001
     body = checker.obstacles.by_component("power.XT")
-    assert isinstance(body.shape, MeshShape) and body.source == "connector_proxy"
+    assert isinstance(body.shape, MeshShape) and body.source == "pulled_stl"
 
 
 def test_only_own_entry_zone_is_exempt_not_the_housing(tmp_path):
-    node = _node("lead", "A", [0, 0, -0.0125], "connector", connector_type="xt30-male",
+    node = _node("lead", "A", [0, 0, -0.0136], "connector", connector_type="xt30-male",
                  face=np.zeros(3), frame=Frame.identity(), direction=np.array([0., 0., -1.]), od=0.002)
     wire = _wire("W", "lead", [[0, -0.02, -0.006], [0, 0.02, -0.006]])
     nodes = {"lead": {"A": node, "B": _node("lead", "B", wire.path[-1])}}
     checker = _checker(tmp_path, [wire], nodes)
     checker._clearance_and_intersection()
     assert any(d.code == "wire_intersects_connector" for d in checker.diagnostics)
-    wire.path = np.array([[0, 0, -0.0125], [0, 0, -0.03]])
+    wire.path = np.array([[0, 0, -0.0136], [0, 0, -0.03]])
     checker = _checker(tmp_path, [wire], nodes)
     checker._clearance_and_intersection()
     assert not checker.diagnostics
@@ -80,7 +83,7 @@ def test_jst_lead_cannot_use_hat_exemption_for_parent_usb_block(tmp_path):
 
 
 def test_connector_inside_static_component_except_owner(tmp_path):
-    node = _node("power", "XT", [0, 0, -0.0125], "floating", connector_type="xt30-male",
+    node = _node("power", "XT", [0, 0, -0.0136], "floating", connector_type="xt30-male",
                  face=np.zeros(3), frame=Frame.identity(), direction=np.array([0., 0., -1.]), component="owner")
     shape = Box(np.zeros(3), np.eye(3), np.full(3, 0.03))
     parts = [Obstacle(cid, "computer", shape, shape, 0, False, "robot", False) for cid in ("owner", "block")]
@@ -152,9 +155,10 @@ def test_router_cable_field_opens_only_incident_entry(tmp_path):
     obstacles, _ = build_obstacles(project)
     router = HarnessRouter(project, obstacles, RouterOptions(plan=False))
     node = _node("power", "XT", [0.1, 0, 0.030], "floating", connector_type="xt30-male",
-                 face=np.array([0.1, 0, 0.0425]), frame=Frame(np.eye(3), np.array([0.1, 0, 0.0425])),
+                 face=np.array([0.1, 0, 0.0436]), frame=Frame(np.eye(3), np.array([0.1, 0, 0.0436])),
                  direction=np.array([0., 0., -1.]), od=0.004)
     nodes = {"power": {"XT": node}}
+    publish_wiring_pull(project.root, nodes)
     own, foreign = router.cable_field(nodes, {"power"}), router.cable_field(nodes, {"signal"})
     body = cable_obstacles(project, nodes)[0]
     centers = router.grid.centers()
@@ -255,6 +259,7 @@ def test_other_branch_cannot_borrow_a_splice_entry_aperture(tmp_path):
     router = HarnessRouter(project, obstacles, RouterOptions(plan=False))
     node = _node('power', 'SN', [.1, 0, .03], 'splice', od=.008)
     nodes = {'power': {'SN': node}}
+    publish_wiring_pull(project.root, nodes)
     obstacles.cable_bodies = cable_obstacles(project, nodes)
     field = router.cable_field(nodes, {'power'})
     inside = obstacles.cable_bodies[0].shape.sdf(router.grid.centers()) < 0

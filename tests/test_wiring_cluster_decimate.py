@@ -38,14 +38,18 @@ def test_thin_feature_cancellation_preserves_remaining_solid() -> None:
 
 
 def test_subcell_obstacle_keeps_its_cad_surface(tmp_path) -> None:
-    box = trimesh.creation.box(extents=[0.0002, 0.0002, 0.0002])
-    box.apply_translation([0.0004, 0.0004, 0.0004])
-    mesh = tmp_path / "build" / "cad" / "magnet.stl"
-    mesh.parent.mkdir(parents=True)
-    box.export(mesh)
-    shape, source = _cad_shape(SimpleNamespace(root=tmp_path), {"mesh": "magnet.stl"})
-    assert source == "cad_mesh"
-    assert len(shape.faces) == len(box.faces)
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
+    from OCP.gp import gp_Pnt
+    from pulled_fixture import write_pull
+    import yaml
+
+    (tmp_path / "robot.yaml").write_text(yaml.safe_dump({"robot": {"name": "Subcell asset"},
+        "components": {"magnet": {"type": "fixture-magnet"}}}))
+    box = BRepPrimAPI_MakeBox(gp_Pnt(.3, .3, .3), .2, .2, .2).Shape()
+    write_pull(tmp_path, {"magnet": box})
+    shape, source = _cad_shape(SimpleNamespace(root=tmp_path), {"part_name": "magnet"})
+    assert source == "pulled_stl"
+    assert len(shape.faces) == 12
     assert unbalanced_edge_count(shape.faces) == 0
     assert shape.sdf(np.array([[0.0004, 0.0004, 0.0004]]))[0] < 0
 
