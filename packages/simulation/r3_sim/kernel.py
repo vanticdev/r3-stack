@@ -138,6 +138,7 @@ class Recorder:
     snapshots_qpos: list[np.ndarray] = field(default_factory=list)
     logs: list[dict[str, Any]] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
+    cable_metadata: dict[str, Any] = field(default_factory=dict)
 
     def add(self, **values: float) -> None:
         for key, value in values.items():
@@ -366,8 +367,14 @@ class CoSimKernel:
         self.wire_clearance: dict[str, tuple[float, str]] = {}
         self.min_wire_clearance = (math.inf, "", "")
         self.recorder = Recorder()
+        if self.vehicle.cables is not None:
+            from .cable_playback import cable_metadata
+
+            self.recorder.cable_metadata = cable_metadata(self.vehicle.cables)
+        self.recorder.snapshots_t.append(0.0)
+        self.recorder.snapshots_qpos.append(self.vehicle.data.qpos.copy())
         self._next_record = 0.0
-        self._next_snapshot = 0.0
+        self._next_snapshot = SNAPSHOT_PERIOD
         self._next_cable = 0.0
         self.esc_pulse = 0.0
         self.servo_pulse = 0.0

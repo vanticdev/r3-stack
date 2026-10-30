@@ -252,7 +252,9 @@ def test_sim_list_and_detail(client):
     assert chassis[10][0] == pytest.approx(2.0 * frames["t"][10], abs=1e-4) and len(chassis[0]) == 7
     assert frames["bodies"]["wheel_rl"][0][1] == pytest.approx(0.1, abs=1e-4)  # world pose via forward kinematics
     cable = frames["cables"]["cable00s0"]
-    assert len(cable["points"]) == 21 and len(cable["points"][0]) == 3 and cable["rgba"] == [0.85, 0.1, 0.1, 1.0]
+    assert len(cable["points"]) == 21 and len(cable["points"][0]) == 4 and cable["rgba"] == [0.85, 0.1, 0.1, 1.0]
+    assert cable["od"] == pytest.approx(0.004)
+    assert cable["points"][0][-1] == pytest.approx([0.16, 0, 0.07], abs=1e-6)
     no_cables = client.get(f"/api/projects/{PID}/sim/full_throttle", params={"hz": 10, "cables": False}).json()
     assert no_cables["recording"]["frames"]["cables"] is None
     assert client.get(f"/api/projects/{PID}/sim/autonomous_course").json()["recording"] is None

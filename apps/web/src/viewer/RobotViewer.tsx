@@ -11,7 +11,7 @@ import {
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
 
 import type { PlaybackRecording, Vec3 } from "../api/types.ts";
-import { resolveSubjects, type SceneComponent, type SceneWire } from "../lib/scene.ts";
+import { resolveSubjects, wireColor, type SceneComponent, type SceneWire } from "../lib/scene.ts";
 import {
   ackermann, bodyDelta, bounds, chainMatrix, clampJoint, componentBody, explodeOffsets, frameAt, interpolatePoints,
   interpolatePose, poseMatrix, restPoses,
@@ -64,13 +64,13 @@ export interface Marker {
 /** Layers of the "Show" menu. Features that add overlays (e.g. connector pins) append an entry here
  * and a matching boolean to ViewOptions. `available` hides layers the data cannot draw. */
 export const SHOW_LAYERS: { key: keyof ViewOptions; label: string; available?: (data: RobotData, playback: boolean) => boolean; count?: (data: RobotData) => number }[] = [
-  { key: "wires", label: "Wires", available: (_d, playback) => !playback },
+  { key: "wires", label: "Wires" },
   { key: "hardware", label: "Fasteners", available: (d) => d.hardware.length > 0, count: (d) => d.hardware.length },
   { key: "interfaces", label: "Connector frames" },
   { key: "joins", label: "Mounts and contacts" },
   { key: "joints", label: "Joint axes", available: (_d, playback) => !playback },
   { key: "issues", label: "Error highlights" },
-  { key: "connectors", label: "Connectors and pins", available: (d, playback) => !!d.connectors && !playback },
+  { key: "connectors", label: "Connectors and pins", available: (d) => !!d.connectors },
   { key: "interference", label: "Interferences", available: (d, playback) => d.interference.length > 0 && !playback, count: (d) => d.interference.length },
 ];
 
@@ -379,7 +379,7 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
       deltas[name] = bodyDelta(nominal, interpolatePose(poses[cursor.i0]!, poses[cursor.i1]!, cursor.alpha));
     }
     for (const [id, group] of groups.current) {
-      const body = assignment[id];
+      const body = id.startsWith("body:") ? id.slice(5) : assignment[id];
       group.matrix.copy((body && deltas[body]) || IDENTITY);
       group.matrixWorldNeedsUpdate = true;
     }
@@ -389,7 +389,7 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
       const b = cable.points[cursor.i1] ?? a;
       if (!mesh || !a || a.length < 2) continue;
       mesh.geometry.dispose();
-      mesh.geometry = tubeGeometry(interpolatePoints(a, b!, cursor.alpha), CABLE_RADIUS, 6);
+      mesh.geometry = playbackTubeGeometry(cable, interpolatePoints(a, b!, cursor.alpha));
     }
     const chassis = root ? deltas[root] : null;
     const orbit = controls as unknown as { target: Vector3; update(): void } | null;
@@ -407,24 +407,59 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
   return null;
 }
 
-/** Cable polylines carry no diameter in the recording; draw them at a typical bundle size. */
-const CABLE_RADIUS = 0.0014;
+/** Use the recorded conductor OD, with legacy recordings retaining their geom OD. */
+export function playbackTubeGeometry(cable: { od?: number }, points: readonly Vec3[]): TubeGeometry {
+  return tubeGeometry(points, (cable.od ?? 0.001) / 2, 8);
+}
 
 function rgbaColor(rgba: number[] | null | undefined): Color {
   const [r, g, b] = rgba ?? [];
   return r !== undefined && g !== undefined && b !== undefined ? new Color(r, g, b) : new Color("#999999");
 }
 
-function PlaybackCables({ recording, meshes }: { recording: PlaybackRecording; meshes: React.MutableRefObject<Map<string, Mesh>> }) {
+export function PlaybackCables({ recording, meshes }: { recording: PlaybackRecording; meshes: React.MutableRefObject<Map<string, Mesh>> }) {
   return (
     <group>
       {Object.entries(recording.frames?.cables ?? {}).map(([id, cable]) => (
         <mesh key={id} ref={(m) => { if (m) meshes.current.set(id, m); else meshes.current.delete(id); }}>
-          <meshStandardMaterial color={rgbaColor(cable.rgba)} roughness={0.5} />
+          <meshStandardMaterial color={cable.color ? wireColor(cable.color) : rgbaColor(cable.rgba)} roughness={0.5} />
         </mesh>
       ))}
     </group>
   );
+}
+
+/** Group vendor models, connector housings and pins by their actual rigid body. */
+function PlaybackConnectors({ playback, data, register }: {
+  playback: PlaybackState; data: RobotData; register: (id: string, group: Group | null) => void;
+}) {
+  const layers = useMemo(() => {
+    const connectors = data.connectors;
+    if (!connectors) return [];
+    const frames = playback.recording.frames!;
+    const bodies = new Set(Object.keys(frames.bodies));
+    const root = frames.component_bodies.chassis ?? (frames.bodies.chassis ? "chassis" : Object.keys(frames.bodies)[0] ?? "");
+    const of = (id: string) => frames.component_bodies[id] ?? componentBody(data.tree, id, bodies, root) ?? root;
+    const owner = (ref: string, seen = new Set<string>()): string => {
+      const c = connectors.connectors[ref];
+      if (!c || seen.has(ref)) return root;
+      seen.add(ref);
+      return c.component ? of(c.component) : c.mates ? owner(c.mates, seen) : root;
+    };
+    return [...bodies].map((body) => ({ body, connectors: {
+      ...connectors,
+      components: Object.fromEntries(Object.entries(connectors.components).filter(([id]) => of(id) === body)),
+      connectors: Object.fromEntries(Object.entries(connectors.connectors).filter(([id]) => owner(id) === body)),
+      mated_pairs: [],
+    } })).filter((l) => Object.keys(l.connectors.components).length || Object.keys(l.connectors.connectors).length);
+  }, [data, playback.recording]);
+  if (!data.connectorAsset) return null;
+  return <>{layers.map(({ body, connectors }) => (
+    <group key={body} matrixAutoUpdate={false} ref={(g) => register(`body:${body}`, g)}>
+      <ConnectorLayer data={connectors} assetUrl={data.connectorAsset!} matrices={{}} harness={null}
+                      showBodies showPins ghost={() => false} />
+    </group>
+  ))}</>;
 }
 
 function Trajectory({ recording }: { recording: PlaybackRecording }) {
@@ -536,7 +571,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
   const dark = themeVersion !== "light";
   const hovered = hover ? data.components.find((c) => c.id === hover) ?? data.wires.find((w) => w.id === hover) : null;
   const meshCount = data.components.filter((c) => data.meshes[c.id]).length;
-  const showConnectors = !!data.connectors && options.connectors && !playback;
+  const showConnectors = !!data.connectors && options.connectors;
   const detailed = useMemo(() => (showConnectors ? detailedComponents(data.connectors ?? null) : new Set<string>()), [showConnectors, data.connectors]);
   const selectedHarness = selected?.kind === "wire" ? data.connectors?.wires[selected.id]?.harness ?? null : null;
   const layers = SHOW_LAYERS.filter((l) => l.available?.(data, !!playback) ?? true);
@@ -627,7 +662,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
             ? <InterferenceBox key={`int${i}`} center={o.center} extent={o.extent} selected={selectedInterference === i} onClick={onInterference ? () => onInterference(i) : undefined} />
             : null
         ))}
-        {showConnectors && data.connectors && data.connectorAsset && (
+        {showConnectors && !playback && data.connectors && data.connectorAsset && (
           <ConnectorLayer data={data.connectors} assetUrl={data.connectorAsset} matrices={matrices} harness={selectedHarness}
                           showBodies showPins={options.explode < 0.02} ghost={(id) => stateOf(id) === "ghost" || (options.xray && stateOf(id) === "normal")} />
         )}
@@ -638,7 +673,8 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         {editor && !playback && <RouteEditor editor={editor} />}
         {playback && (
           <>
-            <PlaybackCables recording={playback.recording} meshes={cableMeshes} />
+            {options.wires && <PlaybackCables recording={playback.recording} meshes={cableMeshes} />}
+            {showConnectors && <PlaybackConnectors playback={playback} data={data} register={register} />}
             <Trajectory recording={playback.recording} />
             <PlaybackDriver playback={playback} data={data} groups={groups} cableMeshes={cableMeshes} />
           </>

@@ -494,11 +494,13 @@ def decode_recording(npz_path: str, mtime_ns: int, hz: float, cables: bool) -> d
                            "firmware_logs": logs[:2000], "events": events[:2000], "frames": None}
     xml = Path(npz_path).with_name("vehicle.xml")
     if "snapshot_qpos" in data.files and xml.exists():
-        out["frames"] = _body_frames(xml, data["snapshot_t"], data["snapshot_qpos"], hz, cables)
+        metadata = json.loads(str(data["cable_metadata"])) if "cable_metadata" in data.files else None
+        out["frames"] = _body_frames(xml, data["snapshot_t"], data["snapshot_qpos"], hz, cables, metadata)
     return out
 
 
-def _body_frames(xml: Path, snapshot_t: Any, snapshot_qpos: Any, hz: float, cables: bool) -> dict[str, Any] | None:
+def _body_frames(xml: Path, snapshot_t: Any, snapshot_qpos: Any, hz: float, cables: bool,
+                 metadata: dict[str, Any] | None = None) -> dict[str, Any] | None:
     import numpy as np
 
     try:
@@ -529,12 +531,37 @@ def _body_frames(xml: Path, snapshot_t: Any, snapshot_qpos: Any, hz: float, cabl
         if gname.startswith("vis_"):
             components[gname[4:]] = names[model.geom_bodyid[g]]
     cable_colors = {}
+    cable_od = {}
+    tip_lengths = {}
     for cable, ids in cable_ids.items():
         geoms = [g for g in range(model.ngeom) if model.geom_bodyid[g] == ids[0]]
         cable_colors[cable] = [round(float(c), 3) for c in model.geom_rgba[geoms[0]]] if geoms else None
+        cable_od[cable] = float(model.geom_size[geoms[0], 0] * 2) if geoms else 0.001
+        last_geom = int(model.body_geomadr[ids[-1]])
+        tip_lengths[cable] = float(model.geom_size[last_geom, 1] * 2)
+    data.qpos[:] = model.qpos0
+    mujoco.mj_kinematics(model, data)
+    # CAD and connector paths are authored in the robot frame. qpos0 can put
+    # the vehicle above ground; remove that root transform from nominal poses.
+    root_name = (metadata or {}).get("root_body", "chassis")
+    root = names.index(root_name) if root_name in names else rigid[0]
+    rotation = data.xmat[root].reshape(3, 3)
+    origin = data.xpos[root].copy()
+    rest = {}
+    for i in rigid:
+        quat = np.zeros(4)
+        mujoco.mju_mat2Quat(quat, (rotation.T @ data.xmat[i].reshape(3, 3)).ravel())
+        rest[names[i]] = np.round(np.r_[(data.xpos[i] - origin) @ rotation, quat], 7).tolist()
+    reconstruction = None
+    if cables and metadata and metadata.get("wires"):
+        from r3_sim.cable_playback import ConductorPlayback
+
+        reconstruction = ConductorPlayback(model, data, metadata)
     times: list[float] = []
     poses: dict[str, list[list[float]]] = {names[i]: [] for i in rigid}
     cable_frames: dict[str, list[list[list[float]]]] = {c: [] for c in cable_ids}
+    if reconstruction:
+        cable_frames = {w: [] for w in metadata["wires"]}
     for index in indices:
         data.qpos[:] = snapshot_qpos[index]
         mujoco.mj_kinematics(model, data)
@@ -542,10 +569,20 @@ def _body_frames(xml: Path, snapshot_t: Any, snapshot_qpos: Any, hz: float, cabl
         for i in rigid:
             poses[names[i]].append([round(float(v), 5) for v in (*data.xpos[i], *data.xquat[i])])
         if cables:
+            points = {}
             for cable, ids in cable_ids.items():
-                cable_frames[cable].append([[round(float(v), 4) for v in data.xpos[i]] for i in ids])
+                tip = data.xpos[ids[-1]] + data.xmat[ids[-1]].reshape(3, 3)[:, 0] * tip_lengths[cable]
+                points[cable] = np.vstack([data.xpos[ids], tip])
+            display = reconstruction.positions(data, points) if reconstruction else points
+            for cable, path in display.items():
+                cable_frames[cable].append(np.round(path, 6).tolist())
+    details = metadata["wires"] if reconstruction else {}
     return {"t": times, "format": "x y z qw qx qy qz (world frame)", "bodies": poses, "component_bodies": components,
-            "cables": {c: {"rgba": cable_colors[c], "points": frames} for c, frames in cable_frames.items()} if cables else None}
+            "rest": rest,
+            "cables": {c: {"rgba": cable_colors.get(c), "points": frames,
+                            **({k: details[c][k] for k in ("wire_id", "bundle", "harness", "od", "color")}
+                               if c in details else {"od": cable_od[c]})}
+                       for c, frames in cable_frames.items()} if cables else None}
 
 
 def diagnostics_view(ref: ProjectRef, stage: str | None = None, severity: str | None = None, subject: str | None = None) -> dict[str, Any]:

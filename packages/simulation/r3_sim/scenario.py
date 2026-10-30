@@ -395,6 +395,7 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
     npz = out_dir / "recording.npz"
     np.savez_compressed(
         npz, **rec, snapshot_t=np.asarray(kernel.recorder.snapshots_t), snapshot_qpos=np.asarray(kernel.recorder.snapshots_qpos),
+        cable_metadata=np.asarray(json.dumps(kernel.recorder.cable_metadata)),
         rc_frame_times=np.asarray(kernel.receiver.rc_frame_times),
         firmware_logs=np.asarray([json.dumps(log) for log in kernel.recorder.logs] or [""]),
         events=np.asarray([json.dumps(e) for e in kernel.recorder.events] or [""]))
