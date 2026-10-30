@@ -8,29 +8,55 @@ tags: []
 key_specs:
   dimensions:
     value:
-    - 0.005900000000000001
-    - 0.005900000000000001
-    - 0.009000000000000001
+    - 0.01730000099632889
+    - 0.015799999237060547
+    - 0.01730000041425228
     unit: m
-    source: 25T servo spline at its 5.9 mm major diameter; mass estimated (included
-      in the servo's 60 g)
-    status: estimated
+    source: DSSERVO official DS3218.stp, https://www.dsservo.com/down.asp?id=25; retained
+      complete solids [2]; dimensions in unplaced STEP axes, excludes detachable horn.
+    status: vendor
   mass:
     value: 0.002
     unit: kg
-    source: 25T servo spline at its 5.9 mm major diameter; mass estimated (included
-      in the servo's 60 g)
+    source: Estimated 2 g of the complete DS3218 datasheet mass of 60 g; official
+      source shaft major diameter is 6.0 mm.
     status: estimated
-sources: []
+sources:
+- kind: vendor_step
+  url: https://www.dsservo.com/down.asp?id=25
+  format: stp.rar
+  license: Copyright Dongguan City Dsservo Technology Co.Ltd; public manufacturer
+    CAD download. Redistribution grant unspecified; retain vendor rights, do not redistribute
+    cached bytes.
+  sha256: 47c8ff34f7657c769ae645acb670d2eacd326f3600986931e70dcc4c6bf3ab8b
+  retrieved_at: '2026-10-29T19:23:04.785844+00:00'
+  requires_login: false
+  direct: true
+  member: DS3218.stp
+  solid_indices:
+  - 2
+  did: ''
+  vid: ''
+  eid: ''
+  part_id: ''
 validation:
-  status: unverified
-  bbox_m: null
-  expected_bbox_m: null
+  status: passed
+  bbox_m:
+  - 0.01730000099632889
+  - 0.015799999237060547
+  - 0.01730000041425228
+  expected_bbox_m:
+  - 0.01730000099632889
+  - 0.015799999237060547
+  - 0.01730000041425228
   tolerance_m: 0.0015
-  key_features: {}
-  date: ''
-  validated_by: ''
-  notes: ''
+  key_features:
+    official_ds3218_source: true
+    solid_identity_measured: true
+  date: '2026-10-30T12:51:49.566606+00:00'
+  validated_by: r3/cascadio
+  notes: Measured from official DS3218 STEP. Verify ear height on receipt. DS3218MG
+    community file is a different label and is not used.
 catalog_component: servo-output-25t
 catalog_aliases: []
 searched_sources:
@@ -46,9 +72,58 @@ searched_sources:
     the servo, not an independently sourced complete servo model; do not insert the
     whole servo in place of its shaft.
   date: '2026-10-29T19:37:47.919393+00:00'
-proxy_reason: The official DS3218 assembly was downloaded, but no independently downloadable/indexed
-  shaft body was published. This record denotes a subpart of the servo, not an independently
-  sourced complete servo model; do not insert the whole servo in place of its shaft.
-placement: null
-interface_frames: {}
+proxy_reason: ''
+placement:
+  origin:
+  - -0.01
+  - -0.0178
+  - 0.0
+  x:
+  - 1.0
+  - 0.0
+  - 0.0
+  z:
+  - 0.0
+  - 0.0
+  - 1.0
+interface_frames:
+  journal:
+    origin:
+    - 0.0
+    - 0.0038
+    - 0.0
+    z:
+    - 0.0
+    - -1.0
+    - 0.0
+    x:
+    - 0.0
+    - 0.0
+    - 1.0
+  spline:
+    origin:
+    - 0.0
+    - 0.0046
+    - 0.0
+    z:
+    - 0.0
+    - 1.0
+    - 0.0
+    x:
+    - 0.0
+    - 0.0
+    - 1.0
+  top:
+    origin:
+    - 0.0
+    - 0.0077
+    - 0.0
+    z:
+    - 0.0
+    - 1.0
+    - 0.0
+    x:
+    - 0.0
+    - 0.0
+    - 1.0
 onshape_connectors: {}
