@@ -23,7 +23,7 @@ def test_new_downloads_have_provenance_and_dimension_review():
         assert entry.validation.bbox_m and entry.validation.expected_bbox_m
         assert entry.validation.tolerance_m == .0015
         assert not entry.proxy_reason
-    assert bank.get('servo-digital-20kg').validation.status == 'mismatch'
+    assert bank.get('servo-digital-20kg').validation.status == 'passed'  # official DS3218 model
     assert bank.get('connector-xt30-female').validation.status == 'mismatch'
 
 
