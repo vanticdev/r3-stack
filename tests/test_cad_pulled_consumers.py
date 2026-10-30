@@ -181,3 +181,81 @@ def test_web_model_poses_are_pulled_without_cached_graph(project, monkeypatch):
     view = projects.model_view(SimpleNamespace(root=project.root, id='synthetic'))
     assert view['graph']['components']['coupon']['xyz'] == pytest.approx([.1,.2,.3])
     assert view['graph']['components']['coupon']['shape'] == 'mesh'
+
+
+def test_explicit_cable_hardware_enters_only_the_cable_field(project):
+    from r3_wiring.obstacles import build_obstacles, cable_obstacles
+    from r3_wiring.router import NodePoint
+    from r3_connectors.frames import Frame
+    from r3_model.project import Project
+
+    path = project.root / 'robot.yaml'
+    data = yaml.safe_load(path.read_text())
+    data['components']['lead.A'] = {'type': 'synthetic-coupon'}
+    data['electrical'] = {'harnesses': [{'id': 'lead', 'connectors': {'A': {'type': 'servo-3-female'}}, 'wires': []}]}
+    path.write_text(yaml.safe_dump(data))
+    write_pull(project.root, {'coupon': BRepPrimAPI_MakeBox(10,10,4).Shape(),
+                              'lead.A': BRepPrimAPI_MakeBox(4,4,4).Shape()})
+    current = Project.load(project.root)
+    primary, _ = build_obstacles(current)
+    assert {o.component for o in primary.obstacles} == {'coupon'}
+    node = NodePoint('lead', 'A', 'connector', exit=np.array([0.,0.,-.004]),
+                     connector_type='servo-3-female', frame=Frame.identity())
+    cable = cable_obstacles(current, {'lead': {'A': node}})
+    assert len(cable) == 1 and cable[0].component == 'lead.A'
+    assert cable[0].source == 'pulled_stl'
+
+
+def test_native_splice_position_and_axis_cannot_be_planned_away(project):
+    from r3_wiring.obstacles import build_obstacles
+    from r3_wiring.router import HarnessRouter, RouterOptions
+    from r3_wiring.planner import _node_junction
+
+    path = project.root / 'robot.yaml'
+    data = yaml.safe_load(path.read_text())
+    data['components']['lead.S'] = {'type': 'synthetic-coupon'}
+    data['electrical'] = {'harnesses': [{'id': 'lead', 'splices': {'S': {
+        'position': [9, 9, 9], 'direction': [1, 0, 0]}}, 'connectors': {}, 'wires': []}]}
+    path.write_text(yaml.safe_dump(data))
+    pose = np.eye(4); pose[:3, 3] = [.1, .2, .3]
+    write_pull(project.root, {'coupon': BRepPrimAPI_MakeBox(10, 10, 4).Shape(),
+                             'lead.S': BRepPrimAPI_MakeCylinder(1, 6).Shape()},
+               poses={'coupon': np.eye(4), 'lead.S': pose},
+               connectors={'lead.S': {'mating': np.eye(4)}})
+    current = Project.load(project.root)
+    obstacles, _ = build_obstacles(current)
+    router = HarnessRouter(current, obstacles, RouterOptions(plan=False))
+    node = router._resolve_nodes()['lead']['S']
+    assert node.native
+    np.testing.assert_allclose(node.exit, [.1, .2, .3])
+    np.testing.assert_allclose(node.direction, [0, 0, 1])
+    junction = _node_junction('lead/N:S', node, current.catalog)
+    assert junction.move == 0 and not junction.axis_free
+
+
+def test_connector_stage_uses_native_instance_and_rejects_stale_route_frame(project):
+    from r3_connectors.stage import ConnectorStage
+
+    path = project.root / 'robot.yaml'
+    data = yaml.safe_load(path.read_text())
+    data['components']['lead.A'] = {'type': 'synthetic-coupon'}
+    data['electrical'] = {'harnesses': [{'id': 'lead', 'connectors': {'A': {
+        'type': 'servo-3-female', 'position': [9, 9, 9]}}, 'wires': []}]}
+    path.write_text(yaml.safe_dump(data))
+    pose = np.eye(4); pose[:3, 3] = [.1, .2, .3]
+    write_pull(project.root, {'coupon': BRepPrimAPI_MakeBox(10, 10, 4).Shape(),
+                             'lead.A': BRepPrimAPI_MakeBox(4, 4, 4).Shape()},
+               poses={'coupon': np.eye(4), 'lead.A': pose})
+    current = Project.load(project.root)
+    result = StageResult(stage='connectors')
+    stage = ConnectorStage(current, result)
+    stage.connector_models()
+    assert stage.scenes == {}
+    assert all(entry['glb'] is None for entry in stage.data['types'].values())
+    stage.component_models()
+    assert set(stage.component_scenes) == {'coupon', 'lead.A'}
+    stage.detail = {'nodes': {'lead.A': {'frame': {'origin': [9, 9, 9], 'x': [1, 0, 0], 'z': [0, 0, 1]}}}}
+    frame, source = stage._harness_frame('lead', 'A', current.spec.electrical.harnesses[0].connectors['A'])
+    assert source == 'pulled'
+    np.testing.assert_allclose(frame.origin, [.1, .2, .3])
+    assert [d.code for d in result.errors] == ['connector_routes_stale']

@@ -61,20 +61,18 @@ def test_revision_ignores_cache_and_mtime(inputs):
 def test_stale_fit_proof_cannot_suppress_interference(inputs, artifact):
     from types import SimpleNamespace
     from r3_orchestrator.model_stage import ModelChecker
-    from r3_orchestrator.geometry import make_solid
+    from r3_model.pulled import PullError
 
     project, roots = inputs
-    project.spec.components = {
-        'a': SimpleNamespace(mount='world'), 'b': SimpleNamespace(mount='world')}
     before = project.fingerprint()
-    proof = {'inputs': before, 'parts': {'a': {}, 'b': {}}, 'fit': {},
-             'poses': {'a': {}, 'b': {}}, 'interference_method': 'exact'}
-    project.read_build_json = lambda path: proof if path.startswith(artifact if artifact == 'cad' else 'model/') else None
-    solids = {name: make_solid(name, 'box', [.01, .01, .01], 'z', [0, 0, 0], [0, 0, 0]) for name in ('a', 'b')}
+    proof = {'inputs': before, 'parts': {'a': {}, 'b': {}}, 'fit': {}, 'interference_method': 'exact'}
+    project.read_build_json = lambda path: proof
     validator = object.__new__(ModelChecker)
     validator.project, validator.spec = project, project.spec
     validator.result = StageResult(stage='model')
-    assert validator.check_interference(solids) == []
-    (roots[1] / 'review.yaml').write_text('validation: changed\n')
-    assert validator.check_interference(solids)
-    assert any(d.code == 'component_interference' for d in validator.result.diagnostics)
+    for changed in (False, True):
+        if changed:
+            (roots[1] / 'review.yaml').write_text('validation: changed\n')
+        with pytest.raises(PullError) as error:
+            validator.check_interference({})
+        assert error.value.code == 'cad_pull_missing'

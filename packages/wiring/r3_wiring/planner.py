@@ -1148,7 +1148,7 @@ def build_problem(project: Any, router: Any, routing: Any, harnesses: list[str],
 
         width = max(body_width(catalog, pair.type_a), body_width(catalog, pair.type_b))
         junctions[key] = Junction(key, "floating", np.asarray(pair.center, float), np.asarray(pair.axis, float),
-                                  axis_free=True, move=FLOATING_MOVE, half_length=pair.length / 2,
+                                  axis_free=not getattr(pair, "native", False), move=0.0 if getattr(pair, "native", False) else FLOATING_MOVE, half_length=pair.length / 2,
                                   body_radius=width / 2,
                                   harnesses={pair.a.split(".")[0], pair.b.split(".")[0]})
         pair_of[pair.a], pair_of[pair.b] = (key, -1.0), (key, 1.0)
@@ -1292,7 +1292,7 @@ def _node_junction(key: str, node: Any, catalog: Any) -> Junction:
                         termination_length=node.termination_length, lead=lead, harnesses={node.harness})
     if node.kind == "splice":
         axis = node.direction.copy() if node.direction is not None else None
-        return Junction(key, "splice", node.exit.copy(), axis, axis_free=axis is None, move=SPLICE_MOVE,
+        return Junction(key, "splice", node.exit.copy(), axis, axis_free=axis is None and not node.native, move=0.0 if node.native else SPLICE_MOVE,
                         termination_length=0.006, harnesses={node.harness})
     return Junction(key, node.kind, node.exit.copy() if node.exit is not None else np.zeros(3), None,
                     axis_free=True, harnesses={node.harness})
@@ -1478,12 +1478,14 @@ def _apply(project: Any, routing: Any, plan: BundlePlan, moved: dict[str, dict[s
             original = None
             for harness in j.harnesses:
                 for node in routing.nodes.get(harness, {}).values():
-                    if j.kind == "splice" and key == f"{harness}/N:{node.name}":
+                    if j.kind == "splice" and not node.native and key == f"{harness}/N:{node.name}":
                         original = node.exit.copy()
                         node.exit = j.position.copy()
                         node.lead_end = j.position.copy()
             if j.kind == "floating":
                 pair = next(f for f in routing.floating if key == f"F:{f.a}|{f.b}")
+                if getattr(pair, "native", False):
+                    continue
                 original = np.asarray(pair.center, float).copy()
                 pair.center, pair.axis = j.position.copy(), j.axis.copy()
                 for ref, sign in ((pair.a, -1.0), (pair.b, 1.0)):

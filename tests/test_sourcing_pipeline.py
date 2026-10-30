@@ -1,5 +1,5 @@
 """Sourcing end to end on the bench (recorded fixtures, no network): search, rank with twin
-checks, choose, lockfile pinning, catalog generation, the model stage, CLI, MCP, HTTP API and CAD import."""
+checks, choose, lockfile pinning, catalog metadata, CLI, MCP and HTTP API."""
 
 from __future__ import annotations
 
@@ -46,12 +46,9 @@ def source_all(root: Path, tmp_path: Path, monkeypatch) -> dict[str, dict]:
 
 
 def test_bench_sources_wheel_receiver_and_pi_and_passes_the_model_stage(tmp_path, monkeypatch):
-    baseline_root = sourced_bench(tmp_path / "plain", sources={})
-    baseline = model_stage.run(Project.load(baseline_root))
     root = sourced_bench(tmp_path)
 
-    before = model_stage.run(Project.load(root))
-    unmet = [d for d in before.diagnostics if d.code == "source_requirement_unmet"]
+    unmet = [d for d in sourcing.check_pins(Project.load(root)) if d.code == "source_requirement_unmet"]
     assert [d.data["param"] for d in unmet] == ["hub"]  # the authored 6 mm plain-bore wheel is not a 12 mm hex wheel
     assert set(unmet[0].subjects) == {"sample_a", "sample_b"}
 
@@ -78,7 +75,7 @@ def test_bench_sources_wheel_receiver_and_pi_and_passes_the_model_stage(tmp_path
     pin = lock["sourcing"]["sample_pair"]
     assert pin["components"] == ["sample_a", "sample_b"] and pin["price"] == {"amount": 7.5, "currency": "USD", "quantity": 2}
     assert pin["vendor"] == "Fixture Hobby Shop" and pin["url"] == "https://example.com/shop/fw-110-45" and pin["mpn"] == "FW-110-45-HEX12"
-    assert lock["sourcing"]["pi"]["cad"] == "vendor_step" and lock["sourcing"]["receiver"]["cad"] == "proxy"
+    assert lock["sourcing"]["pi"]["cad"] == "vendor_step" and lock["sourcing"]["receiver"]["cad"] == "missing"
     for slot_pin in lock["sourcing"].values():
         assert (root / slot_pin["catalog_file"]).is_file() and slot_pin["digest"] and slot_pin["retrieved_at"] > 0
 
@@ -86,15 +83,10 @@ def test_bench_sources_wheel_receiver_and_pi_and_passes_the_model_stage(tmp_path
     assert project.spec.components["sample_a"].type == project.spec.components["sample_b"].type == pin["catalog_id"]
     assert project.spec.components["pi"].type.startswith("sourced-raspberrypi")
     assert "sourcing_sha256" in project.fingerprint()
+    assert not {d.code for d in sourcing.check_pins(project) if d.severity.value == "error"}
     after = model_stage.run(project)
-    non_info = {d.code for d in after.diagnostics if d.severity.value != "info"}
-    assert not non_info & ELECTRICAL_CODES, [d.message for d in after.diagnostics if d.code in ELECTRICAL_CODES]
-    assert not {c for c in non_info if c.startswith(("sourc", "component_unsourced"))}, non_info
-    assert "mass_exceeds_requirement" not in non_info and after.metrics["mass_margin"] > 0
-    # No new interference: every overlap is one the authored layout already had.
-    assert interference_pairs(after) <= interference_pairs(baseline)
-    graph = json.loads((root / "build" / "model" / "graph.json").read_text())
-    assert graph["components"]["sample_a"]
+    assert "cad_pull_missing" in {d.code for d in after.diagnostics}
+    assert not (root / "build/model/graph.json").exists()
 
 
 def test_catalog_entry_provenance_per_field(tmp_path, monkeypatch):
@@ -105,14 +97,11 @@ def test_catalog_entry_provenance_per_field(tmp_path, monkeypatch):
     (entry,) = wheel["components"]
     meta = wheel["sourced"]
     assert entry["mechanical"]["size"] == pytest.approx([0.11, 0.045]) and entry["mechanical"]["mass"] == pytest.approx(0.092)
-    hub = next(f for f in entry["mechanical"]["features"] if f["id"] == "hub_hex")
-    assert hub["kind"] == "socket" and hub["diameter"] == pytest.approx(0.012)
-    assert hub["provenance"] == {"status": "vendor", "source": "https://example.com/wheels/fw-110-45",
-                                 "notes": hub["provenance"]["notes"]}
-    assert not any(f["id"] == "hub_bore" for f in entry["mechanical"]["features"])
+    assert "features" not in entry["mechanical"] and "solids" not in entry["mechanical"]
+    assert any("native model import" in note for note in meta["notes"])
     assert meta["fields"]["mechanical.size"]["status"] == "vendor" and meta["fields"]["mechanical.mass"]["status"] == "vendor"
     assert meta["fields"]["behavior.params.radius"]["source"] == "https://example.com/wheels/fw-110-45"
-    assert meta["template"] == "wheel-110x45" and meta["cad"]["status"] == "proxy"
+    assert meta["template"] == "wheel-110x45" and meta["cad"]["status"] == "missing"
     assert entry["behavior"]["provenance"]["status"] == "estimated"  # inherited from a different product
     pi = yaml.safe_load((root / lock["pi"]["catalog_file"]).read_text())
     assert pi["sourced"]["fields"]["mechanical.mount_holes"]["status"] == "datasheet"
@@ -137,7 +126,7 @@ def test_pins_are_reproducible_and_guarded(tmp_path, monkeypatch):
 
     path = root / pinned["catalog_file"]
     path.write_text(path.read_text().replace("Raspberry Pi 5 (8 GB)", "Edited by hand", 1))
-    codes = {d.code for d in model_stage.run(Project.load(root)).diagnostics}
+    codes = {d.code for d in sourcing.check_pins(Project.load(root))}
     assert "sourcing_digest_mismatch" in codes
 
     spec = yaml.safe_load((root / "robot.yaml").read_text())
@@ -247,84 +236,3 @@ def test_http_api_search_job_and_choose(tmp_path, monkeypatch):
         assert client.post(f"/api/projects/{pid}/sourcing/nope/search").json()["code"] == "sourcing_slot_not_found"
         assert client.get("/api/sourcing/jobs/missing").status_code == 404
         assert client.post(f"/api/projects/{pid}/sourcing/pi/unpin").json()["removed"]["name"] == "Raspberry Pi 5 (4 GB)"
-
-
-# ------------------------------------------------------------------ CAD import
-class FakeOnshape:
-    name = "fake-onshape"
-
-    def __init__(self, extents):
-        self.extents = extents
-        self.calls: list[tuple[str, str, object]] = []
-
-    def upload_multipart(self, path, fields, file_name, data):
-        self.calls.append(("UPLOAD", path, {"fields": fields, "file": file_name, "bytes": len(data)}))
-        return {"id": "tr1", "requestState": "ACTIVE"}
-
-    def json(self, method, path, query=None, body=None):
-        from r3_onshape.policy import check_request
-
-        check_request(method, path, body)
-        self.calls.append((method, path, body))
-        if path == "/translations/tr1":
-            return {"id": "tr1", "requestState": "DONE", "resultElementIds": ["e" * 24]}
-        if path.endswith("/boundingboxes"):
-            x, y, z = self.extents
-            return {"lowX": 0.01, "lowY": -0.02, "lowZ": 0.003, "highX": 0.01 + x, "highY": -0.02 + y, "highZ": 0.003 + z}
-        return {"feature": body["feature"] if body else None}
-
-
-def test_import_vendor_step_and_add_mate_connectors(tmp_path, monkeypatch):
-    from r3_onshape import sourced
-
-    monkeypatch.setattr(sourced.time, "sleep", lambda s: None)
-    root = sourced_bench(tmp_path, sources={"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE})
-    project = Project.load(root)
-    for slot in ("pi", "receiver"):
-        sourcing.search_slot(project, slot, providers=providers(tmp_path, monkeypatch))
-        sourcing.choose(root, slot, 1)
-    project = Project.load(root)
-    archive = io.BytesIO()
-    with zipfile.ZipFile(archive, "w") as zf:
-        zf.writestr("rpi5/RPi5.step", "ISO-10303-21; fixture")
-    http = CassetteHttp(tmp_path, [])
-    monkeypatch.setattr(http, "_fetch", lambda m, u, b, h, raw=archive.getvalue(): sourced_response(u, raw))
-    transport = FakeOnshape([0.085, 0.056, 0.0176])
-    monkeypatch.setenv("R3_ONSHAPE_PARTS_LIBRARY", "https://cad.onshape.com/documents/" + "a" * 24 + "/w/" + "b" * 24 + "/e/" + "c" * 24)
-    out = sourced.import_sourced(project, transport=transport, http=http)
-    results = {r["slot"]: r for r in out["slots"]}
-    assert results["receiver"]["status"] == "proxy"
-    pi = results["pi"]
-    assert pi["status"] == "imported" and pi["code"] == "sourced_cad_imported", pi
-    assert pi["step"].endswith("RPi5.step") and "extents match" in pi["frame_check"]
-    upload = transport.calls[0]
-    assert upload[0] == "UPLOAD" and upload[1].startswith("/api/v17/translations/d/") and upload[2]["fields"]["formatName"] == "STEP"
-    features = [body["feature"] for method, path, body in transport.calls if method == "POST" and path.endswith("/features")]
-    assert {f["featureType"] for f in features} == {"mateConnector"} and len(features) >= 5  # 4 mounting holes + J8
-    flipped = [f for f in features if any(p.get("parameterId") == "flipPrimary" for p in f["parameters"])]
-    assert len(flipped) == 4  # hole axes point -z
-    assert any(entry.endswith("No%20Graphics%20small%20file.zip") for entry in http.log)  # the official STEP was fetched
-
-    transport_bad = FakeOnshape([0.056, 0.085, 0.0176])  # rotated model
-    again = sourced.import_sourced(project, slots=["pi"], transport=transport_bad, http=http)
-    assert again["slots"][0]["code"] == "sourced_cad_frame_unverified"
-
-
-def sourced_response(url, raw):
-    from r3_catalog.sourcing.http import Response
-
-    return Response(url, 200, raw, {"Content-Type": "application/zip"})
-
-
-def test_import_without_transport_is_skipped(tmp_path, monkeypatch):
-    from r3_onshape import sourced
-
-    root = sourced_bench(tmp_path, sources={"pi": PI_SOURCE})
-    sourcing.search_slot(Project.load(root), "pi", providers=providers(tmp_path, monkeypatch))
-    sourcing.choose(root, "pi", 1)
-
-    class Browserish:
-        name = "onshape-native"
-
-    out = sourced.import_sourced(Project.load(root), transport=Browserish())
-    assert out["slots"][0]["code"] == "sourced_cad_transport_missing"

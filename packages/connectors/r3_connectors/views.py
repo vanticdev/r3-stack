@@ -28,7 +28,7 @@ def _box_around(center: np.ndarray, half: float) -> tuple[np.ndarray, np.ndarray
 
 def _add_component(stage: "ConnectorStage", scene: RenderScene, cid: str, clip: tuple | None, alpha: float = 1.0) -> bool:
     comp = stage.data["components"].get(cid)
-    model = stage.component_scenes.get(comp["type"]) if comp else None
+    model = stage.component_scenes.get(cid) if comp else None
     if model is None:
         return False
     # STEP exports carry copper but no solder mask: show copper under green mask, as on the real board.
@@ -38,9 +38,10 @@ def _add_component(stage: "ConnectorStage", scene: RenderScene, cid: str, clip: 
 
 def _add_connector(stage: "ConnectorStage", scene: RenderScene, ref: str, alpha: float = 1.0) -> None:
     entry = stage.data["connectors"][ref]
-    model = stage.scenes.get(entry["type"])
+    model = stage.component_scenes.get(ref)
     if model is not None:
-        scene.add_scene(model, _frame(entry), alpha=alpha)
+        pose = stage.pulled.poses[ref]
+        scene.add_scene(model, Frame(pose[:3, :3], pose[:3, 3]), alpha=alpha)
 
 
 def _add_wires(stage: "ConnectorStage", scene: RenderScene, wire_ids: list[str], near: np.ndarray, radius: float,

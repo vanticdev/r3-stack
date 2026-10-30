@@ -215,8 +215,8 @@ def _assumptions(result: StageResult, estimated: bool, drive: Any = None) -> Non
     result.assume("routing", "Bend radius of loose bundles: factor x OD of the largest wire at the innermost conductor "
                              "(SAE AS50881 references bundle bends to the largest wire); jacketed bundles: factor x "
                              "bundle OD. The router's own (factor x bundle OD) value only guides its search.")
-    result.assume("routing", "Splices may move up to 25 mm, breakouts 30 mm, floating mated pairs 20 mm and integral "
-                             "pigtail exits 30 deg from robot.yaml / the router; moves are reported as recommended edits.")
+    result.assume("routing", "Pulled connector halves and splice sleeves retain their Onshape poses. Free conductor "
+                             "breakouts may move 30 mm and integral pigtail exits rotate 30 deg; recommendations never move native hardware.")
     result.assume("supports", "Supports are catalog hardware (data/supports.yaml) placed on rigid static structure; "
                               "max unsupported span from a clamped-clamped beam sagging 3 mm at 4 g, capped at 100 mm "
                               "(estimates). Splices and floating mated pairs count as held (taped into the bundle).")
