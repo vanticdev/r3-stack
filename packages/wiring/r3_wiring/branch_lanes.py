@@ -51,7 +51,7 @@ def route_lanes(router: Any, harness: Harness, nodes: dict[str, Any]) -> Any:
 
     branches: dict[tuple[str, str], list[Any]] = {}
     for wire in harness.wires:
-        key = tuple(sorted((_terminal(wire.from_, harness), _terminal(wire.to, harness))))
+        key = tuple(sorted((wire.from_, wire.to)))
         branches.setdefault(key, []).append(wire)
     order = sorted(branches, key=lambda k: (-sum(router._wire_od(w.awg) ** 2 for w in branches[k]), k))
     original_fields = router.fields
@@ -59,8 +59,9 @@ def route_lanes(router: Any, harness: Harness, nodes: dict[str, Any]) -> Any:
     previous = []
     routes, wires = [], {}
     try:
-        for index, key in enumerate(order):
-            members = branches[key]
+        for index, pin_pair in enumerate(order):
+            members = branches[pin_pair]
+            key = tuple(dict.fromkeys(_terminal(ref, harness) for ref in pin_pair))
             hints = harness.route.model_copy(update={
                 'independent_branches': False,
                 'via': harness.route.via if index == 0 else [],
