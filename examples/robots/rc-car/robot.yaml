@@ -533,7 +533,7 @@ electrical:
         - {id: W_GPS_PI_TX, from: A.2, to: B.2, awg: 28, color: white, signal: GPS_TX}
         - {id: W_GPS_PI_RX, from: A.3, to: B.3, awg: 28, color: green, signal: GPS_RX}
         - {id: W_GPS_GND, from: A.4, to: B.4, awg: 28, color: black, signal: GND}
-      route: {slack: 20 mm}
+      route: {slack: 20 mm, tie_points: [[44 mm, 5.5 mm, 102.453 mm]]}
     # RTCM3 corrections: correction radio TX -> rover UART2 RX; the radio is powered from the rover's 5 V input.
     - id: rtk_radio_lead
       connectors:
@@ -544,7 +544,7 @@ electrical:
         - {id: W_RTK_RTCM, from: B.3, to: A.2, awg: 28, color: white, signal: RTCM}
         - {id: W_RTK_TX2, from: A.3, to: B.2, awg: 28, color: green, signal: GPS_TX2}
         - {id: W_RTK_GND, from: A.4, to: B.6, awg: 28, color: black, signal: GND}
-      route: {slack: 30 mm}
+      route: {slack: 30 mm, tie_points: [[30 mm, -18 mm, 113 mm]]}
     - id: encoder_lead
       connectors:
         A: {type: integral, mates: encoder.J1}

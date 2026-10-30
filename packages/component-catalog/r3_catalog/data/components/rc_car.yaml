@@ -1720,20 +1720,108 @@ components:
   - id: gnss-riser-petg
     kind: structure
     cad_name: GNSS riser
-    name: Printed GNSS lid riser, PETG, 34 x 44 x 8.946 mm
-    description: Bonded to the gearbox lid; raises both purchased GNSS pigtails clear of the 8 mm gearbox exclusion zone.
+    name: Printed GNSS riser with GPS saddle shelf and RTK lead collar
+    description: Bonded lid riser keeps the GNSS pigtails above the gearbox and supports
+      both outgoing leads.
     mechanical:
-      shape: box
-      size: [34 mm, 44 mm, 8.946 mm]
-      mass: 0.0169
+      shape: custom
+      size:
+      - 66 mm
+      - 53 mm
+      - 37 mm
+      mass: 0.022
       material: PETG
       density: 1270
-      color: "#2c6e9e"
+      color: '#2c6e9e'
       fabricated: true
+      envelope_offset:
+      - 16 mm
+      - -4.5 mm
+      - 0
+      solids:
+      - kind: box
+        name: lid riser
+        position:
+        - 0
+        - 0
+        - 4.473 mm
+        size:
+        - 34 mm
+        - 44 mm
+        - 8.946 mm
+      - kind: box
+        name: GPS tie saddle shelf
+        position:
+        - 33 mm
+        - 5.75 mm
+        - 6.946 mm
+        size:
+        - 36 mm
+        - 18 mm
+        - 4 mm
+      - kind: box
+        name: RTK post foot
+        position:
+        - 24 mm
+        - -22 mm
+        - 6.946 mm
+        size:
+        - 18 mm
+        - 18 mm
+        - 4 mm
+      - kind: cylinder
+        name: RTK tie post
+        position:
+        - 27.5 mm
+        - -24.457 mm
+        - 8 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 27 mm
+      - kind: cylinder
+        name: RTK tie collar
+        position:
+        - 27.5 mm
+        - -24.457 mm
+        - 24.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
     interfaces:
-      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
-      top: {kind: adhesive_pad, origin: [0, -2.25 mm, 8.946 mm], z: [0, 0, 1], x: [1, 0, 0]}
-
+      bottom:
+        kind: adhesive_pad
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+      top:
+        kind: adhesive_pad
+        origin:
+        - 0
+        - -2.25 mm
+        - 8.946 mm
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
   - id: motor-lead-post-petg
     extends: lead-post-petg
     cad_name: Motor cable post
