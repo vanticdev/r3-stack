@@ -1,0 +1,9 @@
+robot: {name: purchased-transmission-coupon, mobility: stationary}
+components:
+  drive: {type: traxxas-3695-magnum-272, pose: {xyz: [0, 0, 0.05]}}
+  motor: {type: traxxas-3785-titan-12t-550}
+assembly:
+  root: drive
+  joins:
+    - {id: motor_mount, a: drive.motor_mount, b: motor.face, clock: 0, fasteners: {type: M3x6}}
+    - {id: coupling, a: drive.pinion, b: motor.shaft, kind: drive_flat}

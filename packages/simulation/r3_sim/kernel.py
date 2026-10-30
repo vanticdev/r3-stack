@@ -967,7 +967,7 @@ class CoSimKernel:
             battery_v=battery_v, battery_i=float(_first(out, [(self.battery_id, "current")], 0.0)),
             soc=float(_first(out, [(self.battery_id, "soc")], 0.0)),
             cell_v=float(_first(out, [(self.battery_id, "cell_voltage")], battery_v / max(self.cells, 1))),
-            rail_5v=float(_first(out, [("_nets", "5V"), (self.computer, "v_in")], 0.0)),
+            rail_5v=float(_first(out, [(self.computer, "voltage"), ("_nets", "5V"), (self.computer, "v_in")], 0.0)),
             bec_v=float(_first(out, [("_nets", "SERVO_6V"), ("_nets", "BEC_6V"), (self.esc_id, "bec_voltage")], 0.0)),
             esc_pulse_pi=next((v for k, v in self.pi_pulses.items() if k in self.arbiters), self.esc_pulse),
             arbiter_failsafe=1.0 if any(a.failsafe for a in self.arbiters.values()) else 0.0,

@@ -4,7 +4,7 @@ components:
       xyz:
       - 0
       - 0
-      - 0.08
+      - 0.04
     type: bench-base
   battery:
     mount: base
@@ -12,31 +12,31 @@ components:
       xyz:
       - -0.05
       - 0
-      - 0.09
+      - 0.045
     type: lipo-2s-5000-25c
   controller:
     mount: base
     pose:
       xyz:
+      - -0.04
       - 0
-      - 0
-      - 0.2
+      - 0.125
     type: bench-controller
   esc:
     mount: base
     pose:
       xyz:
-      - 0.06
+      - -0.09
       - 0
-      - 0.09
+      - 0.08
     type: esc-brushed-60a
   motor:
     mount: base
     pose:
       xyz:
-      - 0.05
+      - -0.02
       - 0
-      - 0.14
+      - 0.095
     type: motor-540-brushed
   roller_left:
     type: test-roller

@@ -211,6 +211,8 @@ class OperatingPoints:
             out = self.solve(self.inputs(t, self.motor_omega_cruise, None, activity), soc, "ambient")
             return self.motor_torque(out) - self.motor_torque_cruise
 
+        if residual(0.0) >= 0:
+            return 0.0
         if residual(1.0) < 0:
             return 1.0
         return float(brentq(residual, 0.0, 1.0, xtol=1e-5))
