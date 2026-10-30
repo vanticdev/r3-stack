@@ -125,9 +125,16 @@ def ffc_end(geometry: ConnectorGeometry, p: dict[str, Any]) -> dict[str, trimesh
     return out
 
 
+def solder_wire_row(geometry: ConnectorGeometry, p: dict[str, Any]) -> dict[str, trimesh.Trimesh]:
+    """Bare conductor ends, not a purchased connector housing."""
+    return {f"contact_{number}": _cylinder(p["diameter"], p["length"], -p["length"], tuple(pos[:2]))
+            for number, pos in _pins_mm(geometry)}
+
+
 BUILDERS: dict[str, Callable[[ConnectorGeometry, dict[str, Any]], dict[str, trimesh.Trimesh]]] = {
     "ffc_end": ffc_end, "housing": housing, "xt_female": xt_female, "xt_male": xt_male, "xt_male_pcb_ra": xt_male_pcb_ra,
     "bullet_male": bullet_male, "bullet_female": bullet_female,
+    "solder_wire_row": solder_wire_row,
 }
 
 
