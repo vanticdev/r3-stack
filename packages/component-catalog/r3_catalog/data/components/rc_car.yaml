@@ -1972,3 +1972,94 @@ components:
           inner_d: 4.4 mm
           inner_h: 2.3 mm
           process: fdm
+  - id: fuse-atc-7.5a
+    kind: fuse
+    cad_name: Fuse holder ATC 7.5A
+    name: Inline ATC/ATO blade fuse holder with 7.5 A fuse
+    mechanical:
+      shape: box
+      size:
+      - 30 mm
+      - 12 mm
+      - 22 mm
+      mass: 0.008
+    pins:
+      A:
+        role: passive
+        current_max: 7.5
+      B:
+        role: passive
+        current_max: 7.5
+    connectors:
+      J1:
+        type: integral
+        position:
+        - -15 mm
+        - 0
+        - 11 mm
+        direction:
+        - -1
+        - 0
+        - 0
+        pins:
+          '1': A
+      J2:
+        type: integral
+        position:
+        - 15 mm
+        - 0
+        - 11 mm
+        direction:
+        - 1
+        - 0
+        - 0
+        pins:
+          '1': B
+    internal_links:
+    - a: A
+      b: B
+      kind: fuse
+      value: 7.5
+    behavior:
+      model: fuse.blade
+      params:
+        rating: 7.5
+        cold_resistance: 10.91 mohm
+        i2t_melt: 60
+      provenance:
+        status: datasheet
+        source: 'Littelfuse 028707.5 ATOF: 7.5 A, 10.91 mOhm, typical melting I2t 60
+          A2s; https://www.littelfuse.com/assetdocs/littelfuse-datasheet-287-atof?assetguid=43dcdce8-8ca2-426f-8998-7e566f048d40'
+    interfaces:
+      bottom:
+        kind: face_mount
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+      tie_path:
+        kind: strap_slot
+        origin:
+        - 0
+        - 0
+        - 22 mm
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          width: 4 mm
+    manufacturer: Littelfuse
+    part_number: '028707.5'

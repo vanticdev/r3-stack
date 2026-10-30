@@ -111,7 +111,7 @@ components:
   battery:     {type: lipo-2s-5000-25c}
   battery_strap: {type: strap-hook-loop-20}
   # The fuse holder hangs in the Y harness at the splice (its input lead is the splice), tied to the plate.
-  fuse:        {type: fuse-atc-5a}
+  fuse:        {type: fuse-atc-7.5a}
   fuse_tie:    {type: zip-tie-2.5}
   pi_spacer_1: {type: spacer-m2.5-ff-10}
   pi_spacer_2: {type: spacer-m2.5-ff-10}
@@ -444,9 +444,9 @@ electrical:
       route: {slack: 20 mm}
     - id: power_y
       # Gauges from the installed (bundle- and enclosure-derated) ampacity of the wiring stage: the HAT branch is 14 AWG
-      # (7.03 A installed in the integrated layout); a 5 A fuse protects it with 35% margin over the 3.70 A HAT load; the
+      # (13.44 A installed in the current layout); a 7.5 A fuse also supplies the owned camera; the
       # fuse holder's input pigtail is 12 AWG like the trunk, so no thinner conductor sits upstream of the fuse.
-      description: XT90H battery input splitting to the XT60 ESC branch (12 AWG) and, through a 5 A fuse, the XT30 HAT branch (14 AWG).
+      description: XT90H battery input splitting to the XT60 ESC branch (12 AWG) and, through a 7.5 A fuse, the XT30 HAT branch (14 AWG).
       connectors:
         P1: {type: xt90h-male, mates: battery_lead.B}
         P2: {type: xt60-female}
