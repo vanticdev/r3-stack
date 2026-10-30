@@ -71,9 +71,11 @@ def test_evidence_from_results(root):
     assert "fallback" in gate["scenario.autonomous_course.brownouts"]["message"]
     assert gate["scenario.autonomous_course.laps_completed"]["status"] == "not_run"
     assert "did not evaluate" in gate["scenario.autonomous_course.laps_completed"]["message"]
-    # Without a CAD build the model stage defers interference to the assembly stage's exact part-plan check
-    # (no bounding-box false positives), so the reference car's model stage is clean.
-    assert gate["stage.model"]["status"] == "verified" and gate["stage.cad"]["status"] == "not_run"
+    # The owned camera's complete FFC route is explicitly unverified even though
+    # its connectors seat and its straight-line reach passes. Do not release it.
+    assert gate["stage.model"]["status"] == "estimated" and gate["stage.cad"]["status"] == "not_run"
+    model_result = json.loads((root / "build/model/result.json").read_text())
+    assert any(d["code"] == "flat_cable_route_estimated" for d in model_result["diagnostics"])
     temperature = gate["requirement.max_component_temperature_c"]
     assert temperature["status"] == "verified" and temperature["evidence"][0]["value"] == 60.0
     assert gate["requirement.min_runtime"]["status"] == "verified" and gate["requirement.min_runtime"]["evidence"][0]["value"] == 1800.0
