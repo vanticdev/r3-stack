@@ -755,6 +755,20 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
         x1 = x0
     stats.update(initial_violation=v0, penalty_iterations=iterations1, penalty_violation=violation(x1))
 
+    # The routing objective is a buildable cable. Once the bounded penalty
+    # solve satisfies every constraint, a dense elastic solve cannot improve
+    # feasibility and can spend hundreds of iterations polishing its length.
+    # Keep the same final constraint audit before accepting this early result.
+    if violation(x1) == 0.0:
+        accepted_stats = {**stats, "best_phase": "penalty", "slsqp_iterations": 0,
+                          "slsqp_message": "Skipped: penalty solution satisfies all constraints",
+                          "final_violation": 0.0,
+                          "initial_length": float(sum(polyline_length(p) for p in problem.points(x0))),
+                          "planned_length": float(sum(polyline_length(p) for p in problem.points(x1)))}
+        accepted = _result(problem, x1, segments, junctions, accepted_stats, obstacles)
+        if accepted.feasible:
+            return accepted
+
     # Phase 2: elastic SLSQP. One slack t >= 0 relaxes every constraint (g + t >= 0) and
     # costs ELASTIC_WEIGHT per unit, so SLSQP always has a feasible point and converges to
     # the least-violating geometry when the layout leaves no feasible route.
