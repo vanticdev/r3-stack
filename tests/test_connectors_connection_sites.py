@@ -135,7 +135,11 @@ def test_contacts_wire_exits_graph_and_stage_use_the_same_site(tmp_path, catalog
     stage.component_connectors()
     stage.harness_connectors()
     stage.mated_pairs()
-    assert stage.result.diagnostics == []
+    # This coordinate-only fixture has no sourced contact models. The mesh
+    # verifier must say so; a valid partial site is not physical fit evidence.
+    assert len(stage.result.diagnostics) == 2
+    assert all(d.code == "connector_unverifiable" and d.severity.value == "warning"
+               for d in stage.result.diagnostics)
     assert stage.data["mated_pairs"][0]["max_pin_lateral_error"] < 1e-6
     np.testing.assert_allclose(stage._frame("lead.B").matrix(), frame.matrix(), atol=1e-12)
 

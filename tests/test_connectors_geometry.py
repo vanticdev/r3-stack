@@ -110,14 +110,15 @@ def project():
 
 
 def test_component_connectors_mate_in_place(project):
-    """Measured header insulator and join datum coincide: no nominal 0.22 mm gap."""
+    """The shimmed stack preserves its declared socket seating gap and pin grid."""
     j8 = component_connector_frame(project, "pi.J8")
     socket = component_connector_frame(project, "hat.J_GPIO")
     catalog = project.catalog
     header, sock = catalog.connector("header-2x20-2.54").geometry, catalog.connector("socket-2x20-2.54").geometry
     d = socket.origin - j8.origin
     assert np.linalg.norm(d - (d @ j8.z) * j8.z) < 1e-6
-    assert abs(d @ j8.z) < 1e-15  # floating-point composition of coincident planes
+    join = next(j for j in project.spec.assembly.joins if j.join_id == "gpio_header")
+    assert float(d @ j8.z) == pytest.approx(float(join.offset), abs=1e-15)
     assert np.dot(j8.z, socket.z) < -0.9999 and np.dot(j8.x, socket.x) > 0.9999
     for number in header.pins:
         delta = socket.point(sock.pins[number].position) - j8.point(header.pins[number].position)

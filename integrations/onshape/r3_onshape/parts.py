@@ -298,7 +298,8 @@ def build_part_catalog(project: Project) -> tuple[dict[str, LocalPart], dict[str
             parts[key] = LocalPart(key=key, name=name, studio=ctype.cad_family or cad_name(ctype), type=type_id, plan=plan,
                                    connectors=interface_connectors(project, type_id, mirror),
                                    library=not mech.fabricated and ctype.kind != "pcb", mirror=mirror, properties=props)
-            if not mech.fabricated and not mech.solids and ctype.model and ctype.model.source in {"vendor", "kicad"}:
+            if (not mech.fabricated and mech.shape == "custom" and not mech.solids
+                    and ctype.model and ctype.model.source in {"vendor", "kicad"}):
                 parts[key].source_model = ctype.model.model_copy(deep=True)
         if not ctype.mechanical.fabricated and ctype.kind != "pcb":
             from .purchased import bank_entry
