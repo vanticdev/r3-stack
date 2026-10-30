@@ -105,3 +105,7 @@ From review 01 (GPT-6.1 Sol, GPT-6 Astra) and the agent findings:
     - There is no wire-vs-wire check.
 
     The USB-block case is fixed in 5a585ab, where the exemption covers only the connector owner, and the HAT header move is with lane B2. Owner for the checks: GPT-6.1 Sol on `r3/wire-collisions`, adding `wire_intersects_connector`, `connector_intersects_component` and `wire_intersects_wire`, and making the router avoid connector bodies. The layout lane then fixes what these checks expose.
+
+31. **23 of 25 mated connector pairs cannot be mesh-verified (2026-10-30).** r3/part-accuracy added the mesh-mating check. It found that most connector models (XT30, bullets, JST, servo crimps and so on) are proxies with no contact geometry, so the check reports `connector_unverifiable` for them.
+
+    Fix: source real models through the model bank (KiCad 3D libraries, vendor STEP) for every connector type in use, so each pair can pass or fail on real geometry. This is a candidate for the Sol/Astra review round. It has to work for any robot's connectors, not only the rc-car's.
