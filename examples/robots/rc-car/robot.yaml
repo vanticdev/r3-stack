@@ -158,7 +158,7 @@ components:
   cap_power_lead_post: {type: screw-cap-m3-petg}
   gnss_riser: {type: gnss-riser-petg}
   encoder_lead_post: {type: encoder-lead-post-petg}
-  sensor_lead_post: {type: sensor-lead-post-petg}
+  sensor_lead_post: {type: sensor-rtk-mast-petg}
   cap_encoder_lead_post: {type: screw-cap-m3-petg}
   cap_sensor_lead_post: {type: screw-cap-m3-petg}
   cap_lead_post: {type: screw-cap-m3-petg}
@@ -312,7 +312,7 @@ assembly:
     - {id: gnss_riser_bond, a: gearbox.lid_pad, b: gnss_riser.bottom}
     - {id: gps_tape_bottom, a: gnss_riser.top, b: tape_gps.bottom}
     - {id: gps_tape_top, a: tape_gps.top, b: gps.bottom}
-    - {id: rtk_radio_tape_bottom, a: deck.rtk_radio_pad, b: tape_rtk_radio.bottom}
+    - {id: rtk_radio_tape_bottom, a: sensor_lead_post.radio_pad, b: tape_rtk_radio.bottom}
     - {id: rtk_radio_tape_top, a: tape_rtk_radio.top, b: rtk_radio.side}
     - {id: lead_post_mount, a: deck.lead_post, b: lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
     - {id: motor_lead_post_mount, a: chassis.motor_lead_post, b: motor_lead_post.base, clock: 0 deg, fasteners: {type: M3x10}}
