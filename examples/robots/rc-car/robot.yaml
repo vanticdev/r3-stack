@@ -40,8 +40,7 @@ components:
       # Rear-right notch clears the transmission's gear cover.
       # Rear-left tab carries the so_rl standoff behind the motor terminals (3 mm clear of the gear case at y < 30 mm);
       # the right-edge tab carries the lead post's screw (edge distance) beside the lead slot.
-      outline: [[-66 mm, -55 mm], [-49 mm, -55 mm], [-49 mm, -108 mm], [-15 mm, -108 mm], [-15 mm, -55 mm], [5 mm, -55 mm], [5 mm, -80 mm], [35 mm, -80 mm], [35 mm, -55 mm], [85 mm, -55 mm],
-                [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
+      outline: [[-66 mm, -55 mm], [-49 mm, -55 mm], [-49 mm, -120 mm], [5 mm, -120 mm], [5 mm, -80 mm], [55 mm, -80 mm], [55 mm, -55 mm], [85 mm, -55 mm], [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
   standoff_rl: {type: standoff-m3-47}
   standoff_rr: {type: standoff-m3-47}
   standoff_fl: {type: standoff-m3-47}
@@ -193,6 +192,14 @@ components:
       - 11.5 mm
       - 4 mm
       - 1.6 mm
+  servo_climb_post:
+    type: servo-climb-post-petg
+  cap_servo_climb_post:
+    type: screw-cap-m3-petg
+  servo_upper_post:
+    type: servo-upper-post-petg
+  cap_servo_upper_post:
+    type: screw-cap-m3-petg
 assembly:
   root: chassis
   tolerance: {position: 0.05 mm, angle: 0.1 deg}
@@ -406,6 +413,24 @@ assembly:
     - id: camera_strain_tape_cable
       a: camera_tape.top
       b: camera_fpc.strain_pad
+    - id: servo_climb_post
+      a: deck.servo_climb_post
+      b: servo_climb_post.base
+      clock: 0 deg
+      fasteners:
+        type: M3x10
+    - id: cap_servo_climb_post
+      a: deck.cap_servo_climb_post
+      b: cap_servo_climb_post.seat
+    - id: servo_upper_post
+      a: deck.servo_upper_post
+      b: servo_upper_post.base
+      clock: 0 deg
+      fasteners:
+        type: M3x10
+    - id: cap_servo_upper_post
+      a: deck.cap_servo_upper_post
+      b: cap_servo_upper_post.seat
 mechanical:
   transmissions:
     - id: drivetrain
@@ -519,7 +544,7 @@ electrical:
         - {id: W_SRV_GND, from: A.3, to: B.3, awg: 20, color: black, signal: GND}
       # The forward shelf restrains the pigtail turn; collared posts carry the climb outside the deck
       # and above the receiver to the HAT's south-facing connector.
-      route: {keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr], slack: 30 mm, tie_points: [[311 mm, -10 mm, 41.87 mm], [185.21 mm, -49.21 mm, 62 mm], [135 mm, -79.347 mm, 113 mm], [85.5 mm, -100 mm, 128 mm]], via: [[303 mm, -25 mm, 42 mm], [170 mm, -63 mm, 78 mm], [115 mm, -105 mm, 135 mm]]}
+      route: {keep_away: [wheel_fl, wheel_fr, knuckle_fl, knuckle_fr], slack: 30 mm, tie_points: [[325 mm, -10 mm, 41.87 mm], [185.21 mm, -49.21 mm, 62 mm], [135 mm, -79.347 mm, 113 mm], [85.5 mm, -100 mm, 128 mm], [159.6546 mm, -67.412733 mm, 84.586 mm], [117.4532 mm, -104.542333 mm, 135.4386 mm]], via: [[320 mm, -30 mm, 42 mm], [170 mm, -63 mm, 85 mm], [110 mm, -100 mm, 140 mm]]}
     - id: rx_lead
       connectors:
         A: {type: integral, mates: receiver.J1}

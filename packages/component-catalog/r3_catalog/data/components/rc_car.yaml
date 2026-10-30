@@ -162,6 +162,52 @@ components:
         - 0
       servo_approach_post: {kind: hole_pattern, origin: [-41.87017 mm, -100 mm, 3 mm], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       cap_servo_approach_post: {kind: adhesive_pad, origin: [-41.87017 mm, -100 mm, 0], z: [0, 0, -1]}
+      servo_climb_post:
+        kind: hole_pattern
+        origin:
+        - 39.6546 mm
+        - -74.7829 mm
+        - 3 mm
+        params:
+          holes:
+          - - 0
+            - 0
+            - 3.4 mm
+            - clearance
+            - 3 mm
+      cap_servo_climb_post:
+        kind: adhesive_pad
+        origin:
+        - 39.6546 mm
+        - -74.7829 mm
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+      servo_upper_post:
+        kind: hole_pattern
+        origin:
+        - -2.5468 mm
+        - -111.9125 mm
+        - 3 mm
+        params:
+          holes:
+          - - 0
+            - 0
+            - 3.4 mm
+            - clearance
+            - 3 mm
+      cap_servo_upper_post:
+        kind: adhesive_pad
+        origin:
+        - -2.5468 mm
+        - -111.9125 mm
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
   - id: standoff-m3-47
     kind: structure
     cad_name: Deck standoff M3x47
@@ -1190,10 +1236,10 @@ components:
     mechanical:
       shape: custom
       size:
-      - 34.5 mm
-      - 36 mm
+      - 54.5 mm
+      - 56 mm
       - 27.5 mm
-      mass: 0.0165
+      mass: 0.025572
       material: Aluminum 6061-T6
       density: 2700
       color: '#a9b0b8'
@@ -1212,12 +1258,12 @@ components:
       - kind: box
         name: front lead saddle shelf
         position:
-        - -15 mm
-        - 9 mm
+        - -25 mm
+        - 19 mm
         - 1 mm
         size:
-        - 30 mm
-        - 34 mm
+        - 50 mm
+        - 54 mm
         - 2 mm
       - kind: box
         op: remove
@@ -1231,8 +1277,8 @@ components:
         - 16 mm
         - 11 mm
       envelope_offset:
-      - -12.75 mm
-      - 8 mm
+      - -22.75 mm
+      - 18 mm
       - 0
     interfaces:
       base:
@@ -2424,3 +2470,83 @@ components:
         - 1
         diameter: 11 mm
         length: 1.2 mm
+
+  - id: servo-climb-post-petg
+    extends: lead-post-petg
+    name: servo climb post
+    cad_name: Servo lower climb support
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 11 mm
+      - 11 mm
+      - 15 mm
+      mass: 0.0015
+      solids:
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 15 mm
+      - kind: cylinder
+        name: tie collar
+        position:
+        - 0
+        - 0
+        - 5.985999999999999 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+    description: Collared PETG cable tie support, mounted through a capped M3 screw
+      join.
+
+  - id: servo-upper-post-petg
+    extends: lead-post-petg
+    name: servo upper post
+    cad_name: Servo upper climb support
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 11 mm
+      - 11 mm
+      - 65 mm
+      mass: 0.0042
+      solids:
+      - kind: cylinder
+        name: post
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 65 mm
+      - kind: cylinder
+        name: tie collar
+        position:
+        - 0
+        - 0
+        - 56.83860000000001 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+    description: Collared PETG cable tie support, mounted through a capped M3 screw
+      join.
