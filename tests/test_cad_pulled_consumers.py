@@ -259,3 +259,27 @@ def test_connector_stage_uses_native_instance_and_rejects_stale_route_frame(proj
     assert source == 'pulled'
     np.testing.assert_allclose(frame.origin, [.1, .2, .3])
     assert [d.code for d in result.errors] == ['connector_routes_stale']
+
+
+def test_connection_inventory_reads_pulled_floating_frame(project):
+    import json
+    from r3_connectors.connection_points import connection_points
+
+    path = project.root / 'robot.yaml'
+    data = yaml.safe_load(path.read_text())
+    data['components'].update({f'lead.{name}': {'type': 'synthetic-coupon'} for name in ('A', 'B')})
+    data['electrical'] = {'harnesses': [{'id': 'lead', 'connectors': {
+        'A': {'type': 'xt30-male', 'mates': 'lead.B', 'position': [9, 9, 9]},
+        'B': {'type': 'xt30-female', 'mates': 'lead.A'}}, 'wires': []}]}
+    path.write_text(yaml.safe_dump(data))
+    pose = np.eye(4); pose[:3, 3] = [.4, .5, .6]
+    partner = pose.copy(); partner[:3, :3] = np.diag([1, -1, -1])
+    write_pull(project.root, {name: BRepPrimAPI_MakeBox(4, 4, 4).Shape() for name in data['components']},
+               poses={'coupon': np.eye(4), 'lead.A': pose, 'lead.B': partner})
+    current = Project.load(project.root)
+    stale = current.build_dir('wiring') / 'routing_detail.json'
+    stale.write_text(json.dumps({'nodes': {'lead.A': {'frame': {'origin': [7, 8, 9], 'x': [1, 0, 0], 'z': [0, 0, 1]}}}}))
+    pair = next(p for p in connection_points(current)['connection_points'] if 'pair' in p)
+    np.testing.assert_allclose(pair['origin'], [.4, .5, .6])
+    np.testing.assert_allclose(pair['exit_direction'], [0, 0, 1])
+    assert pair['placement'] == 'pulled'

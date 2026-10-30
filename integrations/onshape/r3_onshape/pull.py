@@ -279,7 +279,7 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
     backup = folder / ".pulled-previous"
     destination = folder / "pulled"
     try:
-        download(transport, manifest, staging, url)
+        download(transport, manifest, staging, pin["url"])
         checksum = hashlib.sha256((staging / "pull.json").read_bytes()).hexdigest()
         from r3_model.description import refresh_pulled
         from r3_model.spec_files import load_spec_files
