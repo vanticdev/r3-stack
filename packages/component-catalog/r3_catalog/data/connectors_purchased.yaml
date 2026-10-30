@@ -1,0 +1,311 @@
+connectors:
+- id: rpi5-fpc-22p-0.5mm-vertical
+  family: rpi5-fpc-22p-0.5mm-vertical
+  gender: socket
+  mates_with:
+  - fpc-22p-0.5mm-cable
+  pin_count: 22
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.0167
+  - 0.0038
+  - 0.00395
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: Electrical ratings are conservative placeholders; not a vendor current-rating certification. 22 spring
+      apex centres; vertical cable exit. Pin 1 inward (Y=13.75); CAM0=J3 nearest Ethernet, CAM1=J4 nearest HDMI.
+- id: rpi5-fpc-16p-0.5mm-vertical
+  family: rpi5-fpc-16p-0.5mm-vertical
+  gender: socket
+  mates_with: []
+  pin_count: 16
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.0137
+  - 0.0038
+  - 0.00395
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: 'Electrical ratings are conservative placeholders; not a vendor current-rating certification. Amphenol
+      62674-161120ALF; Raspberry Pi PCIe connector standard figures 1/2: pin 1 at Y=26.25; contacts on RHS.'
+- id: jst-sh-4-header
+  family: jst-sh-4-header
+  gender: header
+  mates_with: []
+  pin_count: 4
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.006
+  - 0.004
+  - 0.0043
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: 'Electrical ratings are conservative placeholders; not a vendor current-rating certification. JST BMxxB-SRSS-TB
+      top-entry housing measured in Pi STEP; 1 mm contact pitch. Pin signals: Raspberry Pi hardware docs / RP-003139-SP.
+      Spring-tip axis is projected onto housing top.'
+- id: jst-sh-3-header
+  family: jst-sh-3-header
+  gender: header
+  mates_with: []
+  pin_count: 3
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.005
+  - 0.004
+  - 0.0043
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: 'Electrical ratings are conservative placeholders; not a vendor current-rating certification. JST BMxxB-SRSS-TB
+      top-entry housing measured in Pi STEP; 1 mm contact pitch. Pin signals: Raspberry Pi hardware docs / RP-003139-SP.
+      Spring-tip axis is projected onto housing top.'
+- id: jst-sh-2-header
+  family: jst-sh-2-header
+  gender: header
+  mates_with: []
+  pin_count: 2
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.004
+  - 0.004
+  - 0.0043
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: 'Electrical ratings are conservative placeholders; not a vendor current-rating certification. JST BMxxB-SRSS-TB
+      top-entry housing measured in Pi STEP; 1 mm contact pitch. Pin signals: Raspberry Pi hardware docs / RP-003139-SP.
+      Spring-tip axis is projected onto housing top.'
+- id: header-2x2-2.54
+  family: header-2x2-2.54
+  gender: header
+  mates_with: []
+  pin_count: 4
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.00508
+  - 0.00508
+  - 0.01044
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: Electrical ratings are conservative placeholders; not a vendor current-rating certification. Four separate
+      STEP posts and insulator. CT numbering/net association requires board schematic; no PoE voltage is assumed.
+- id: rpi5-usb2-a-receptacle-0
+  family: rpi5-usb2-a-receptacle-0
+  gender: socket
+  mates_with: []
+  pin_count: 4
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.0146
+  - 0.0086
+  - 0.018
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: Electrical ratings are conservative placeholders; not a vendor current-rating certification. Port shell
+      lip and gold contacts measured independently in official STEP. Contact spring shape is not a straight prism;
+      centres are projected from contact region. USB-A pinout per USB-IF.
+- id: rpi5-usb2-a-receptacle-1
+  family: rpi5-usb2-a-receptacle-1
+  gender: socket
+  mates_with: []
+  pin_count: 4
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.0146
+  - 0.0086
+  - 0.018
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: Electrical ratings are conservative placeholders; not a vendor current-rating certification. Port shell
+      lip and gold contacts measured independently in official STEP. Contact spring shape is not a straight prism;
+      centres are projected from contact region. USB-A pinout per USB-IF.
+- id: rpi5-usb3-a-receptacle-0
+  family: rpi5-usb3-a-receptacle-0
+  gender: socket
+  mates_with: []
+  pin_count: 9
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.0146
+  - 0.0086
+  - 0.018
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: Electrical ratings are conservative placeholders; not a vendor current-rating certification. Port shell
+      lip and gold contacts measured independently in official STEP. Contact spring shape is not a straight prism;
+      centres are projected from contact region. USB-A pinout per USB-IF.
+- id: rpi5-usb3-a-receptacle-1
+  family: rpi5-usb3-a-receptacle-1
+  gender: socket
+  mates_with: []
+  pin_count: 9
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.0146
+  - 0.0086
+  - 0.018
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: Electrical ratings are conservative placeholders; not a vendor current-rating certification. Port shell
+      lip and gold contacts measured independently in official STEP. Contact spring shape is not a straight prism;
+      centres are projected from contact region. USB-A pinout per USB-IF.
+- id: rpi5-rj45-receptacle
+  family: rpi5-rj45-receptacle
+  gender: socket
+  mates_with: []
+  pin_count: 8
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.016
+  - 0.0134
+  - 0.02165
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: Electrical ratings are conservative placeholders; not a vendor current-rating certification. 8 separate
+      gold contacts (source Y=6.68..13.82, 1.02 mm pitch); shell lip X=88.05.
+- id: rpi5-micro-hdmi-receptacle
+  family: rpi5-micro-hdmi-receptacle
+  gender: socket
+  mates_with: []
+  pin_count: 19
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.0074
+  - 0.0045
+  - 0.0087
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: Electrical ratings are conservative placeholders; not a vendor current-rating certification. Molex 46765
+      drawing and 19 spring contact lanes in STEP; shell front flare at Y=-1.6303501. Contact-side numbering must
+      be confirmed against fitted connector revision.
+- id: rpi5-usb-c-16-receptacle
+  family: rpi5-usb-c-16-receptacle
+  gender: socket
+  mates_with: []
+  pin_count: 16
+  current_rating_per_pin: 0.5
+  voltage_rating: 30
+  contact_resistance: 0.02
+  awg_min: 28
+  awg_max: 32
+  body_size:
+  - 0.009
+  - 0.0044
+  - 0.0078
+  provenance:
+    status: estimated
+    source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+      docs/guide/part-accuracy.md
+    notes: Electrical ratings are conservative placeholders; not a vendor current-rating certification. Shell and
+      tongue verified in STEP. The STEP has 16 solder tails but no mating contact solids. Standard USB-C USB2 contact
+      layout is ESTIMATED until vendor connector drawing or physical measurement confirms it.
+- id: solder-pads-1x8-2.54
+  family: Soldered 2.54 mm through-hole row
+  gender: none
+  mates_with:
+  - solder-wire-1x8-2.54
+  pin_count: 8
+  current_rating_per_pin: 0.1
+  voltage_rating: 30
+  contact_resistance: 0.0002
+  awg_min: 26
+  awg_max: 30
+  body_size:
+  - 0.02032
+  - 0.00254
+  - 0.001
+  provenance:
+    status: measured
+    source: https://raw.githubusercontent.com/adam-kabbara/RSX-CANSAT-2026/6e7b39f8cbd07e0290e0925f2fbab3cb3e0e376f/electrical/DO_NOT_EDIT__KICAD_LIBRARIES/Custom_3D_Models.3dshapes/GY-521_%28MPU-6050%29.step
+    notes: Loose header is optional; this type describes pads and bare soldered wire ends, not an installed plastic
+      connector.
+- id: solder-wire-1x8-2.54
+  family: Soldered 2.54 mm through-hole row
+  gender: none
+  mates_with:
+  - solder-pads-1x8-2.54
+  pin_count: 8
+  current_rating_per_pin: 0.1
+  voltage_rating: 30
+  contact_resistance: 0.0002
+  awg_min: 26
+  awg_max: 30
+  body_size:
+  - 0.02032
+  - 0.00254
+  - 0.001
+  provenance:
+    status: measured
+    source: https://raw.githubusercontent.com/adam-kabbara/RSX-CANSAT-2026/6e7b39f8cbd07e0290e0925f2fbab3cb3e0e376f/electrical/DO_NOT_EDIT__KICAD_LIBRARIES/Custom_3D_Models.3dshapes/GY-521_%28MPU-6050%29.step
+    notes: Loose header is optional; this type describes pads and bare soldered wire ends, not an installed plastic
+      connector.

@@ -38,9 +38,12 @@ components:
       features:
         - {id: hole_1, kind: clearance_hole, position: [15 mm, 15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm,
            provenance: {status: estimated, source: "No official drawing (forum.arducam.com/t/10317); 38 x 38 Pi camera footprint of the RPi GS camera drawing (4x 2.5 mm on 30 mm pitch). MEASURE before printing a bracket"}}
-        - {id: hole_2, kind: clearance_hole, position: [-15 mm, 15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm}
-        - {id: hole_3, kind: clearance_hole, position: [15 mm, -15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm}
-        - {id: hole_4, kind: clearance_hole, position: [-15 mm, -15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm}
+        - {id: hole_2, kind: clearance_hole, position: [-15 mm, 15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm,
+           provenance: {status: estimated, source: "https://forum.arducam.com/t/10317", notes: "Unconfirmed owned-board pattern; user must measure."}}
+        - {id: hole_3, kind: clearance_hole, position: [15 mm, -15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm,
+           provenance: {status: estimated, source: "https://forum.arducam.com/t/10317", notes: "Unconfirmed owned-board pattern; user must measure."}}
+        - {id: hole_4, kind: clearance_hole, position: [-15 mm, -15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm,
+           provenance: {status: estimated, source: "https://forum.arducam.com/t/10317", notes: "Unconfirmed owned-board pattern; user must measure."}}
       provenance:
         status: vendor
         source: "https://www.uctronics.com/1-58mp-imx296-color-global-shutter-camera-module-with-m12-lens-for-raspberry-pi.html (Arducam store: 38 x 38 mm board, 13 mm lens holder); lens 14 mm dia (RobotShop M2506ZH04 listing)"
@@ -71,6 +74,7 @@ components:
       # 2-lane camera on a 22-pin (4-lane) connector: lanes 2 and 3 (pins 11, 12, 14, 15) are not connected.
       J1: {type: fpc-22p-0.5mm-socket, position: [0, -17 mm, 0], direction: [0, -1, 0], x: [1, 0, 0],
            source: "estimated: back-side 22-pin FPC at the board edge (forum.arducam.com/t/10317)",
+           provenance: {status: estimated, source: "https://forum.arducam.com/t/10317", notes: "Arducam public request has no drawing/model response as of 2026-10-30. Connector centre, height and exit require measurement; not verified by a Raspberry Pi camera footprint."},
            pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
                   "13": GND, "16": GND, "17": IO0, "18": IO1, "19": GND, "20": SCL, "21": SDA, "22": 3V3}}
     behavior:

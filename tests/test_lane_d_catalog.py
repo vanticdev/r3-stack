@@ -74,7 +74,8 @@ def test_camera_and_csi_cables() -> None:
 def test_pi5_variants_extend_the_8gb_board() -> None:
     catalog = default_catalog()
     base = catalog.component("raspberry-pi-5-8gb")
-    assert {"CAM0", "CAM1"} <= set(base.connectors) and base.connectors["CAM0"].type == "fpc-22p-0.5mm-socket"
+    assert {"CAM0", "CAM1"} <= set(base.connectors) and base.connectors["CAM0"].type == "rpi5-fpc-22p-0.5mm-vertical"
+    assert base.connectors["CAM0"].direction == [0, 0, 1]  # measured top-entry vendor housing
     assert base.connectors["CAM0"].pins["21"] == "CAM0_SDA" and base.connectors["CAM0"].pins["22"] == "3V3"
     for ram in (1, 2, 4, 16):
         variant = catalog.component(f"raspberry-pi-5-{ram}gb")
