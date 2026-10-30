@@ -416,6 +416,20 @@ class HarnessRouter:
                 np.minimum(out, self._cable_fields[key], out=out)
         return out
 
+    def _nonincident_hardware(self, harness: str, terminals: tuple[str, str], radius: float) -> np.ndarray:
+        """A branch cannot borrow another branch's connector/splice entry aperture."""
+        blocked = np.zeros(self.grid.size, dtype=bool)
+        for body in self.obstacles.cable_bodies:
+            node = body.node
+            if node.harness != harness or node.name in terminals:
+                continue
+            key = (body.component, body.source, tuple(node.exit),
+                   None if node.frame is None else tuple(node.frame.matrix().ravel()))
+            if key not in self._cable_fields:
+                self._cable_fields[key] = body.shape.sdf_bounded(self.grid.centers(), 0.05) - body.keepout
+            blocked |= self._cable_fields[key] < radius
+        return blocked
+
     # ----------------------------------------------------------------- nodes
     def _wire_od(self, awg: int) -> float:
         return float(self.catalog.wire(awg).outer_diameter)
@@ -833,6 +847,10 @@ class HarnessRouter:
                     stops.append(voxel)
                     stop_dirs.append(None)
             stops.append(terminals[1])
+            # Reclose unrelated entry zones even when an earlier branch opened
+            # their voxels. Only the incident conductors may enter a splice.
+            for voxel in np.flatnonzero(self._nonincident_hardware(harness.id, key, r)):
+                blocked[voxel] = 1
             voxels: list[int] = []
             ok = True
             for leg in range(len(stops) - 1):

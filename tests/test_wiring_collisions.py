@@ -246,3 +246,19 @@ def test_future_header_exit_is_reserved_for_its_own_harness(tmp_path):
     midpoint = np.array([[.11, 0, .04]])
     assert router.grid.sample(other, midpoint)[0] < 0
     assert router.grid.sample(own, midpoint)[0] > .04
+
+
+def test_other_branch_cannot_borrow_a_splice_entry_aperture(tmp_path):
+    project = Project.load(write_project(tmp_path, block=False))
+    from r3_wiring.obstacles import build_obstacles
+    obstacles, _ = build_obstacles(project)
+    router = HarnessRouter(project, obstacles, RouterOptions(plan=False))
+    node = _node('power', 'SN', [.1, 0, .03], 'splice', od=.008)
+    nodes = {'power': {'SN': node}}
+    obstacles.cable_bodies = cable_obstacles(project, nodes)
+    field = router.cable_field(nodes, {'power'})
+    inside = obstacles.cable_bodies[0].shape.sdf(router.grid.centers()) < 0
+    assert np.any(inside & (field > 0))  # harness-level entry alone admits these voxels
+    unrelated = router._nonincident_hardware('power', ('P1', 'SP'), .002)
+    incident = router._nonincident_hardware('power', ('P1', 'SN'), .002)
+    assert np.all(unrelated[inside]) and not np.any(incident)
