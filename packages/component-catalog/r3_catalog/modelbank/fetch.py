@@ -73,6 +73,11 @@ def acquire(source: Source, *, pin: bool = False, downloader: Callable[..., Path
 
 
 def unpack(path: Path, source: Source) -> Path:
+    if source.solid_indices:
+        from .selection import select_solids
+
+        original = unpack(path, source.model_copy(update={'solid_indices': []}))
+        return select_solids(original, source.solid_indices)
     if source.format == 'stp.rar':
         return unpack_rar(path, source)
     if source.format != 'stp.zip':
@@ -156,7 +161,8 @@ def convert(path: Path, source: Source) -> dict[str, Any]:
     if not scene.geometry:
         raise ValueError('model contains no tessellated geometry')
     mesh = scene.to_mesh()
-    glb_target, stl_target = path.parent / 'model.glb', path.parent / 'model.stl'
+    output = model.parent if source.solid_indices else path.parent
+    glb_target, stl_target = output / 'model.glb', output / 'model.stl'
     scene.export(glb_target)
     mesh.export(stl_target)
     return {'source': str(model), 'glb': str(glb_target), 'stl': str(stl_target), 'bbox_m': mesh.extents.tolist(),
