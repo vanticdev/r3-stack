@@ -943,7 +943,10 @@ class HarnessRouter:
                 key_ = canon[0] if end == 0 else canon[-1]
                 node = nodes.get(key_[2:]) if isinstance(key_, str) and key_.startswith("N:") else None
                 pts = segment["points"] if end == 0 else segment["points"][::-1]
-                bo = self._breakout(node, pts) if node is not None else None
+                opposite_key = canon[-1] if end == 0 else canon[0]
+                opposite = nodes.get(opposite_key[2:]) if isinstance(opposite_key, str) and opposite_key.startswith("N:") else None
+                both_ends = opposite is not None and opposite.kind in ("connector", "floating") and opposite.fan_length > 0
+                bo = self._breakout(node, pts, opposite_fanout=both_ends) if node is not None else None
                 if bo is not None:
                     breakouts[(node.name, canon)] = bo
                 bos.append(bo)
@@ -1030,16 +1033,17 @@ class HarnessRouter:
         node.fan_length = max(0.006, 3.0 * lateral + 2.0 * node.od)
 
     @staticmethod
-    def _breakout(node: NodePoint, points: np.ndarray) -> dict[str, Any] | None:
+    def _breakout(node: NodePoint, points: np.ndarray, *, opposite_fanout: bool = True) -> dict[str, Any] | None:
         """Breakout of ``node``'s conductors on a bundle segment (``points`` start at the
-        node exit): the point at the node's fan length along the segment (at most 45 %
-        of it), and the segment tangent there, pointing away from the node."""
+        node exit): the point at the node's fan length along the segment and its
+        outward tangent. Reserve 10% for the core; share the remaining length
+        only when the opposite end also has a pin fan-out."""
         if node.kind not in ("connector", "floating") or node.fan_length <= 0 or len(points) < 2:
             return None
         arc = np.concatenate([[0.0], np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))])
         if arc[-1] < 1e-6:
             return None
-        b = min(node.fan_length, 0.45 * float(arc[-1]))
+        b = min(node.fan_length, (0.45 if opposite_fanout else 0.90) * float(arc[-1]))
         delta = min(0.001, b, float(arc[-1]) - b)
         at = lambda s: np.array([np.interp(s, arc, points[:, a]) for a in range(3)])  # noqa: E731
         q = at(b)
