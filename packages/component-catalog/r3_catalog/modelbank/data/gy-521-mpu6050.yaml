@@ -78,21 +78,38 @@ sources:
   eid: ''
   part_id: ''
 validation:
-  status: unverified
+  status: passed
   bbox_m:
-  - 0.020349999889731407
-  - 0.015650000423192978
-  - 0.0024999999441206455
+  - 0.02035
+  - 0.01565
+  - 0.0025
   expected_bbox_m:
   - 0.021
   - 0.016
   - 0.0032
   tolerance_m: 0.0015
-  key_features: {}
-  date: '2026-10-30T04:13:48.992955+00:00'
-  validated_by: r3/cascadio
-  notes: Axis-specific bbox check; interface features require independent geometry
-    inspection.
+  key_features:
+    pcb_outline_20p35x15p65: true
+    mount_holes_d3_pitch16p35: true
+    pcb_seating_faces_z0_z1: true
+    header_eight_d1_holes_pitch2p54: true
+    interface_frames_from_step: true
+  date: '2026-10-30T15:41:58.611896+00:00'
+  validated_by: Codex / Open CASCADE native STEP B-rep inspection
+  notes: 'Inspected checksum-pinned source.step with STEPControl_Reader, BRepAdaptor_Surface and BRepBndLib.AddOptimal
+    (no tolerance inflation). All measurements below are source mm; face numbers are zero-based TopExp
+    FACE traversal. Cylindrical faces 229/234 have radius 1.5, axes (2,-2) and (18.35,-2), Z=0..1. PCB
+    top face 42 is Z=1; bottom face 241 is Z=0, both bounded by X=0..20.35, Y=-15.65..0. Placement subtracts
+    (10.175,-7.825,0) mm. mc_mount and mc_bottom use the outline centre on the bottom plane, -Z outward;
+    mc_mount_h1/h2 and mc_cap_2/1 use the +X/-X bore axes at the top plane, +Z outward. Frame X follows
+    the board long edge. Eight radius-0.5 header bores lie at Y=-14.38 and X=1.285+2.54*n, n=0..7. All
+    six frames agree with the current catalog to numerical precision. Model bbox 20.35x15.65x2.5 differs
+    from nominal bank dimensions 21x16x3.2 by 0.65/0.35/0.70 mm; hole diameter 3.0 differs from the approximate
+    vendor 3.2 mm by 0.2 mm, within unchanged 1.5 mm tolerance. This passes MODEL-to-catalog inspection
+    only: it does not identify or measure the owned physical board. The 15.5 mm estimated vendor pitch
+    differs from this STEP''s 16.35 mm by 0.85 mm; another documented variant is 17.05 mm. Keep estimated
+    mount provenance and mount_pattern_estimated / mount_geometry_estimated release evidence until user
+    caliper confirmation.'
 catalog_component: gy-521-mpu6050
 catalog_aliases: []
 searched_sources:
@@ -132,5 +149,11 @@ placement:
   - 0.0
   - 0.0
   - 1.0
-interface_frames: {}
+interface_frames:
+  mc_mount: {origin: [0.0, 0.0, 0.0], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
+  mc_mount_h1: {origin: [0.008175, 0.005825, 0.001], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_mount_h2: {origin: [-0.008175, 0.005825, 0.001], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_cap_1: {origin: [-0.008175, 0.005825, 0.001], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_cap_2: {origin: [0.008175, 0.005825, 0.001], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, 1.0]}
+  mc_bottom: {origin: [0.0, 0.0, 0.0], x: [1.0, 0.0, 0.0], z: [0.0, 0.0, -1.0]}
 onshape_connectors: {}
