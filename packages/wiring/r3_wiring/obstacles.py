@@ -220,6 +220,24 @@ def _catalog_shape(project: Project, component: str) -> Shape | None:
     mech = ctype.mechanical
     position, rotation = project.graph.component_pose(component)
     size = np.asarray(mech.size, dtype=float)
+    instance = spec.components[component]
+    if mech.fabricated and (mech.solids or instance.params.get("solids")):
+        # An envelope fills the useful gaps in a printed saddle or frame. Use
+        # the same authored boolean solid as offline CAD, even before an export
+        # exists. It remains estimated catalog geometry in the stage evidence.
+        from r3_onshape.geometry import PartPlan, plan_manifold
+        from r3_onshape.parts import component_ops
+
+        plan = PartPlan(name=ctype.name, kind="fabricated", material=mech.material or ctype.name,
+                        density=float(mech.density or 0.0), ops=component_ops(
+            project, ctype.id, instance.params, instance.params.get("mirror")))
+        local = plan_manifold(plan).to_mesh()
+        vertices = np.asarray(local.vert_properties)[:, :3] @ rotation.T + position
+        faces = np.asarray(local.tri_verts)
+        coarse_vertices, coarse_faces = cluster_decimate(vertices, faces, ROUTING_MESH_CELL)
+        if len(coarse_faces):
+            vertices, faces = coarse_vertices, coarse_faces
+        return MeshShape(vertices, faces)
     if mech.shape == "cylinder":
         radius, length = size[0] / 2, size[1]
         local_center = np.array([0.0, 0.0, length / 2]) if mech.axis == "z" else np.zeros(3)

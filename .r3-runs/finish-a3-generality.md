@@ -40,3 +40,12 @@ checks. A synthetic supplied plate proves the real bore, thickness and seat
 face survive; source-only purchased parts cannot be silently mirrored. No robot,
 harness, connector or component IDs occur in these new code paths. The models
 extra now declares cadquery-ocp (already installed in the shared environment).
+
+Fresh-build follow-up: routing now reads authored fabricated solids (including
+boolean openings, mounting holes and instance transforms) through the same
+local CAD plan used by recomposition, instead of filling every custom support
+with its enclosing box. Geometry without an export remains labelled estimated.
+A robot-independent optical bridge fixture checks the open corridor, solid legs
+and rotation; 11 related routing tests pass. Required-support reservations also
+reuse the existing EMC categories and termination-zone policy. No dimensional
+threshold was added or relaxed in either change.
