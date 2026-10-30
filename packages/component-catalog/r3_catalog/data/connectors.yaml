@@ -15,7 +15,7 @@ connectors:
     awg_min: 10
     awg_max: 12
     mating_cycles: 1000
-    body_size: [20.8 mm, 11.7 mm, 29.7 mm]
+    body_size: [20.8 mm, 11.7 mm, 30.7 mm]
     provenance: {status: datasheet, source: "AMASS XT90H V1.2: 45 A rated / 90 A momentary, 0.30 mOhm; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf", notes: "10 AWG recommended; 12 AWG solder termination retained at the existing lead. Body envelope includes insulating cap."}
   - id: xt90h-female
     family: Amass XT90H

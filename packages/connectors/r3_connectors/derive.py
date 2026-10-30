@@ -192,17 +192,17 @@ PROXIES: dict[str, ProxySpec] = {
         "JST GH datasheet (eGH.pdf) GHR-04V-S: 1.25 mm pitch, 6.25 mm wide; SSHL-002T-P0.2 crimps (proxy)",
         "#f2efdc"),
     "xt90h-male": ProxySpec(
-        [("1", -4.95, 0.0), ("2", 4.95, 0.0)], "housing",
-        {"width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5},
-        29.7, 0.0, (20.8, 11.7, 29.7), 0.0, "solder_cup", 4.5,
-        "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; "
+        [("1", -5.5, 0.0), ("2", 5.5, 0.0)], "housing",
+        {"width": 20.8, "thickness": 11.7, "length": 30.7, "cavity": 4.5},
+        30.7, 0.0, (20.8, 11.7, 30.7), 0.0, "solder_cup", 4.5,
+        "AMASS XT90H V1.2 drawing: 11.00 mm pitch, 20.8 x 11.7 x 30.7 mm capped envelope; "
         "conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf",
         "#d9a21b"),
     "xt90h-female": ProxySpec(
-        [("1", -4.95, 0.0), ("2", 4.95, 0.0)], "housing",
+        [("1", -5.5, 0.0), ("2", 5.5, 0.0)], "housing",
         {"width": 20.8, "thickness": 11.7, "length": 29.7, "cavity": 4.5},
         29.7, 0.0, (20.8, 11.7, 29.7), 0.0, "solder_cup", 4.5,
-        "AMASS XT90H V1.2 drawing: 9.90 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; "
+        "AMASS XT90H V1.2 drawing: 11.00 mm pitch, 20.8 x 11.7 x 29.7 mm capped envelope; "
         "conservative envelope proxy, mating recess and wire exit estimated; https://www.electrokit.com/upload/product/41020/41020964/XT90H.pdf",
         "#d9a21b"),
     "servo-3-female": ProxySpec(
