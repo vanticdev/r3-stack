@@ -32,3 +32,10 @@ Final local fit evidence at 49827fd:
 Model-stage `mount_geometry_estimated` keeps the owned mount visible as estimated
 in release evidence until its holes are measured. The future joint-physics layer
 must still be merged and rerun; this report does not claim that unmerged check.
+
+The restored seats remain ordinary `adhesive_pad` interfaces and the robot uses
+ordinary joins `imu.cap_1 -> cap_imu_1.seat` and
+`imu.cap_2 -> cap_imu_2.seat`. They carry no validation exemption or special
+retention path. Integration at b630f8b still has no joint-physics layer; when it
+lands, rerun its ordinary cap/clamp checks on these joins, including the
+missing-cap zero-clamp case. No future clamp-force result is asserted here.

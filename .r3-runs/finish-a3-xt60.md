@@ -35,3 +35,14 @@ They expose specification PDFs, but no replacement STEP pair was found. The
 current official KiCad files already are the pair in use. A compatible real
 model pair is still needed; this is not permission to modify purchased geometry
 or increase the overlap tolerance. No vendor was contacted.
+
+A further public supplier model was evaluated from Bristol Bot Builders:
+https://shop.bristolbotbuilders.com/product/xt60/ links the assembled pair at
+https://drive.google.com/file/d/1akDTGfGDaTSRl7Z06hR7Tx2zWON6zQzp/view .
+Its STEP SHA-256 is
+`1e7216af4bfe05a5c43e71a3bd4d5b2f5f176a3fc0df4c4ef144a595937ee413`.
+The two unchanged supplied solids intersect by **651.844886 mm^3** in the
+published assembly. Both contain 2.15 mm-radius bores at +/-3.6 mm pitch centres;
+the model does not supply separate conductive pin/socket solids. It is useful
+as an envelope reference, but cannot replace the current pair for the blocking
+mesh-mating/insertion proof. It was not installed, edited or redistributed.
