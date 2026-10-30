@@ -63,7 +63,20 @@ def test_author_components_designs_and_scenarios_from_tools(project):
     assert m.r3_patch_spec(design, current["sha256"], project=str(project))["ok"]
     built = Project.load(project)
     assert len(built.spec.assembly.joins) == 1 and len(built.spec.electrical.harnesses[0].wires) == 1
-    assert built.assembly is not None
+    # Authored interfaces describe intent; only a native pull supplies an assembly.
+    assert built.assembly is None
+    from pulled_fixture import box, write_pull
+    poses = {"a": np.eye(4), "b": np.eye(4)}
+    poses["b"][:3, 3] = [0, 0, .004]
+    face_a, face_b = np.eye(4), np.eye(4)
+    face_a[2, 3] = .004
+    write_pull(project, {"a": box((50,40,4)), "b": box((50,40,4))}, poses=poses,
+               connectors={"a": {"face": face_a}, "b": {"face": face_b}},
+               mates=[dict(id="coupon-stack", kind="fastened", a=["a", "face"], b=["b", "face"],
+                           axis=None, limits=None)])
+    native = Project.load(project)
+    assert native.assembly is not None
+    np.testing.assert_allclose(native.spec.components["b"].pose.xyz, [0,0,.004])
 
 
 def test_cad_pull_on_empty_project_returns_actionable_target_error(project):
@@ -151,7 +164,8 @@ def test_project_device_runs_with_native_physics_and_real_hal(tmp_path):
     shutil.copytree(FIXTURES / "bench", root)
     (root / "simulation").mkdir()
     shutil.copy(FIXTURES / "project-capabilities/probe.py", root / "simulation/probe.py")
-    project = Project.load(root)
+    from pulled_fixture import instrumentation_pull
+    project = instrumentation_pull(root)
     project.spec.simulation.devices["probe"] = ProjectDeviceSpec(component="base", source="simulation/probe.py")
     kernel = CoSimKernel(project, Scenario(id="instrument-observe", duration=.05))
     server = TwinHalServer(kernel)

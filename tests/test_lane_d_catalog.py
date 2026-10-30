@@ -12,6 +12,8 @@ import numpy as np
 import pytest
 import yaml
 
+from test_camera_twin import printbot  # Explicit native optics fixture.
+
 from r3_catalog import default_catalog, load_catalog
 from r3_model.project import Project
 from r3_model.units import to_si
@@ -121,10 +123,8 @@ def test_track_texture_and_cones(tmp_path: Path) -> None:
     assert abs(int(lane[0]) - int(lane[2])) < 15 and grass[1] > grass[0] + 20
 
 
-def test_vehicle_model_has_the_camera_and_scene(tmp_path: Path) -> None:
-    root = tmp_path / "printbot"
-    shutil.copytree(FIXTURE, root)
-    project = Project.load(root)
+def test_vehicle_model_has_the_camera_and_scene(printbot: Path) -> None:
+    project = Project.load(printbot)
     project.spec.simulation.environment.visual = {"ground": "asphalt", "cones": [{"position": [3, 0.5], "color": "orange"}]}
     vm = build_vehicle_model(project)
     xml = ET.fromstring(vm.xml)

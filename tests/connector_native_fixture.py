@@ -81,6 +81,9 @@ def cable_coupons(project: Any, shapes: dict[str, Any], poses: dict[str, np.ndar
     folder = project.root / "catalog/components"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "connector-coupon.yaml").write_text(yaml.safe_dump({"components": [kind.model_dump(mode="json")]}))
+    peers = {conn.mates: f"{harness.id}.{name}"
+             for harness in project.spec.electrical.harnesses
+             for name, conn in harness.connectors.items() if conn.mates}
     for harness in project.spec.electrical.harnesses:
         for name, conn in harness.connectors.items():
             if conn.type == "integral":
@@ -89,7 +92,8 @@ def cable_coupons(project: Any, shapes: dict[str, Any], poses: dict[str, np.ndar
             if conn.mates in project.graph.endpoints and project.graph.endpoints[conn.mates].owner_kind == "component":
                 frame = mating_site_frame(project, ref, conn).mated()
             elif floating_frame is not None:
-                frame = floating_frame if not conn.mates or ref < conn.mates else floating_frame.mated()
+                peer = conn.mates or peers.get(ref)
+                frame = floating_frame if peer is None or ref < peer else floating_frame.mated()
             else:
                 raise AssertionError(f"Fixture needs an explicit floating frame for {ref}")
             project.spec.components[ref] = ComponentInstance(type=kind.id)
