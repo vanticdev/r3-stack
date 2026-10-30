@@ -7,6 +7,7 @@ from r3_wiring.checks import HarnessChecker
 from r3_wiring.obstacles import build_obstacles
 from r3_wiring.router import HarnessRouter, RouterOptions
 from test_wiring_support import write_project
+from native_wiring_fixture import publish_wiring_pull
 
 
 def test_independent_branches_have_no_artificial_shared_core(tmp_path):
@@ -23,6 +24,7 @@ def test_independent_branches_have_no_artificial_shared_core(tmp_path):
     harness['route'] = {'independent_branches': True, 'slack': '10 mm',
                         'wire_via': {'north': [[.1, .035, .015]], 'south': [[.1, -.035, .015]]}}
     path.write_text(yaml.safe_dump(spec, sort_keys=False))
+    publish_wiring_pull(root)
     project = Project.load(root)
     obstacles, _ = build_obstacles(project)
     router = HarnessRouter(project, obstacles, RouterOptions(plan=True))
@@ -85,6 +87,7 @@ def test_stiff_conductors_fit_between_nearby_facing_exits(tmp_path):
                         {'id': 'negative', 'from': 'A.2', 'to': 'B.2', 'awg': 12}]
     harness['route'] = {'independent_branches': True}
     path.write_text(yaml.safe_dump(spec, sort_keys=False))
+    publish_wiring_pull(root)
     project = Project.load(root)
     obstacles, _ = build_obstacles(project)
     router = HarnessRouter(project, obstacles, RouterOptions(plan=True))
@@ -109,6 +112,7 @@ def test_installed_splice_axis_is_preserved_by_lane_planning(tmp_path):
                         {'id': 'out', 'from': 'S', 'to': 'B.1', 'awg': 22}]
     harness['route'] = {'independent_branches': True}
     path.write_text(yaml.safe_dump(spec, sort_keys=False))
+    publish_wiring_pull(root)
     project = Project.load(root)
     obstacles, _ = build_obstacles(project)
     router = HarnessRouter(project, obstacles, RouterOptions(plan=True))
@@ -117,7 +121,9 @@ def test_installed_splice_axis_is_preserved_by_lane_planning(tmp_path):
     np.testing.assert_allclose(junction.axis, [1., 0., 0.], atol=1e-12)
     assert not junction.axis_free
     sleeve = next(body for body in cable_obstacles(project, routing.nodes) if body.component == 'lead.S')
-    np.testing.assert_allclose(sleeve.shape.axis, junction.axis, atol=1e-12)
+    native_axis = np.asarray(project.spec.components["lead.S"].pulled.pose)[:3, 2]
+    np.testing.assert_allclose(native_axis, junction.axis, atol=1e-12)
+    assert sleeve.source == "pulled_stl"
     assert all(plan.feasible for plan in routing.planning.plans)
 
 

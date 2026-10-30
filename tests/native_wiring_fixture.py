@@ -117,9 +117,10 @@ def _fixture_nodes(project: Any) -> dict[str, dict[str, Any]]:
                 key = tuple(sorted((ref, mate_ref)))
                 if key not in pairs:
                     # The synthetic inline pair is installed 100 mm from the
-                    # datum, 25 mm above it, along X. Further test pairs have
+                    # datum, 13 mm above it (aligned with the source wire
+                    # entries), along X. Further test pairs have
                     # explicitly separated Y stations; no space search occurs.
-                    face = [.1, .03 * len(pairs), .025]
+                    face = [.1, .03 * len(pairs), .013]
                     wire_axis = np.array([-1., 0., 0.])
                     if connector.position is not None:
                         face = connector.position
