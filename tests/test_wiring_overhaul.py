@@ -75,6 +75,13 @@ def test_planner_reports_an_infeasible_bend_with_its_constraint():
     assert kinds & {"curvature", "tangent"}
     v = next(v for v in plan.violations if v.kind in ("curvature", "tangent"))
     assert v.required == pytest.approx(0.09, rel=1e-6) and v.achieved < v.required and v.action
+    # An infeasible bend must remain a local engineering finding. Failed
+    # elastic iterations previously won by stretching a motor lead to 192 m,
+    # making the downstream 10 mm-resolution MuJoCo model unconstructible.
+    grid = _field().grid
+    points = np.vstack([segment.points for segment in plan.segments])
+    assert np.all(points >= grid.origin - 1e-9)
+    assert np.all(points <= grid.origin + (np.asarray(grid.shape) - 1) * grid.voxel + 1e-9)
 
 
 def test_bundle_bend_radius_rule():

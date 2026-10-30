@@ -713,6 +713,20 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     spacing = {k: float(np.clip(seg.r_min / 3.0, 0.0015, 0.004)) for k, seg in enumerate(segments)}
     problem = _Problem(segments, junctions, fields, requirement, spacing)
     x0 = problem.x0_array.copy()
+    # The distance fields are defined only on this routing volume. In an
+    # infeasible layout an unbounded elastic solve can otherwise send a point
+    # tens of metres away, marginally reduce its largest residual, and win the
+    # candidate comparison. Keep positional variables in the modelled domain;
+    # include their authored initial position when an exit sits on its edge.
+    lower, upper = np.full(problem.n, -np.inf), np.full(problem.n, np.inf)
+    low = fields.grid.origin
+    high = low + (np.asarray(fields.grid.shape) - 1) * fields.grid.voxel
+    positions = {int(i) for i in problem.p_var if i >= 0}
+    positions.update(i for i in problem.jpos.values() if i is not None)
+    for offset in positions:
+        lower[offset:offset + 3] = np.minimum(low, x0[offset:offset + 3])
+        upper[offset:offset + 3] = np.maximum(high, x0[offset:offset + 3])
+    bounds = list(zip(lower, upper))
     stats: dict[str, Any] = {"variables": problem.n, "points": problem.n_points}
     if problem.n == 0:
         return _result(problem, x0, segments, junctions, stats, obstacles)
@@ -730,7 +744,8 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     v0 = violation(x0)
     x1, iterations1 = x0, 0
     for weight in PENALTY_WEIGHTS:
-        step = minimize(penalty, x1, args=(weight,), jac=True, method="L-BFGS-B", options={"maxiter": 400})
+        step = minimize(penalty, x1, args=(weight,), jac=True, method="L-BFGS-B", bounds=bounds,
+                        options={"maxiter": 400})
         iterations1 += int(step.nit)
         if violation(step.x) <= violation(x1) + 1e-12 or weight == PENALTY_WEIGHTS[0]:
             x1 = step.x
@@ -763,6 +778,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     z1 = np.concatenate([x1, [max(0.0, -float(g1.min())) + 1e-3]])
     try:
         result = minimize(fun, z1, jac=jac, method="SLSQP",
+                          bounds=[*bounds, (0.0, np.inf)],
                           constraints=[{"type": "ineq", "fun": cons, "jac": cons_jac}],
                           options={"maxiter": max_iterations, "ftol": 1e-10})
         x2, message, iterations = result.x[:-1], str(result.message), int(result.nit)
@@ -773,7 +789,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     x3 = x2
     try:
         polish = minimize(lambda x: problem.objective(x)[0], x2, jac=lambda x: problem.objective(x)[1],
-                          method="SLSQP", options={"maxiter": 2 * max_iterations, "ftol": 1e-10},
+                          method="SLSQP", bounds=bounds, options={"maxiter": 2 * max_iterations, "ftol": 1e-10},
                           constraints=[{"type": "ineq", "fun": lambda x: problem.constraints(x)[0],
                                         "jac": problem.jacobian_dense}])
         x3 = polish.x
