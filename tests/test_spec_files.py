@@ -173,7 +173,9 @@ def publish_pull(root):
             (folder / path).write_bytes(content)
             (folder / path).chmod(0o444)
             hashes[kind] = hashlib.sha256(content).hexdigest()
-        parts[name] = {**paths, "sha256": hashes, "mate_connectors": {"origin": frame}, "mass": 1.0,
+        selector = load_spec_files(root).data["components"][name].get("onshape") or {}
+        parts[name] = {**paths, "onshape": {"occurrence_path": selector.get("occurrence_path", []),
+                      "configuration": selector.get("configuration", "")}, "sha256": hashes, "mate_connectors": {"origin": frame}, "mass": 1.0,
                        "com": [0, 0, 0], "inertia": [1, 0, 0, 0, 1, 0, 0, 0, 1], "material": "test", "purchased": False}
     data = {"schema": "r3/pull@1", "document_id": "document", "version_id": "version", "parts": parts,
             "poses": {name: frame for name in parts},

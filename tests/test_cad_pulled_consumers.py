@@ -11,6 +11,7 @@ from r3_model.pulled import PullError, load_pulled
 from r3_model.pulled_view import apply_pulled, cad_view, world_mesh
 from r3_model.diagnostics import StageResult
 from r3_onshape.step_geometry import part_from_step, geometry_from_pulled
+from r3_onshape.model import GeometryModel
 from r3_onshape.fit import FitChecker, FitReport, VOLUME_TOL
 from pulled_fixture import write_pull
 
@@ -283,3 +284,47 @@ def test_connection_inventory_reads_pulled_floating_frame(project):
     np.testing.assert_allclose(pair['origin'], [.4, .5, .6])
     np.testing.assert_allclose(pair['exit_direction'], [0, 0, 1])
     assert pair['placement'] == 'pulled'
+
+
+def test_physical_pose_mirrors_are_refreshed_and_read_only(project):
+    from r3_orchestrator.spec_ops import get_spec, patch_spec
+    from r3_onshape.stage import run
+
+    pull(project)
+    current = get_spec(project.root)
+    assert current['spec']['components']['coupon']['pose']['xyz'] == [.1, .2, .3]
+    patch = patch_spec(project.root, {'components': {'coupon': {'pose': {'xyz': [9, 9, 9]}}}}, current['sha256'])
+    assert patch['code'] == 'spec_read_only'
+    path = project.root / 'robot.yaml'
+    data = yaml.safe_load(path.read_text())
+    data['components']['coupon']['pose']['xyz'] = [9, 9, 9]
+    path.write_text(yaml.safe_dump(data))
+    result = run(Project.load(project.root))
+    assert [d.code for d in result.errors] == ['cad_pull_modified']
+
+
+def test_native_joint_keeps_qualification_association_without_authored_motion(project):
+    from r3_onshape.fit import FitChecker
+
+    path = project.root / 'robot.yaml'
+    data = yaml.safe_load(path.read_text())
+    data['components']['rotor'] = {'type': 'synthetic-coupon'}
+    data['mechanical'] = {'interfaces': [{'id': 'capture', 'kind': 'revolute_fit',
+        'parts': ['coupon', 'rotor'], 'axis_point': [0, 0, 0], 'axis_dir': [0, 0, 1]}],
+        'joints': [{'id': 'authored-rating', 'type': 'revolute', 'parent': 'coupon', 'child': 'rotor',
+                    'origin': [9, 9, 9], 'axis': [1, 0, 0], 'limits': [-4, 4], 'interface': 'capture'}]}
+    path.write_text(yaml.safe_dump(data))
+    write_pull(project.root, {name: BRepPrimAPI_MakeBox(4, 4, 4).Shape() for name in data['components']},
+               mates=[{'id': 'pivot', 'kind': 'revolute', 'a': ['coupon', 'origin'], 'b': ['rotor', 'origin'],
+                       'axis': [0, 0, 1], 'limits': [-.2, .3]}])
+    current = Project.load(project.root)
+    assembly = apply_pulled(current)
+    joint = assembly.joints[0]
+    assert joint.id == 'pivot' and joint.interface == 'capture'
+    assert joint.origin == [0, 0, 0] and joint.axis == [0, 0, 1] and joint.limits == [-.2, .3]
+    result = StageResult(stage='cad')
+    checker = FitChecker(current, GeometryModel({}), {}, result)
+    checker.report.verified_interfaces.add('capture')
+    checker.report.interface_axes['capture'] = {'point': [0, 0, 0], 'axis': [0, 0, 1]}
+    checker.check_joints()
+    assert not result.errors

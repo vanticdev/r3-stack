@@ -64,11 +64,14 @@ def test_pulled_fastened_frames_are_checked_without_correction(tmp_path):
     from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
     from pulled_fixture import write_pull
     import yaml
-    (tmp_path / "robot.yaml").write_text(yaml.safe_dump({"robot": {"name": "closure-coupon"}, "components": {}}))
+    (tmp_path / "robot.yaml").write_text(yaml.safe_dump({"robot": {"name": "closure-coupon"}, "components": {name: {"type": "test-box"} for name in ("a", "b")}}))
     a = np.eye(4)
     b = np.eye(4); b[2, 3] = .005
     write_pull(tmp_path, {name: BRepPrimAPI_MakeBox(10, 10, 10).Shape() for name in ("a", "b")},
         poses={"a": a, "b": b}, mates=[{"id": "seat", "kind": "fastened", "a": ["a", "origin"], "b": ["b", "origin"]}])
+    folder = tmp_path / "catalog/components"
+    folder.mkdir(parents=True)
+    (folder / "coupon.yaml").write_text(yaml.safe_dump({"components": [{"id": "test-box", "kind": "structure", "name": "Native closure coupon", "mechanical": {"mass": .02, "size": [.01, .01, .01]}}]}))
     result = apply_pulled(Project.load(tmp_path))
     assert result.errors[0].code == "assembly_misfit"
     assert result.joins["seat"]["position_error"] == pytest.approx(.005)

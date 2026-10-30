@@ -79,6 +79,8 @@ def apply_pulled(project: Any, pulled: PulledModel | None = None):
     check_pulled(project.root, pulled)
     declared = getattr(project.spec, "assembly", None)
     root = declared.root if declared and declared.root in pulled.parts else next(iter(pulled.parts), "")
+    source_joints = {joint.id: joint for joint in project.spec.mechanical.joints}
+    qualification = {item.id: item for item in project.spec.mechanical.interfaces}
     result = AssemblyResult(root=root, poses=dict(pulled.poses))
     if root:
         result.root_pose = pulled.poses[root]
@@ -128,8 +130,13 @@ def apply_pulled(project: Any, pulled: PulledModel | None = None):
                 if reverse:
                     axis = -axis
                 limits = [-mate.limits[1], -mate.limits[0]] if reverse and mate.limits else mate.limits
+                source = source_joints.get(mate.id)
+                iid = source.interface if source else None
+                if iid not in qualification or set(qualification[iid].parts) != {parent, child}:
+                    candidates = [item.id for item in qualification.values() if set(item.parts) == {parent, child}]
+                    iid = candidates[0] if len(candidates) == 1 else mate.id
                 result.joints.append(Joint(id=mate.id, type=kind, parent=parent, child=child,
-                    origin=frame[:3, 3].tolist(), axis=axis.tolist(), limits=limits, interface=mate.id))
+                    origin=frame[:3, 3].tolist(), axis=axis.tolist(), limits=limits, interface=iid))
     for mate in pulled.mates:
         if mate.id not in used:
             result.loops.append({"join": mate.id, **result.joins[mate.id]})

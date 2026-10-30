@@ -272,6 +272,9 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
     manifest = describe(transport.assembly(pin["url"]), pin, selectors)
     for name, part in manifest["parts"].items():
         component = project.spec.components.get(name)
+        selection = getattr(component, "onshape", None)
+        if selection and selection.configuration and selection.configuration != part["onshape"]["configuration"]:
+            raise PullError("cad_pull_selection_invalid", f"{name}: configured native occurrence differs from the requested selector; configure the assembly in Onshape")
         catalog = project.catalog.components.get(component.type) if component else None
         part["purchased"] = bool(catalog and not catalog.mechanical.fabricated)
     folder = project.root / "cad"

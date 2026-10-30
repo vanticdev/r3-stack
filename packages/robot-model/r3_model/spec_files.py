@@ -382,6 +382,32 @@ def _check_pulled_instances(files: SpecFiles, model: PulledModel) -> None:
         raise PullError("cad_pull_invalid", f"Undeclared components in CAD pull: {', '.join(sorted(unknown))}")
 
 
+def _pulled_placements(files: SpecFiles, pulled: PulledModel) -> dict[str, dict[str, Any]]:
+    from .assembly import rpy_from_matrix
+
+    preferred = (files.data.get("assembly") or {}).get("root")
+    root = preferred if preferred in pulled.parts else next(iter(pulled.parts))
+    parents = {name: "world" for name in pulled.parts}
+    edges = {name: [] for name in pulled.parts}
+    for mate in pulled.mates:
+        edges[mate.a[0]].append(mate.b[0])
+        edges[mate.b[0]].append(mate.a[0])
+    seen = set()
+    for start in [root, *pulled.parts]:
+        if start in seen:
+            continue
+        seen.add(start)
+        queue = [start]
+        for parent in queue:
+            for child in edges[parent]:
+                if child not in seen:
+                    seen.add(child)
+                    queue.append(child)
+                    parents[child] = parent
+    return {name: {"pose": {"xyz": pulled.poses[name][:3, 3].tolist(), "rpy": rpy_from_matrix(pulled.poses[name])},
+                   "mount": parents[name]} for name in pulled.parts}
+
+
 def validate_pulled_spec(root: str | Path) -> PulledModel:
     """Return verified PulledModel or raise PullError(cad_pull_modified/invalid/...).
 
@@ -401,6 +427,15 @@ def validate_pulled_spec(root: str | Path) -> PulledModel:
             raise PullError("cad_pull_modified", f"Local pulled description is invalid: {error}") from error
         _check_pulled_instances(files, pulled)
         expected_parts, attachments = _pulled_values(pulled, root)
+        placements = _pulled_placements(files, pulled)
+        for name, descriptor in files.data["components"].items():
+            selection = descriptor.get("onshape") or {}
+            for key in ("occurrence_path", "configuration"):
+                if key in selection and selection[key] is not None and selection[key] != expected_parts[name]["onshape"][key]:
+                    raise PullError("cad_pull_modified", f"components.{name}.onshape.{key} differs from the pulled instance; pull again")
+            for key in ("pose", "mount"):
+                if key in descriptor and descriptor[key] != placements[name][key]:
+                    raise PullError("cad_pull_modified", f"components.{name}.{key} differs from the native assembly; pull again")
         actual = {name: value.get("pulled") for name, value in files.data["components"].items() if value.get("pulled") is not None}
         if actual != expected_parts or files.data.get("attachments", []) != attachments:
             raise PullError("cad_pull_modified", "Local pulled metadata, poses or attachments differ from the pinned manifest; pull again")
@@ -428,6 +463,7 @@ def refresh_pulled_spec(root: str | Path, expected_sha256: str | None = None,
         if manifest is not None and json.loads((root / "cad/pulled/pull.json").read_text()) != manifest:
             raise PullError("cad_pull_modified", "Refresh manifest differs from the pinned CAD pull")
         parts, attachments = _pulled_values(pulled, root)
+        placements = _pulled_placements(files, pulled)
         documents = {name: roundtrip(text) for name, text in files.texts.items()}
         changed = set()
         for name in files.data["components"]:
@@ -436,6 +472,7 @@ def refresh_pulled_spec(root: str | Path, expected_sha256: str | None = None,
             for key in origin.path:
                 document = document[key]
             document["pulled"] = parts[name]
+            document.update(placements[name])
             changed.add(origin.file)
         origin = files.origin(("attachments",)) if "attachments" in files.data else Origin("robot.yaml", ("attachments",))
         document = documents[origin.file][1]

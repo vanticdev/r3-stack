@@ -52,7 +52,8 @@ def get_spec(root: str | Path, section: str | None = None) -> dict[str, Any]:
                               for name, text in files.texts.items()},
                     "sources": [{"path": list(path), "file": origin.file, "source_path": list(origin.path)}
                                 for path, origin in files.origins.items()],
-                    "read_only": ["attachments", *[f"components.{name}.pulled" for name in files.data["components"]]]}
+                    "read_only": ["attachments", *[f"components.{name}.{field}" for name, item in files.data["components"].items()
+                                                      for field in (["pulled", "pose", "mount"] if item.get("pulled") else ["pulled"])]]}
     except SpecError as error:
         return error.payload()
 
@@ -174,6 +175,11 @@ def _check_readonly(files: SpecFiles, proposed: SpecFiles, patch: dict[str, Any]
     for name in set(before) | set(after):
         old = before[name].get("pulled") if isinstance(before.get(name), dict) else None
         new = after[name].get("pulled") if isinstance(after.get(name), dict) else None
+        if old is not None and isinstance(changes, dict) and isinstance(changes.get(name), dict):
+            for field in ("pose", "mount"):
+                if field in changes[name]:
+                    raise files.error("spec_read_only", ("components", name, field),
+                                      "Physical placement is owned by the Onshape assembly; change it there and pull")
         explicit = isinstance(changes, dict) and isinstance(changes.get(name), dict) and "pulled" in changes[name]
         if old != new or explicit:
             raise files.error("spec_read_only", ("components", name, "pulled"),

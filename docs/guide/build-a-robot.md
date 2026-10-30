@@ -190,7 +190,7 @@ this changes no bytes and validation still checks every hash. The scaffolded CI 
 `r3.lock.yaml` pins the manifest's
 SHA-256 and Onshape version; the manifest pins every file's SHA-256. The pull refreshes
 Onshape-derived fields in `parts/<name>.yaml` and the top-level attachments. Editing
-pulled bytes, hashes, connector frames, material, mass or attachments locally is an
+pulled bytes, hashes, connector frames, material, mass, physical pose/mount mirrors or attachments locally is an
 integrity error. Fix the model in Onshape and pull again.
 
 The only export backend is the authenticated loopback companion at
