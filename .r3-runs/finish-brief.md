@@ -42,7 +42,7 @@ recompose cad_model.json from the per-object meshes and the compiled poses. Only
 needs rebuilding.
 
 ## Final acceptance test (user requirement, runs LAST after lanes A–D merge)
-A completely independent Claude Opus 5.5 agent, using the default system prompt and given none of these
+A completely independent GPT-6 Astra agent (user, 2026-10-30; replaces Opus 5.5), using the default system prompt and given none of these
 internal briefs, builds an autonomous RC car from scratch ("literally nothing") with R3, as a user would
 (CLI / MCP / web / docs). Constraints from the user:
 - Do NOT create a GitHub repository or link.
