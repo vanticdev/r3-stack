@@ -604,6 +604,10 @@ def compile_connections(project: Project) -> ConnectionModel:
         elif i.kind == "press_fit":
             required = ["friction", "radius", "outer_diameter"]
             ma, mb = material(a), material(b)
+            if "interference" not in i.params and measured_fit.get("bore_d_mm") is None:
+                missing.append("interference or measured shaft/bore diameters")
+            if "min_engagement" not in i.params and measured_fit.get("engagement_mm") is None:
+                missing.append("engagement length")
             interference = i.params.get("interference", [0, 0])
             delta = min(to_si(v) for v in interference) if isinstance(interference, list) else to_si(interference)
             length = to_si(i.params.get("min_engagement", 0))
@@ -670,6 +674,8 @@ def compile_connections(project: Project) -> ConnectionModel:
             # Radial bearing/flat load from projected bearing area and weakest
             # material; axial retention comes ONLY from a real retainer.
             ma, mb = material(a), material(b)
+            if "min_engagement" not in i.params and "shear_force" not in inp:
+                missing.append("bearing engagement length or transverse rating")
             if ma and mb:
                 strength = min(ma.z_strength, mb.z_strength)
                 estimate(

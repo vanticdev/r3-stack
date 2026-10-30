@@ -784,6 +784,21 @@ def test_release_blocks_unknown_capacity_for_a_non_vehicle_project(tmp_path):
     assert item["id"] in gate["blocking"]
 
 
+@pytest.mark.parametrize("kind", ["press_fit", "revolute_fit"])
+def test_missing_fit_geometry_is_unknown_rather_than_zero_strength(tmp_path, kind):
+    p = fixture_project(tmp_path, connection="tape")
+    interface = p.spec.mechanical.interfaces[0]
+    interface.kind = kind
+    interface.params = {}
+    model = compile_connections(p)
+    assert "joint_capacity_unknown" in {d.code for d in model.diagnostics}
+    assert "joint_capacity_zero" not in {d.code for d in model.diagnostics}
+    connection = model.connections[0]
+    assert not connection.capacity_known
+    assert any("engagement" in field for field in connection.missing_data)
+    assert connection.as_dict()["axial"] is None
+
+
 def test_slender_links_keep_positive_inertia_without_changing_assembly_mass(tmp_path):
     p=arm_project(tmp_path)
     p.catalog.component("arm-link").mechanical.size=[1,.0003,.0003]
