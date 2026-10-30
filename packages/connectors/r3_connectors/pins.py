@@ -52,7 +52,16 @@ def instance_frame(inst: ConnectorInstance) -> Frame:
 def component_connector_frame(project: "Project", ref: str) -> Frame:
     """Robot-frame connector frame of ``<component>.<connector>``."""
     component, _, name = ref.partition(".")
-    inst = project.catalog.component(project.spec.components[component].type).connectors[name]
+    ctype = project.catalog.component(project.spec.components[component].type)
+    inst = ctype.connectors[name]
+    if ctype.kind == "cable" and inst.flexible_end:
+        partners = [m.b if m.a == ref else m.a for m in project.spec.electrical.direct_mates
+                    if ref in (m.a, m.b)]
+        if len(partners) == 1:
+            owner = partners[0].partition(".")[0]
+            if (owner in project.spec.components and
+                    project.catalog.component(project.spec.components[owner].type).kind != "cable"):
+                return component_connector_frame(project, partners[0]).mated()
     position, rotation = project.graph.component_pose(component)
     return Frame(rotation, position) @ instance_frame(inst)
 

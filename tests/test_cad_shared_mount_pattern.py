@@ -24,7 +24,7 @@ def test_one_source_pattern_updates_fixture_and_cap_seat(tmp_path):
                'mechanical': {'size': ['40 mm', '40 mm', '8 mm'], 'mass': .01, 'fabricated': True},
                'interfaces': {'camera': {'kind': 'hole_pattern', 'origin': [0, 0, '8 mm'],
                                         'params': {'holes_from': 'measured-camera.mount', 'hole_kind': 'tapped',
-                                                   'hole_diameter': '2.5 mm', 'hole_depth': '7 mm'}}}}
+                                                   'hole_diameter': '2 mm', 'hole_depth': '7 mm'}}}}
     folder = tmp_path / 'catalog' / 'components'
     folder.mkdir(parents=True)
     path = folder / 'camera.yaml'
@@ -32,13 +32,16 @@ def test_one_source_pattern_updates_fixture_and_cap_seat(tmp_path):
     robot = {'schema': 'r3/robot@1', 'robot': {'name': 'Camera fixture'},
              'components': {'fixture': {'type': 'camera-fixture'}, 'camera': {'type': 'measured-camera'}},
              'assembly': {'root': 'fixture', 'joins': [{'id': 'mount', 'a': 'fixture.camera',
-                           'b': 'camera.mount', 'clock': '0 deg', 'fasteners': {'type': 'M2.5x8'}}]}}
+                           'b': 'camera.mount', 'clock': '0 deg', 'fasteners': {'type': 'M2x8'}}]}}
     (tmp_path / 'robot.yaml').write_text(yaml.safe_dump(robot))
     for xy in [(15, 15), (14, 16)]:
         changed = copy.deepcopy(source)
-        changed['interfaces']['mount']['params']['holes'][0][:2] = [f'{v} mm' for v in xy]
+        changed['interfaces']['mount']['params']['holes'] = [
+            [f'{sx * xy[0]} mm', f'{sy * xy[1]} mm', '2.5 mm', 'clearance', '1.6 mm']
+            for sx, sy in [(1, 1), (-1, 1), (1, -1), (-1, -1)]]
         path.write_text(yaml.safe_dump({'components': [changed, fixture]}))
         project = Project.load(tmp_path)
+        assert not project.assembly.errors
         camera = project.catalog.component('measured-camera')
         mount = project.catalog.component('camera-fixture').interfaces['camera']
         assert mount.params['holes'][0][:2] == [f'{v} mm' for v in xy]

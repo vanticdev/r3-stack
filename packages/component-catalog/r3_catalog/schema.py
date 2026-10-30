@@ -57,6 +57,8 @@ class ConnectorInstance(_Model):
     (pin 1 toward the last pin). See :class:`ConnectorGeometry`."""
 
     type: str
+    flexible_end: bool = Field(default=False, description="Free end of a flexible cable; its installed frame is derived "
+                                                        "from its direct mate, independently of the cable's retained end.")
     position: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
     direction: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0], description="Unit vector of cable exit.")
     x: Vector | None = Field(default=None, description="Pin-row axis of the connector frame (perpendicular to direction).")

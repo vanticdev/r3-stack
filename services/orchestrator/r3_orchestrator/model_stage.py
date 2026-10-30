@@ -518,6 +518,12 @@ class ModelChecker:
                 continue
             span, limit = float(np.linalg.norm(points[0] - points[1])), to_si(length)
             data = {"span": span, "length": limit, "slack_fraction": (limit - span) / limit}
+            if any(c.flexible_end for c in ctype.connectors.values()):
+                self.add(Diagnostic.warning(
+                    "flat_cable_route_estimated", f"{cid}: flexible ends are seated, but socket separation alone "
+                    "does not verify the ribbon's installed bends, restraints or swept clearance",
+                    subjects=[cid, *ends], data=data,
+                    hint="Validate the installed ribbon route and its supports before fabrication release."))
             if span > limit:
                 self.add(Diagnostic.error("cable_too_short", f"{cid} ({limit * 1e3:.0f} mm) cannot reach from {ends[0]} to {ends[1]} "
                                                              f"({span * 1e3:.0f} mm straight)", subjects=[cid, *ends], data=data,
