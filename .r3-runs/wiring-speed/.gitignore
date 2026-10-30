@@ -18,3 +18,5 @@ capture_problem.py
 monitor_cpu.py
 collection_probe.py
 before-process-start.json
+resume-status.txt
+fixture-*/

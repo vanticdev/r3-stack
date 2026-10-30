@@ -1,0 +1,17 @@
+{
+  "nested_cumulative_seconds": {
+    "voxel_fields": 22.917769916,
+    "voxel_routing_including_fields_excluding_planner": 114.62216237500002,
+    "constrained_planning": 5067.3840967920005,
+    "native_slsqp": 4706.951326648,
+    "collision_queries": 404.421717161,
+    "support_placement": 325.73625741700005,
+    "slack_simulation": 99.63032625000001,
+    "png_rendering_and_output": 46.18113490378526,
+    "manufacturing_including_wireviz": 6.193450542000001
+  },
+  "function_calls": 524309629,
+  "primitive_calls": 523108366,
+  "render_measurement": "wall-time remainder after route/check, drive, manufacturing; includes JSON/output overhead",
+  "note": "Phase costs are nested; collision queries and native SLSQP are included in their calling phases."
+}

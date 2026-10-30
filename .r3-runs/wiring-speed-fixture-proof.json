@@ -1,0 +1,99 @@
+{
+  "equal": true,
+  "stage_runs_completed": true,
+  "tolerance": {
+    "rtol": 1e-07,
+    "atol_m": 1e-09
+  },
+  "input_content_equal": true,
+  "input_files": 15,
+  "paths_compared": 50,
+  "path_shapes_equal": true,
+  "max_absolute_path_difference_m": 0.0,
+  "routes_byte_identical": true,
+  "diagnostics_before": {
+    "error:cable_support_unplaceable": 8,
+    "error:cable_unsupported_span": 7,
+    "error:connector_intersects_component": 2,
+    "error:route_infeasible": 12,
+    "error:terminal_overload": 4,
+    "error:wire_bend_radius_violation": 13,
+    "error:wire_clearance_violation": 3,
+    "error:wire_dynamic_clearance_violation": 1,
+    "error:wire_intersects_component": 1,
+    "error:wire_intersects_connector": 1,
+    "error:wire_intersects_wire": 1,
+    "info:harness_mass": 12,
+    "info:wire_pass_through": 2,
+    "warning:cad_geometry_estimated": 1,
+    "warning:edge_protection_required": 4,
+    "warning:excess_slack_loop": 47,
+    "warning:wire_bend_radius_violation": 1
+  },
+  "diagnostics_after": {
+    "error:cable_support_unplaceable": 8,
+    "error:cable_unsupported_span": 7,
+    "error:connector_intersects_component": 2,
+    "error:route_infeasible": 12,
+    "error:terminal_overload": 4,
+    "error:wire_bend_radius_violation": 13,
+    "error:wire_clearance_violation": 3,
+    "error:wire_dynamic_clearance_violation": 1,
+    "error:wire_intersects_component": 1,
+    "error:wire_intersects_connector": 1,
+    "error:wire_intersects_wire": 1,
+    "info:harness_mass": 12,
+    "info:wire_pass_through": 2,
+    "warning:cad_geometry_estimated": 1,
+    "warning:edge_protection_required": 4,
+    "warning:excess_slack_loop": 47,
+    "warning:wire_bend_radius_violation": 1
+  },
+  "diagnostic_count_before": 120,
+  "diagnostic_count_after": 120,
+  "release_before": {
+    "status": "unreleased",
+    "blocking_codes": [
+      "cable_support_unplaceable",
+      "cable_unsupported_span",
+      "connector_intersects_component",
+      "route_infeasible",
+      "terminal_overload",
+      "wire_bend_radius_violation",
+      "wire_clearance_violation",
+      "wire_dynamic_clearance_violation",
+      "wire_intersects_component",
+      "wire_intersects_connector",
+      "wire_intersects_wire"
+    ],
+    "rule": "a harness is released when no error-level geometry/buildability diagnostic (or geometry_uncertain) names it or its wires"
+  },
+  "release_after": {
+    "status": "unreleased",
+    "blocking_codes": [
+      "cable_support_unplaceable",
+      "cable_unsupported_span",
+      "connector_intersects_component",
+      "route_infeasible",
+      "terminal_overload",
+      "wire_bend_radius_violation",
+      "wire_clearance_violation",
+      "wire_dynamic_clearance_violation",
+      "wire_intersects_component",
+      "wire_intersects_connector",
+      "wire_intersects_wire"
+    ],
+    "rule": "a harness is released when no error-level geometry/buildability diagnostic (or geometry_uncertain) names it or its wires"
+  },
+  "before_timing": {
+    "wall_s": 2524.1020109653473,
+    "source_revision": "143518c"
+  },
+  "after_timing": {
+    "wall_s": 1543.0305681228638,
+    "source_revision": "3b2697a"
+  },
+  "mismatch_count": 0,
+  "first_mismatches": [],
+  "validation_passed": true
+}
