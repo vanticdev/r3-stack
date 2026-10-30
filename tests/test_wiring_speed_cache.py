@@ -116,3 +116,24 @@ def test_field_read_footprint_covers_all_gradient_corners_and_signed_zero():
     assert not fields_match(fields, arrays)
     fields.static[expected[-1]] = 1e-10
     assert not fields_match(fields, arrays)
+
+
+def _process_solution(directory):
+    from pathlib import Path
+    from r3_wiring.planner import plan_bundle
+    from test_wiring_feasible_stop import _fixed_exit_problem
+
+    segment, junctions, fields = _fixed_exit_problem()
+    plan = plan_bundle([segment], junctions, fields, .008, cache_dir=Path(directory))
+    return {'points': [s.points.tolist() for s in plan.segments],
+            'violations': [v.as_dict() for v in plan.violations], 'stats': plan.stats}
+
+
+def test_serial_and_multiple_processes_produce_identical_solutions(tmp_path):
+    import multiprocessing
+    from concurrent.futures import ProcessPoolExecutor
+
+    serial = _process_solution(str(tmp_path / 'serial'))
+    with ProcessPoolExecutor(max_workers=2, mp_context=multiprocessing.get_context('spawn')) as pool:
+        results = list(pool.map(_process_solution, [str(tmp_path / 'parallel')] * 4))
+    assert results == [serial] * 4
