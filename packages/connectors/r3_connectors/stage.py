@@ -68,7 +68,7 @@ class ConnectorStage:
         self.display: dict[str, np.ndarray] = {}
         self.component_scenes: dict[str, trimesh.Scene] = {}
         self._mesh_bodies: dict[str, list[trimesh.Trimesh]] = {}
-        from r3_model.pulled import load_pulled
+        from r3_model.spec_files import validate_pulled_spec as load_pulled
         from r3_model.pulled_view import apply_pulled
         self.pulled = load_pulled(project.root)
         apply_pulled(project, self.pulled)
@@ -499,15 +499,6 @@ class ConnectorStage:
                     self.result.add(Diagnostic.error("connector_model_pin_mismatch",
                         f"{cid}.{name}: embedded contact array differs from the owner model",
                         subjects=[cid, f"{cid}.{name}"], data={"max_error": worst, "posts": len(found), "limit": 5e-5}))
-            pcb = next((solid for solid in ctype.mechanical.solids if solid.name == "pcb"), None)
-            if pcb is not None:
-                board = max(scene.geometry.values(), key=lambda mesh: float(np.prod(mesh.extents[:2])))
-                thickness = float(board.extents[2])
-                self.data["checks"][f"{cid}_pcb_thickness"] = {"model": thickness, "catalog": pcb.size[2]}
-                if abs(pcb.size[2] - thickness) > 1e-4:
-                    self.result.add(Diagnostic.warning("component_model_dimension_mismatch",
-                        f"{cid}: vendor PCB thickness {thickness*1000:.3f} mm differs from catalog {pcb.size[2]*1000:.3f} mm",
-                        subjects=[cid], data={"model": thickness, "catalog": pcb.size[2], "units": "m"}))
 
     def verify_board_poses(self) -> None:
         """Catalog connector poses of KiCad boards against the placed footprints (pcbnew)."""
@@ -571,7 +562,8 @@ def run(project: Project, render: bool = True) -> StageResult:
     started = time.time()
     result = StageResult(stage=STAGE)
     result.inputs = project.fingerprint()
-    from r3_model.pulled import PullError, load_pulled
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import apply_pulled
     try:
         apply_pulled(project, load_pulled(project.root))

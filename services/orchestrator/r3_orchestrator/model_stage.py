@@ -43,7 +43,7 @@ from r3_model.project import Project
 
 from r3_model.units import to_si
 
-from .geometry import Solid, make_solid, outline_solid, overlap, solids_solid
+from .geometry import Solid, make_solid, outline_solid, overlap
 
 STAGE = "model"
 
@@ -493,15 +493,12 @@ class ModelChecker:
             if not comp.owned or comp.type not in self.catalog.components:
                 continue
             mechanical = self.catalog.component(comp.type).mechanical
-            holes = [f for f in mechanical.features if f.kind == "clearance_hole"
-                     and f.provenance.status == "estimated"]
-            if mechanical.fabricated or not holes:
+            if mechanical.fabricated or mechanical.provenance.status != "estimated" or not mechanical.mount_holes:
                 continue
-            self.add(Diagnostic.warning(
-                "mount_geometry_estimated",
-                f"{cid}: {len(holes)} mounting holes use estimated geometry; measure the owned part before releasing its mount",
-                subjects=[cid], data={"holes": [f.model_dump(mode="json") for f in holes]},
-                hint="Confirm the hole centres and diameters, then update their catalog provenance."))
+            self.add(Diagnostic.warning("mount_geometry_estimated",
+                f"{cid}: mounting data is estimated; verify the owned part against pulled STEP before release",
+                subjects=[cid], data={"holes": mechanical.mount_holes},
+                hint="Measure the real part and verify native geometry; update provenance only with evidence."))
 
     # ------------------------------------------------------------ flat cables
     def _connector_point(self, ref: str) -> np.ndarray | None:
@@ -846,7 +843,8 @@ def _plot_layout(path: Any, geometry: dict[str, Any], overlaps: list[dict[str, A
 def run(project: Project) -> StageResult:
     start = time.time()
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
-    from r3_model.pulled import load_pulled, PullError
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import apply_pulled, require_mass
     try:
         pulled = load_pulled(project.root)

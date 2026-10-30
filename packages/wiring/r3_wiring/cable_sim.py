@@ -57,7 +57,8 @@ def _fmt(values: Any) -> str:
 
 
 def _component_mass(project: Project, component: str) -> float:
-    from r3_model.pulled import load_pulled, PullError
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     pulled = load_pulled(project.root)
     part = pulled.parts.get(component)
     if part is None or part.mass is None:

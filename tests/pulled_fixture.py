@@ -50,4 +50,7 @@ def write_pull(root: Path, shapes: dict, *, poses=None, mates=None, connectors=N
     lock["cad_pull"] = {"manifest_sha256": hashlib.sha256(manifest.read_bytes()).hexdigest()}
     lock_path.write_text(yaml.safe_dump(lock))
     manifest.chmod(0o444)
+    from r3_model.description import refresh_pulled
+    if (root / "robot.yaml").exists():
+        refresh_pulled(root, data)
     return data

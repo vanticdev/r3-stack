@@ -1,9 +1,12 @@
 """CAD stage validates the immutable pulled copy; never generates native CAD."""
 from __future__ import annotations
 
+import json
+
 from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
-from r3_model.pulled import PullError, load_pulled
+from r3_model.pulled import PullError
+from r3_model.spec_files import validate_pulled_spec as load_pulled
 
 
 def run(project: Project) -> StageResult:
@@ -25,6 +28,10 @@ def run(project: Project) -> StageResult:
     result.metrics.update(parts=len(model.parts), assembly_mates=len(model.mates),
                           total_mass_kg=sum(part.mass or 0 for part in model.parts.values()),
                           onshape_document=f"https://cad.onshape.com/documents/{model.document_id}/v/{model.version_id}")
+    from .step_geometry import verify_pulled
+    payload = verify_pulled(project, result, model)
+    if payload:
+        (project.build_dir("cad") / "cad_model.json").write_text(json.dumps(payload, indent=2, allow_nan=False))
     limit = project.spec.requirements.max_mass
     if limit is not None and result.metrics["total_mass_kg"] > limit:
         result.add(Diagnostic.error("mass_budget_exceeded", "Pulled CAD mass exceeds the robot mass budget",

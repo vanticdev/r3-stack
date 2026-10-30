@@ -1,38 +1,36 @@
-"""An offset joint requires its declared intermediate solid to reach both seats."""
+"""A declared spacer must physically reach both clamp seats in pulled STEP."""
 from types import SimpleNamespace
-
-import manifold3d as m3d
-import numpy as np
 import pytest
-
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
+from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder
+from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt
+from r3_catalog import default_catalog
 from r3_model.diagnostics import StageResult
-from r3_orchestrator.assembly_stage import check_seat_contact
+from r3_model.pulled import load_pulled
+from r3_model.spec import Fastener
+from r3_onshape.fit import FitChecker
+from r3_onshape.step_geometry import geometry_from_pulled
+from pulled_fixture import write_pull
 
 
-@pytest.mark.parametrize("declared,height,x,expected", [
-    (True, .005, 0., False),
-    (True, .004, 0., True),
-    (True, .005, .03, True),
-    (False, .005, 0., True),
+@pytest.mark.parametrize('declared,height,x,expected', [
+    (True, 5, 0, False), (True, 4, 0, True), (True, 5, 30, True), (False, 5, 0, True),
 ])
-def test_only_a_contacting_declared_spacer_explains_seat_offset(declared, height, x, expected):
-    def box(z, depth, shift=0.):
-        return m3d.Manifold.cube([.02, .02, depth]).translate([shift-.01, -.01, z])
-    exact = {"base": box(0., .002), "cap": box(.007, .002), "spacer": box(.002, height, x)}
-    frames = {}
-    for name, z in [("base.top", .002), ("cap.bottom", .007)]:
-        frame = np.eye(4)
-        frame[2, 3] = z
-        frames[name] = frame
-    interfaces = {name: SimpleNamespace(obj=name.split(".")[0], kind="face_mount", holes=[])
-                  for name in frames}
-    assembly = SimpleNamespace(
-        joins={"clamp": {"a": "base.top", "b": "cap.bottom", "valid": True,
-                          "kind": "fasten", "offset": .005}},
-        interfaces=interfaces, interface_world=lambda ref: frames[ref],
-    )
-    join = SimpleNamespace(join_id="clamp", fasteners=SimpleNamespace(clamps=["spacer"] if declared else []))
-    project = SimpleNamespace(spec=SimpleNamespace(assembly=SimpleNamespace(joins=[join])))
-    result = StageResult(stage="assembly")
-    check_seat_contact(project, assembly, {}, result, exact)
-    assert any(d.code == "seat_not_in_contact" for d in result.diagnostics) is expected
+def test_only_a_contacting_declared_spacer_explains_seat_offset(tmp_path, declared, height, x, expected):
+    def box(z, depth, shift=0):
+        block = BRepPrimAPI_MakeBox(gp_Pnt(shift-10, -10, z), 20, 20, depth).Shape()
+        hole = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, -5), gp_Dir(0, 0, 1)), 1.7, 30).Shape()
+        return BRepAlgoAPI_Cut(block, hole).Shape()
+    head = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, 9), gp_Dir(0, 0, 1)), 3, 3).Shape()
+    shank = BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0, 0, 9), gp_Dir(0, 0, -1)), 1.5, 20).Shape()
+    shapes = {'base': box(0, 2), 'cap': box(7, 2), 'spacer': box(2, height, x),
+              'fastener:clamp': BRepAlgoAPI_Fuse(head, shank).Shape()}
+    write_pull(tmp_path, shapes)
+    geometry = geometry_from_pulled(load_pulled(tmp_path))
+    project = SimpleNamespace(spec=SimpleNamespace(components={}), catalog=default_catalog())
+    result = StageResult(stage='assembly')
+    checker = FitChecker(project, geometry, {}, result)
+    fastener = Fastener(id='clamp', type='shcs-m3', length=.02, position=[0, 0, .009], axis=[0, 0, -1],
+                        clamps=['cap', *(['spacer'] if declared else []), 'base'])
+    checker.check_fastener(fastener)
+    assert any(d.code == 'fastener_joint_gap' for d in result.diagnostics) is expected

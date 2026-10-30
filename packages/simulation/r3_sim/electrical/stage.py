@@ -73,7 +73,7 @@ def _net_of_label(system: ElectricalSystem) -> dict[str, str]:
 
 
 def vehicle_model(project: Any, result: StageResult) -> dict[str, Any]:
-    from ..vehicle.roles import wheel_joints
+    from ..vehicle.roles import wheel_joints, wheel_dimensions
     from ..load_cases import is_mobile
 
     wheel_owners = wheel_joints(project)
@@ -85,18 +85,8 @@ def vehicle_model(project: Any, result: StageResult) -> dict[str, Any]:
     transmission = next(iter(ground_transmissions or transmissions), None)
     ratio = transmission.ratio if transmission else 1.0
     efficiency = transmission.efficiency if transmission else 1.0
-    radius = None
-    if transmission:
-        for wheel, joint in wheel_owners.items():
-            ctype = catalog.components.get(spec.components[wheel].type) if joint.id in transmission.joints else None
-            params = {**(ctype.behavior.params if ctype and ctype.behavior else {}), **spec.components[wheel].params}
-            if ctype and "radius" in params:
-                radius = to_si(params["radius"])
-                break
-    if radius is None:
-        radius = 0.05
-        if ground_transmissions:
-            result.assume("vehicle", "No wheel behavior radius found; using 0.05 m.")
+    radius = next((wheel_dimensions(project, wheel, joint)[0] for wheel, joint in wheel_owners.items()
+                   if transmission and joint.id in transmission.joints), 0.0)
     from r3_model.pulled_view import cad_view
     cad = cad_view(project, mass_required=True)
     cad_parts = cad["parts"]
@@ -111,12 +101,7 @@ def vehicle_model(project: Any, result: StageResult) -> dict[str, Any]:
     ground_drive = is_mobile(project) and bool(driven)
     if ground_drive:
         characteristics = {(float(t.ratio), float(t.efficiency)) for t in ground_transmissions}
-        radii = set()
-        for wheel in driven:
-            behavior = catalog.component(spec.components[wheel].type).behavior
-            params = {**(behavior.params if behavior else {}), **spec.components[wheel].params}
-            if "radius" in params:
-                radii.add(to_si(params["radius"]))
+        radii = {round(wheel_dimensions(project, wheel, wheel_owners[wheel])[0], 9) for wheel in driven}
         if len(characteristics) > 1 or len(radii) > 1:
             result.add(Diagnostic.error("electrical_drive_layout_unsupported",
                 "Steady road-load estimation requires equal driven radii, transmission ratios and efficiencies; heterogeneous drives need individual load allocation"))

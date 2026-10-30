@@ -126,8 +126,6 @@ class _Builder:
 
         mech = self.entry["mechanical"]
         mech["provenance"] = downgrade(mech.get("provenance"))
-        for feature in mech.get("features", []):
-            feature["provenance"] = downgrade(feature.get("provenance"))
         if "behavior" in self.entry:
             self.entry["behavior"]["provenance"] = downgrade(self.entry["behavior"].get("provenance"))
 
@@ -157,50 +155,18 @@ class _Builder:
             self.entry["mechanical"]["provenance"] = _prov(mass)
 
     def wheel(self) -> None:
+        """Sourced dimensions/behavior only; purchased CAD is imported in Onshape."""
         diameter, width = self.get("diameter"), self.get("width")
         mech = self.entry["mechanical"]
         if diameter and width and isinstance(diameter.value, (int, float)) and isinstance(width.value, (int, float)):
             d, w = float(diameter.value), float(width.value)
             mech.update({"shape": "cylinder", "axis": mech.get("axis", "y")})
             self.set("mechanical.size", [d, w], diameter if diameter.status == "estimated" else width)
-            axis = {"x": [1, 0, 0], "y": [0, 1, 0], "z": [0, 0, 1]}[mech["axis"]]
-            mech["solids"] = [{"kind": "cylinder", "name": "tire", "position": [-a * w / 2 for a in axis], "axis": axis,
-                               "diameter": d, "length": w}]
-            self.fields["mechanical.solids"] = {"status": "derived", "source": "diameter x width"}
-            features = []
-            for feature in mech.get("features", []):
-                kept = dict(feature)
-                if feature["kind"] == "face":
-                    # Seating faces scale with the wheel width (template offsets kept proportionally).
-                    old_w = float(self.template.mechanical.size[1]) if self.template else w
-                    kept["position"] = [p * w / old_w for p in feature["position"]]
-                if feature.get("diameter", 0) >= d * 0.95:
-                    self.notes.append(f"template feature {feature['id']} ({feature['diameter'] * 1e3:.1f} mm) does not fit a {d * 1e3:.1f} mm wheel; dropped")
-                    continue
-                features.append(kept)
-            mech["features"] = features
             if "behavior" in self.entry:
                 self.set("behavior.params.radius", d / 2, diameter)
                 self.set("behavior.params.width", w, width)
-        hub = self.get("hub")
-        if hub and isinstance(hub.value, dict):
-            size, shape = float(hub.value["size"]), normalize(hub.value["shape"])
-            hub_features = [f for f in mech.get("features", []) if f["id"].startswith("hub_") and f["kind"] in ("bore", "d_bore", "socket")
-                            and not f["id"].startswith("hub_recess")]
-            template_kind = {"bore": "bore", "d_bore": "d-bore", "socket": "hex"}
-            same = [f for f in hub_features if template_kind[f["kind"]] == shape and abs(f["diameter"] - size) <= size * 0.02]
-            if not same:
-                anchor = hub_features[0] if hub_features else {"position": [0, -float(mech["size"][1]) / 2 + 0.014, 0], "axis": [0, 1, 0],
-                                                               "depth": 0.01}
-                mech["features"] = [f for f in mech.get("features", []) if f not in hub_features]
-                kind = {"hex": "socket", "bore": "bore", "d-bore": "d_bore"}.get(shape, "socket")
-                feature_id = {"socket": "hub_hex", "bore": "hub_bore", "d_bore": "hub_dbore"}[kind]
-                mech["features"].append({"id": feature_id, "kind": kind, "position": anchor["position"], "axis": anchor["axis"],
-                                         "diameter": size, "depth": anchor.get("depth", 0.01), "provenance": _prov(hub)})
-                self.fields[f"mechanical.features.{feature_id}"] = _prov(hub)
-                if hub_features:
-                    self.notes.append(f"hub {size * 1e3:g} mm {shape} replaces the template's "
-                                      f"{', '.join(f['id'] for f in hub_features)}: parts mating at the hub need an adapter or a new interface")
+        if self.get("hub"):
+            self.notes.append("Sourced hub specifications require native model import and STEP fit verification; no local solid is generated")
 
     def radio(self) -> None:
         supply = self.get("supply")
@@ -242,10 +208,10 @@ class _Builder:
             pitch = [max(xs) - min(xs), max(ys) - min(ys)]
             if all(abs(a - float(b)) < 1e-4 for a, b in zip(pitch, holes.value)):
                 self.fields["mechanical.mount_holes"] = _prov(holes)
-                self.fields["mechanical.features"] = {**_prov(holes), "notes": "template hole features match the drawing's pattern"}
+                self.fields["mechanical.mount_holes"] = {**_prov(holes), "notes": "template mounting data matches the drawing; verify on pulled STEP"}
             else:
                 self.notes.append(f"hole pattern {holes.value} differs from the template's {pitch}; template holes removed")
-                mech["mount_holes"], mech["features"] = [], [f for f in mech.get("features", []) if f["kind"] != "clearance_hole"]
+                mech["mount_holes"] = []
         supply = self.get("supply")
         current = self.get("supply_current")
         for name, pin in self.entry.get("pins", {}).items():
@@ -281,8 +247,8 @@ def build_entry(candidate: Candidate, requirement: Requirement, template: Compon
         "requirement": requirement.raw, "requirement_sha256": requirement.digest(), "template": template.id if template else None,
         "urls": candidate.urls, "offers": [o.model_dump(mode="json") for o in candidate.offers],
         "models": [m.model_dump(mode="json") for m in candidate.models],
-        "cad": {"status": "vendor_step" if step else "proxy", "model": step.url if step else None,
-                "notes": "import with `r3 source --import-cad`" if step else "parametric proxy from the catalog envelope (no vendor model)"},
+        "cad": {"status": "vendor_step" if step else "missing", "model": step.url if step else None,
+                "notes": "import in Onshape through native tools, verify, then r3 cad pull" if step else "exact vendor model required; catalog metadata cannot substitute for CAD"},
         "params": {k: v.model_dump(mode="json") for k, v in candidate.params.items()},
         "matches": [m.to_json() for m in matches or []],
         "fields": builder.fields, "notes": builder.notes + candidate.notes,

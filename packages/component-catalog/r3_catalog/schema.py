@@ -73,69 +73,6 @@ FeatureKind = Literal["bore", "d_bore", "shaft", "d_shaft", "tapped_hole", "clea
                       "sphere", "socket", "pocket"]
 
 
-class Feature(_Model):
-    """A datasheet mechanical interface of a part, in the component frame.
-
-    Material-removing kinds (bore, d_bore, tapped_hole, clearance_hole, slot,
-    socket, pocket) are cut into the envelope starting at ``position`` and going
-    along ``axis`` (into the material) for ``depth``. Material-adding kinds
-    (shaft, d_shaft, spline, sphere) grow from ``position`` along ``axis`` for
-    ``depth``. D-shapes keep a flat at ``flat_offset`` from the axis whose
-    outward normal is ``flat_normal``. ``thread`` is the catalog fastener whose
-    thread a tapped hole accepts (the hole is cut at its tap-drill diameter; depth 0 = threaded through).
-    Slots are obround, ``length`` center-to-center along ``slot_dir``. Pockets
-    are boxes of ``size`` [along slot_dir, across, depth]. ``face`` only names a
-    seating face for verification (``position`` on it, ``axis`` its outward normal).
-    """
-
-    id: str
-    kind: FeatureKind
-    position: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
-    axis: Vector = Field(default_factory=lambda: [0.0, 0.0, -1.0])
-    diameter: Quantity = 0.0
-    depth: Quantity = 0.0
-    flat_offset: Quantity | None = None
-    flat_normal: Vector | None = None
-    thread: str | None = None
-    length: Quantity = 0.0
-    slot_dir: Vector | None = None
-    size: Vector | None = None
-    provenance: Provenance = Field(default_factory=lambda: Provenance(status="datasheet"))
-
-
-SolidKind = Literal["box", "cylinder", "prism", "revolve", "sphere"]
-
-
-class Solid(_Model):
-    """One primitive of a part's envelope or fabricated geometry, component frame.
-
-    * ``box``: ``position`` is the center, ``size`` the full extents.
-    * ``cylinder``: base center ``position``, grows along ``axis`` for ``length``.
-    * ``prism``: 2D ``profile`` polygon (plane coordinates u, v) on the plane
-      through ``position`` normal to ``axis``, extruded ``depth`` along ``axis``.
-      ``u_axis`` gives the in-plane u direction (v = axis x u). A profile string
-      ``"@name"`` reads the polygon from the instance ``params[name]``.
-    * ``revolve``: profile ``[[r, t], ...]`` (radius, distance along ``axis`` from
-      ``position``) revolved 360 degrees about the axis.
-    * ``sphere``: center ``position``, ``diameter``.
-
-    ``op: remove`` subtracts the primitive (pockets, cavities).
-    """
-
-    kind: SolidKind
-    op: Literal["add", "remove"] = "add"
-    name: str = ""
-    position: Vector = Field(default_factory=lambda: [0.0, 0.0, 0.0])
-    axis: Vector = Field(default_factory=lambda: [0.0, 0.0, 1.0])
-    u_axis: Vector | None = None
-    size: Vector | None = None
-    diameter: Quantity = 0.0
-    length: Quantity = 0.0
-    depth: Quantity = 0.0
-    profile: list[Vector] | str | None = None
-    inner: list[list[Vector]] = Field(default_factory=list, description="prism: inner loops (holes) in plane coordinates.")
-
-
 class RatedInternalJoint(_Model):
     """Manufacturer-rated motion wholly inside one supplied purchased unit."""
 
@@ -162,12 +99,7 @@ class Mechanical(_Model):
     mount_holes: list[Vector] = Field(default_factory=list)
     keepout_margin: Quantity = 0.002
     moving: bool = Field(default=False, description="Part rotates or sweeps volume (wheels, gears).")
-    fabricated: bool = Field(default=False, description="Made for this robot: mass from geometry x density, holes and bores "
-                                                        "derived from the fasteners and interfaces that use it.")
-    solids: list[Solid] = Field(default_factory=list, description="Custom geometry; empty means the box/cylinder envelope.")
-    features: list[Feature] = Field(default_factory=list, description="Datasheet interfaces realized on the envelope.")
-    proxy_holes_from: list[str] = Field(default_factory=list, description="Explicit hole-pattern interfaces used by a "
-                                      "missing-model proxy. Never modifies an imported purchased model.")
+    fabricated: bool = Field(default=False, description="Made for this robot in Onshape; fabrication reads the pulled geometry.")
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 

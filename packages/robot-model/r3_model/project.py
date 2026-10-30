@@ -54,10 +54,7 @@ class Project:
 
     @property
     def assembly(self):  # -> r3_model.assembly.AssemblyResult | None
-        """Compiled object/interface assembly. Compiling fills
-        ``spec.components[*].pose`` (and ``mount`` / derived joints) with the
-        derived poses, so stages that read poses work unchanged. Specs without
-        an ``assembly`` section are left untouched and return None."""
+        """Read the pulled solved poses/mates and project them to stage-facing fields."""
         if not hasattr(self, "_assembly"):
             if not (self.root / "cad/pulled/pull.json").exists():
                 return None
@@ -115,6 +112,9 @@ class Project:
         with spec_lock(self.root, shared=True):
             digest = load_spec_files(self.root).sha256[:16]
         result = {"robot_yaml_sha256": digest}
+        manifest = self.root / "cad/pulled/pull.json"
+        if manifest.is_file():
+            result["cad_pull_manifest_sha256"] = hashlib.sha256(manifest.read_bytes()).hexdigest()
         from r3_catalog.revision import catalog_modelbank_revision
 
         result["catalog_modelbank_revision"] = catalog_modelbank_revision(self.root / "catalog")

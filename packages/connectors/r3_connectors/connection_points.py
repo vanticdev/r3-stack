@@ -19,7 +19,7 @@ from .frames import Frame
 
 
 def _envelopes(project: Project) -> dict[str, tuple[np.ndarray, np.ndarray, str]]:
-    from r3_model.pulled import load_pulled
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import world_mesh
     pulled = load_pulled(project.root)
     return {name: (*world_mesh(pulled, name).bounds, "pulled_aabb") for name in pulled.parts}

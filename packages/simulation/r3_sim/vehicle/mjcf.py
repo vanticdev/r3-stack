@@ -43,7 +43,7 @@ from r3_model.units import to_si
 from ..geometry import MassProperties, axis_rotation, combine, rotation_to_quat
 from .scene_visual import add_cameras, add_scene
 from .servo import ackermann_angles
-from .roles import wheel_joints
+from .roles import wheel_joints, wheel_dimensions
 from ..assembly import (AssemblyModel, TransmissionInfo, write_mjcf, mass_report, _add_cables, _behavior_params, _component_shape, _find_root, _fmt, _hex_rgba, _local_center, _si, cad_mass_properties, catalog_mass_properties)
 
 #: Contact bitmasks: robot geoms (1) collide only with the environment (2).
@@ -271,10 +271,10 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     for cid, joint in wheel_joints(project).items():
         body = joint.child
         params = _behavior_params(project, cid)
-        _, size, _ = _component_shape(project, cid)
+        radius, width = wheel_dimensions(project, cid, joint)
         wheels[cid] = WheelInfo(
             component=cid, joint=joint.id, body=body,
-            radius=_si(params.get("radius"), size[0] / 2.0), width=_si(params.get("width"), size[1]),
+            radius=radius, width=width,
             friction=float(params.get("friction", env.ground_friction)),
             rolling_resistance=float(env.ground_rolling_resistance if env.ground_rolling_resistance is not None
                                      else params.get("rolling_resistance", 0.015)))
@@ -413,42 +413,18 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
                       fullinertia=_fmt([inertia[0, 0], inertia[1, 1], inertia[2, 2], inertia[0, 1], inertia[0, 2], inertia[1, 2]]))
         for cid in bodies[body]:
             ctype = catalog.component(spec.components[cid].type)
-            position, rotation = project.graph.component_pose(cid)
-            shape, size, axis = _component_shape(project, cid)
             rgba = _hex_rgba(ctype.mechanical.color)
             common = {"contype": "0", "conaffinity": "0", "group": "1", "mass": "0", "rgba": rgba}
             ET.SubElement(el, "geom", name=f"vis_{cid}", type="mesh", mesh=meshes_used[cid], pos=_fmt(-origin), **common)
             if cid == body and body != root:
-                center_robot = position + rotation @ (_local_center(shape, size) + np.asarray(ctype.mechanical.envelope_offset))
-                geometry[body] = {"shape": shape, "size": size, "axis_vector": (rotation @ axis_rotation(axis))[:, 2].tolist()
-                                  if shape == "cylinder" else None, "center_offset": (center_robot - origin).tolist(),
-                                  "rotation": rotation.tolist(), "keepout": float(ctype.mechanical.keepout_margin)}
+                lo, hi = np.asarray(cad_parts[cid]["bbox_min"]), np.asarray(cad_parts[cid]["bbox_max"])
+                geometry[body] = {"shape": "mesh", "size": (hi-lo).tolist(), "axis_vector": None,
+                    "center_offset": ((lo+hi)/2-origin).tolist(), "rotation": np.eye(3).tolist(),
+                    "keepout": float(ctype.mechanical.keepout_margin)}
         for name in cad_extras[body]:
             if name in meshes_used:
                 ET.SubElement(el, "geom", name=f"vis_{name.replace(':', '__')}", type="mesh", mesh=meshes_used[name],
                               pos=_fmt(-origin), contype="0", conaffinity="0", group="1", mass="0", rgba="0.62 0.63 0.66 1")
-        for wheel in [w for w in wheels.values() if w.body == body]:
-            joint = joint_children[body]
-            axis_vec = np.asarray(joint.axis, dtype=float)
-            # Cylinder local z -> wheel spin axis.
-            z = axis_vec / np.linalg.norm(axis_vec)
-            ref = np.array([1.0, 0.0, 0.0]) if abs(z[0]) < 0.9 else np.array([0.0, 0.0, 1.0])
-            x = np.cross(ref, z)
-            x /= np.linalg.norm(x)
-            rot = np.column_stack([x, np.cross(z, x), z])
-            wheel_center = project.graph.component_pose(wheel.component)[0] - origin
-            ET.SubElement(el, "geom", name=f"tire_{wheel.component}", type="cylinder", pos=_fmt(wheel_center), quat=_fmt(rotation_to_quat(rot)),
-                          size=f"{wheel.radius:.9g} {wheel.width / 2:.9g}", friction=f"{wheel.friction:.6g} 0.005 0.0001",
-                          condim="3", solref="0.004 1", solimp="0.95 0.99 0.001", mass="0",
-                          contype=str(ROBOT_CONTYPE), conaffinity=str(ROBOT_CONAFFINITY), rgba="0.12 0.12 0.12 0.0", group="3")
-        if body == root:
-            # Underbody collision box (bottoming out / rollover), from the root component's footprint.
-            shape, size, _ = _component_shape(project, root)
-            position, rotation = project.graph.component_pose(root)
-            center = position + rotation @ _local_center("box", size)
-            ET.SubElement(el, "geom", name="underbody", type="box", pos=_fmt(center), size=_fmt(np.asarray(size) / 2.0),
-                          friction="0.4 0.005 0.0001", condim="3", mass="0", contype=str(ROBOT_CONTYPE),
-                          conaffinity=str(ROBOT_CONAFFINITY), rgba="0 0 0 0", group="3")
         for child, joint in joint_children.items():
             parent_body = _owner_body(project, joint.parent, joint_children, root) if joint.parent != "world" else root
             if parent_body == body:
@@ -511,11 +487,10 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     from ..joints import separate_parts
 
     connections, joint_bindings = separate_parts(project, mj, root, bodies, body_origin, body_props, cad_extras,
-                                                 elements, joint_children, cad_parts, part_props, initial_pose,
-                                                 contact_proxies={cid:f"tire_{cid}" for cid in wheels})
+                                                 elements, joint_children, cad_parts, part_props, initial_pose)
     diagnostics.extend(connections.diagnostics)
     total_mass = sum(p.mass for p in body_props.values())
-    assumptions.append(("mechanical", "Each part is a separate MuJoCo body. Catalog or CAD convex-piece collisions, "
+    assumptions.append(("mechanical", "Each part is a separate MuJoCo body. Pulled STL convex-piece collisions, "
                         "breakable constraints from real connections; mounts alone provide no retention."))
     cable_plan = _add_cables(project, mj, routes, root, elements, body_origin, diagnostics, assumptions) if routes else None
 

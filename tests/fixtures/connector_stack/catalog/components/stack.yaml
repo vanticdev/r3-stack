@@ -9,9 +9,6 @@ components:
       density: 1500
       fabricated: true
       material: Polymer
-      solids:
-        - {kind: box, position: [0, 0, 0.001], size: [0.056, 0.010, 0.002]}
-        - {kind: box, position: [0, 0, 0.005], size: [0.050, 0.005, 0.006]}
   - id: synthetic-socket
     name: Synthetic socket cavity
     kind: structure
@@ -22,6 +19,3 @@ components:
       density: 1500
       fabricated: true
       material: Polymer
-      solids:
-        - {kind: box, position: [0, 0, 0.004], size: [0.056, 0.010, 0.008]}
-        - {kind: box, op: remove, position: [0, 0, 0.003], size: [0.0504, 0.0054, 0.008]}

@@ -157,7 +157,7 @@ def r3_list_catalog(project: str = "", kind: str = "", query: str = "") -> dict[
 
 @_tool(_READ)
 def r3_get_catalog_component(component_id: str, project: str = "") -> dict[str, Any]:
-    """One catalog entry in full: mechanical envelope and solids, interfaces (for assembly joins), pins, connectors,
+    """One catalog entry in full: purchased metadata, qualification interfaces, pins, connectors,
     behaviour model parameters and provenance, plus whether it comes from the platform or the project catalog."""
     return _guard(lambda: api.get_catalog_component(project or None, component_id))
 
@@ -166,7 +166,7 @@ def r3_get_catalog_component(component_id: str, project: str = "") -> dict[str, 
 def r3_put_catalog_component(entry: dict[str, Any], project: str = "", dry_run: bool = False) -> dict[str, Any]:
     """Add or replace a component type in the project's catalog (catalog/components/<id>.yaml), validated against the
     catalog schema. Use it for the robot's own 3D-printed parts (mechanical.fabricated: true, material e.g. PETG,
-    solids + interfaces with hole patterns that match the parts they join) and for bought parts missing from the
+    electrical/software metadata) and for bought parts missing from the
     platform catalog (with provenance). Returns `catalog_entry_invalid` with the schema errors otherwise."""
     return _guard(lambda: api.put_catalog_component(project or None, entry, dry_run=dry_run))
 

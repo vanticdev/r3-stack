@@ -36,7 +36,7 @@ wires, rails, buses, mass budget) and `build/model/layout.png`.
 
 ```bash
 r3 validate [--stage model,wiring] [--scenario id] [--json]
-r3 cad sync | r3 pcb build | r3 wiring route | r3 sim run [--scenario id]
+r3 cad pull | r3 pcb build | r3 wiring route | r3 sim run [--scenario id]
 r3 report            # regenerate build/report from stored results
 r3 status            # revision, git state, lock pins, per-stage status (stale if robot.yaml changed)
 r3 diagnose          # errors grouped by subject, with hints

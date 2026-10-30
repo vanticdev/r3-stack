@@ -1,4 +1,4 @@
-"""Cable pass-throughs designed into the CAD: through ``slot`` features of structure parts.
+"""Registration helpers for verified cable pass-through hardware.
 
 A bundle that passes through such an opening is held there by the grommet edge
 strip the opening carries, like a hole the router drills (``PassThrough``), but
@@ -24,24 +24,9 @@ TOLERANCE = 0.001  # m beyond the slot faces that still counts as passing throug
 
 def cad_slots(project: Project) -> list[dict[str, Any]]:
     """Through slots of structure parts, robot frame: centre (mid-depth), axis, slot direction, sizes."""
-    out = []
-    for cid, comp in project.spec.components.items():
-        ctype = project.catalog.components.get(comp.type)
-        if ctype is None or ctype.kind != "structure":
-            continue
-        pose = pose_matrix(comp.pose.xyz, comp.pose.rpy)
-        rotation, origin = pose[:3, :3], pose[:3, 3]
-        for feature in ctype.mechanical.features:
-            if feature.kind != "slot" or not feature.slot_dir or float(feature.depth) <= 0:
-                continue
-            axis = rotation @ np.asarray(feature.axis, float)
-            axis /= np.linalg.norm(axis)
-            along = rotation @ np.asarray(feature.slot_dir, float)
-            along /= np.linalg.norm(along)
-            entry = rotation @ np.asarray(feature.position, float) + origin
-            out.append({"component": cid, "id": feature.id, "entry": entry, "axis": axis, "along": along,
-                        "length": float(feature.length), "width": float(feature.diameter), "depth": float(feature.depth)})
-    return out
+    # Slot geometry alone does not establish an installed grommet/support.
+    # Only explicitly modeled support hardware is credited by the span audit.
+    return []
 
 
 def _inside(points: np.ndarray, slot: dict[str, Any]) -> np.ndarray:

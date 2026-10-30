@@ -116,6 +116,8 @@ def test_sim_does_not_estimate_missing_mass(project):
     data = json.loads(manifest.read_text()); data["parts"]["coupon"]["inertia"] = None
     manifest.chmod(0o644); manifest.write_text(json.dumps(data)); manifest.chmod(0o444)
     (project.root / 'r3.lock.yaml').write_text(yaml.safe_dump({'cad_pull': {'manifest_sha256': hashlib.sha256(manifest.read_bytes()).hexdigest()}}))
+    from r3_model.spec_files import refresh_pulled_spec
+    refresh_pulled_spec(project.root)
     from r3_sim.assembly import build_assembly_model
     with pytest.raises(PullError, match="mass, COM and inertia") as exc:
         build_assembly_model(project)
@@ -157,3 +159,25 @@ def test_cad_hook_missing_pull_has_one_diagnostic(project):
     result = StageResult(stage='cad')
     assert verify_pulled(project, result) == {}
     assert [d.code for d in result.errors] == ['cad_pull_missing']
+
+
+def test_web_api_does_not_reuse_stale_meshes(project, monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from r3_orchestrator.api import projects
+    monkeypatch.setattr(projects, 'load', lambda ref: project)
+    old = project.build_dir('cad') / 'cad_model.json'
+    old.write_text(json.dumps({'parts': {'coupon': {'mesh': 'meshes/old.stl'}}}))
+    view = projects.cad_view(SimpleNamespace(root=project.root, id='synthetic'))
+    assert view['authority']['code'] == 'cad_pull_missing'
+    assert view['meshes'] == {} and view['cad_model'] is None
+
+
+def test_web_model_poses_are_pulled_without_cached_graph(project, monkeypatch):
+    from types import SimpleNamespace
+    from r3_orchestrator.api import projects
+    pull(project)
+    monkeypatch.setattr(projects, 'load', lambda ref: project)
+    view = projects.model_view(SimpleNamespace(root=project.root, id='synthetic'))
+    assert view['graph']['components']['coupon']['xyz'] == pytest.approx([.1,.2,.3])
+    assert view['graph']['components']['coupon']['shape'] == 'mesh'

@@ -950,7 +950,8 @@ def _frame(z_axis: np.ndarray, origin: np.ndarray) -> np.ndarray:
 
 def verify_fit(project: Project, model: GeometryModel | None, materials: dict[str, str] | None, result: StageResult,
                scoped: bool = False) -> FitReport:
-    from r3_model.pulled import load_pulled, PullError
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import apply_pulled
     from .step_geometry import geometry_from_pulled
 

@@ -9,7 +9,8 @@ import hashlib
 from typing import Any
 import numpy as np
 
-from .pulled import PulledModel, PullError, load_pulled
+from .pulled import PulledModel, PullError
+from .spec_files import validate_pulled_spec as load_pulled
 
 
 def world_mesh(pulled: PulledModel, name: str):
@@ -27,8 +28,9 @@ def require_mass(pulled: PulledModel) -> None:
         if part.mass is None or part.com is None or part.inertia is None:
             raise PullError("cad_pull_mass_missing", f"{name}: pulled mass, COM and inertia are required; assign material/mass in Onshape and pull again")
         inertia = np.asarray(part.inertia).reshape(3, 3)
-        if not np.allclose(inertia, inertia.T) or np.linalg.eigvalsh(inertia).min() <= 0:
-            raise PullError("cad_pull_invalid", f"{name}: inertia must be symmetric positive definite")
+        eigenvalues = np.linalg.eigvalsh(inertia)
+        if not np.allclose(inertia, inertia.T) or eigenvalues.min() <= 0 or eigenvalues[-1] > eigenvalues[:2].sum() * (1 + 1e-7):
+            raise PullError("cad_pull_invalid", f"{name}: inertia must be positive definite and satisfy the principal-moment triangle inequality")
 
 
 def cad_view(project: Any, *, mass_required: bool = False) -> dict[str, Any]:
@@ -72,7 +74,9 @@ def apply_pulled(project: Any, pulled: PulledModel | None = None):
     from .assembly import AssemblyResult, ResolvedInterface, rpy_from_matrix
     from .diagnostics import Diagnostic
     from .spec import Joint, Pose
+    from .description import check_pulled
     pulled = pulled or load_pulled(project.root)
+    check_pulled(project.root, pulled)
     declared = getattr(project.spec, "assembly", None)
     root = declared.root if declared and declared.root in pulled.parts else next(iter(pulled.parts), "")
     result = AssemblyResult(root=root, poses=dict(pulled.poses))
@@ -118,9 +122,9 @@ def apply_pulled(project: Any, pulled: PulledModel | None = None):
                 if kind is None:
                     result.diagnostics.append(Diagnostic.error("cad_mate_unsupported", f"{mate.id}: {mate.kind} mate requires a native simulator constraint not supported by this adapter", subjects=[mate.id]))
                     continue
-                # The mate axis is expressed in connector A's frame.
+                # Pull records the native axis in the assembly/world frame.
                 a_frame = pulled.poses[mate.a[0]] @ pulled.parts[mate.a[0]].mate_connectors[mate.a[1]]
-                axis = a_frame[:3, :3] @ np.asarray(mate.axis if mate.axis is not None else [0, 0, 1], float)
+                axis = np.asarray(mate.axis, float) if mate.axis is not None else a_frame[:3, 2]
                 if reverse:
                     axis = -axis
                 limits = [-mate.limits[1], -mate.limits[0]] if reverse and mate.limits else mate.limits

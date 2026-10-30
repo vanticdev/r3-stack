@@ -154,7 +154,7 @@ def scene_from_environment(environment: Any, receiver_params: dict[str, Any]) ->
 
 def _part_mesh(project: Any, cid: str, cad_parts: dict[str, Any]) -> tuple[np.ndarray, np.ndarray] | None:
     """Pulled part-local STL transformed into the robot frame."""
-    from r3_model.pulled import load_pulled
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import world_mesh
     mesh = world_mesh(load_pulled(project.root), cid)
     return np.asarray(mesh.vertices), np.asarray(mesh.faces)
@@ -195,7 +195,8 @@ def antenna_component(project: Any) -> str | None:
 
 def antenna_offset(project: Any, receiver_id: str | None, height_above_mount: float) -> tuple[np.ndarray, str]:
     """An explicit pulled feed connector is required for an antenna phase centre."""
-    from r3_model.pulled import load_pulled, PullError
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     pulled = load_pulled(project.root)
     antenna = antenna_component(project) or receiver_id
     part = pulled.parts.get(antenna)

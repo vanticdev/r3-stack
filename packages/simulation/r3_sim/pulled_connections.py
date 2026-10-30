@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from r3_model.connections import Connection, ConnectionModel, compile_connections
 from r3_model.diagnostics import Diagnostic
-from r3_model.pulled import load_pulled
+from r3_model.spec_files import validate_pulled_spec as load_pulled
 
 
 def pulled_connections(project) -> ConnectionModel:

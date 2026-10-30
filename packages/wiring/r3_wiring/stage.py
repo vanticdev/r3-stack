@@ -247,15 +247,21 @@ def run_stage(project: Project, options: RouterOptions | None = None, drive_prof
     started = time.time()
     result = StageResult(stage=STAGE)
     result.inputs = project.fingerprint()
-    from r3_model.pulled import PullError, load_pulled
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import apply_pulled
     try:
         apply_pulled(project, load_pulled(project.root))
     except PullError as error:
         result.add(Diagnostic.error(error.code, str(error)))
         return result, {}
+    result.assume("wiring", "STEP holes/slots do not establish grommet or retention capacity; only explicitly modeled support hardware is credited by span checks.")
     out = project.build_dir(STAGE)
-    bundle = route_and_check(project, options)
+    try:
+        bundle = route_and_check(project, options)
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
+        return result, {}
     obstacles, routing, report, routes = bundle["obstacles"], bundle["routing"], bundle["report"], bundle["routes"]
     supports, cuts, bundles = bundle["supports"], bundle["cuts"], bundle["bundles"]
     result.extend(bundle["diagnostics"])

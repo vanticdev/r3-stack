@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import csv
 import json
+
+import numpy as np
 import math
 import re
 import threading
@@ -249,7 +251,25 @@ def model_view(ref: ProjectRef) -> dict[str, Any]:
                            "kind": entry.kind if entry else None, "name": entry.name if entry else None,
                            "shape": entry.mechanical.shape if entry else None, "size": entry.mechanical.size if entry else None,
                            "mass": entry.mechanical.mass if entry else None}
-    compiled = project.assembly
+    from r3_model.pulled import PullError
+    from r3_model.pulled_view import apply_pulled, cad_view as pulled_view
+    try:
+        compiled = apply_pulled(project)
+        pulled = pulled_view(project)
+        graph = graph or project.graph.to_json()
+        graph["components"] = {cid: {**(graph.get("components", {}).get(cid) or {}),
+            "type": instance.type, "kind": catalog.component(instance.type).kind,
+            "name": catalog.component(instance.type).name, "color": catalog.component(instance.type).mechanical.color,
+            "xyz": list(instance.pose.xyz), "rpy": list(instance.pose.rpy), "mount": instance.mount,
+            "shape": "mesh", "size": (np.asarray(pulled["parts"][cid]["bbox_max"]) - np.asarray(pulled["parts"][cid]["bbox_min"])).tolist(),
+            "aabb_min": pulled["parts"][cid]["bbox_min"], "aabb_max": pulled["parts"][cid]["bbox_max"],
+            "mass": pulled["parts"][cid]["mass"]}
+            for cid, instance in project.spec.components.items()}
+        assembly = compiled.to_json()
+    except PullError:
+        compiled = None
+        graph = None
+        assembly = None
     derived_joints = [j.model_dump(mode="json") if hasattr(j, "model_dump") else j for j in (compiled.joints if compiled else [])]
     joints = [j.model_dump(mode="json") for j in project.spec.mechanical.joints]
     return _finite({"graph": graph, "assembly": assembly, "components": components, "joints": joints,

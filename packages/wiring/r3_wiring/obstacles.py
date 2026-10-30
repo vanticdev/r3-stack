@@ -174,6 +174,9 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
     """
     from r3_connectors.frames import Frame, any_perpendicular
 
+    from r3_model.pulled import load_pulled, PullError
+    from r3_model.pulled_view import world_mesh
+    pulled = load_pulled(project.root)
     out = []
     for harness in sorted(nodes):
         for name, node in sorted(nodes[harness].items()):
@@ -183,8 +186,7 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
             if node.kind == "splice":
                 rotation = (Frame.from_axes(node.exit, any_perpendicular(node.direction), node.direction).rotation
                             if node.direction is not None else np.eye(3))
-                shape = Cylinder(node.exit.copy(), rotation, max(node.od / 2, 0.001), 0.003)
-                source = "splice_sleeve_estimated"
+                source = "pulled_stl"
             elif node.connector_type and node.connector_type != "integral":
                 frame = node.frame
                 if frame is None:
@@ -195,8 +197,7 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
                         project.catalog, node.connector_type)
                     frame = Frame.from_axes(origin,
                                             any_perpendicular(direction), -direction)
-                local, source = _connector_shape(project.catalog.connector(node.connector_type).model_dump_json())
-                shape = local.transformed(frame.rotation, frame.origin)
+                source = "pulled_stl"
                 geometry = project.catalog.connector(node.connector_type).geometry
                 if geometry is not None:
                     exits = [pin.wire_entry for pin in geometry.pins.values() if pin.wire_entry is not None]
@@ -204,6 +205,11 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
                 entry_direction = -frame.z
             else:
                 continue
+            if node.ref not in pulled.parts:
+                raise PullError("cad_pull_missing", f"{node.ref}: connector/splice hardware is absent from pulled CAD")
+            mesh = world_mesh(pulled, node.ref)
+            shape = MeshShape(mesh.vertices, mesh.faces)
+            source = "pulled_stl"
             moving = project.spec.components.get(node.component) is not None and bool(
                 project.catalog.component(project.spec.components[node.component].type).mechanical.moving)
             out.append(CableBody(node.ref, "splice" if node.kind == "splice" else "connector", shape, shape,
@@ -215,7 +221,8 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
 
 def _cad_shape(project: Project, part: dict[str, Any]) -> tuple[Shape, str]:
     """Compatibility entry point: resolve only a pinned pulled part by identity."""
-    from r3_model.pulled import load_pulled, PullError
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import world_mesh
     pulled = load_pulled(project.root)
     name = part.get("part_name") or part.get("name")
@@ -268,7 +275,7 @@ def _swept(kin: Kinematics, shape: Shape, body: str, label: str) -> Shape:
 
 
 def build_obstacles(project: Project) -> tuple[ObstacleSet, list[Diagnostic]]:
-    from r3_model.pulled import load_pulled
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import apply_pulled, world_mesh
 
     pulled = load_pulled(project.root)

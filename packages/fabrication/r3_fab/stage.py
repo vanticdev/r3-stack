@@ -63,7 +63,7 @@ def resolve_material(catalog: Any, text: str | None) -> Any | None:
 
 def select_parts(project: Project, result: StageResult) -> dict[str, PrintedPart]:
     """Fabricated components printed in an FDM material; the others are reported as not printed."""
-    from r3_model.pulled import load_pulled
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     pulled = load_pulled(project.root)
     fab = project.spec.fabrication
     catalog = project.catalog
@@ -151,7 +151,7 @@ def _strength_diagnostics(part: PrintedPart, analysis: strength.StrengthResult, 
                           result: StageResult) -> dict[str, Any]:
     cid, material = part.cid, part.material
     if not analysis.applicable:
-        result.add(Diagnostic.info("print_strength_not_applicable", f"{cid}: strength not evaluated: {analysis.reason}",
+        result.add(Diagnostic.error("print_strength_geometry_unavailable", f"{cid}: strength requires measured attachment-to-face load/support data: {analysis.reason}",
                                    subjects=[cid], data={"supports": len(analysis.supports), "loads": len(analysis.loads)}))
         return {"applicable": False, "reason": analysis.reason}
     build = np.asarray(chosen.build_direction)
@@ -212,7 +212,7 @@ def process_part(project: Project, part: PrintedPart, printer: Any, cases: list[
         return entry
     mesh = geometry.mesh
     entry["geometry_source"] = geometry.source
-    if geometry.source != "cad":
+    if geometry.source != "pulled_stl":
         result.add(Diagnostic.warning(
             "print_geometry_estimated", f"{cid}: print geometry from the catalog {geometry.source} (no usable CAD mesh)",
             subjects=[cid], data={"source": geometry.source, "notes": geometry.notes, "holes_cut": len(geometry.holes)},
@@ -300,10 +300,13 @@ def process_part(project: Project, part: PrintedPart, printer: Any, cases: list[
 def run(project: Project) -> StageResult:
     started = time.time()
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
-    from r3_model.pulled import PullError, load_pulled
-    from r3_model.pulled_view import apply_pulled
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
+    from r3_model.pulled_view import apply_pulled, require_mass
     try:
-        apply_pulled(project, load_pulled(project.root))
+        pulled = load_pulled(project.root)
+        require_mass(pulled)
+        apply_pulled(project, pulled)
     except PullError as error:
         result.add(Diagnostic.error(error.code, str(error)))
         return result
@@ -325,7 +328,7 @@ def run(project: Project) -> StageResult:
         result.assume("fabrication", "Load cases are R3 estimates (no fabrication.load_cases): " +
                       "; ".join(f"{c['id']}: {c['description']}" for c in cases))
     if project.assembly is None:
-        result.add(Diagnostic.info("print_strength_not_applicable", "no assembly section: printed load paths cannot be derived",
+        result.add(Diagnostic.error("print_strength_geometry_unavailable", "Native attachment-to-STEP-face associations are required to derive printed load paths",
                                    subjects=sorted(printed), data={"parts": len(printed)}))
     result.assume("fabrication", "Isotropic linear elasticity with TDS E and an estimated Poisson ratio; FDM anisotropy enters "
                                  "only as the Z (interlayer) strength where the major principal stress is within 45 deg of the "
