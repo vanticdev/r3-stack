@@ -449,6 +449,20 @@ components:
       supplied solid. Frame at case bottom centre. Verify ear height on receipt; DS3218MG is not a substitute. Component
       axes retain STEP orientation: X is the long case direction, Y is height, Z is width.'
     mechanical:
+      rated_internal_joints:
+        output:
+          motion: rotational
+          interface: output
+          member_type: servo-output-25t
+          member_interface: journal
+          ratings: {torque: 1.765197, angular_speed: 6.544984694978735}
+          source: https://www.dsservo.com/d_file/DS3218%20datasheet.pdf
+          notes: >-
+            Manufacturer 5 V ratings: 18 kgf cm stall torque and 0.16 s/60 deg no-load speed.
+            Conservative lower-voltage ratings for the regulated 6 V installation; torque and speed
+            are separate peak capabilities, not a simultaneous operating point. The body and output
+            are complete, disjoint solids from the same official DS3218 STEP. Only this factory
+            internal motion uses rated verification; all external interfaces retain geometric checks.
       shape: custom
       size:
       - 0.062196936
@@ -461,7 +475,8 @@ components:
       provenance:
         status: vendor
         source: DSSERVO official DS3218.stp, down.asp?id=25; case bottom source Y=-20 mm. Housing mass is 60 g total
-          less 2 g output allocation. Ear underside approx 27.65 mm and top 30.82 mm at slot axes; verify on receipt.
+          less 2 g output allocation. Ear underside 27.643739 mm and top 30.793155 mm at slot axes; verify on receipt.
+        notes: Factory output motion may use the explicit manufacturer-rated internal-joint category above; external ears, screws, spline, horn and clearances retain geometric verification.
       envelope_offset:
       - 0.003906766
       - 0.02075

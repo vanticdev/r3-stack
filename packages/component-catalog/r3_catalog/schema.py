@@ -13,6 +13,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from r3_model.units import Quantity, Vector
+from r3_model.ratings import RatingMetric
 
 
 class _Model(BaseModel):
@@ -135,7 +136,20 @@ class Solid(_Model):
     inner: list[list[Vector]] = Field(default_factory=list, description="prism: inner loops (holes) in plane coordinates.")
 
 
+class RatedInternalJoint(_Model):
+    """Manufacturer-rated motion wholly inside one supplied purchased unit."""
+
+    motion: Literal["rotational", "translational"]
+    interface: str
+    member_type: str
+    member_interface: str
+    ratings: dict[RatingMetric, Quantity] = Field(default_factory=dict)
+    source: str = ""
+    notes: str = ""
+
+
 class Mechanical(_Model):
+    rated_internal_joints: dict[str, RatedInternalJoint] = Field(default_factory=dict)
     shape: Literal["box", "cylinder", "custom"] = "box"
     size: Vector = Field(description="Overall envelope including protrusions: box/custom [x, y, z]; cylinder [diameter, length] along local axis.")
     board_outline: Vector | None = Field(default=None, min_length=2, max_length=2, description="PCB outline [x, y], excluding connector protrusions; size remains the overall envelope.")

@@ -54,9 +54,10 @@ show solid 2 (output gear/shaft) overlaps solid 4 (upper housing) by
 upper housing has no matching analytic bearing bore. This is a limitation of
 using the manufacturer's presentation assembly to verify its hidden internal
 bearing, not evidence of the wrong DS3218 external dimensions. No supplied solid
-has been cut or reshaped to resolve it. An explicit policy clarification for
-manufacturer-verified internal joints was requested; external mounting work
-continues independently.
+has been cut or reshaped to resolve it. The user subsequently authorized a generic manufacturer-rated internal-joint
+category. It verifies sourced ratings against explicit design demand and checks
+unit membership, pinned source identity and the unchanged factory-relative pose.
+External interfaces continue through the existing geometric checks.
 
 The isolated external-mount fixture now has **0 fit errors**: two aluminum posts
 with drafted seats, two raised PA12 clamps with relief around the ear ribs,
@@ -68,3 +69,29 @@ the ball-stud centers fixed, and adds 0.5 mm local underside bosses for the
 6 mm stud threads. Its M3x12 retaining screw has 4.700 mm material-equivalent
 engagement versus 4.500 mm required. CAD-plan and assembly regression tests:
 22 passed. Hidden factory internals remain diagnosed separately.
+
+On the full recomposed layout, assembly has 199 exact solids, 129 placed objects,
+152 joins and zero errors/interferences. Model mass is 2.146813 kg with 53.187 g
+margin. Recompose reports nine errors, all from the supplied internal overlap,
+segmented modeled thread and the resulting unverified retention graph. The
+modeled thread has 56 coaxial cylindrical root patches of radius 1.25 mm,
+spanning source Y=16.6..25.2 mm; the longest individual patch overlaps the screw
+by 0.450 mm. The checker currently compares that single patch to 4.713 mm
+material-equivalent engagement (10.179 mm³ intersection). This evidence is
+recorded without changing the check or the supplied solid.
+
+
+## Stop instruction and retained platform result
+
+The user stopped car optimization. The generic rated-unit rule is implemented
+and tested, and the purchased part declares its manufacturer ratings in catalog
+provenance. The official datasheet gives 18 kgf cm at 5 V (1.765197 N m) and
+0.16 s/60 degrees (6.544985 rad/s); these conservative lower-voltage ratings are
+recorded separately from the existing 6 V behavior model.
+
+An isolated fixture with the explicit unit annotation passed the new internal
+verification and retained three external errors: horn-screw thread-volume
+mismatch, horn-screw/housing interference (28.254 mm³), and that screw's failed
+retention. No external check was altered. The full robot's uncommitted rated-unit
+annotation was reverted as instructed because offline recomposition was not at
+zero errors. No further routing or scenario runs were started after the stop.

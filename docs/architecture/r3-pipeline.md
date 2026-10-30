@@ -201,3 +201,31 @@ for fast iteration. See `packages/hardware-interface/PROTOCOL.md`.
 Codes are stable snake_case identifiers. Each carries `subjects` (ids) and
 `data` with measured value, limit and units, e.g.
 `{"code": "wire_overcurrent", "subjects": ["W_Y_P_IN"], "data": {"current": 41.2, "ampacity": 35, "awg": 12}}`.
+
+### Manufacturer-rated internal joints
+
+A purchased assembly can declare `mechanical.rated_internal_joints` in its
+catalog entry. Each named joint declares its motion (`rotational` or
+`translational`), owner interface, supplied member type/interface, manufacturer
+source, and ratings. Rotational joints require torque (N m) and angular speed
+(rad/s); translational joints require force (N) and linear speed (m/s).
+
+The member instance explicitly names `purchased_unit`. Its assembly join supplies
+`rated_internal: {unit, joint, demand, source}` with sourced design demands for
+all rated quantities. Missing ratings, source, demand or excess demand are
+errors. Peak torque and no-load speed must not be represented as a simultaneous
+operating point; the ordinary actuator simulation still checks loaded motion.
+
+This category replaces only the internal running-fit test and internal overlap
+check between those two supplied members. Both must be purchased, identify
+non-overlapping solid selections of the same pinned assembly asset, and retain
+the source-relative pose. A fabricated part or a separate purchased unit gets
+the normal geometric checks. The declared interfaces must identify exactly the
+catalog-rated factory joint. Mounting, screws, output engagement, external
+interference, retention and joint physics remain checked normally. No geometry
+or tolerance is changed.
+
+Every successful joint emits `rated_internal_joint_verified` at info level and
+stores its unit, source, ratings, demands and measured vendor-model overlap in
+the CAD fit report. This evidence describes a manufacturer's rated assembly;
+it does not claim that simplified internal CAD solids establish a running fit.
