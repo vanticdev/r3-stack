@@ -66,7 +66,7 @@ def test_bench_sources_wheel_receiver_and_pi_and_passes_the_model_stage(tmp_path
     best = wheels["ranked"][0]
     assert best["candidate"]["mpn"] == "FW-110-45-HEX12"  # FW-108-42 has an uncited (estimated) hub
     codes = {c["code"] for c in best["twin"]["checks"]}
-    assert "sourcing_interface_feature_changed" in codes  # hub_fl/hub_fr ran on the 6 mm bore; a hex hub needs an adapter
+    assert "sourcing_interface_feature_changed" in codes  # The specimen mounts used a plain bore; a hex hub needs an adapter
     assert not best["twin"]["errors"]
     mass = next(c for c in best["twin"]["checks"] if c["code"] == "sourcing_mass_budget")
     assert mass["data"]["delta"] == pytest.approx(2 * (0.092 - 0.085))

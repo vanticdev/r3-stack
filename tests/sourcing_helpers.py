@@ -110,6 +110,9 @@ def sourced_bench(parent: Path, sources: dict[str, dict[str, Any]] | None = None
         {"id": "sample_fit_" + cid, "kind": "revolute_fit", "parts": ["base", cid],
          "axis_point": [.3, y, .1], "axis_dir": [0, 1, 0], "params": {"bore_feature": "hub"}}
         for cid, y in (("sample_a", .3), ("sample_b", -.3))])
+    existing = yaml.safe_load(lock_path.read_text()) if lock_path.exists() else {}
+    existing.setdefault("cad", {"document_id": "a" * 24, "workspace_id": "b" * 24, "element_id": "c" * 24})
+    lock_path.write_text(yaml.safe_dump(existing))
     sources = sources if sources is not None else {"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE, "sample_a": WHEEL_SOURCE,
                                                    "sample_b": WHEEL_SOURCE}
     for cid, source in sources.items():
