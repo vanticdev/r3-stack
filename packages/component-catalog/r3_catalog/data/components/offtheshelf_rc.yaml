@@ -521,6 +521,8 @@ components:
       mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
               params: {holes: [[7.6 mm, -5.5 mm, 3.0 mm, clearance, 1.6 mm], [-7.6 mm, -5.5 mm, 3.0 mm, clearance, 1.6 mm]]}}
       bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      cap_1: {kind: adhesive_pad, origin: [-7.6 mm, 5.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      cap_2: {kind: adhesive_pad, origin: [7.6 mm, 5.5 mm, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0]}
     pins:
       VCC: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.0, voltage_max: 5.5, current_max: 0.01}
       GND: {role: ground}

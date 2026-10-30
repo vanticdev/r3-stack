@@ -41,7 +41,7 @@ components:
       # Rear-right notch clears the transmission's gear cover.
       # Rear-left tab carries the so_rl standoff behind the motor terminals (3 mm clear of the gear case at y < 30 mm);
       # the right-edge tab carries the lead post's screw (edge distance) beside the lead slot.
-      outline: [[-66 mm, -55 mm], [-28 mm, -55 mm], [-28 mm, -59 mm], [-16 mm, -59 mm], [-16 mm, -55 mm], [85 mm, -55 mm],
+      outline: [[-66 mm, -55 mm], [-28 mm, -55 mm], [-28 mm, -59 mm], [-16 mm, -59 mm], [-16 mm, -55 mm], [5 mm, -55 mm], [5 mm, -74 mm], [35 mm, -74 mm], [35 mm, -55 mm], [85 mm, -55 mm],
                 [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
   standoff_rl: {type: standoff-m3-47}
   standoff_rr: {type: standoff-m3-47}
@@ -129,6 +129,14 @@ components:
   hat:         {type: r3-carrier-hat}
   imu:         {type: gy-521-mpu6050, owned: true}
   imu_mount:   {type: imu-pedestal-petg}
+  imu_outboard_post: {type: imu-lead-post-petg}
+  cap_imu_outboard_post: {type: screw-cap-m3-petg}
+  imu_south_post: {type: imu-lead-post-petg}
+  cap_imu_south_post: {type: screw-cap-m3-petg}
+  cap_imu_1: {type: imu-screw-cap-1-petg}
+  cap_imu_2: {type: imu-screw-cap-2-petg}
+  imu_corner_post: {type: imu-lead-post-petg}
+  cap_imu_corner_post: {type: screw-cap-m3-petg}
   cap_hat_1:   {type: screw-cap-m2.5-petg}
   cap_hat_2:   {type: screw-cap-m2.5-petg}
   cap_hat_3:   {type: screw-cap-m2.5-petg}
@@ -252,9 +260,17 @@ assembly:
     - {id: cap_so_rr, a: deck.cap_so_rr, b: cap_so_rr.seat}
     - {id: cap_so_fl, a: deck.cap_so_fl, b: cap_so_fl.seat}
     - {id: cap_so_fr, a: deck.cap_so_fr, b: cap_so_fr.seat}
-    # Rigid provisional mount at (115, 40, 86) mm, axes aligned with the chassis; no soft foam.
+    # Rigid mount at (155, 40, 113) mm, axes aligned with the chassis; no soft foam.
     - {id: imu_mount_bond, a: deck.imu_seat, b: imu_mount.bottom}
     - {id: imu_screws, a: imu_mount.imu, b: imu.mount, fasteners: {type: M2.5x8}}
+    - {id: imu_outboard_post_mount, a: deck.imu_outboard_post, b: imu_outboard_post.base, fasteners: {type: M3x10}}
+    - {id: cap_imu_outboard_post, a: deck.cap_imu_outboard_post, b: cap_imu_outboard_post.seat}
+    - {id: imu_south_post_mount, a: deck.imu_south_post, b: imu_south_post.base, fasteners: {type: M3x10}}
+    - {id: cap_imu_south_post, a: deck.cap_imu_south_post, b: cap_imu_south_post.seat}
+    - {id: cap_imu_1, a: imu.cap_1, b: cap_imu_1.seat}
+    - {id: cap_imu_2, a: imu.cap_2, b: cap_imu_2.seat}
+    - {id: imu_corner_post_mount, a: deck.imu_corner_post, b: imu_corner_post.base, fasteners: {type: M3x10}}
+    - {id: cap_imu_corner_post, a: deck.cap_imu_corner_post, b: cap_imu_corner_post.seat}
     # Pi stack: deck -> F-F spacers (screws from below), Pi on the spacers, M-F standoffs clamp the Pi into the
     # spacers' top threads, HAT screwed onto the standoffs, header into socket.
     # Official Pi laminate: 1.276 mm. Four purchased DIN 988 0.3 mm shims plus 11 mm standoffs put
@@ -478,7 +494,8 @@ electrical:
         - {id: W_IMU_GND, from: A.2, to: B.2, awg: 28, color: black, signal: GND}
         - {id: W_IMU_SDA, from: A.3, to: B.4, awg: 28, color: blue, signal: I2C_SDA}
         - {id: W_IMU_SCL, from: A.4, to: B.3, awg: 28, color: yellow, signal: I2C_SCL}
-      route: {slack: 15 mm}
+      # Three capped posts hold the lead above the Pi IO block and clear of the drivetrain.
+      route: {slack: 15 mm, tie_points: [[135 mm, -71.7071 mm, 109.5 mm], [161.2929 mm, -40 mm, 114.9 mm], [155.2929 mm, -8 mm, 114.6 mm]], via: [[155 mm, -65 mm, 114 mm]]}
 
 pcb:
   boards:
@@ -501,7 +518,8 @@ cad:
     Deck and electronics stack: [standoff_rl, standoff_rr, standoff_fl, standoff_fr, deck, cap_so_rl, cap_so_rr, cap_so_fl, cap_so_fr,
                                  pi_spacer_1, pi_spacer_2, pi_spacer_3, pi_spacer_4, pi, pi_standoff_1, pi_standoff_2, pi_standoff_3,
                                  pi_standoff_4, pi_shim_1, pi_shim_2, pi_shim_3, pi_shim_4, hat, cap_hat_1, cap_hat_2, cap_hat_3, cap_hat_4, receiver_riser, tape_rx, receiver, antenna_mast,
-                                 rx_antenna, tape_rtk_radio, rtk_radio, lead_post, sensor_lead_post, cap_sensor_lead_post, cap_lead_post]
+                                 rx_antenna, imu, imu_mount, imu_outboard_post, cap_imu_outboard_post, imu_south_post, cap_imu_south_post, cap_imu_1, cap_imu_2, imu_corner_post, cap_imu_corner_post,
+                                 tape_rtk_radio, rtk_radio, lead_post, sensor_lead_post, cap_sensor_lead_post, cap_lead_post]
     Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc, power_lead_post, cap_power_lead_post]
 
 software:

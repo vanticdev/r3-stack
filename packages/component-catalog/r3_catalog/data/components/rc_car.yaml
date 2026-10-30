@@ -90,7 +90,13 @@ components:
       pi_2: {kind: hole_pattern, origin: [9 mm, -24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       pi_3: {kind: hole_pattern, origin: [-49 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
       pi_4: {kind: hole_pattern, origin: [9 mm, 24.5 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 2.9 mm, clearance, 3 mm]]}}
-      imu_seat: {kind: adhesive_pad, origin: [-5 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], description: "Provisional rigid epoxy-bonded IMU pedestal; layout lane finalises placement"}
+      imu_seat: {kind: adhesive_pad, origin: [35 mm, 40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], description: "Rigid IMU pedestal outside the Pi IO block; board axes remain chassis aligned"}
+      imu_south_post: {kind: hole_pattern, origin: [15 mm, -67 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      imu_outboard_post: {kind: hole_pattern, origin: [40 mm, -8 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      imu_corner_post: {kind: hole_pattern, origin: [46 mm, -40 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
+      cap_imu_south_post: {kind: adhesive_pad, origin: [15 mm, -67 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      cap_imu_outboard_post: {kind: adhesive_pad, origin: [40 mm, -8 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      cap_imu_corner_post: {kind: adhesive_pad, origin: [46 mm, -40 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       rx_pad: {kind: adhesive_pad, origin: [56 mm, 42 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       gps_pad: {kind: adhesive_pad, origin: [-65 mm, 30 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       # RTCM correction radio, case on edge along the right deck edge (antenna jack forward).
@@ -1558,16 +1564,76 @@ components:
   - id: imu-pedestal-petg
     kind: structure
     cad_name: GY-521 rigid pedestal
-    name: Printed PETG rigid GY-521 pedestal, epoxy bonded to deck
+    name: Printed rigid GY-521 pedestal, 35 mm, epoxy bonded to deck
     mechanical:
-      shape: box
-      size: [25 mm, 20 mm, 8 mm]
-      mass: 0.0051
+      shape: custom
+      size: [25 mm, 20 mm, 35 mm]
+      mass: 0.0061
       material: PETG
       density: 1270
       fabricated: true
-      color: "#50585c"
+      color: '#50585c'
+      solids:
+      - {kind: box, name: base, position: [0, 0, 1.5 mm], size: [25 mm, 20 mm, 3 mm]}
+      - {kind: box, name: board seat, position: [0, 0, 34 mm], size: [25 mm, 20 mm, 2 mm]}
+      - {kind: cylinder, name: pillar -7.6, position: [-7.6 mm, 5.5 mm, 3 mm], axis: [0, 0, 1], diameter: 7 mm, length: 30 mm}
+      - {kind: cylinder, name: pillar 7.6, position: [7.6 mm, 5.5 mm, 3 mm], axis: [0, 0, 1], diameter: 7 mm, length: 30 mm}
     interfaces:
-      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], description: "Rigid cured epoxy bond (not vibration-isolating foam)"}
-      imu: {kind: hole_pattern, origin: [0, 0, 8 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7.6 mm, 5.5 mm, 2.5 mm, tapped, 7 mm], [-7.6 mm, 5.5 mm, 2.5 mm, tapped, 7 mm]]}}
-    provenance: {status: estimated, source: "Provisional near-CoM rigid GY-521 mounting fixture; verify owned board hole spacing before fabrication"}
+      bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], description: Rigid cured epoxy bond (not vibration-isolating foam)}
+      imu: {kind: hole_pattern, origin: [0, 0, 35 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7.6 mm, 5.5 mm, 2.5 mm, tapped, 7 mm], [-7.6 mm, 5.5 mm, 2.5 mm, tapped, 7 mm]]}}
+    provenance: {status: estimated, source: Rigid GY-521 fixture with pillars under the screws; board hole spacing remains an estimate requiring measurement.}
+  - id: imu-lead-post-petg
+    extends: lead-post-petg
+    name: IMU cable support post, 7 x 40 mm
+    cad_name: IMU lead post
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [7 mm, 40 mm]
+      mass: 0.002
+      solids:
+      - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 40 mm}
+  - id: imu-screw-cap-1-petg
+    kind: structure
+    cad_name: IMU screw cap 1
+    cad_family: Screw caps
+    name: IMU M2.5 screw cap with relieved overhanging rim
+    description: Standard cap cavity and roof; bottom 0.3 mm of the rim is relieved beyond the board edges, leaving a full bonded bearing face on the PCB.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [6.7 mm, 3.8 mm]
+      mass: 8.0e-05
+      material: PETG
+      density: 1270
+      color: '#2c6e9e'
+      fabricated: true
+      solids:
+      - {kind: cylinder, name: cap, position: [0, 0, 0], axis: [0, 0, 1], diameter: 6.7 mm, length: 3.8 mm}
+      - {kind: cylinder, op: remove, name: head pocket, position: [0, 0, 0], axis: [0, 0, 1], diameter: 5.1 mm, length: 2.8 mm}
+      - {kind: box, op: remove, name: outboard rim relief, position: [-7.9 mm, 0, -0.35 mm], size: [10 mm, 20 mm, 1.3 mm]}
+      - {kind: box, op: remove, name: rear rim relief, position: [0, 7.5 mm, -0.35 mm], size: [20 mm, 10 mm, 1.3 mm]}
+    interfaces:
+      seat: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {cap_for: shcs-m2.5, inner_d: 5.1 mm, inner_h: 2.8 mm, process: fdm}}
+  - id: imu-screw-cap-2-petg
+    kind: structure
+    cad_name: IMU screw cap 2
+    cad_family: Screw caps
+    name: IMU M2.5 screw cap with relieved overhanging rim
+    description: Standard cap cavity and roof; bottom 0.3 mm of the rim is relieved beyond the board edges, leaving a full bonded bearing face on the PCB.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size: [6.7 mm, 3.8 mm]
+      mass: 8.0e-05
+      material: PETG
+      density: 1270
+      color: '#2c6e9e'
+      fabricated: true
+      solids:
+      - {kind: cylinder, name: cap, position: [0, 0, 0], axis: [0, 0, 1], diameter: 6.7 mm, length: 3.8 mm}
+      - {kind: cylinder, op: remove, name: head pocket, position: [0, 0, 0], axis: [0, 0, 1], diameter: 5.1 mm, length: 2.8 mm}
+      - {kind: box, op: remove, name: outboard rim relief, position: [7.9 mm, 0, -0.35 mm], size: [10 mm, 20 mm, 1.3 mm]}
+      - {kind: box, op: remove, name: rear rim relief, position: [0, 7.5 mm, -0.35 mm], size: [20 mm, 10 mm, 1.3 mm]}
+    interfaces:
+      seat: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {cap_for: shcs-m2.5, inner_d: 5.1 mm, inner_h: 2.8 mm, process: fdm}}
