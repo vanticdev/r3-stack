@@ -587,6 +587,8 @@ components:
         description: 'Generic vendor variant: Flux Workshop 15.5 mm mounting pitch; downloaded STEP 16.35 mm; JK EMC
           GY-521 V1.1 17.05 mm. Spread 1.55 mm; MEASURE owned board. Use the downloaded STEP centres at +/-8.175 mm for this build, not a
           fabrication-certified pattern.'
+      cap_1: {kind: adhesive_pad, params: {hole_seat: {interface: mount, index: 1}}}
+      cap_2: {kind: adhesive_pad, params: {hole_seat: {interface: mount, index: 0}}}
       bottom:
         kind: adhesive_pad
         origin:
