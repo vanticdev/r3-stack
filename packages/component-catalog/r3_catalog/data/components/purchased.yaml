@@ -819,9 +819,7 @@ components:
     kind: structure
     cad_name: Magnet N52 2x1
     name: NdFeB N52 disc magnet, 2 mm x 1 mm, axially magnetized
-    description: >
-      Sized so the field halfway between magnets on the 20 mm ring drops below the A1120 release point
-      (3 x 2 mm magnets on a 16 mm ring left ~10 mT between magnets, so the switch could miss releases).
+    description: Axially magnetized disc; field at an installed sensor depends on the project geometry.
     mechanical:
       shape: cylinder
       axis: z
@@ -832,7 +830,7 @@ components:
       moving: true
       provenance: {status: datasheet, source: "N52 grade: Br 1.42-1.47 T; mass = pi/4 x 2^2 x 1 mm^3 x 7.5 g/cm^3"}
     interfaces:
-      body: {kind: shaft, origin: [0, 0, 0], z: [0, 0, 1], x: [1, 0, 0], params: {d: 2 mm, length: 1 mm, short_engagement_ok: true}, description: "Bottom face flush with the ring OD"}
+      body: {kind: shaft, origin: [0, 0, 0], z: [0, 0, 1], x: [1, 0, 0], params: {d: 2 mm, length: 1 mm, short_engagement_ok: true}, description: "Bottom face of the magnet"}
     behavior:
       model: passive
       params: {remanence: 1.44, grade: N52}
@@ -858,43 +856,32 @@ components:
     kind: structure
     cad_name: Battery strap
     name: Hook-and-loop battery strap, 20 mm x 1.5 mm
-    description: Closed loop around the battery and the chassis plate (inner 47 x 28 mm); frame at the bottom band's inner face.
+    description: Unformed cross-section proxy; installed length and loop shape must be specified by the project.
     mechanical:
-      shape: custom
-      size: [20 mm, 50 mm, 31 mm]
+      shape: box
+      size: [20 mm, 20 mm, 1.5 mm]
       mass: 0.006
       material: Nylon hook-and-loop
       density: 600
       color: "#202020"
-      fabricated: true
-      solids:
-        - {kind: prism, name: strap loop, position: [-10 mm, 0, 0], axis: [1, 0, 0], u_axis: [0, 1, 0], depth: 20 mm,
-           profile: [[-25 mm, -1.5 mm], [25 mm, -1.5 mm], [25 mm, 29.5 mm], [-25 mm, 29.5 mm]],
-           inner: [[[-23.5 mm, 0], [23.5 mm, 0], [23.5 mm, 28 mm], [-23.5 mm, 28 mm]]]}
-      provenance: {status: estimated, notes: "density of woven nylon hook-and-loop estimated"}
+      provenance: {status: estimated, notes: "Cross-section proxy only; mass and material estimates retained from catalog"}
     interfaces:
       bottom: {kind: strap_seat, origin: [0, 0, 0], z: [0, 0, 1], x: [1, 0, 0], params: {width: 20 mm}}
-      top: {kind: strap_seat, origin: [0, 0, 28 mm], z: [0, 0, -1], x: [1, 0, 0], params: {width: 20 mm}}
   - id: zip-tie-2.5
     kind: structure
     cad_name: Fuse cable tie
     name: Nylon 6.6 cable tie, 2.5 mm x 1 mm
-    description: Closed tie loop around the fuse holder and the chassis plate (inner 12 x 25 mm); frame at the bottom band's inner face.
+    description: Unformed cross-section proxy; installed length and loop shape must be specified by the project.
     mechanical:
-      shape: custom
-      size: [14 mm, 2.5 mm, 27 mm]
+      shape: box
+      size: [2.5 mm, 2.5 mm, 1 mm]
       mass: 0.0005
       material: Nylon 6.6
       density: 1140
       color: "#f0f0f0"
-      fabricated: true
-      solids:
-        - {kind: prism, name: tie loop, position: [0, -1.25 mm, 0], axis: [0, 1, 0], u_axis: [-1, 0, 0], depth: 2.5 mm,
-           profile: [[-7 mm, -1 mm], [7 mm, -1 mm], [7 mm, 26 mm], [-7 mm, 26 mm]],
-           inner: [[[-6 mm, 0], [6 mm, 0], [6 mm, 25 mm], [-6 mm, 25 mm]]]}
+      provenance: {status: estimated, notes: "Cross-section proxy only; mass and material estimates retained from catalog"}
     interfaces:
       bottom: {kind: strap_seat, origin: [0, 0, 0], z: [0, 0, 1], x: [1, 0, 0], params: {width: 2.5 mm}}
-      top: {kind: strap_seat, origin: [0, 0, 25 mm], z: [0, 0, -1], x: [1, 0, 0], params: {width: 2.5 mm}}
   - id: foam-tape-3m-4026
     kind: structure
     cad_name: Foam tape
@@ -909,7 +896,7 @@ components:
     kind: antenna
     cad_name: ELRS T-antenna
     name: ExpressLRS 2.4 GHz T-antenna (1.13 mm coax lead + half-wave dipole)
-    description: Frame on the coax axis at the mast's flange top. Dipole arms along x; the feed point is the junction center.
+    description: Frame at the coax lead end. Dipole arms along x; the feed point is the junction center.
     mechanical:
       shape: custom
       size: [62 mm, 6 mm, 83 mm]
@@ -922,7 +909,7 @@ components:
         - {kind: cylinder, name: dipole, position: [-31 mm, 0, 81.5 mm], axis: [1, 0, 0], diameter: 1.0 mm, length: 62 mm}
       provenance: {status: estimated, source: "RadioMaster/ELRS 2.4 GHz T antenna: two 31 mm arms (lambda/4 at 2.44 GHz is 30.7 mm)"}
     interfaces:
-      seat: {kind: adhesive_pad, origin: [0, 0, 80 mm], z: [0, 0, -1], x: [1, 0, 0], description: "Bottom face of the feed junction on the mast top"}
+      seat: {kind: adhesive_pad, origin: [0, 0, 80 mm], z: [0, 0, -1], x: [1, 0, 0], description: "Bottom face of the feed junction"}
   # ------------------------------------------------------------------ phase B: hardware modeled as assembly objects
   # Fasteners that carry a joint or a stack (kingpin pivots, ball studs, stacking standoffs, wheel nuts) are objects
   # with interfaces, so the compiler places them and the CAD fit checks verify their threads. Plain clamping screws
@@ -931,7 +918,7 @@ components:
     kind: structure
     cad_name: Kingpin screw M3x20
     name: Kingpin pivot, ISO 4762 M3 x 20 socket head cap screw (threadlocked, unclamped)
-    description: Frame at the screw tip, +z toward the head. The knuckle turns on the plain shank above the arm.
+    description: Frame at the screw tip, +z toward the head. The plain shank can serve as a pivot journal.
     mechanical:
       shape: custom
       size: [5.5 mm, 5.5 mm, 23 mm]
@@ -941,11 +928,11 @@ components:
       solids:
         - {kind: revolve, name: screw, position: [0, 0, 0], axis: [0, 0, 1],
            profile: [[0, 0], [1.5 mm, 0], [1.5 mm, 20 mm], [2.75 mm, 20 mm], [2.75 mm, 23 mm], [0, 23 mm]]}
-      provenance: {status: datasheet, source: "ISO 4762 M3 x 20 (dk 5.5, k 3.0); mass = steel x modeled volume"}
+      provenance: {status: datasheet, source: "ISO 4762 M3 x 20 (dk 5.5, k 3.0); mass = steel x modeled volume; 8 mm thread / 12 mm journal split is a proxy estimate"}
     interfaces:
-      thread: {kind: hole_pattern, origin: [0, 0, 7.85 mm], z: [0, 0, -1], x: [1, 0, 0],
-               params: {holes: [[0, 0, 3 mm, thread, 7.85 mm]], fastener: shcs-m3, preloaded: false}}
-      shank: {kind: shaft, origin: [0, 0, 7.85 mm], z: [0, 0, 1], x: [1, 0, 0], params: {d: 3 mm, length: 12.15 mm}}
+      thread: {kind: hole_pattern, origin: [0, 0, 8 mm], z: [0, 0, -1], x: [1, 0, 0],
+               params: {holes: [[0, 0, 3 mm, thread, 8 mm]], fastener: shcs-m3, preloaded: false}}
+      shank: {kind: shaft, origin: [0, 0, 8 mm], z: [0, 0, 1], x: [1, 0, 0], params: {d: 3 mm, length: 12 mm}}
   - id: ball-stud-m3-5.8x6
     kind: structure
     cad_name: Ball stud M3x6

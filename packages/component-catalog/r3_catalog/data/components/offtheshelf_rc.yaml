@@ -426,7 +426,7 @@ components:
     part_number: GPS-18037
     description: >
       38.1 x 30.5 mm board, 4 holes on a 33.0 x 25.4 mm rectangle, 3.3 V only. Needs an external active L1 antenna on
-      the SMA (e.g. SparkFun GPS-14986 molex/u.FL or a puck): place the antenna with a clear sky view on top of the car.
+      the SMA (e.g. SparkFun GPS-14986 molex/u.FL or a puck): place the antenna with a clear sky view on the robot.
     mechanical:
       shape: box
       size: [38.1 mm, 30.5 mm, 4 mm]

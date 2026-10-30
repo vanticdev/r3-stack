@@ -18,11 +18,11 @@ components:
   sensor:
     type: wheel-110x45
     source: &wheel
-      group: front_wheels             # one choice and one lock entry for both wheels
+      group: sample_pair             # one choice and one lock entry for both wheels
       requires: {kind: wheel, diameter: [100 mm, 115 mm], width: [40 mm, 50 mm], hub: 12 mm hex}
       prefer: {price: low}
       budget: 40 USD                  # total for `quantity` (default: the components in the group)
-  wheel_fr: {type: wheel-110x45, source: *wheel}
+  sample_b: {type: wheel-110x45, source: *wheel}
 ```
 
 Requirement values (`r3_catalog.sourcing.quantities`):
