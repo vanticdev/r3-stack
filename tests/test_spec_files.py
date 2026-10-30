@@ -400,3 +400,13 @@ def test_undefined_module_reference_points_to_runs_on_not_module_name(root):
     assert error.value.errors[0]["file"] == "software/system.yaml"
     assert error.value.errors[0]["path"] == ["software", "modules", 0, "runs_on"]
     assert error.value.errors[0]["source_path"] == ["modules", 0, "runs_on"]
+
+
+def test_layout_preservation_never_discards_significant_scalar_whitespace(root):
+    read = spec_ops.get_spec(root)
+    first = spec_ops.patch_spec(root, {"components": {"base": {"label": "two  spaces"}}}, read["sha256"])
+    assert first["ok"]
+    second = spec_ops.patch_spec(root, {"components": {"base": {"label": "two spaces"}}}, first["sha256"])
+    assert second["ok"]
+    assert Project.load(root).spec.components["base"].label == "two spaces"
+    assert "# keep this comment" in (root / "parts/base.yaml").read_text()
