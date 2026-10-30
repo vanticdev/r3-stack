@@ -202,8 +202,8 @@ def component_ops(project: Project, type_id: str, params: dict[str, Any], mirror
             op.folder = _folder_for(op, "bore" if feature.kind in ("bore", "d_bore", "shaft", "d_shaft", "spline") else "feature")
             op.name = feature.id.replace("_", " ")
             ops.append(op)
-    if mech.fabricated:
-        for iface in _resolved_interfaces(project, type_id, mirror):
+    for iface in _resolved_interfaces(project, type_id, mirror):
+        if mech.fabricated or iface.name in mech.proxy_holes_from:
             ops.extend(_interface_ops(project, iface))
     if not ops or getattr(ops[0], "op", "add") == "remove" or isinstance(ops[0], Hole):
         raise PlanError(f"{type_id}: first operation must add material")

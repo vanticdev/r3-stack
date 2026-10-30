@@ -602,6 +602,15 @@ class AssemblyCompiler:
         if mirror is not None:
             resolved = mirrored_interface(resolved, [float(v) for v in mirror])
         resolved.material = ctype.mechanical.material or ""
+        if resolved.params.get("pattern_confirmed") is False:
+            holes = resolved.holes
+            self.add(Diagnostic.warning(
+                "mount_pattern_estimated", f"{obj}.{name}: mounting pattern is unconfirmed; "
+                f"{len(holes)} holes, diameters {[round(h.d * 1e3, 3) for h in holes]} mm; "
+                "measure the owned part before releasing its mount",
+                subjects=[obj, join.join_id],
+                data={"interface": resolved.ref, "holes": [[h.x, h.y, h.d] for h in holes],
+                      "source": resolved.params.get("pattern_source", ""), "units": "m"}))
         self.result.interfaces[ref] = resolved
         return resolved
 

@@ -149,6 +149,8 @@ class Mechanical(_Model):
                                                         "derived from the fasteners and interfaces that use it.")
     solids: list[Solid] = Field(default_factory=list, description="Custom geometry; empty means the box/cylinder envelope.")
     features: list[Feature] = Field(default_factory=list, description="Datasheet interfaces realized on the envelope.")
+    proxy_holes_from: list[str] = Field(default_factory=list, description="Explicit hole-pattern interfaces used by a "
+                                      "missing-model proxy. Never modifies an imported purchased model.")
     provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 
