@@ -95,5 +95,6 @@
   },
   "mismatch_count": 0,
   "first_mismatches": [],
+  "test_summary": "888 passed, 3 skipped, 8 warnings in 2235.56s",
   "validation_passed": true
 }

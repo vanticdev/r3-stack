@@ -118,6 +118,19 @@ def main():
                            'exit_code', 'sampling_interval_s', 'cpu_total_covers_full_process_lifetime') if k in data}
             if loads:
                 proof[label]['load_1m'] = {'min': min(loads), 'max': max(loads), 'mean': sum(loads)/len(loads)}
+            machine_counts = [s['machine_processes'] for s in samples if 'machine_processes' in s]
+            if machine_counts:
+                proof[label]['machine_processes'] = {
+                    'min': min(machine_counts), 'max': max(machine_counts),
+                    'mean': sum(machine_counts) / len(machine_counts),
+                }
+            elif 'observed_peak_machine_processes' in data:
+                proof[label]['machine_processes'] = {
+                    'min': data['observed_min_machine_processes'],
+                    'max': data['observed_peak_machine_processes'],
+                }
+            if 'load_observation_started_at' in data:
+                proof[label]['load_observation_started_at'] = data['load_observation_started_at']
             proof[label]['load_observations'] = len(samples)
     proof['validation_passed'] = proof['equal'] and all(
         proof[label].get('exit_code') == 0 for label in ('before_tests', 'after_tests') if label in proof)
