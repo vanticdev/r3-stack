@@ -139,3 +139,16 @@ Every sourced model is:
 - given the datasheet mass (mass override);
 - given interface frames derived from its real holes and faces;
 - recorded with URL, licence and checksum.
+
+## Generality policy (user directive, 2026-10-30): every feature works for any robot
+Every feature, check, stage, simulation layer, data format and UI you add must work for any robot R3 can
+describe: arms, drones, legged robots, boats and stationary rigs, not only the rc-car and not only wheeled
+vehicles. The rc-car is a test case, not the target.
+- Do not put robot-, project- or component-specific ids, names, dimensions or special cases in package
+  code (`packages/`, `services/`, `integrations/`, `apps/`). Derive everything from robot.yaml, the
+  catalog and the build artifacts. Design-specific values belong in robot.yaml or the catalog.
+- Do not assume vehicle concepts (wheels, steering, chassis, top speed) in generic code. Gate them on what
+  the spec declares, and give non-vehicle robots a sensible path.
+- Test new behaviour on synthetic, robot-agnostic fixtures, not only through examples/robots/rc-car.
+- If something can only work for one robot type, say so explicitly in the code and the docs, and emit a
+  diagnostic when it is skipped. Never fail silently.
