@@ -89,7 +89,7 @@ def part_from_step(name: str, path: Path, pose: np.ndarray | None = None) -> Par
             radius = geom.MajorRadius()
         if kind != "OTHER":
             origin = np.array(geom.Location().Coord())
-            axis = np.array(geom.Axis().Direction().Coord())
+            axis = np.zeros(3) if kind == "SPHERE" else np.array(geom.Axis().Direction().Coord())
         props = GProp_GProps()
         BRepGProp.SurfaceProperties_s(face, props)
         pts = triangles.reshape(-1, 3)

@@ -51,13 +51,9 @@ def _components(project: Project) -> tuple[str, str, str] | None:
 
 
 def _cad(project: Project) -> tuple[str, str, str] | None:
-    if (found := _components(project)) is not None:
-        return found
-    if project.spec.cad.provider == "onshape" and project.spec.assembly is None:
-        return ("not_configured", "CAD is built from the assembly: robot.yaml has no `assembly:` section yet",
-                "Add `assembly: {root: <frame component>, joins: [{a: <frame>.<interface>, b: <part>.<interface>}]}` "
-                "joining every object at matching catalog interfaces (see docs/guide/build-a-robot.md).")
-    return None
+    # A populated description must check its pull, even before an assembly
+    # root is selected. Missing CAD is an error, never a generation preflight.
+    return _components(project) if not project.spec.components else None
 
 
 def _pcb(project: Project) -> tuple[str, str, str] | None:
@@ -102,13 +98,7 @@ def _sim(project: Project) -> tuple[str, str, str] | None:
 
 
 def _assembly(project: Project) -> tuple[str, str, str] | None:
-    if project.spec.assembly is None:
-        return None
-    missing = _unresolved(project)
-    if missing:
-        return ("not_configured", f"the assembly joins components without a resolved catalog type: {', '.join(missing)}",
-                "Pin each `source:` slot with r3_source_search + r3_source_choose (or set `type`), then re-run.")
-    return None
+    return _components(project) if not project.spec.components else None
 
 
 def _model(project: Project) -> tuple[str, str, str] | None:

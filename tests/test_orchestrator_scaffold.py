@@ -74,13 +74,15 @@ def test_workflow_yaml(tmp_path):
     # Runs inside the R3 worker image pinned to the platform revision.
     assert job["container"]["image"].endswith("'ghcr.io/vanticdev/r3-worker:v1.2.3' }}")
     assert "vars.R3_WORKER_IMAGE" in job["container"]["image"]
-    assert job["env"]["MPLBACKEND"] == "Agg" and job["env"]["R3_ONSHAPE_TRANSPORT"] == "api-keys"
+    assert job["env"]["MPLBACKEND"] == "Agg"
+    assert not any("ONSHAPE" in name for name in job["env"])
     steps = {s.get("name", s.get("uses")): s for s in job["steps"]}
     assert "actions/setup-python@v5" not in steps
     assert "r3-platform" in steps["Install r3-platform override"]["run"]
     assert "r3 doctor" in steps["Worker environment"]["run"]
     assert "r3 validate" in steps["Validate"]["run"] and "--json" in steps["Validate"]["run"]
-    assert "ONSHAPE_ACCESS_KEY" in steps["Sync CAD (Onshape)"]["if"]
+    assert "chmod a-w" in steps["Restore read-only permissions on checked-out native CAD"]["run"]
+    assert "Sync CAD (Onshape)" not in steps
     assert "kicad-cli" in steps["Build PCBs (KiCad)"]["run"]
     upload = steps["Upload build artifacts"]
     assert upload["uses"].startswith("actions/upload-artifact") and upload["with"]["path"] == "build/" and upload["if"] == "always()"
@@ -105,7 +107,7 @@ def test_job_summary_script_renders(tmp_path, monkeypatch):
     monkeypatch.chdir(root)
     exec(compile(script, "summary.py", "exec"), {})
     text = out.read_text()
-    assert "R3 validation: r3-bench FAILED" in text and "`component_interference`" in text
+    assert "R3 validation: r3-bench FAILED" in text and "`cad_pull_missing`" in text
 
 
 def test_lock_entries(tmp_path):

@@ -258,40 +258,45 @@ def _counterbore(project: Any, fastener: Any, ftype: Any, host: str, printed: di
 
 
 def hole_clearance_checks(project: Any, printed: dict[str, Any]) -> tuple[list[Diagnostic], dict[str, list[dict[str, Any]]]]:
-    """Printed clearance holes vs the FDM print-fit range (hole diameter - nominal screw diameter)."""
-    from r3_model.assembly import parse_fastener
+    """Compare STEP-measured bores with declared screw nominals; unchanged FDM limits."""
+    from r3_onshape.step_geometry import load_geometry
+    from r3_onshape.fit import FitChecker
+    from r3_model.diagnostics import StageResult
 
     out: list[Diagnostic] = []
     records: dict[str, list[dict[str, Any]]] = {cid: [] for cid in printed}
-    result = project.assembly
-    if result is None:
-        return out, records
-    joins = {j.join_id: j for j in project.spec.assembly.joins} if project.spec.assembly else {}
-    for join_id, (a, b) in result.valid.items():
-        join = joins.get(join_id)
-        for mine, other in ((a, b), (b, a)):
-            part = printed.get(mine.obj)
-            if part is None or part.print_fit is None or mine.kind not in ("hole_pattern", "face_mount"):
+    geometry = load_geometry(project.root)
+    checker = FitChecker(project, geometry, {}, StageResult(stage="fabrication"))
+    associated: set[str] = set()
+    for fastener in project.spec.mechanical.fasteners:
+        kind = project.catalog.fasteners.get(fastener.type)
+        if kind is None:
+            continue
+        point, axis = np.asarray(fastener.position, float), np.asarray(fastener.axis, float)
+        for cid in fastener.clamps:
+            part = printed.get(cid)
+            if part is None or part.print_fit is None:
                 continue
-            parsed = parse_fastener(join.fasteners.type) if join and join.fasteners else None
-            others = other.holes if other.kind in ("hole_pattern", "face_mount") else []
-            for index, hole in enumerate(mine.holes):
-                if hole.kind != "clearance":
-                    continue
-                nominal = parsed[0] if parsed else next((h.d for h in others if h.kind in ("thread", "tapped")), None)
-                if nominal is None:
-                    continue
-                clearance = hole.d - nominal
+            associated.add(cid)
+            holes = checker.hole_faces(cid, point, axis, kind.d)
+            if not holes:
+                out.append(Diagnostic.error("printed_hole_geometry_missing",
+                    f"{cid}: no pulled STEP clearance bore at fastener {fastener.id}", subjects=[cid, fastener.id]))
+                continue
+            for hole in holes:
+                diameter = 2 * hole.radius
+                clearance = diameter - kind.d
                 low, high = part.print_fit.hole_clearance
-                records[mine.obj].append({"interface": mine.name, "hole": index + 1, "d_mm": round(hole.d * 1e3, 3),
-                                          "nominal_mm": round(nominal * 1e3, 3), "clearance_mm": round(clearance * 1e3, 3),
-                                          "range_mm": [round(low * 1e3, 3), round(high * 1e3, 3)]})
-                if low - 1e-9 <= clearance <= high + 1e-9:
-                    continue
-                out.append(Diagnostic.warning(
-                    "printed_hole_clearance",
-                    f"{mine.obj}.{mine.name} hole {index + 1}: {hole.d * 1e3:.2f} mm for {_thread_name(nominal)} is "
-                    f"{clearance * 1e3:+.2f} mm clearance, outside the FDM range {low * 1e3:.1f}-{high * 1e3:.1f} mm",
-                    subjects=[mine.obj, join_id], data={"d": hole.d, "nominal": nominal, "clearance": clearance, "range": [low, high]},
-                    hint=f"Use a {(nominal + (low + high) / 2) * 1e3:.2f} mm hole (printed holes shrink; print_fits.yaml)."))
+                records[cid].append({"fastener": fastener.id, "face": hole.id, "d_mm": diameter * 1e3,
+                    "nominal_mm": kind.d * 1e3, "clearance_mm": clearance * 1e3, "range_mm": [low * 1e3, high * 1e3]})
+                if not low - 1e-9 <= clearance <= high + 1e-9:
+                    out.append(Diagnostic.warning("printed_hole_clearance",
+                        f"{cid}: STEP bore {diameter * 1e3:.2f} mm has {clearance * 1e3:.2f} mm clearance outside the FDM range",
+                        subjects=[cid, fastener.id], data={"d": diameter, "nominal": kind.d, "clearance": clearance, "range": [low, high]}))
+    for cid in printed.keys() - associated:
+        bores = [face for face in geometry[cid].faces_of("CYLINDER") if face.convex is False]
+        if bores:
+            out.append(Diagnostic.error("printed_hole_nominal_missing",
+                f"{cid}: measured STEP bores have no fastener/nominal association; FDM clearance and thread checks cannot be qualified",
+                subjects=[cid], data={"measured_bores": len(bores)}))
     return out, records

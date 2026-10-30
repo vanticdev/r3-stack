@@ -82,11 +82,13 @@ def select_parts(project: Project, result: StageResult) -> dict[str, PrintedPart
             not_printed[cid] = f"{ctype.mechanical.material or 'unknown material'} (print: false)"
             continue
         text = pulled.parts[cid].material or ""
-        material, source = None, ""
+        material, source = resolve_material(catalog, text), "pulled material"
         if options.get("material"):
-            material, source = resolve_material(catalog, str(options["material"])), "fabrication.parts override"
-        if material is None:
-            material, source = resolve_material(catalog, text), "pulled material"
+            requested = resolve_material(catalog, str(options["material"]))
+            if material is None or requested is None or requested.id != material.id:
+                result.add(Diagnostic.error("print_material_differs_from_pull",
+                    f"{cid}: requested print material differs from native material {text!r}; change it in Onshape and pull again",
+                    subjects=[cid], data={"pulled_material": text, "requested_material": options["material"]}))
         if material is None and fab.material and (not text or any(word in text.lower() for word in GENERIC_PRINTED)):
             material, source = resolve_material(catalog, fab.material), "fabrication.material default"
         if material is None or material.process != "fdm":
@@ -207,7 +209,7 @@ def process_part(project: Project, part: PrintedPart, printer: Any, cases: list[
     try:
         geometry = build_geometry(project, cid)
     except Exception as error:  # noqa: BLE001 - one bad part must not stop the others
-        result.add(Diagnostic.warning("print_geometry_failed", f"{cid}: print geometry could not be built: {error}", subjects=[cid]))
+        result.add(Diagnostic.error("print_geometry_failed", f"{cid}: print geometry could not be built: {error}", subjects=[cid]))
         entry["error"] = str(error)
         return entry
     mesh = geometry.mesh
@@ -300,6 +302,9 @@ def process_part(project: Project, part: PrintedPart, printer: Any, cases: list[
 def run(project: Project) -> StageResult:
     started = time.time()
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
+    if not project.spec.components:
+        result.add(Diagnostic.info("not_applicable", "No parts to fabricate", subjects=["fabrication"]))
+        return result
     from r3_model.pulled import PullError
     from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import apply_pulled, require_mass

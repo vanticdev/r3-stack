@@ -1,8 +1,4 @@
-"""Spec additions: fasteners, interfaces, joint interfaces, transmission paths, mount graph.
-
-Runs on the direct-CAD revision of the bench with robot-frame fasteners and interfaces
-(``tests/fixtures/cad/robot_world_frame_v0.yaml``); the current robot.yaml derives them from
-its assembly joins (``tests/test_cad_phaseb.py``)."""
+"""Strict qualification metadata references; shapes and assembly poses come from pull."""
 
 import copy
 from pathlib import Path
@@ -18,9 +14,16 @@ BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "cad" / "ro
 
 @pytest.fixture(scope="module")
 def raw() -> dict:
-    project = Project.load(Path(__file__).parent / "fixtures/mechanism")
-    data = project.spec.model_dump(mode="json")
-    data.pop("assembly", None)
+    data = {"robot": {"name": "qualification reference fixture"},
+        "components": {"base": {"type": "generic"}, "support": {"type": "generic", "mount": "base"},
+            "sleeve": {"type": "generic", "mount": "support"}, "rotor": {"type": "generic", "mount": "sleeve"}},
+        "mechanical": {"interfaces": [
+            {"id": "sleeve_press", "kind": "press_fit", "parts": ["support", "sleeve"], "axis_point": [0,0,0], "axis_dir": [0,0,1]},
+            {"id": "rotor_pivot", "kind": "revolute_fit", "parts": ["sleeve", "rotor"], "axis_point": [0,0,0], "axis_dir": [0,0,1]}],
+            "joints": [{"id": "pivot", "type": "continuous", "parent": "sleeve", "child": "rotor",
+                        "origin": [0,0,0], "interface": "rotor_pivot"}],
+            "fasteners": [{"id": f"support_mount_{i}", "type": "generic", "position": [0,0,0],
+                            "clamps": ["base"], "thread_into": "support"} for i in (1,2)]}}
     data["components"]["drive"] = {"type": "motor-540-brushed", "mount": "base"}
     data["mechanical"]["interfaces"].extend([
         {"id": kind, "kind": kind, "parts": ["support", "rotor"], "axis_point": [0, 0, 0], "axis_dir": [0, 0, 1]}

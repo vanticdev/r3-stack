@@ -1,17 +1,9 @@
-"""Physical obstacles for routing, checks and slack simulation.
-
-Geometry comes from ``build/cad/cad_model.json`` (meshes, else bounding boxes)
-when the CAD stage has run, otherwise from catalog primitives posed by
-``RobotGraph.component_pose`` (``cad_geometry_estimated``). Moving parts get a
-swept envelope over their joint travel: wheels spinning about their axle and
-steered wheels/knuckles swept through the steering limits about the kingpin.
-"""
+"""Routing obstacles read exclusively from the verified native pulled STL copy."""
 
 from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -135,37 +127,6 @@ class CableBody(Obstacle):
         return (axial >= -0.001 - radius) & (axial <= node.termination_length) & (transverse <= aperture + radius)
 
 
-@lru_cache(maxsize=128)
-def _connector_shape(connector_json: str) -> tuple[Shape, str]:
-    """Viewer model in the connector frame, cached across routing/planning passes."""
-    from r3_catalog.schema import Catalog, ConnectorType
-    from r3_connectors.models import ModelUnavailable, connector_scene, scene_meshes
-
-    connector = ConnectorType.model_validate_json(connector_json)
-    if connector.geometry is not None:
-        try:
-            import trimesh
-
-            scene = connector_scene(Catalog(connectors={connector.id: connector}), connector.id)
-            meshes = [mesh for _, mesh, _ in scene_meshes(scene)]
-            for mesh in meshes:
-                mesh.merge_vertices()  # glTF splits vertices at material/normal seams
-            # Union closed model pieces: overlapping contacts/housings must not
-            # cancel the winding sign or leave internal surfaces as free space.
-            if not all(mesh.is_volume for mesh in meshes):
-                # Some vendor contact meshes have open seams. Keep each signed
-                # surface separately: concatenation can cancel overlapping shells,
-                # and a boolean may silently discard an open contact entirely.
-                shapes = [MeshShape(mesh.vertices, mesh.faces, spacing=0.0005) for mesh in meshes]
-                return SweptShape(shapes, connector.id), f"connector_{connector.geometry.model.source}"
-            mesh = trimesh.boolean.union(meshes, engine="manifold") if len(meshes) > 1 else meshes[0]
-            return MeshShape(mesh.vertices, mesh.faces, spacing=0.0005), f"connector_{connector.geometry.model.source}"
-        except (ModelUnavailable, FileNotFoundError):
-            pass
-    size = np.asarray(connector.body_size, float)
-    return Box(np.array([0.0, 0.0, -size[2] / 2]), np.eye(3), size / 2), "connector_catalog_box"
-
-
 def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[CableBody]:
     """All cable-side halves and splice sleeves at their current routed poses.
 
@@ -174,7 +135,8 @@ def cable_obstacles(project: Project, nodes: dict[str, dict[str, Any]]) -> list[
     """
     from r3_connectors.frames import Frame, any_perpendicular
 
-    from r3_model.pulled import load_pulled, PullError
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_model.pulled_view import world_mesh
     pulled = load_pulled(project.root)
     out = []
@@ -284,7 +246,13 @@ def build_obstacles(project: Project) -> tuple[ObstacleSet, list[Diagnostic]]:
     kin = Kinematics(spec)
     obstacles: list[Obstacle] = []
     diagnostics = list(assembly.diagnostics)
+    cable_parts = {f"{h.id}.{name}" for h in spec.electrical.harnesses
+                   for name in [*h.connectors, *h.splices]}
     for cid, part in pulled.parts.items():
+        # Cable hardware is added once by cable_obstacles, whose entry masks
+        # distinguish its own wires from foreign harnesses.
+        if cid in cable_parts:
+            continue
         comp = spec.components.get(cid)
         ctype = catalog.components.get(comp.type) if comp else None
         mech = ctype.mechanical if ctype else None

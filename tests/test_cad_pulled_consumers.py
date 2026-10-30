@@ -181,3 +181,26 @@ def test_web_model_poses_are_pulled_without_cached_graph(project, monkeypatch):
     view = projects.model_view(SimpleNamespace(root=project.root, id='synthetic'))
     assert view['graph']['components']['coupon']['xyz'] == pytest.approx([.1,.2,.3])
     assert view['graph']['components']['coupon']['shape'] == 'mesh'
+
+
+def test_explicit_cable_hardware_enters_only_the_cable_field(project):
+    from r3_wiring.obstacles import build_obstacles, cable_obstacles
+    from r3_wiring.router import NodePoint
+    from r3_connectors.frames import Frame
+    from r3_model.project import Project
+
+    path = project.root / 'robot.yaml'
+    data = yaml.safe_load(path.read_text())
+    data['components']['lead.A'] = {'type': 'synthetic-coupon'}
+    data['electrical'] = {'harnesses': [{'id': 'lead', 'connectors': {'A': {'type': 'servo-3-female'}}, 'wires': []}]}
+    path.write_text(yaml.safe_dump(data))
+    write_pull(project.root, {'coupon': BRepPrimAPI_MakeBox(10,10,4).Shape(),
+                              'lead.A': BRepPrimAPI_MakeBox(4,4,4).Shape()})
+    current = Project.load(project.root)
+    primary, _ = build_obstacles(current)
+    assert {o.component for o in primary.obstacles} == {'coupon'}
+    node = NodePoint('lead', 'A', 'connector', exit=np.array([0.,0.,-.004]),
+                     connector_type='servo-3-female', frame=Frame.identity())
+    cable = cable_obstacles(current, {'lead': {'A': node}})
+    assert len(cable) == 1 and cable[0].component == 'lead.A'
+    assert cable[0].source == 'pulled_stl'

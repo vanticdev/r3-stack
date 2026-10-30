@@ -184,7 +184,10 @@ missing material, unresolved occurrence, unsupported constraint or missing geome
 error. Pull never substitutes an envelope or drops a part.
 
 Files live at `cad/pulled/pull.json`, `cad/pulled/parts/<name>.stl` and `.step`, with
-viewport evidence alongside them. All are read-only. `r3.lock.yaml` pins the manifest's
+viewport evidence alongside them. All are read-only. After a fresh Git checkout, restore their mode with
+`find cad/pulled -type f -exec chmod a-w {} +` (Git does not store read-only bits);
+this changes no bytes and validation still checks every hash. The scaffolded CI does this.
+`r3.lock.yaml` pins the manifest's
 SHA-256 and Onshape version; the manifest pins every file's SHA-256. The pull refreshes
 Onshape-derived fields in `parts/<name>.yaml` and the top-level attachments. Editing
 pulled bytes, hashes, connector frames, material, mass or attachments locally is an

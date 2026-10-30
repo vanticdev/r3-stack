@@ -14,24 +14,26 @@ from r3_wiring.geometry_audit import audit_routing_mesh
 
 @pytest.mark.parametrize("offset", [[.130, .066, .045], [.130, -.066, .045], [0, 0, .060], [.0014, .0014, .0014]])
 def test_thin_bored_part_roundtrip_has_no_mesh_diagnostic(tmp_path, offset):
-    # Small screw-cap/standoff scale: clustering changes the volume substantially.
-    # The CAD audit checks the unclustered STL; routing checks edge balance/bounds.
-    mesh = trimesh.creation.annulus(r_min=.0013, r_max=.0025, height=.0024, sections=64)
-    mesh.apply_translation(offset)
-    build = tmp_path / "build"
-    path = build / "cad" / "cap.stl"
-    path.parent.mkdir(parents=True)
-    mesh.export(path)
-    entry = {"mesh": "cap.stl", "volume": float(mesh.volume), "bbox_min": mesh.bounds[0].tolist(),
-             "bbox_max": mesh.bounds[1].tolist()}
-    class Project:
-        root = tmp_path
-        def read_build_json(self, path):
-            return {"parts": {"cap": entry}} if path == "cad/cad_model.json" else {}
-        def fingerprint(self): return {"robot_yaml_sha256": "fixture"}
-    project = Project()
-    shape, source = _cad_shape(project, entry)
-    diagnostics, audit = audit_cad(project, SimpleNamespace(obstacles=[SimpleNamespace(component="cap", source=source, shape=shape)]))
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder
+    from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
+    import yaml
+    from r3_model.project import Project
+    from r3_model.pulled import load_pulled
+    from r3_wiring.obstacles import build_obstacles
+    from pulled_fixture import write_pull
+
+    (tmp_path / "robot.yaml").write_text(yaml.safe_dump({"robot": {"name": "mesh audit fixture"},
+        "components": {"cap": {"type": "coupon"}}}))
+    directory = tmp_path / "catalog/components"
+    directory.mkdir(parents=True)
+    (directory / "coupon.yaml").write_text(yaml.safe_dump({"components": [{"id": "coupon", "kind": "structure", "name": "Coupon",
+        "mechanical": {"size": [.005,.005,.0024], "mass": .001}}]}))
+    ring = BRepAlgoAPI_Cut(BRepPrimAPI_MakeCylinder(2.5,2.4).Shape(),BRepPrimAPI_MakeCylinder(1.3,2.4).Shape()).Shape()
+    pose = np.eye(4); pose[:3,3] = offset
+    write_pull(tmp_path, {"cap": ring}, poses={"cap": pose})
+    project = Project.load(tmp_path)
+    obstacles, _ = build_obstacles(project)
+    diagnostics, audit = audit_cad(project, obstacles)
     assert diagnostics == [] and audit["invalid"] == []
     assert audit["parts"]["cap"]["routing_mesh"]["unbalanced_edges"] == 0
     assert abs(audit["parts"]["cap"]["volume_error"]) < 1e-5
