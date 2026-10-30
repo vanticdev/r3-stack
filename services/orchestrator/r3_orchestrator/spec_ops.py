@@ -94,7 +94,10 @@ def _restore_unchanged_lines(original: str, dumped: str) -> str:
     for line in original.splitlines():
         by_key.setdefault(_line_key(line), line)
     lines = [by_key.get(_line_key(line), line) for line in dumped.splitlines()]
-    return "\n".join(lines) + ("\n" if dumped.endswith("\n") else "")
+    restored = "\n".join(lines) + ("\n" if dumped.endswith("\n") else "")
+    # Whitespace inside YAML strings/block scalars is data. Only reuse aligned
+    # lines when doing so leaves the requested values exactly unchanged.
+    return restored if roundtrip(restored)[1] == roundtrip(dumped)[1] else dumped
 
 
 def validation_errors(data: Any) -> list[dict[str, Any]]:
