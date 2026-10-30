@@ -108,10 +108,10 @@ def test_job_summary_script_renders(tmp_path, monkeypatch):
 
 def test_lock_entries(tmp_path):
     lock.pin_onshape(tmp_path, "doc", "ws", "el", "mv42")
-    lock.pin_board(tmp_path, "carrier-controller", "deadbeef", kicad="8.0")
+    lock.pin_board(tmp_path, "test-board", "deadbeef", kicad="8.0")
     data = lock.read_lock(tmp_path)
     assert data["onshape"]["revision"] == "mv42" and data["onshape"]["document_id"] == "doc"
-    assert data["pcb_carrier-controller"] == {**data["pcb_carrier-controller"], "revision": "deadbeef", "kicad": "8.0"}
+    assert data["pcb_test-board"] == {**data["pcb_test-board"], "revision": "deadbeef", "kicad": "8.0"}
     assert (tmp_path / "r3.lock.yaml").read_text().startswith("# Pinned external revisions")
 
 

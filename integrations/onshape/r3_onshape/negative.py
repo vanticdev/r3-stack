@@ -7,7 +7,7 @@ scoped fit/motion checks on the imported geometry and delete the document;
 build (``build/cad/fixtures/onshape_geometry.json.gz``) with the mutated spec.
 Results go to ``build/cad/negative_tests.json``.
 
-    python -m r3_onshape.negative examples/robots/robot [case ...]
+    python -m r3_onshape.negative path/to/project [case ...]
 """
 
 from __future__ import annotations

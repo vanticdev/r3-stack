@@ -121,7 +121,7 @@ def test_top_speed_consistent_with_motor_limit(tmp_path):
     v_batt = kernel.last_outputs[kernel.battery_id]["v_terminal"]
     omega_max = (v_batt - float(params.get("brush_drop", 0.2))) / ke  # no-load motor speed at this supply
     bound = omega_max * 0.07 / 12.0
-    # The 9.066:1 drive spins the motor nearer its no-load speed only up to the load line: drag and rolling resistance
-    # hold it near 80 % of the no-load wheel speed (8.5 of 10.7 m/s at this supply).
+    # Drag and rolling resistance keep the wheel speed below the motor's
+    # no-load bound; the declared ratio and roller radius map the actual speed.
     assert 0.75 * bound < speed < bound
     assert speed == pytest.approx(kernel.vehicle.motor_omega() * 0.07 / 12.0, rel=0.03)

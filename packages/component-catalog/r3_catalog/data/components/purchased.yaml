@@ -122,8 +122,7 @@ components:
       Frame at the bottom center of the case. Case body, a motor plate on the -y side and a gear cover outboard of it
       enclosing the 18T pinion and 66T m0.6 spur (center distance 25.2 mm; the motor slides 0.3 mm along its mesh
       slots from the 17T position). Internal reduction 2.4727:1, so 66/18 x 2.4727 = 9.066. Outputs are 6 mm D-bores
-      on the outer faces (right output through the motor plate). The spur shaft is extended 8 mm through the gear
-      cover for the encoder magnet carrier (senses the differential carrier at 2.4727 x carrier speed).
+      on the outer faces (right output through the motor plate).
     mechanical:
       shape: custom
       size: [95 mm, 75 mm, 60 mm]
@@ -151,12 +150,6 @@ components:
         - {id: mount_2, kind: tapped_hole, position: [-18 mm, 22 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
         - {id: mount_3, kind: tapped_hole, position: [18 mm, -22 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
         - {id: mount_4, kind: tapped_hole, position: [18 mm, 22 mm, 0], axis: [0, 0, 1], depth: 8 mm, thread: shcs-m3}
-        - {id: spur_output, kind: shaft, position: [29.93 mm, -45 mm, 34 mm], axis: [0, -1, 0], diameter: 5 mm, depth: 8 mm,
-           provenance: {status: derived, source: "R3 build drawing: 5 mm h6 spur-shaft extension through the gear cover"}}
-        - {id: encoder_a, kind: tapped_hole, position: [33.43 mm, -45 mm, 20 mm], axis: [0, 1, 0], depth: 10 mm, thread: shcs-m2,
-           provenance: {status: derived, source: "R3 build drawing: drill and tap M2 x 10 in the gear cover for the encoder board"}}
-        - {id: encoder_b, kind: tapped_hole, position: [26.43 mm, -45 mm, 20 mm], axis: [0, 1, 0], depth: 10 mm, thread: shcs-m2,
-           provenance: {status: derived, source: "R3 build drawing: drill and tap M2 x 10 in the gear cover for the encoder board"}}
       provenance: {status: estimated, source: "Envelope of a 1/10 2WD transmission with motor plate and gear cover"}
     interfaces:
       mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[18 mm, 22 mm, 3 mm, tapped, 8 mm], [-18 mm, 22 mm, 3 mm, tapped, 8 mm], [18 mm, -22 mm, 3 mm, tapped, 8 mm], [-18 mm, -22 mm, 3 mm, tapped, 8 mm]]}}
@@ -164,9 +157,6 @@ components:
       pinion: {kind: bore, origin: [49.24 mm, -30 mm, 17.8 mm], z: [0, 1, 0], x: [-0.766044443, 0, 0.642787610], params: {d: 3.175 mm, depth: 12 mm, flat_offset: 1.385 mm}, description: "18T pinion bore (internal; the case shows the 8 mm plate hole)"}
       output_l: {kind: bore, origin: [0, 30 mm, 27 mm], z: [0, 1, 0], x: [0, 0, 1], params: {d: 6.02 mm, depth: 10 mm, flat_offset: 2.51 mm}}
       output_r: {kind: bore, origin: [0, -33 mm, 27 mm], z: [0, -1, 0], x: [0, 0, 1], params: {d: 6.02 mm, depth: 10 mm, flat_offset: 2.51 mm}}
-      spur_shaft: {kind: shaft, origin: [29.93 mm, -45 mm, 34 mm], z: [0, -1, 0], x: [1, 0, 0], params: {d: 5 mm, length: 8 mm}, description: "Spur-gear shaft extension through the gear cover: turns at 2.4727 x the differential carrier"}
-      encoder: {kind: hole_pattern, origin: [29.93 mm, -45 mm, 20 mm], z: [0, -1, 0], x: [1, 0, 0], params: {holes: [[3.5 mm, 0, 2 mm, tapped, 10 mm], [-3.5 mm, 0, 2 mm, tapped, 10 mm]]}}
-      # Flat case lid (55 x 60.5 mm), the highest clear surface at the rear: open sky for a GNSS antenna.
       lid_pad: {kind: adhesive_pad, origin: [2.5 mm, -0.25 mm, 60 mm], z: [0, 0, 1], x: [1, 0, 0]}
     behavior:
       model: gearbox.differential

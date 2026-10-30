@@ -141,9 +141,8 @@ capacity and cause.
 `tests/test_joint_physics.py` exercises hand-calculated screw/fit/snap capacities, retained and missing-nut
 plates in all gravity orientations, tape peeling, contact-only resting parts, locked/unlocked native
 vibration, arbitrary scenarios and a stationary two-link arm using the public assembly API. Existing
-vehicle dynamics and HAL performance checks use an intact generic mounting bench, while the actual
-reference robot's unqualified connections remain failures. Never repair the reference design inside
-the simulator or suppress its diagnostics to recover a legacy pass.
+vehicle dynamics and HAL performance checks use an intact generic mounting bench, and separate unsafe fixtures verify rejection of unqualified connections. Never repair a project
+inside the simulator or suppress its diagnostics to recover a legacy pass.
 
 ## Already-failed runs and replay
 

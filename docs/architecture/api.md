@@ -417,7 +417,7 @@ session then returns 503 `agent_cli_missing`.
 .venv/bin/python -m pytest tests/test_api_server.py tests/test_api_runs.py tests/test_api_agents.py tests/test_api_release.py
 ```
 
-- The tests use FastAPI's TestClient against a temporary copy of `examples/robots/robot`,
+- The tests use FastAPI's TestClient against a temporary copy of `path/to/project`,
   with real assembly and model results plus stage hand-off files in the documented
   formats.
 - Runs use fake stages (`tests/api_fake_stage.py`) in real worker processes.

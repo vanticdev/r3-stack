@@ -77,14 +77,14 @@ Project scope: copy [`examples/mcp.json`](examples/mcp.json) to `.mcp.json` in
 the project root (projects scaffolded by `r3 create` already have one), or:
 
 ```bash
-claude mcp add r3 -e R3_PROJECT=$PWD/examples/robots/robot -- \
+claude mcp add r3 -e R3_PROJECT=$PWD/path/to/project -- \
   $PWD/.venv/bin/python -m r3_orchestrator.mcp_server
 ```
 
 ### Register in Codex
 
 ```bash
-codex mcp add r3 --env R3_PROJECT=$PWD/examples/robots/robot -- \
+codex mcp add r3 --env R3_PROJECT=$PWD/path/to/project -- \
   $PWD/.venv/bin/python -m r3_orchestrator.mcp_server
 ```
 

@@ -26,7 +26,7 @@ catalog's 13.6 mm; it is indexed, visibly **mismatch**, and cannot be used as an
 approved XT30U-F. Savox SC-0251MG+ CAD was found, but it is not SC-0251MG; no
 substitution was made. A bare u-blox chip is not a GNSS breakout board.
 
-## Pi decision and robot checks
+## Purchased Pi measurements
 
 [Full Pi measurement evidence](model-bank-pi5-measurement.md): the official STEP
 and native B-rep confirm the **85 × 56 mm PCB** and **58 × 49 mm hole pattern**.
@@ -36,12 +36,6 @@ with an offset envelope preserving board-frame hole positions. The 1.5 mm
 validation tolerance is unchanged; `r3 models validate raspberry-pi-5-4gb` passes
 its bbox/outline/hole checks. Geometry-derived native mate frames still require
 review of the nominal 1.6 mm mounting stack versus the STEP's 1.276 mm PCB.
-
-robot assembly/model validation passes: **132 plan solids, 83 objects, 105
-joins, zero interferences**. A separate FCL check using the entire official Pi
-mesh, including open STEP shells, finds **zero surface collisions** against the
-other current robot part plans. This is a local geometry check, not a live
-Onshape proof or certification of the remaining proxy parts.
 
 CAD validation reports the newly exposed **DS3218 `model_datasheet_mismatch`**:
 the official file's native bounds are **65.192 × 48.100 × 20.039 mm**, including
@@ -167,13 +161,12 @@ python -m r3_orchestrator models search 'Pi 5'
 python -m r3_orchestrator models validate raspberry-pi-5-4gb --json
 python -m r3_orchestrator models validate servo-digital-20kg --json  # intentional mismatch
 python -m r3_orchestrator models validate connector-xt30-female --json  # intentional mismatch
-R3_ONSHAPE_TRANSPORT=api-keys python -m r3_orchestrator validate -C examples/robots/robot --stage assembly,model,cad --json
+R3_ONSHAPE_TRANSPORT=api-keys python -m r3_orchestrator validate -C path/to/project --stage assembly,model,cad --json
 python -m pytest -q
 ```
 
 Build-only evidence: `build/modelbank/url-verification.json` records the successful
-live URL/checksum re-fetches; `pi-surface-fit-evidence.json` records the FCL result;
-`pi5-dimensions.png` shows the board, connector overhangs, underside parts and holes.
+live URL/checksum re-fetches; `pi5-dimensions.png` shows the board, connector overhangs, underside parts and holes.
 No GUI was launched. Verification-only packages installed in the shared venv were
 `cadquery-ocp` and `python-fcl`; `rarfile` is now part of the optional `models` extra.
 

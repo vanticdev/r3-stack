@@ -115,7 +115,7 @@ defined and checked separately by the wiring stage.
 Agents can read fresh options, including before a connectors build:
 
 ```python
-r3_connection_points(project="examples/robots/robot", component="pi",
+r3_connection_points(project="path/to/project", component="pi",
                      free_only=True, fits_type="dupont-1x3")
 ```
 

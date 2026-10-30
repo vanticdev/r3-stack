@@ -16,7 +16,7 @@ operations (:func:`r3_onshape.geometry.plan_manifold`), its analytic faces
 ``source.recomposed.pending_rebuild``. The cad stage reports those parts as
 ``cad_part_rebuild_pending`` until the next Onshape build replaces them.
 
-Run: ``python -m r3_onshape.recompose examples/robots/robot``.
+Run: ``python -m r3_onshape.recompose path/to/project``.
 """
 
 from __future__ import annotations
@@ -386,7 +386,7 @@ def main(argv: list[str] | None = None) -> int:
     import sys
 
     argv = list(sys.argv[1:] if argv is None else argv)
-    project = Project.load(argv[0] if argv else "examples/robots/robot")
+    project = Project.load(argv[0] if argv else ".")
     out = recompose(project)
     for d in out["diagnostics"]:
         if d["severity"] != "info":
