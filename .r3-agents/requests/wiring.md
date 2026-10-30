@@ -102,12 +102,13 @@ separation constraint between different branches within its current group.
 
 A numerical lower-bound reproduction explains why moving the layout can merely
 move this failure. Two 12 AWG, 4 mm OD branches leave a shared centre with a
-shared tangent and minimum centreline radius 16 mm. At 5 mm arc distance, even
+shared tangent and minimum centreline radius 16 mm. At 6 mm arc distance, even
 opposite maximum-curvature turns separate their centres by only
-`2 * 16 * (1 - cos(5 / 16)) = 1.5498257 mm`. The current shared-core local tube
-ends at `2 + 2 + 1 = 5 mm`; outside it, the unchanged 0.5 mm penetration threshold
+`2 * 16 * (1 - cos(6 / 16)) = 2.2237561 mm`. Both points are
+`2 * 16 * sin(6 / 32) = 5.9649055 mm` from the shared-core endpoint, outside
+the current local tube (`2 + 2 + 1 = 5 mm`). There, the unchanged 0.5 mm penetration threshold
 requires centre separation at least `2 + 2 - 0.5 = 3.5 mm`. That ideal split still
-penetrates by 2.4501743 mm. Increasing bend radius reduces separation further.
+penetrates by 1.7762439 mm. Increasing bend radius reduces separation further.
 This is not room that a moved support can create within the shared-centre branch
 representation. It needs physical conductor lay, or independently planned branch
 lanes with the correct finite-width fan-out. Do not increase the exemption tube
