@@ -81,10 +81,10 @@ def _verify(request: dict, access: str, secret: str) -> None:
 def test_hmac_transport_signs_each_request_and_redirect(server):
     base, seen = server
     api = ApiKeyTransport("AK", "SK", base=base)
-    assert api.json("GET", "/documents", query={"q": "robot car", "ownerType": 1}) == {"ok": True}
+    assert api.json("GET", "/documents", query={"q": "sensor rig", "ownerType": 1}) == {"ok": True}
     assert api.json("POST", "/documents", body={"name": "x"}) == {"ok": True}
     assert api.json("GET", "/redirect", query={"a": "b"}) == {"ok": True}
-    assert [r["path"] for r in seen] == ["/api/v17/documents?q=robot+car&ownerType=1", "/api/v17/documents",
+    assert [r["path"] for r in seen] == ["/api/v17/documents?q=sensor+rig&ownerType=1", "/api/v17/documents",
                                          "/api/v17/redirect?a=b", "/api/v17/target?x=1"]
     for request in seen:
         _verify(request, "AK", "SK")

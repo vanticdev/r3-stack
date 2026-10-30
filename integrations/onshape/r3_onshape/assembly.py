@@ -116,9 +116,23 @@ class AssemblyBuilder:
                 return link.a, best.face_a, link.b, best.face_b, "CENTROID"
         return None
 
-    def plan_mates(self, root: str = "chassis") -> list[tuple[Link, str]]:
+    def _root(self, root: str | None) -> str:
+        if root is None:
+            root = self.spec.assembly.root if self.spec.assembly else None
+        if not root:
+            candidates = [name for name, component in self.spec.components.items()
+                          if component.mount in (None, "world") and name in self.model.parts]
+            if len(candidates) != 1:
+                raise ValueError("An assembly with multiple root candidates must declare its root")
+            root = candidates[0]
+        if root not in self.model.parts:
+            raise ValueError(f"Assembly root {root!r} has no modeled part")
+        return root
+
+    def plan_mates(self, root: str | None = None) -> list[tuple[Link, str]]:
         """Spanning tree over verified links (rigid links preferred, ball joints
         last), plus every ball joint as a loop-closing mate, plus every joint."""
+        root = self._root(root)
         joints = {j.interface: j for j in self.spec.mechanical.joints if j.interface}
         steering = {i.id for i in self.spec.mechanical.interfaces if i.kind == "spline"}
         def mate_type(link: Link) -> str:
@@ -229,12 +243,12 @@ class AssemblyBuilder:
                                   "translation_mm": [round(float(v) * 1e3, 4) for v in translation]}
         self.restore_pose()
 
-    def restore_pose(self, root: str = "chassis") -> None:
+    def restore_pose(self, root: str | None = None) -> None:
         """Bring every occurrence back to its modeled (Part Studio) pose: undo the
         rigid motion the solver applied while connectors were uncorrected (relative
         transform by the root's inverse; absolute transforms are ignored by the
         API), then zero every revolute/ball mate value (free spins)."""
-        root_occ = self.occurrence.get(root) or next(iter(self.occurrence.values()))
+        root_occ = self.occurrence[self._root(root)]
         for _ in range(2):
             definition = self.definition()
             transforms = {o["path"][0]: np.asarray(o["transform"], dtype=float).reshape(4, 4)

@@ -237,8 +237,8 @@ def camera(back: list[float], center: list[float] | None = None) -> list[float]:
 VIEWS = {
     "onshape_isometric.png": (camera([1.0, -1.2, 0.9]), 0.0),
     "onshape_isometric_left.png": (camera([1.0, 1.2, 0.9]), 0.0),
-    "onshape_front_steering.png": (camera([0.9, -0.6, 1.0], [0.245, 0.0, 0.07]), 0.00015),
-    "onshape_rear_drivetrain.png": (camera([-0.8, -1.0, 0.9], [0.02, 0.0, 0.055]), 0.00015),
+    "onshape_front.png": (camera([1, 0, 0]), 0.0),
+    "onshape_rear.png": (camera([-1, 0, 0]), 0.0),
     "onshape_top.png": ("top", 0.0),
 }
 

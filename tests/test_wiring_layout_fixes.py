@@ -24,12 +24,12 @@ def _box(name: str, lo: list[float], hi: list[float]) -> Obstacle:
 
 
 def test_base_plate_is_the_largest_footprint_not_a_strap_under_it():
-    # A battery strap loops under the 3 mm plate (it reaches lower than the plate) and up over the battery;
-    # taking it as the floor put the routing volume's floor at the top of the loop (54.5 mm on the bench).
-    plate = _box("chassis", [-0.04, -0.065, 0.025], [0.30, 0.065, 0.028])
-    strap = _box("battery_strap", [0.13, -0.025, 0.0235], [0.15, 0.025, 0.0545])
-    deck = _box("deck", [0.035, -0.055, 0.075], [0.205, 0.055, 0.078])
-    assert base_plate([strap, deck, plate]).component == "chassis"
+    # A small loop reaches below a broad fixture plate; height alone must not
+    # select it as the routing floor. A smaller sensor shelf sits above both.
+    plate = _box("base", [-.1, -.1, .01], [.1, .1, .015])
+    strap = _box("loop", [-.01, -.02, .008], [.01, .02, .04])
+    shelf = _box("shelf", [-.03, -.03, .06], [.03, .03, .064])
+    assert base_plate([strap, shelf, plate]).component == "base"
     assert base_plate([]) is None
 
 

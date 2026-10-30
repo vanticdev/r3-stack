@@ -9,12 +9,9 @@
   synthetic projects of :mod:`test_wiring_support` (one connector pair; every
   termination kind), for fast router/planner tests.
 
-Tests never see ``examples/robots/*/build`` (design-fix-queue item 19: stale
-``routes.json`` and CAD exports caused false failures). ``Project.load`` of an
-example project returns a source-only copy, one per test module, so every
-artifact a test reads it (or its module) generated, and nothing is written into
-the example. ``R3_TESTS_USE_EXAMPLE_BUILD=1`` restores the old behaviour for
-manual debugging.
+Fixture projects are copied from sources before each module uses them. Every
+artifact read by a test is generated in its temporary project; local build
+folders never affect the suite.
 """
 
 from __future__ import annotations
@@ -42,7 +39,7 @@ class _ExampleCopies:
 
     def redirect(self, root: Path) -> Path:
         path = Path(root).resolve()
-        if path.parent != EXAMPLES or os.environ.get("R3_TESTS_USE_EXAMPLE_BUILD") == "1":
+        if path.parent != EXAMPLES:
             return path
         key = (self.module, path)
         if key not in self.copies:

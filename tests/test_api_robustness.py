@@ -93,10 +93,10 @@ def test_many_errors_list_the_first_few_and_count_all(client, projects):
 
 
 def test_project_list_carries_the_structured_error_and_other_projects_load(client, projects):
-    copy_bench(projects, "good-car")
+    copy_bench(projects, "good-project")
     edit_spec(projects / PID, bad_types("gps"))
     rows = {row["id"]: row for row in client.get("/api/projects").json()["projects"]}
-    bad, good = rows[PID], rows["good-car"]
+    bad, good = rows[PID], rows["good-project"]
     assert bad["error"] == bad["error_detail"]["message"] and "components.gps.type" in bad["error"]
     assert bad["error_detail"]["code"] == "project_invalid"
     assert bad["error_detail"]["data"]["errors"][0]["path"] == "components.gps.type"

@@ -264,3 +264,31 @@ def test_misaligned_hole_pattern_is_a_compile_error(tmp_path):
     mismatch = [d for d in Project.load(tmp_path).assembly.diagnostics if d.code == "hole_pattern_mismatch"]
     assert mismatch and "support_mount" in mismatch[0].subjects
     assert mismatch[0].data["max_offset"] == pytest.approx(5e-4, abs=1e-9)
+
+
+def test_variable_studio_uses_authored_geometry_only(project, catalog_parts):
+    from r3_onshape.geometry import Prism
+    from r3_onshape.organized import robot_variables
+
+    variables, bindings = robot_variables(project)
+    assert variables and bindings
+    parts, _ = catalog_parts
+    expected = {(part.studio, op.name): op.depth for part in parts.values() if not part.library
+                for op in part.plan.ops if isinstance(op, Prism) and op.depth is not None and op.name}
+    assert {(studio, operation) for studio, group in bindings.items() for operation in group["extrude"]} == set(expected)
+    for (studio, operation), depth in expected.items():
+        variable = variables[bindings[studio]["extrude"][operation]]
+        assert variable.value == depth
+        assert variable.expression == f"{depth * 1e3:g} mm"
+
+
+def test_assembly_builder_uses_declared_root(project):
+    from r3_onshape.assembly import AssemblyBuilder
+    from cad_helpers import geometry_for
+    from r3_onshape.fit import FitReport
+
+    model, _ = geometry_for(project)
+    builder = AssemblyBuilder(None, "", "", "", project, model, FitReport(), StageResult(stage="cad"))
+    assert builder._root(None) == project.spec.assembly.root
+    with pytest.raises(ValueError, match="no modeled part"):
+        builder._root("missing")

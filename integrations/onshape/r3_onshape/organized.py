@@ -206,44 +206,23 @@ def expected_world(plan: AssemblyPlan) -> dict[str, np.ndarray]:
 # ===================================================================== variables
 def robot_variables(project: Project) -> tuple[dict[str, Variable], dict[str, dict[str, Any]]]:
     """Variable Studio contents and the Part Studio features that must reference them."""
-    spec, catalog = project.spec, project.catalog
-    steering = next((t for t in spec.mechanical.transmissions if t.type == "ackermann_steering"), None)
-    wheelbase = to_si(steering.params.get("wheelbase", 0.26)) if steering else 0.26
-    track = to_si(steering.params.get("kingpin_track", 0.135)) if steering else 0.135
-    plate = float(catalog.component(spec.components[spec.assembly.root].type).mechanical.size[2])
-    deck_type = next((c.type for c in spec.components.values() if "deck" in c.type), None)
-    deck = float(catalog.component(deck_type).mechanical.size[2]) if deck_type else 0.003
-    variables = {
-        "plate_thickness": Variable("plate_thickness", f"{plate * 1e3:g} mm", "Chassis plate thickness (6061-T6 sheet)", plate),
-        "deck_thickness": Variable("deck_thickness", f"{deck * 1e3:g} mm", "Printed electronics deck thickness", deck),
-        "wheelbase": Variable("wheelbase", f"{wheelbase * 1e3:g} mm", "Rear axle to front kingpin axis", wheelbase),
-        "kingpin_track": Variable("kingpin_track", f"{track * 1e3:g} mm", "Distance between the kingpin axes", track),
-    }
-    root_x = float(spec.components[spec.assembly.root].pose.xyz[0])
+    from .geometry import Prism
 
-    def offset(var: str, value: float) -> str:
-        delta = variables[var].value - value
-        return f"#{var} - {delta * 1e3:g} mm" if delta >= 0 else f"#{var} + {-delta * 1e3:g} mm"
-
-    def half(value: float) -> str:
-        delta = track / 2 - value
-        return f"#kingpin_track / 2 - {delta * 1e3:g} mm" if delta >= 0 else f"#kingpin_track / 2 + {-delta * 1e3:g} mm"
-
-    chassis_type = catalog.component(spec.components[spec.assembly.root].type)
-    points: dict[str, dict[tuple[str, int], str]] = {}
-    for name, iface in chassis_type.interfaces.items():
-        if not name.startswith("arm_"):
+    parts, _ = build_part_catalog(project)
+    variables: dict[str, Variable] = {}
+    bindings: dict[str, dict[str, Any]] = {}
+    for part in sorted(parts.values(), key=lambda p: p.key):
+        if part.library:
             continue
-        ox, oy = to_si(iface.origin[0]), to_si(iface.origin[1])
-        # Plate-frame x of the arm holes = wheelbase - (rear axle to plate origin): "#wheelbase - 130 mm".
-        entries = {("x", int(round(ox * 1e6))): offset("wheelbase", ox)}
-        for hole in iface.params.get("holes", []):
-            y = oy + to_si(hole[1])
-            entries[("y", int(round(y * 1e6)))] = half(abs(y))
-        points[name] = entries
-    bindings = {cad_name_of(project, spec.assembly.root): {"extrude": {"plate": "plate_thickness"}, "points": points}}
-    if deck_type:
-        bindings[project.catalog.component(deck_type).cad_name or "Electronics deck"] = {"extrude": {"deck": "deck_thickness"}}
+        for index, operation in enumerate(part.plan.ops):
+            if not isinstance(operation, Prism) or operation.depth is None or not operation.name:
+                continue
+            # Variables describe authored geometry; no inferred robot layout or
+            # relationship between unrelated parts is introduced here.
+            name = "dim_" + re.sub(r"[^A-Za-z0-9_]", "_", f"{part.key}_{index}")
+            depth = float(operation.depth)
+            variables[name] = Variable(name, f"{depth * 1e3:g} mm", f"{part.name}: {operation.name} depth", depth)
+            bindings.setdefault(part.studio, {}).setdefault("extrude", {})[operation.name] = name
     return variables, bindings
 
 

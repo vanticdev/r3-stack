@@ -144,8 +144,12 @@ class Motion:
                               knuckle_ball=np.asarray(axes[knuckle_ball.id]["point"]), horn_ball=np.asarray(axes[horn_ball.id]["point"]),
                               limits=(float(joint.limits[0]), float(joint.limits[1])) if joint.limits else (-math.pi, math.pi)))
         params = steering.params
-        linkage = Linkage(servo_point=servo_point, servo_axis=servo_axis, sides=sides, wheelbase=to_si(params.get("wheelbase", 0.26)),
-                          track=to_si(params.get("kingpin_track", 0.135)))
+        if "wheelbase" not in params or to_si(params["wheelbase"]) <= 0:
+            self.result.add(Diagnostic.error("steering_linkage_unverified", "Ackermann steering requires a positive wheelbase", subjects=[steering.id]))
+            return None
+        track = max(s.kingpin_point[1] for s in sides) - min(s.kingpin_point[1] for s in sides)
+        linkage = Linkage(servo_point=servo_point, servo_axis=servo_axis, sides=sides, wheelbase=to_si(params["wheelbase"]),
+                          track=to_si(params.get("kingpin_track", track)))
         return linkage, groups
 
     def steering(self) -> dict[str, Any]:

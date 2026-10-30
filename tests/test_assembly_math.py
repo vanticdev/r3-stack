@@ -241,16 +241,16 @@ def _moving_catalog() -> Catalog:
         "rail": {"kind": "shaft", "origin": [-0.01, 0, 0.004], "z": [1, 0, 0], "x": [0, 0, 1], "params": {"d": "8 mm", "tol": "h6"}},
         "ball": {"kind": "ball_stud", "origin": [0, 0.01, 0.004], "params": {"d": "4.8 mm"}}})
     arm = _ctype("arm-t", {"hub": {"kind": "bore", "origin": [0.02, 0.0, 0.0], "z": [0, 0, -1], "params": {"d": "6 mm", "tol": "H7"}}})
-    carriage = _ctype("car-t", {"bush": {"kind": "bore", "origin": [0, 0, 0], "z": [-1, 0, 0], "x": [0, 0, 1], "params": {"d": "8 mm", "tol": "H7"}}})
+    carriage = _ctype("carriage-type", {"bush": {"kind": "bore", "origin": [0, 0, 0], "z": [-1, 0, 0], "x": [0, 0, 1], "params": {"d": "8 mm", "tol": "H7"}}})
     link = _ctype("link-t", {"cup": {"kind": "ball_socket", "origin": [0.0, 0.0, 0.005], "z": [0, 0, 1], "params": {"d": "4.9 mm"}}})
     return _catalog(base, arm, carriage, link)
 
 
 def _moving_spec(**extra) -> RobotSpec:
     return _spec({"base": {"type": "base-t", "pose": {"xyz": [0.5, 0.2, 0.1], "rpy": [0, 0, 0.3]}},
-                  "arm": {"type": "arm-t"}, "car": {"type": "car-t"}, "link": {"type": "link-t"}},
+                  "arm": {"type": "arm-t"}, "carriage": {"type": "carriage-type"}, "link": {"type": "link-t"}},
                  [{"a": "base.pin", "b": "arm.hub", "kind": "revolute", "joint": "elbow", "limits": [-1, 1]},
-                  {"a": "base.rail", "b": "car.bush", "kind": "slider", "joint": "slide"},
+                  {"a": "base.rail", "b": "carriage.bush", "kind": "slider", "joint": "slide"},
                   {"a": "base.ball", "b": "link.cup", "kind": "ball", "id": "ball"}], **extra)
 
 
@@ -271,7 +271,7 @@ def test_moving_joints_at_nonzero_q():
     # Slider: a translation by q along the derived axis, no rotation.
     shift = np.eye(4)
     shift[:3, 3] = np.asarray(slide.axis) * q_slide
-    assert np.allclose(moved["car"], shift @ result.poses["car"], atol=1e-15)
+    assert np.allclose(moved["carriage"], shift @ result.poses["carriage"], atol=1e-15)
     # Ball: the socket center stays on the stud center; orientation changes by the rotation vector.
     center = result.interface_world("base.ball")[:3, 3]
     assert np.allclose(result.interface_world("link.cup", moved)[:3, 3], center, atol=1e-15)

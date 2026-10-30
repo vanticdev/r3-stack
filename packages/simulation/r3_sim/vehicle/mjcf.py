@@ -321,11 +321,13 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
             params = trans.params
             left, right = (joints_by_id[j].origin for j in ordered[:2])
             track = _si(params.get("kingpin_track"), abs(left[1] - right[1]))
+            if "wheelbase" not in params or _si(params["wheelbase"], 0) <= 0:
+                raise ValueError(f"{trans.id}: Ackermann steering requires a positive wheelbase")
             limits = joints_by_id[ordered[0]].limits or [-0.6, 0.6]
             table_servo, table_angles = _steering_table(cad, trans.id, ordered)
             steering.append(SteeringInfo(
                 id=trans.id, actuator_component=trans.actuator, joints=ordered, ratio=float(trans.ratio),
-                wheelbase=_si(params.get("wheelbase"), 0.26), kingpin_track=track,
+                wheelbase=_si(params["wheelbase"], 0), kingpin_track=track,
                 max_steer=_si(params.get("max_steer"), float(max(abs(v) for v in limits))),
                 actuators=[f"act_{j}" for j in ordered], table_servo=table_servo, table_angles=table_angles,
                 horn_joint=next((j.id for j in spec.mechanical.joints if j.parent == trans.actuator), None)))
