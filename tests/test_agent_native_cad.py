@@ -25,7 +25,8 @@ def test_session_has_direct_native_editor_server(tmp_path, monkeypatch):
     encoded = next(x.split('=',1)[1] for x in overrides if x.startswith('mcp_servers.onshape_native.enabled_tools='))
     tools = tomllib.loads('value=' + encoded)['value']
     assert {'native_write', 'native_schema', 'assembly_feature', 'document_edit', 'capture_viewport'} <= set(tools)
-    assert not {'evaluate', 'api_request', 'api_write', 'api_upload', 'feature_studio'} & set(tools)
+    assert {'api_catalog', 'api_request', 'api_write', 'api_read', 'api_upload'} <= set(tools)
+    assert not {'evaluate', 'feature_studio'} & set(tools)
 
 
 def test_pull_replaces_generation_tools():
@@ -46,3 +47,35 @@ def test_proxy_preserves_native_errors(monkeypatch):
     monkeypatch.setattr(NativeCadTransport, 'command', reject)
     result = mcp_server.r3_onshape_native('command', {'kind': 'rest'})
     assert result['ok'] is False and result['code'] == 'cad_native_route_forbidden'
+
+
+def test_bridge_document_management_has_no_export_or_featurescript_fallback(monkeypatch):
+    import pytest
+    from r3_onshape.native import NativeCadTransport
+    from r3_model.pulled import PullError
+    from r3_onshape.policy import FeatureScriptForbidden
+    monkeypatch.setattr(NativeCadTransport, '__init__', lambda self: None)
+    calls = []
+    def request(self, method, endpoint, **kwargs):
+        calls.append((method, endpoint, kwargs))
+        return b'{"id":"synthetic-document"}'
+    monkeypatch.setattr(NativeCadTransport, '_request', request)
+    native = NativeCadTransport()
+    for method, endpoint, body in [
+        ('POST', '/api/v9/documents', {'name':'Synthetic coupon', 'parentId':'folder'}),
+        ('POST', '/api/v9/documents/d/doc/versions', {'name':'Pinned', 'documentId':'doc', 'workspaceId':'workspace', 'microversionId':'microversion'}),
+        ('DELETE', '/api/v9/documents/doc', None),
+    ]:
+        assert native.api_request(method, endpoint, body)['id'] == 'synthetic-document'
+    assert len(calls) == 3
+    for endpoint in ('/api/v17/parts/d/doc/v/version/e/element/partid/part/stl',
+                     '/api/v17/partstudios/d/doc/v/version/e/element/translations',
+                     '/api/v9/documents/d/doc/v/version/translate'):
+        with pytest.raises(PullError, match='Geometry exports'):
+            native.api_request('POST', endpoint)
+    with pytest.raises(FeatureScriptForbidden):
+        native.api_request('POST', '/api/v17/partstudios/d/doc/w/workspace/e/element/featurescript')
+    assert len(calls) == 3
+    result = mcp_server.r3_onshape_native('api_request', {'method':'POST', 'endpoint':'/api/v9/documents',
+                                                       'body':{'name':'Synthetic coupon','parentId':'folder'}})
+    assert result['ok'] and len(calls) == 4

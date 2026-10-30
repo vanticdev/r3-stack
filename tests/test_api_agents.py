@@ -70,7 +70,8 @@ def test_claude_session_streams_transcript_runs_and_spec_diff(env):
     assert {f"mcp__r3__{t}" for t in GATED} <= set(denied)
     assert not {f"mcp__r3__{t}" for t in GATED} & set(allowed)
     assert "mcp__onshape_native__native_write" in allowed
-    assert "mcp__onshape_native__api_write" in denied
+    assert "mcp__onshape_native__api_write" in allowed
+    assert "mcp__onshape_native__api_request" in allowed
     assert "mcp__onshape_native__evaluate" in denied
     config = json.loads(open(argv[argv.index("--mcp-config") + 1]).read())["mcpServers"]["r3"]
     assert config["args"] == ["-m", "r3_orchestrator.mcp_server"] and config["env"]["R3_PROJECT"] == str(root)

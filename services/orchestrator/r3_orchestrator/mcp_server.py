@@ -225,13 +225,16 @@ def r3_onshape_native(operation: str, arguments: dict[str, Any]) -> dict[str, An
     """Direct native bridge access when no separate onshape_native MCP launcher is installed.
     operation is a local tool (search_commands, element_tree, document_edit, capture_viewport, etc.)
     or command with a schema-discovered editor envelope. Native commands support modeling, mates and
-    mate connectors. Public REST proxy and FeatureScript are refused. Use fresh revision guards for writes."""
+    mate connectors. api_request accepts method, endpoint, body and query for browser-session API
+    operations (including document/version creation). Exports remain native-only; FeatureScript is refused.
+    Use fresh revision guards for writes."""
     from r3_onshape.native import NativeCadTransport
     from r3_model.pulled import PullError
 
     try:
         native = NativeCadTransport()
-        return {"ok": True, "result": native.command(arguments) if operation == "command" else native.local(operation, arguments)}
+        return {"ok": True, "result": native.command(arguments) if operation == "command" else
+                native.api_request(**arguments) if operation == "api_request" else native.local(operation, arguments)}
     except (PullError, FileNotFoundError) as error:
         return {"ok": False, "code": getattr(error, "code", "cad_native_unavailable"), "message": str(error)}
 

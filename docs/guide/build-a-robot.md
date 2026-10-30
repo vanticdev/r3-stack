@@ -150,8 +150,9 @@ project's designated folder through the native integration's supported workflow.
 purchased parts, search `r3_models_search` first, download the exact vendor STEP with
 provenance, then import it into Onshape. Add mate connectors on its real seating faces,
 holes and axes. Electrical and software catalog metadata stays useful; catalog boxes do
-not become CAD. Missing native import or document-creation capabilities must be reported
-explicitly; never fall back to the quota-limited public API or sculpt a bought part.
+not become CAD. Use the browser-session bridge API tools for document creation and versions, as below.
+If an API operation is rejected, inspect the result and use a native tool instead; never
+retry in a loop or sculpt a bought part.
 
 Build the real assembly in Onshape using its native insert and mate operations. Define
 attachments there, including joint type, axis and limits. Use full occurrence paths for
@@ -165,6 +166,19 @@ motion limits. Use `native_measure` for supported geometric measurements and
 does not establish fit or interference clearance.
 
 ## 5. Pull CAD and qualify fabricated parts
+
+Use `onshape_native.api_catalog` to discover `createDocument`, `createVersion` and
+`deleteDocument`, then `api_write`; `api_request` also accepts the browser-session routes:
+`POST /api/v9/documents` with `{name, parentId, isPublic}`, and
+`POST /api/v9/documents/d/{did}/versions` with
+`{name, documentId, workspaceId, microversionId}`. Read the current workspace
+microversion first; the version pins that exact state.
+Keep `parentId` in the designated project folder. Choose visibility compatible with the
+account and user requirements; never change an existing document's visibility silently.
+Record created IDs. To trash a run's document, verify its name and folder first, then
+`DELETE /api/v9/documents/{did}`. These requests go through the companion's browser
+session. No geometry export uses this route. `r3 cad pull` consumes the selected version;
+it deliberately does not create or modify the design or document.
 
 Create or select an immutable Onshape version, then pull the assembly:
 
@@ -196,8 +210,9 @@ integrity error. Fix the model in Onshape and pull again.
 The only export backend is the authenticated loopback companion at
 `http://127.0.0.1:8766/native/api/v17`. It supports selected-part STL and STEP through
 UI translations, polling and the translation's `resultDocumentId` external-data download.
-Public `/api` calls, `bodydetails`, `tessellatedfaces`, `massproperties`, `shadedviews` and
-public `/translations` are unavailable and never used as fallbacks. Only STL supports
+Public export endpoints are never used as fallbacks. Document management and other
+working operations may use the authenticated browser-session `/api/...` bridge; no API keys
+or expired saved sessions. A rejection is a finding, not a reason to retry in a loop. Only STL supports
 microversions; STEP requires a pinned version. Install the updated extension and restart
 the companion to expose `/native` routes. Unsupported operations fail with a clear code.
 The desktop native integration needs its signed-in browser/companion on the worker;

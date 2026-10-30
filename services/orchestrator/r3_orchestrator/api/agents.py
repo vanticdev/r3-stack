@@ -81,8 +81,10 @@ CAD changes must happen only in a real Onshape document, using standard editable
 No FeatureScript, locally fabricated CAD, hand-written external tool formats, or sculpted purchased parts.
 Use onshape_native directly: discover native commands/schemas, model parts, add mate connectors,
 import vendor STEP, create documents in the designated folder and build real assemblies with real mates.
-Use native editor/local bridge routes only; public /api calls, bodydetails, massproperties, shadedviews,
-and public translations are unavailable. UI exports use /native/api/v17, never a public fallback.
+Use the authenticated browser-session bridge for Onshape; never API keys or an expired saved session.
+Document creation, versions and deletion use onshape_native api_write/api_request through /api.
+Other bridge /api operations may be used when they work. On rejection, inspect and use a native tool;
+never retry in a loop. All geometry exports use /native/api/v17, never public export endpoints.
 Search the R3 model bank first for purchased parts, then import them into Onshape and add connectors there.
 Verify geometry, regeneration and mates numerically and inspect viewport captures before r3_cad_pull.
 Create or select an immutable Onshape version. robot.yaml is an index into parts/, electrical/ and software/;
@@ -121,9 +123,9 @@ def detect(provider: str, executable: str | None = None) -> dict[str, Any]:
             "detail": "" if ok else f"`{path} --version` exited with {proc.returncode}"}
 
 
-# Only editor/native tooling is exposed. Public REST, evaluation and generated
-# FeatureScript are deliberately excluded even when installed in the account.
-NATIVE_TOOLS = ("bridge_status", "resolve_target", "search_commands", "browse_commands", "native_catalog",
+# Browser-session REST and native editor tools are available. FeatureScript
+# evaluation/authoring remains excluded. Export acquisition uses native UI routes.
+NATIVE_TOOLS = ("api_catalog", "api_read", "api_write", "api_request", "api_upload", "bridge_status", "resolve_target", "search_commands", "browse_commands", "native_catalog",
     "native_state", "native_schema", "native_read", "native_write", "open_document", "editor_tab",
     "document_tree", "element_tree", "document_history", "document_edit", "sidebar_edit", "artifact_page",
     "display_state", "set_visibility", "mate_animation", "view_control", "capture_viewport",
@@ -181,8 +183,7 @@ def claude_command(executable: str, config_path: Path, model: str | None = None)
                "--append-system-prompt", SYSTEM_PROMPT,
                "--allowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in allowed], *CLAUDE_READ_TOOLS,
                "--disallowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in gated],
-               "mcp__onshape_native__evaluate", "mcp__onshape_native__feature_studio", "mcp__onshape_native__api_read",
-               "mcp__onshape_native__api_write", "mcp__onshape_native__api_upload", "mcp__onshape_native__api_request"]
+               "mcp__onshape_native__evaluate", "mcp__onshape_native__feature_studio"]
     # An explicit allowlist keeps discovery/modeling available under strict MCP config.
     index = command.index("--disallowedTools")
     command[index:index] = [f"mcp__onshape_native__{tool}" for tool in NATIVE_TOOLS]

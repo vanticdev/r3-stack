@@ -1,6 +1,7 @@
 """Dedicated native CAD transport: editor/local calls and UI exports only.
 
-Never uses the browser-authenticated public /api proxy or API-key transport.
+Geometry exports use native UI routes. Other API operations use only the
+authenticated loopback browser-session bridge, never API keys.
 Writes are submitted exactly once. Unknown outcomes require inspection.
 """
 from __future__ import annotations
@@ -37,8 +38,8 @@ class NativeCadTransport:
 
     def _request(self, method: str, path: str, body: Any = None, query: dict | None = None,
                  timeout: float = 120) -> bytes:
-        if not (path.startswith("/native/api/v17/") or path.startswith("/local/") or path == "/command"):
-            raise PullError("cad_native_route_forbidden", "Only /native/api/v17, /local and editor commands are supported; public /api is disabled")
+        if not (path.startswith("/native/api/v17/") or re.match(r"^/api/v[0-9]+/", path) or path.startswith("/local/") or path == "/command"):
+            raise PullError("cad_native_route_forbidden", "Only loopback browser API, native exports, local and editor routes are supported")
         if ".." in path or "?" in path or "#" in path:
             raise PullError("cad_native_route_forbidden", "Invalid native route")
         url = self.base + path + ("?" + urlencode(query) if query else "")
@@ -66,6 +67,19 @@ class NativeCadTransport:
             except (OSError, TimeoutError) as error:
                 raise PullError("cad_native_unavailable", f"Native bridge unavailable or command outcome unknown: {error}; inspect before retrying writes") from None
         raise PullError("cad_native_request_failed", "Too many native export redirects")
+
+    def api_request(self, method: str, endpoint: str, body: Any = None, query: dict | None = None) -> Any:
+        """One browser-session API operation; geometry exports stay native-only."""
+        from .policy import check_request
+        if method not in {"GET", "POST", "PUT", "PATCH", "DELETE"} or not re.match(r"^/api/v[0-9]+/", endpoint):
+            raise PullError("cad_native_route_forbidden", "Use a versioned browser-session API endpoint")
+        if (re.search(r"/(stl|gltf|parasolid|externaldata|foreigndata|translate|exportinternal)(/|$)", endpoint)
+                or ("/translations" in endpoint and "/partstudios/" in endpoint)
+                or ("/translations" in endpoint and "/assemblies/" in endpoint)):
+            raise PullError("cad_native_route_forbidden", "Geometry exports require /native/api/v17")
+        check_request(method, endpoint, body)
+        raw = self._request(method, endpoint, body=body, query=query)
+        return json.loads(raw) if raw else None
 
     def local(self, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
         allowed = {"resolve_target", "search_commands", "browse_commands", "document_tree", "element_tree",
