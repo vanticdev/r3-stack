@@ -10,7 +10,7 @@ import re
 import shutil
 import tempfile
 from typing import Any, Iterator
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 import numpy as np
 
@@ -92,9 +92,9 @@ def mass_properties(path: Path, density: float) -> dict[str, Any]:
             "volume": volume, "density": density}
 
 
-def _part_records(snapshot: dict[str, Any]) -> dict[tuple[str, str, str], dict[str, Any]]:
+def _part_records(snapshot: dict[str, Any]) -> dict[tuple[str, str, str, str], dict[str, Any]]:
     records = snapshot["definition"].get("parts", [])
-    return {(p["documentId"], p["elementId"], p["partId"]): p for p in records}
+    return {(p["documentId"], p["elementId"], p["partId"], p.get("fullConfiguration") or p.get("configuration") or ""): p for p in records}
 
 
 def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str, list[str]]) -> dict[str, Any]:
@@ -117,15 +117,18 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
     records = _part_records(snapshot)
     parts, poses = {}, {}
     for name, occurrence in selectors.items():
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", name) or name in (".", ".."):
-            raise PullError("cad_pull_selection_invalid", f"Part name is not a safe file identity: {name!r}")
+        if not isinstance(name, str) or not name:
+            raise PullError("cad_pull_selection_invalid", "Part identities must be nonempty strings")
+        filename = quote(name, safe="-_.")
+        if filename in (".", ".."):
+            filename = filename.replace(".", "%2E")
         row = rows[tuple(occurrence)]
         ref = row["reference"]
-        key = (ref["documentId"], ref["elementId"], ref["partId"])
+        key = (ref["documentId"], ref["elementId"], ref["partId"], ref.get("fullConfiguration") or ref.get("configuration") or "")
         record = records.get(key)
         if record is None:
             raise PullError("cad_pull_incomplete", f"{name}: no native part definition")
-        vid = pin["version_id"] if ref["documentId"] == pin["document_id"] else ref.get("documentVersion")
+        vid = ref.get("documentVersion") or (pin["version_id"] if ref["documentId"] == pin["document_id"] else None)
         if not vid:
             raise PullError("cad_pull_version_required", f"{name}: external reference is only a microversion; pin that source to an Onshape version for STEP")
         name_material, density = _material(record.get("material"))
@@ -135,12 +138,14 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
             if not connector_id or connector_id in connectors:
                 raise PullError("cad_pull_incomplete", f"{name}: missing or duplicate native connector identity")
             connectors[connector_id] = _cs(item.get("mateConnectorCS") or item.get("coordinateSystem") or item)
-        parts[name] = {"name": name, "stl": f"parts/{name}.stl", "step": f"parts/{name}.step", "sha256": {},
+        parts[name] = {"name": name, "stl": f"parts/{filename}.stl", "step": f"parts/{filename}.step", "sha256": {},
                        "material": name_material, "density": density, "mate_connectors": connectors,
                        "purchased": False, "onshape": {"document_id": key[0], "version_id": vid, "element_id": key[1],
-                           "part_id": key[2], "occurrence_path": occurrence, "configuration": ref.get("fullConfiguration") or ref.get("configuration") or ""}}
+                           "part_id": key[2], "occurrence_path": occurrence, "configuration": key[3]}}
         poses[name] = _frame(np.asarray(row["transform"]).reshape(4, 4), f"pose {name}").tolist()
     mates = []
+    assembly_poses = {tuple(r["occurrence_path"]): np.asarray(r["transform"]).reshape(4, 4)
+                      for r in snapshot["rows"] if r.get("kind") == "occurrence" and r.get("transform") is not None}
     # Native definitions retain full nested paths. Reject unsupported relation
     # types rather than silently discarding a kinematic constraint.
     assemblies = [(definition["rootAssembly"], [])]
@@ -179,7 +184,7 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
                 part = by_path[full]
                 # matedCS is solved in assembly coordinates; pull its exact frame
                 # into the part frame, rather than deriving it from catalog interfaces.
-                world = np.asarray(_cs(entity["matedCS"]))
+                world = (assembly_poses[tuple(parent)] if parent else np.eye(4)) @ np.asarray(_cs(entity["matedCS"]))
                 local = np.linalg.inv(poses[part]) @ world
                 connector_id = entity.get("mateConnectorId") or f"{mate_id}:{side}"
                 previous = parts[part]["mate_connectors"].get(connector_id)
@@ -234,7 +239,8 @@ def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_
     if not revision or revision != manifest["microversion"]:
         raise PullError("cad_pull_view_stale", "Viewport revision differs from the pinned native assembly; open the pinned view before pull")
     (directory / "viewport.png").write_bytes(image)
-    manifest["images"] = [{"path": "viewport.png", "sha256": hashlib.sha256(image).hexdigest(), "capture": evidence}]
+    capture = {key: value for key, value in evidence.items() if key not in ("path", "artifact")}
+    manifest["images"] = [{"path": "viewport.png", "sha256": hashlib.sha256(image).hexdigest(), "capture": capture}]
     (directory / "pull.json").write_text(json.dumps(manifest, indent=2, allow_nan=False) + "\n")
     for path in directory.rglob("*"):
         if path.is_file():
@@ -245,15 +251,17 @@ def pull(project: Any, url: str = "", version_id: str = "", transport: Any = Non
     """Explicit refresh. Validation stages never contact or modify native CAD."""
     try:
         with pull_lock(project.root):
-            return _pull(project, url, version_id, transport or NativeCadTransport())
-    except (PullError, FileNotFoundError) as error:
-        return {"ok": False, "code": getattr(error, "code", "cad_native_unavailable"), "message": str(error)}
+            return _pull(project, url, version_id, transport)
+    except (ValueError, FileNotFoundError, ImportError, RuntimeError) as error:
+        fallback = "cad_native_unavailable" if isinstance(error, FileNotFoundError) else "cad_pull_failed"
+        return {"ok": False, "code": getattr(error, "code", fallback), "message": str(error)}
 
 
 def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, Any]:
     cad = project.spec.cad.model_dump()
     url = url or cad.get("source", "") or cad.get("url", "")
     pin = target(url, version_id or cad.get("version_id") or "")
+    transport = transport or NativeCadTransport()
     # Spec-schema integration refreshes these selectors from the split part refs.
     selectors = {}
     for name, descriptor in project.spec.components.items():

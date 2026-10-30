@@ -18,7 +18,7 @@ Each reserved folder holds one importable package:
 | `packages/wiring` | `r3_wiring` | 3D cable routing, harness checks, physical slack simulation |
 | `packages/simulation` | `r3_sim` | co-simulation kernel, MuJoCo vehicle, electrical network, radio, sensors, twin HAL server |
 | `packages/hardware-interface` | `r3_hal` | software-facing HAL (linux + virtual backends), `PROTOCOL.md` |
-| `integrations/onshape` | `r3_onshape` | FeatureScript generation, Onshape sync, mass properties, mesh export |
+| `integrations/onshape` | `r3_onshape` | Native-only read-only Onshape pulls, STEP checks, STL mesh evidence |
 | `integrations/kicad` | `r3_kicad` | KiCad schematic/PCB generation, ERC/DRC, netlist + board import |
 | `integrations/github` | `r3_github` | project repository creation, workflow templates, status publishing |
 | `services/orchestrator` | `r3_orchestrator` | `r3` CLI, MCP server, stage scheduling, reports |
@@ -35,9 +35,9 @@ exposed as `<package>.stage.run`. It writes artifacts under `build/<stage>/`, ad
 
 | # | Stage | Reads | Writes |
 | --- | --- | --- | --- |
-| 0 | `assembly` | `assembly:` joins, catalog `interfaces` | `build/model/assembly.json`, `build/model/assembly_graph.png`; derived poses, fits, hole patterns, loop residuals ([guide](assembly-model.md)) |
+| 0 | `assembly` | pinned native poses, mate connectors and mates | `build/model/assembly.json`; integrity, fit and interference diagnostics ([guide](assembly-model.md)) |
 | 1 | `model` | robot.yaml, catalog | `build/model/graph.json`; binding/connector-mate/pin-voltage/logic-level/I²C-address checks |
-| 2 | `cad` | spec, `cad/` | `build/cad/cad_model.json`, `build/cad/meshes/<component>.stl`, `build/cad/views/*.png` (REST shaded views) |
+| 2 | `cad` | split description, `cad/pulled/pull.json`, pinned STEP/STL | Integrity and geometry checks; no native writes or geometry generation |
 | 3 | `pcb` | spec, `pcb/<board>/` | `build/pcb/<board>/board.json`, KiCad files, gerbers, ERC/DRC reports |
 | 4 | `wiring` | graph, cad_model, board.json | `build/wiring/routes.json`, harness BOM, cut lengths |
 | 4b | `connectors` | catalog connector geometry, vendor/KiCad models, routes | `build/connectors/connectors.json`, GLB models, close-up renders |
@@ -46,23 +46,33 @@ exposed as `<package>.stage.run`. It writes artifacts under `build/<stage>/`, ad
 | 7 | `sim` | everything above | `build/sim/<scenario>/summary.json`, `recording.npz`, plots, renders |
 | 8 | `report` | all results | `build/report/index.html`, `build/report/summary.json` |
 
-Stages fall back to catalog estimates when an upstream artifact is missing, and
-say so with a `*_estimated` warning diagnostic.
+CAD-dependent stages fail when the pulled copy is missing, changed or incomplete. Catalog
+envelopes never replace native geometry. Estimates in other domains remain labelled.
 
-Every stage runs headless (no display, no browser) in the R3 worker image;
+Validation stages consume the pulled copy headlessly in the R3 worker image. Modeling and
+pull require the native signed-in browser/companion; public Onshape APIs are unavailable;
 `r3 doctor` reports what the current environment supports. See
 [headless operation](headless.md).
 
-### `build/cad/cad_model.json`
+### `cad/pulled/pull.json`
 
-```json
-{"source": {"provider": "onshape", "document_id": "...", "workspace_id": "...", "element_id": "...", "microversion": "..."},
- "parts": {"<component id>": {"part_name": "...", "mass": 0.0, "com": [x, y, z], "inertia": [ixx, iyy, izz, ixy, ixz, iyz],
-                              "bbox_min": [..], "bbox_max": [..], "material": "...", "density": 0.0, "mesh": "meshes/<id>.stl",
-                              "mass_status": "cad"}}}
-```
+`robot.yaml` indexes explicit `{$include: parts/<name>.yaml}` values and domain files.
+The resolved description remains strict and typed. Part files keep authored object/catalog
+selection beside read-only `pulled` metadata; top-level `attachments` are native mates.
 
-Robot frame, SI units; inertia about the part COM in robot-frame axes.
+The `r3/pull@1` manifest records `document_id`, immutable `version_id`, `parts`, `mates`
+and solved `poses`. Each part has part-local STL (metres), STEP, their SHA-256 hashes,
+native reference/occurrence path, material/density, mass, centre of mass, inertia and local
+mate-connector frames. Poses and frames are rigid 4x4 matrices in metres; inertia has nine
+row-major values in kg m² about the part COM. Mates name `(part, connector)` endpoints,
+type, assembly-frame axis and limits. Viewport evidence records the captured revision.
+
+`r3.lock.yaml: cad_pull.manifest_sha256` pins the manifest; all pull files are read-only.
+`r3_model.pulled.load_pulled` is the dependency-independent consumer API, and the split-spec
+integrity hook compares every mirrored field and attachment. A local mismatch is an error.
+Modeling never occurs in a validation stage. `r3 cad pull` alone refreshes evidence through
+`/native/api/v17` downloads and onshape-native local/editor reads; there is no public API
+fallback. No CAD is authored from YAML or recomposed offline.
 
 ### `build/pcb/<board>/board.json`
 

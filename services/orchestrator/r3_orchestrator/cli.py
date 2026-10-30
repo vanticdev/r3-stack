@@ -174,10 +174,6 @@ def cmd_source(args: argparse.Namespace) -> dict[str, Any]:
 
     if args.bom:
         return {**sourcing.price_bom(api.load_project(args.project), provider_ids=args.provider), "view": "bom"}
-    if args.import_cad:
-        from r3_onshape.sourced import import_sourced
-
-        return {**import_sourced(api.load_project(args.project), slots=[args.component] if args.component else None), "view": "cad"}
     if args.unpin:
         if not args.component:
             return {"ok": False, "code": "usage_error", "message": "--unpin needs a component"}
@@ -218,6 +214,12 @@ PRINTERS: dict[str, Callable[[dict[str, Any]], None]] = {"status": _print_status
                                                         "doctor": _print_doctor, "source": _print_source}
 
 
+def cmd_cad_pull(args: argparse.Namespace) -> dict[str, Any]:
+    from r3_onshape.pull import pull
+
+    return pull(api.load_project(args.project), url=args.url, version_id=args.version_id)
+
+
 def build_parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--project", "-C", default=None, help="Project directory (default: $R3_PROJECT or nearest robot.yaml).")
@@ -231,12 +233,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--scenario", action="append", help="Restrict the sim stage to these scenario ids.")
     p.set_defaults(func=cmd_validate)
 
-    for group, action, stage, text in (("cad", "sync", "cad", "Sync CAD from Onshape and extract mass properties."),
-                                       ("pcb", "build", "pcb", "Generate KiCad boards and run ERC/DRC."),
+    for group, action, stage, text in (("pcb", "build", "pcb", "Generate KiCad boards and run ERC/DRC."),
                                        ("wiring", "route", "wiring", "Route harnesses in 3D and check clearances.")):
         g = sub.add_parser(group, parents=[common], help=text)
         gsub = g.add_subparsers(dest="action", required=True)
         gsub.add_parser(action, parents=[common], help=text).set_defaults(func=_single(stage))
+
+    cad = sub.add_parser("cad", parents=[common], help="Read pinned native Onshape CAD.")
+    cadsub = cad.add_subparsers(dest="action", required=True)
+    pull = cadsub.add_parser("pull", parents=[common], help="Pull read-only STL/STEP, mates, material and viewport evidence.")
+    pull.add_argument("--url", default="", help="Onshape assembly /v URL, or /w URL with --version.")
+    pull.add_argument("--version", dest="version_id", default="", help="Immutable Onshape version id.")
+    pull.set_defaults(func=cmd_cad_pull)
 
     sim = sub.add_parser("sim", parents=[common], help="Digital twin scenarios.")
     simsub = sim.add_subparsers(dest="action", required=True)
@@ -275,8 +283,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-rejected", action="store_true", help="Allow pinning a candidate that fails a hard requirement.")
     p.add_argument("--unpin", action="store_true", help="Remove the slot's pin (the authored `type`, if any, is used again).")
     p.add_argument("--bom", action="store_true", help="Price and stock-check the PCB BOM MPNs through the distributor APIs.")
-    p.add_argument("--import-cad", action="store_true",
-                   help="Import pinned vendor STEP models into the Onshape parts library and add mate connectors (API keys).")
+
     p.set_defaults(func=cmd_source)
 
     p = sub.add_parser("doctor", parents=[common], help="Report available tools and which stages can run headless here.")

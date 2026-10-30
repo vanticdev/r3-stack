@@ -157,11 +157,7 @@ def ingest(bank: ModelBank, provider: str, **options: Any) -> dict[str, Any]:
         root = options.get('root')
         entries = ingest_kicad(Path(root) if root else None, query=options.get('query', ''))
     elif provider == 'onshape':
-        from r3_onshape.client import default_transport
-        transport = default_transport()
-        if transport is None:
-            raise ValueError('Onshape public search requires a connected transport (API keys or browser bridge)')
-        entries = ingest_onshape(options.get('query', ''), transport)
+        raise ValueError('Public Onshape search API is unavailable; search the local model bank or use native tools to select an immutable source')
     else:
         entries = ingest_page(provider, options['url'], name=options.get('name') or provider,
                               category=options.get('category', 'other'), mpn=options.get('mpn', ''))

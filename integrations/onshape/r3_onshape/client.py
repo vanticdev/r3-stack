@@ -290,60 +290,34 @@ def _native_if_connected() -> NativeBridgeTransport | None:
     return native if native.healthy() else None
 
 
-def default_transport() -> Transport | None:
-    """The transport selected by ``R3_ONSHAPE_TRANSPORT``. ``auto`` prefers the
-    official API keys (the supported server path), then a valid headless
-    session, then the local browser bridge."""
-    choice = (os.environ.get("R3_ONSHAPE_TRANSPORT") or "auto").lower()
-    if choice not in TRANSPORT_CHOICES:
-        raise ValueError(f"R3_ONSHAPE_TRANSPORT must be one of {', '.join(TRANSPORT_CHOICES)}, not {choice!r}")
+def default_transport():
+    """Native-only default. Public API keys and browser REST sessions are disabled.
+
+    Legacy HTTP transport classes remain importable for policy enforcement and
+    migration diagnostics; the CAD pipeline never selects them.
+    """
+    choice = (os.environ.get("R3_ONSHAPE_TRANSPORT") or "native").lower()
     if choice == "none":
         return None
-    if choice == "api-keys":
-        return ApiKeyTransport.from_env()
-    if choice in ("auto", "session"):
-        if choice == "auto":
-            keys = ApiKeyTransport.from_env()
-            if keys is not None:
-                return keys
-        from .session import SessionTransport
-
-        session = SessionTransport(os.environ.get("ONSHAPE_BASE", "https://cad.onshape.com"))
-        if session.healthy() or choice == "session":
-            return session
-    native = _native_if_connected()
-    if native is not None or choice == "native":
-        return native
-    return None
+    if choice not in ("auto", "native"):
+        raise ValueError("Public Onshape transports are unavailable; use onshape-native /native exports and editor/local tools")
+    from .native import NativeCadTransport
+    try:
+        return NativeCadTransport()
+    except FileNotFoundError:
+        return None
 
 
 def describe_transport() -> dict[str, Any]:
-    """What ``default_transport`` would use, in the same order (API keys, then a
-    stored headless session, then the local bridge), without secrets or network
-    calls to Onshape: the session is reported as stored, not verified, and only
-    the local bridge health endpoint is probed."""
-    choice = (os.environ.get("R3_ONSHAPE_TRANSPORT") or "auto").lower()
-    keys = ApiKeyTransport.from_env() if choice in ("auto", "api-keys") else None
-    session_stored = False
-    if choice in ("auto", "session"):
-        from .session import SessionTransport
-
-        session_stored = SessionTransport(os.environ.get("ONSHAPE_BASE", "https://cad.onshape.com")).has_session
+    """Native bridge readiness, without public Onshape API probes or credentials."""
+    choice = (os.environ.get("R3_ONSHAPE_TRANSPORT") or "native").lower()
+    if choice not in ("auto", "native", "none"):
+        raise ValueError("Public Onshape transports are unavailable; use onshape-native")
     try:
-        bridge = NativeBridgeTransport() if choice in ("auto", "native") else None
-        bridge_configured = bridge is not None
+        bridge = NativeBridgeTransport() if choice != "none" else None
     except FileNotFoundError:
-        bridge, bridge_configured = None, False
-    bridge_connected = bool(bridge and bridge.healthy())
-    if keys is not None:
-        selected = ApiKeyTransport.name
-    elif session_stored or choice == "session":
-        selected = "onshape-session"
-    elif bridge_connected:
-        selected = NativeBridgeTransport.name
-    else:
-        selected = None
-    return {"choice": choice, "selected": selected, "headless": selected in (ApiKeyTransport.name, "onshape-session"),
-            "api_keys": {"configured": keys is not None, "auth": keys.auth if keys else None, "base": keys.base if keys else None},
-            "session": {"stored": session_stored},
-            "native_bridge": {"configured": bridge_configured, "connected": bridge_connected}}
+        bridge = None
+    connected = bool(bridge and bridge.healthy())
+    return {"choice": choice, "selected": "onshape-native" if connected else None,
+            "headless": False, "public_api": False,
+            "native_bridge": {"configured": bridge is not None, "connected": connected}}

@@ -2,7 +2,7 @@
 
 You are one of six parallel worker agents building R3: "Lovable for full-stack
 robotics". The goal is an AI-driven pipeline in which a robot is described once in
-`robot.yaml`. From it the pipeline generates CAD (Onshape), PCBs (KiCad), 3D-routed
+`robot.yaml`. Native CAD is authored in Onshape and pulled read-only; from the local description the pipeline builds PCBs (KiCad), 3D-routed
 wiring with physically simulated slack, and software deployed through BLITZ. All of
 it runs together in a multi-domain digital twin: physics, electrical, wiring, radio,
 sensors, and the real robot software against virtual hardware. The twin emits
@@ -60,9 +60,9 @@ the Onshape UI. Feature Studios, custom features, FeatureScript evaluation and a
 generated `.fs` source are forbidden. `integrations/onshape/r3_onshape/policy.py`
 enforces this in the R3 client, `tests/test_cad_policy.py` tests it, and
 `.claude/settings.json` denies the onshape-native `evaluate` tool. Do not work
-around it. Verification uses native REST data instead: `bodydetails` face/edge
-surface definitions, mass properties, bounding boxes, and tessellated meshes with
-Python mesh booleans (manifold3d/trimesh are installed in the shared venv).
+around it. Verification reads pinned STEP with OCP and pulled STL meshes. No public `bodydetails`,
+`massproperties`, `tessellatedfaces` or `shadedviews` calls are available. R3 never generates
+parts or assemblies from YAML. Native connector frames, mates and poses are pulled evidence.
 
 ## Tool-use policy (user directive): use every tool the way a human engineer would
 For every external tool, the AI works through the same operations a person uses
@@ -110,8 +110,10 @@ exchange), device/register models that bridge software to the physics, and the
 ## Headless policy (user directive): everything must run headless on a server
 Every stage must run with no display and no interactive browser.
 - **MuJoCo rendering:** `MUJOCO_GL=egl` (or osmesa) on Linux.
-- **Onshape:** the official API-key transport. Images come from the REST shaded-view
-  endpoints, never browser captures. The browser bridge is a local-dev convenience only.
+- **Onshape:** author through onshape-native editor/local tools and pull through its
+  `/native/api/v17` UI exports. Capture native viewport images. This authoring/pull step
+  needs the signed-in native browser/companion; headless stages consume its pinned copy.
+  Public API-key and session REST transports are unavailable and never fallbacks.
 - **KiCad:** `kicad-cli` plus the bundled `pcbnew` Python module. Never a GUI, not even under Xvfb.
 - **Freerouting:** CLI mode.
 - **Docker:** used for firmware.
@@ -127,9 +129,8 @@ real downloaded 3D model, never one modelled by R3 or by an agent. Source it in 
 3. **Open model databases with programmatic or public access:** KiCad 3D libraries, TraceParts,
    3D ContentCentral, SnapEDA / Ultra Librarian. Respect terms and robots.txt, and never scrape behind
    logins.
-4. **Only when nothing exists:** a datasheet-dimensioned `proxy` built with standard features, as
-   accurate as possible. It is labelled `proxy` and reported as a `cad_purchased_proxy` warning with the
-   searches that failed.
+4. **When nothing exists:** report the missing exact purchased model. Do not sculpt a proxy
+   to substitute for real purchased geometry in the pull, viewer or simulation.
 
 Every sourced model is:
 - validated against the datasheet (bounding box and key features);

@@ -155,8 +155,13 @@ def load_pulled(project_root: Path) -> PulledModel:
             if not item["id"] or item["id"] in ids:
                 raise PullError("cad_pull_invalid", "Mate ids must be nonempty and unique")
             ids.add(item["id"])
-            mates.append(PulledMate(item["id"], item["kind"], *ends,
-                _numbers(item.get("axis"), 3, "mate axis"), _numbers(item.get("limits"), 2, "mate limits")))
+            axis = _numbers(item.get("axis"), 3, "mate axis")
+            limits = _numbers(item.get("limits"), 2, "mate limits")
+            if axis is not None and not np.isclose(np.linalg.norm(axis), 1, atol=1e-7):
+                raise PullError("cad_pull_invalid", f"Mate {item['id']}: axis must be a unit vector")
+            if limits is not None and limits[0] > limits[1]:
+                raise PullError("cad_pull_invalid", f"Mate {item['id']}: reversed limits")
+            mates.append(PulledMate(item["id"], item["kind"], *ends, axis, limits))
         for item in data.get("images", []):
             _file(folder, item["path"], item["sha256"], "viewport evidence")
         return PulledModel(data["document_id"], data["version_id"], parts, mates, poses)
