@@ -78,10 +78,24 @@ validation:
   key_features:
     official_ds3218_source: true
     solid_identity_measured: true
-  date: '2026-10-30T12:51:47.786730+00:00'
-  validated_by: r3/cascadio
-  notes: Measured from official DS3218 STEP. Verify ear height on receipt. DS3218MG
-    community file is a different label and is not used.
+    ear_slot_axes_d4p5: true
+    ear_seat_plane_intersections: true
+    ear_hole_seat_frames_from_step: true
+  date: '2026-10-30T15:44:00.829374+00:00'
+  validated_by: Codex / Open CASCADE native STEP B-rep inspection
+  notes: Inspected DS3218.stp from the checksum-pinned manufacturer RAR with STEPControl_Reader and BRepAdaptor_Surface.
+    Face numbers below are zero-based TopExp FACE traversal of the original full STEP, in source mm. Retained
+    complete solids [0,1,3,4] are unchanged; all ear evidence is on solid 4 (case top), not excluded solid
+    2 (output) or 5 (horn). Radius-2.25 cylindrical slot walls 1034/1040 have axes X=24.75, Z=+5/-5; 902/898
+    have X=-24.75, Z=+5/-5, all parallel to +Y. Top ear planes 1025/888 have outward normals (+/-0.022033876799,0.999757224667,0),
+    so their normals are drafted, not the bolt axis. Intersecting each cylinder axis with its own top
+    plane gives source Y=10.793155398332 (a) / 10.793155398329 (b); adding placement Y=20 gives the four
+    recorded hole-seat origins. Frame Z is the measured cylinder/bolt axis +Y, not the tilted face normal;
+    frame X follows the pair of slot centres along +Z. Underside planes 881/893 intersect those axes at
+    Y=7.643739490228, giving 3.149415908104 mm ear thickness along the bolt. The slots are open-sided
+    cylindrical seats, not complete round bores. All four far-seat frames agree with the catalog to numerical
+    precision and retain the real draft; no geometry was sculpted or flattened. Verify ear height on receipt.
+    DS3218MG community geometry is a different label and is not used.
 catalog_component: servo-digital-20kg
 catalog_aliases: []
 searched_sources:
@@ -226,4 +240,8 @@ interface_frames:
     - 0.0
     - 0.0
     - 1.0
+  mc_ears_a_h1: {origin: [0.02475, 0.030793155398332148, 0.005], x: [0.0, 0.0, 1.0], z: [0.0, 1.0, 0.0]}
+  mc_ears_a_h2: {origin: [0.02475, 0.030793155398332148, -0.005], x: [0.0, 0.0, 1.0], z: [0.0, 1.0, 0.0]}
+  mc_ears_b_h1: {origin: [-0.02475, 0.030793155398329133, 0.005], x: [0.0, 0.0, 1.0], z: [0.0, 1.0, 0.0]}
+  mc_ears_b_h2: {origin: [-0.02475, 0.030793155398329133, -0.005], x: [0.0, 0.0, 1.0], z: [0.0, 1.0, 0.0]}
 onshape_connectors: {}
