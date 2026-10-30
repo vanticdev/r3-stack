@@ -106,6 +106,60 @@ components:
       cap_sensor_lead_post: {kind: adhesive_pad, origin: [-60 mm, -45 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       cap_lead_post: {kind: adhesive_pad, origin: [-22 mm, -51.5 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       mast: {kind: hole_pattern, origin: [55 mm, 0, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[7 mm, 0, 3.4 mm, clearance, 3 mm], [-7 mm, 0, 3.4 mm, clearance, 3 mm]]}}
+      camera_mount:
+        kind: hole_pattern
+        origin:
+        - 75 mm
+        - 5 mm
+        - 3 mm
+        z:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 4 mm
+            - 3.4 mm
+            - clearance
+            - 3 mm
+          - - 0
+            - -4 mm
+            - 3.4 mm
+            - clearance
+            - 3 mm
+      cap_camera_mount_1:
+        kind: adhesive_pad
+        origin:
+        - 75 mm
+        - 1 mm
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+      cap_camera_mount_2:
+        kind: adhesive_pad
+        origin:
+        - 75 mm
+        - 9 mm
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
   - id: standoff-m3-47
     kind: structure
     cad_name: Deck standoff M3x47
@@ -1715,3 +1769,206 @@ components:
         - 0
         - 0
         - 1
+  - id: rc-camera-mount-petg
+    kind: structure
+    cad_name: Front camera bracket
+    name: Printed front-facing UC-717 camera bracket
+    mechanical:
+      shape: custom
+      size:
+      - 23 mm
+      - 65 mm
+      - 69 mm
+      envelope_offset:
+      - 3.5 mm
+      - -24.5 mm
+      - 0
+      mass: 0.03
+      material: PETG
+      density: 1270
+      fabricated: true
+      color: '#2c6e9e'
+      solids:
+      - kind: box
+        name: base
+        position:
+        - 0
+        - 0
+        - 4 mm
+        size:
+        - 16 mm
+        - 16 mm
+        - 8 mm
+      - kind: box
+        name: column
+        position:
+        - 0
+        - 0
+        - 20.5 mm
+        size:
+        - 10 mm
+        - 10 mm
+        - 25 mm
+      - kind: box
+        name: side arm
+        position:
+        - 0
+        - -15.5 mm
+        - 29 mm
+        size:
+        - 10 mm
+        - 40 mm
+        - 8 mm
+      - kind: box
+        name: front arm
+        position:
+        - 4.2 mm
+        - -35 mm
+        - 29 mm
+        size:
+        - 18.4 mm
+        - 8 mm
+        - 8 mm
+      - kind: box
+        name: FPC backing
+        position:
+        - 12.4 mm
+        - -35 mm
+        - 26 mm
+        size:
+        - 2 mm
+        - 14 mm
+        - 4 mm
+      - kind: box
+        name: camera seat
+        position:
+        - 11 mm
+        - -35 mm
+        - 48.55 mm
+        size:
+        - 8 mm
+        - 44 mm
+        - 40.9 mm
+    interfaces:
+      base:
+        kind: hole_pattern
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          holes:
+          - - 0
+            - 4 mm
+            - 3 mm
+            - tapped
+            - 7 mm
+          - - 0
+            - -4 mm
+            - 3 mm
+            - tapped
+            - 7 mm
+      camera:
+        kind: hole_pattern
+        origin:
+        - 15 mm
+        - -35 mm
+        - 47 mm
+        z:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - 1
+        - 0
+        params:
+          holes_from: arducam-b0445-imx296.mount
+          hole_kind: tapped
+          hole_diameter: 2 mm
+          hole_depth: 7 mm
+      cable_pad:
+        kind: adhesive_pad
+        origin:
+        - 13.4 mm
+        - -35 mm
+        - 26 mm
+        z:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - 1
+        - 0
+  - id: screw-cap-m2-petg
+    kind: structure
+    cad_name: Screw cap M2
+    cad_family: Screw caps
+    name: Printed M2 screw cap, 0.3 mm FDM clearance
+    description: M2 socket head 3.8 x 2 mm, 0.3 mm radial and axial clearance, 0.8 mm wall and 1 mm roof.
+    mechanical:
+      shape: cylinder
+      axis: z
+      size:
+      - 6 mm
+      - 3.3 mm
+      mass: 6.0e-05
+      material: PETG
+      density: 1270
+      color: '#2c6e9e'
+      fabricated: true
+      solids:
+      - kind: cylinder
+        name: cap
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 6 mm
+        length: 3.3 mm
+      - kind: cylinder
+        op: remove
+        name: head pocket
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 4.4 mm
+        length: 2.3 mm
+    interfaces:
+      seat:
+        kind: adhesive_pad
+        origin:
+        - 0
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - -1
+        x:
+        - 1
+        - 0
+        - 0
+        params:
+          cap_for: shcs-m2
+          inner_d: 4.4 mm
+          inner_h: 2.3 mm
+          process: fdm

@@ -68,7 +68,12 @@ def test_purchased_parts_get_no_interface_holes(project, catalog):
     parts, _ = catalog
     for part in parts.values():
         if part.plan.kind == "purchased":
-            assert not any(":" in (op.name or "") for op in part.plan.ops), part.name  # interface ops are named '<iface>: ...'
+            # Only explicitly documented holes in a missing-model proxy may
+            # follow a shared pattern. An imported purchased body is untouched.
+            allowed = set(project.catalog.component(part.type).mechanical.proxy_holes_from) if not part.bank_model else set()
+            interface_ops = [op for op in part.plan.ops if ":" in (op.name or "")]
+            assert all(isinstance(op, Hole) and op.name.partition(":")[0] in allowed
+                       for op in interface_ops), part.name
 
 
 def test_fabricated_holes_come_from_interfaces(catalog):

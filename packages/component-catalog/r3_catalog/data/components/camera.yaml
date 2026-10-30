@@ -35,25 +35,46 @@ components:
         - {kind: box, name: pcb, position: [0, 0, 0.8 mm], size: [38 mm, 38 mm, 1.6 mm]}
         - {kind: box, name: lens holder, position: [0, 0, 8.1 mm], size: [16 mm, 16 mm, 13 mm]}
         - {kind: cylinder, name: lens, position: [0, 0, 14.6 mm], axis: [0, 0, 1], diameter: 14 mm, length: 10 mm}
-      features:
-        - {id: hole_1, kind: clearance_hole, position: [15 mm, 15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm,
-           provenance: {status: estimated, source: "No official drawing (forum.arducam.com/t/10317); 38 x 38 Pi camera footprint of the RPi GS camera drawing (4x 2.5 mm on 30 mm pitch). MEASURE before printing a bracket"}}
-        - {id: hole_2, kind: clearance_hole, position: [-15 mm, 15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm}
-        - {id: hole_3, kind: clearance_hole, position: [15 mm, -15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm}
-        - {id: hole_4, kind: clearance_hole, position: [-15 mm, -15 mm, 1.6 mm], axis: [0, 0, -1], diameter: 2.5 mm, depth: 1.6 mm}
+      features: []
       provenance:
         status: vendor
-        source: "https://www.uctronics.com/1-58mp-imx296-color-global-shutter-camera-module-with-m12-lens-for-raspberry-pi.html (Arducam store: 38 x 38 mm board, 13 mm lens holder); lens 14 mm dia (RobotShop M2506ZH04 listing)"
+        source: "https://www.uctronics.com/1-58mp-imx296-color-global-shutter-camera-module-with-m12-lens-for-raspberry-pi.html (Arducam store: 38 x 38 mm board, 13 mm lens holder);
+          lens 14 mm dia (RobotShop M2506ZH04 listing)"
         notes: "PCB 1.6 mm, lens protrusion (10 mm) and mass (15 g) are estimates; no STEP model is published"
+      proxy_holes_from:
+        - mount
     interfaces:
       # Four M2 / M2.5 screws through the board corners into a printed bracket (seat = PCB bottom face).
-      mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0],
-              params: {holes: [[15 mm, 15 mm, 2.5 mm, clearance, 1.6 mm], [-15 mm, 15 mm, 2.5 mm, clearance, 1.6 mm],
-                               [15 mm, -15 mm, 2.5 mm, clearance, 1.6 mm], [-15 mm, -15 mm, 2.5 mm, clearance, 1.6 mm]]},
-              description: "4x 2.5 mm on a 30 mm square (estimated footprint); board bottom face"}
+      mount: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[15 mm, 15 mm, 2.5 mm, clearance, 1.6 mm], [-15 mm, 15 mm, 2.5 mm, clearance, 1.6
+                    mm], [15 mm, -15 mm, 2.5 mm, clearance, 1.6 mm], [-15 mm, -15 mm, 2.5 mm, clearance, 1.6 mm]], pattern_confirmed: false, pattern_source: 'UC-717 pattern unconfirmed:
+            assume four 2.5 mm holes on a 30 x 30 mm square; owner measurement pending.'}, description: "4x 2.5 mm on a 30 mm square (estimated footprint); board bottom face"}
       front: {kind: face_mount, origin: [0, 0, 1.6 mm], z: [0, 0, 1], x: [1, 0, 0], description: "Board top (lens side) face, for a bezel"}
-      csi: {kind: connector_body, origin: [0, -17 mm, 0], z: [0, -1, 0], x: [1, 0, 0], params: {type: fpc-22p-0.5mm-socket},
-            description: "22-pin FPC ZIF on the back at the -y edge; the cable leaves toward -y"}
+      csi: {kind: connector_body, origin: [0, -17 mm, 0], z: [0, -1, 0], x: [1, 0, 0], params: {type: fpc-22p-0.5mm-socket}, description: "22-pin FPC ZIF on the back at the -y edge;
+          the cable leaves toward -y"}
+      cap_1:
+        kind: adhesive_pad
+        params:
+          hole_seat:
+            interface: mount
+            index: 0
+      cap_2:
+        kind: adhesive_pad
+        params:
+          hole_seat:
+            interface: mount
+            index: 1
+      cap_3:
+        kind: adhesive_pad
+        params:
+          hole_seat:
+            interface: mount
+            index: 2
+      cap_4:
+        kind: adhesive_pad
+        params:
+          hole_seat:
+            interface: mount
+            index: 3
     pins:
       GND: {role: ground}
       D0_N: {role: passive}
@@ -69,10 +90,9 @@ components:
       3V3: {role: power_in, voltage_nominal: 3.3, voltage_min: 3.1, voltage_max: 3.6, current_max: 0.3}
     connectors:
       # 2-lane camera on a 22-pin (4-lane) connector: lanes 2 and 3 (pins 11, 12, 14, 15) are not connected.
-      J1: {type: fpc-22p-0.5mm-socket, position: [0, -17 mm, 0], direction: [0, -1, 0], x: [1, 0, 0],
-           source: "estimated: back-side 22-pin FPC at the board edge (forum.arducam.com/t/10317)",
-           pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
-                  "13": GND, "16": GND, "17": IO0, "18": IO1, "19": GND, "20": SCL, "21": SDA, "22": 3V3}}
+      J1: {type: fpc-22p-0.5mm-socket, position: [0, -17 mm, 0], direction: [0, -1, 0], x: [1, 0, 0], source: "estimated: back-side 22-pin FPC at the board edge (forum.arducam.com/t/10317)",
+        pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND, "13": GND, "16": GND, "17": IO0, "18": IO1, "19": GND, "20":
+            SCL, "21": SDA, "22": 3V3}}
     behavior:
       model: camera.csi
       params:
@@ -95,7 +115,8 @@ components:
         dtoverlay: "imx296,cam0"
       provenance:
         status: datasheet
-        source: "https://docs.arducam.com/Raspberry-Pi-Camera/Native-camera/Global-Shutter/1.58MP-IMX296/ (1440 x 1080, 60 fps, 55(D) x 45(H) x 33(V) deg, 6 mm, dtoverlay=imx296); mode 1456x1088 @ 60.38 fps from rpicam --list-cameras on a Pi 5 (forum.arducam.com/t/9520)"
+        source: "https://docs.arducam.com/Raspberry-Pi-Camera/Native-camera/Global-Shutter/1.58MP-IMX296/ (1440 x 1080, 60 fps, 55(D) x 45(H) x 33(V) deg, 6 mm, dtoverlay=imx296); mode
+          1456x1088 @ 60.38 fps from rpicam --list-cameras on a Pi 5 (forum.arducam.com/t/9520)"
         notes: "Supply current, lens position and read noise are estimates"
     software:
       - {bus: i2c, address: 0x1a, protocol: imx296-cci, params: {libcamera: imx296, port_overlay: "dtoverlay=imx296,cam0 (CAM0) / dtoverlay=imx296 (CAM1)"}}
@@ -122,6 +143,20 @@ components:
       provenance: {status: vendor, source: "uctronics.com B0445 listing: 150 mm 22pin-22pin FPC included; envelope = the end stiffener only (the flat cable bends)"}
     interfaces:
       end_a: {kind: connector_body, origin: [0, 0, 0], z: [0, 1, 0], x: [1, 0, 0], params: {type: fpc-22p-0.5mm-cable}}
+      strain_pad:
+        kind: adhesive_pad
+        origin:
+          - 0
+          - -4 mm
+          - 0
+        z:
+          - 0
+          - 0
+          - -1
+        x:
+          - 1
+          - 0
+          - 0
     pins:
       GND: {role: passive}
       D0_N: {role: passive}
@@ -140,14 +175,11 @@ components:
       SDA: {role: passive}
       3V3: {role: passive, current_max: 0.5}
     connectors:
-      A: {type: fpc-22p-0.5mm-cable, position: [0, 0, 0], direction: [0, 1, 0], x: [1, 0, 0],
-          pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
-                 "11": D2_N, "12": D2_P, "13": GND, "14": D3_N, "15": D3_P, "16": GND, "17": IO0, "18": IO1, "19": GND,
-                 "20": SCL, "21": SDA, "22": 3V3}}
-      B: {type: fpc-22p-0.5mm-cable, position: [0, -150 mm, 0], direction: [0, -1, 0], x: [1, 0, 0],
-          pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
-                 "11": D2_N, "12": D2_P, "13": GND, "14": D3_N, "15": D3_P, "16": GND, "17": IO0, "18": IO1, "19": GND,
-                 "20": SCL, "21": SDA, "22": 3V3}}
+      A: {type: fpc-22p-0.5mm-cable, position: [0, 0, 0], direction: [0, 1, 0], x: [1, 0, 0], pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8":
+            CK_N, "9": CK_P, "10": GND, "11": D2_N, "12": D2_P, "13": GND, "14": D3_N, "15": D3_P, "16": GND, "17": IO0, "18": IO1, "19": GND, "20": SCL, "21": SDA, "22": 3V3}}
+      B: {type: fpc-22p-0.5mm-cable, position: [0, -150 mm, 0], direction: [0, -1, 0], x: [1, 0, 0], pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND,
+          "8": CK_N, "9": CK_P, "10": GND, "11": D2_N, "12": D2_P, "13": GND, "14": D3_N, "15": D3_P, "16": GND, "17": IO0, "18": IO1, "19": GND, "20": SCL, "21": SDA, "22": 3V3},
+          flexible_end: true}
     behavior:
       model: passive
       params: {length: 150 mm, min_bend_radius: 1 mm}
@@ -188,12 +220,10 @@ components:
       SDA: {role: passive}
       3V3: {role: passive, current_max: 0.5}
     connectors:
-      A: {type: fpc-15p-1.0mm-cable, position: [0, 0, 0], direction: [0, 1, 0], x: [1, 0, 0],
-          pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
-                 "11": IO0, "12": IO1, "13": SCL, "14": SDA, "15": 3V3}}
-      B: {type: fpc-22p-0.5mm-cable, position: [0, -200 mm, 0], direction: [0, -1, 0], x: [1, 0, 0],
-          pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8": CK_N, "9": CK_P, "10": GND,
-                 "13": GND, "16": GND, "17": IO0, "18": IO1, "19": GND, "20": SCL, "21": SDA, "22": 3V3}}
+      A: {type: fpc-15p-1.0mm-cable, position: [0, 0, 0], direction: [0, 1, 0], x: [1, 0, 0], pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND, "8":
+            CK_N, "9": CK_P, "10": GND, "11": IO0, "12": IO1, "13": SCL, "14": SDA, "15": 3V3}}
+      B: {type: fpc-22p-0.5mm-cable, position: [0, -200 mm, 0], direction: [0, -1, 0], x: [1, 0, 0], pins: {"1": GND, "2": D0_N, "3": D0_P, "4": GND, "5": D1_N, "6": D1_P, "7": GND,
+          "8": CK_N, "9": CK_P, "10": GND, "13": GND, "16": GND, "17": IO0, "18": IO1, "19": GND, "20": SCL, "21": SDA, "22": 3V3}}
     behavior:
       model: passive
       params: {length: 200 mm, min_bend_radius: 1 mm}

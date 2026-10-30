@@ -604,9 +604,12 @@ class AssemblyCompiler:
         resolved.material = ctype.mechanical.material or ""
         if resolved.params.get("pattern_confirmed") is False:
             holes = resolved.holes
+            span = [max((getattr(h, axis) for h in holes), default=0)
+                    - min((getattr(h, axis) for h in holes), default=0) for axis in ("x", "y")]
             self.add(Diagnostic.warning(
                 "mount_pattern_estimated", f"{obj}.{name}: mounting pattern is unconfirmed; "
                 f"{len(holes)} holes, diameters {[round(h.d * 1e3, 3) for h in holes]} mm; "
+                f"hole centres span {span[0] * 1e3:g} × {span[1] * 1e3:g} mm; "
                 "measure the owned part before releasing its mount",
                 subjects=[obj, join.join_id],
                 data={"interface": resolved.ref, "holes": [[h.x, h.y, h.d] for h in holes],

@@ -166,6 +166,32 @@ components:
 
 # Join ids name the derived fasteners (<id> or <id>_<n>) and fit interfaces; `verify` holds the exact-geometry limits
 # the CAD fit checks apply (radial clearances/interferences, engagement lengths, retainers).
+  front_camera:
+    type: arducam-b0445-imx296
+    owned: true
+  camera_mount:
+    type: rc-camera-mount-petg
+  camera_fpc:
+    type: arducam-fpc-22-22-150mm
+  cap_camera_1:
+    type: screw-cap-m2-petg
+  cap_camera_2:
+    type: screw-cap-m2-petg
+  cap_camera_3:
+    type: screw-cap-m2-petg
+  cap_camera_4:
+    type: screw-cap-m2-petg
+  cap_camera_mount_1:
+    type: screw-cap-m3-petg
+  cap_camera_mount_2:
+    type: screw-cap-m3-petg
+  camera_tape:
+    type: foam-tape-3m-4026
+    params:
+      size:
+      - 11.5 mm
+      - 4 mm
+      - 1.6 mm
 assembly:
   root: chassis
   tolerance: {position: 0.05 mm, angle: 0.1 deg}
@@ -338,6 +364,45 @@ assembly:
     - {id: fuse_tie_loop, a: fuse.tie_path, b: fuse_tie.top, clock: 90 deg, verify: {strap: fuse_tie, around: fuse, through: [chassis]}}
     - {id: fuse_tie_slots, a: chassis.tie_slots, b: fuse_tie.bottom}
 
+    - id: camera_bracket_mount
+      a: deck.camera_mount
+      b: camera_mount.base
+      clock: 0 deg
+      fasteners:
+        type: M3x10
+    - id: camera_screws
+      a: camera_mount.camera
+      b: front_camera.mount
+      clock: 0 deg
+      fasteners:
+        type: M2x8
+    - id: camera_fpc_insert
+      a: front_camera.csi
+      b: camera_fpc.end_a
+    - id: cap_camera_1
+      a: front_camera.cap_1
+      b: cap_camera_1.seat
+    - id: cap_camera_2
+      a: front_camera.cap_2
+      b: cap_camera_2.seat
+    - id: cap_camera_3
+      a: front_camera.cap_3
+      b: cap_camera_3.seat
+    - id: cap_camera_4
+      a: front_camera.cap_4
+      b: cap_camera_4.seat
+    - id: cap_camera_mount_1
+      a: deck.cap_camera_mount_1
+      b: cap_camera_mount_1.seat
+    - id: cap_camera_mount_2
+      a: deck.cap_camera_mount_2
+      b: cap_camera_mount_2.seat
+    - id: camera_strain_tape_base
+      a: camera_mount.cable_pad
+      b: camera_tape.bottom
+    - id: camera_strain_tape_cable
+      a: camera_tape.top
+      b: camera_fpc.strain_pad
 mechanical:
   transmissions:
     - id: drivetrain
@@ -363,6 +428,10 @@ electrical:
   ground_net: GND
   direct_mates:
     - {a: hat.J_GPIO, b: pi.J8}
+    - a: front_camera.J1
+      b: camera_fpc.A
+    - a: camera_fpc.B
+      b: pi.CAM0
   harnesses:
     - id: battery_lead
       description: Battery 12 AWG pigtail reterminated with XT90H female (45 A continuous / 90 A burst).
@@ -522,6 +591,17 @@ cad:
                                  tape_rtk_radio, rtk_radio, lead_post, sensor_lead_post, cap_sensor_lead_post, cap_lead_post]
     Power: [battery, battery_strap, fuse, fuse_tie, tape_esc, esc, power_lead_post, cap_power_lead_post]
 
+    Front camera:
+    - front_camera
+    - camera_mount
+    - camera_fpc
+    - cap_camera_1
+    - cap_camera_2
+    - cap_camera_3
+    - cap_camera_4
+    - cap_camera_mount_1
+    - cap_camera_mount_2
+    - camera_tape
 software:
   modules:
     - {name: rc_car_controller, language: python, runs_on: pi, entrypoint: main.py}
@@ -535,6 +615,16 @@ software:
     # Failsafe heartbeat to the HAT's ATtiny412 arbiter: toggled every control cycle (100 Hz); after 60 ms
     # without an edge the arbiter modulates the ESC brake, then sends 1500 us neutral.
     heartbeat: {interface: gpio, computer: pi, pins: [pi.J8.13], device: gpiochip0, channel: 27, expects: [hat.HEARTBEAT]}
+    front_camera:
+      interface: csi
+      computer: pi
+      device: cam0
+      pins:
+      - pi.CAM0.21
+      - pi.CAM0.20
+      expects:
+      - front_camera.J1.21
+      - front_camera.J1.20
   config:
     mpu6050: {address: 0x68, component: imu, mounting_rpy_deg: [0, 0, 0]}
     control_rate_hz: 100
