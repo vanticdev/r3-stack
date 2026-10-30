@@ -103,7 +103,7 @@ class NumericCache:
             # A unique temporary file and atomic replace make concurrent writers safe.
             with tempfile.NamedTemporaryFile(dir=self.directory, suffix='.npz', delete=False) as stream:
                 temporary = Path(stream.name)
-                np.savez(stream, **arrays, metadata=np.asarray(json.dumps(metadata)))
+                np.savez_compressed(stream, **arrays, metadata=np.asarray(json.dumps(metadata)))
             temporary.replace(self.directory / f'{key}.npz')
         except OSError:
             pass
