@@ -1024,16 +1024,24 @@ CROSSING_GAP = 0.0005  # m between the surfaces of two harnesses that cross or r
 
 
 def occupancy_field(grid: VoxelGrid, occupied: list[tuple[np.ndarray, float, set[str]]],
-                    categories: set[str]) -> np.ndarray:
-    """Distance field of bundles already planned (other harnesses), less their radius,
-    the EMC segregation distance between the categories involved and a crossing gap:
-    the next harness group must keep this field >= its own radius."""
+                    categories: set[str], *, termination_exits: list[np.ndarray] | None = None) -> np.ndarray:
+    """Reserve earlier bundle radii and a crossing gap everywhere, plus EMC
+    segregation outside short connector fan-outs. The next harness group must
+    keep this field >= its own radius; the separate EMC audit is unchanged."""
     from scipy.spatial import cKDTree
 
-    from .bundles import SEPARATION
+    from .bundles import SEPARATION, TERMINATION_ZONE
 
     centers = grid.centers()
     out = np.full(grid.size, FIELD_CUTOFF)
+    # The EMC audit applies segregation to parallel runs of at least 30 mm.
+    # Applying that long-run spacing at a fixed connector's short fan-out can
+    # make adjacent, physically clear headers impossible to route. Preserve
+    # full physical occupancy and the crossing gap everywhere; only the extra
+    # EMC routing margin stops at the existing 12 mm termination boundary.
+    termination = np.zeros(grid.size, dtype=bool)
+    for point in termination_exits or []:
+        termination |= np.linalg.norm(centers - point, axis=1) <= TERMINATION_ZONE
     seen: set[tuple] = set()
     for points, radius, cats in occupied:
         separation = max([SEPARATION.get(frozenset({a, b}), 0.0) for a in categories for b in cats if a != b] + [0.0])
@@ -1046,7 +1054,8 @@ def occupancy_field(grid: VoxelGrid, occupied: list[tuple[np.ndarray, float, set
                       axis=1)
         d = np.full(len(centers), FIELD_CUTOFF)
         d[near], _ = cKDTree(points).query(centers[near], distance_upper_bound=FIELD_CUTOFF)
-        np.minimum(out, np.minimum(d, FIELD_CUTOFF) - radius - separation - CROSSING_GAP, out=out)
+        margin = np.where(termination, 0.0, separation) if separation else 0.0
+        np.minimum(out, np.minimum(d, FIELD_CUTOFF) - radius - margin - CROSSING_GAP, out=out)
     return out
 
 
@@ -1392,7 +1401,9 @@ def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str,
         fields.hardware = router.cable_field(routing.nodes, set(group))
         categories = _group_categories(project, group)
         if occupied:
-            occupancy = occupancy_field(router.grid, occupied, categories)
+            exits = [node.exit for harness in group for node in routing.nodes[harness].values()
+                     if node.kind == "connector" and node.exit is not None]
+            occupancy = occupancy_field(router.grid, occupied, categories, termination_exits=exits)
             np.minimum(fields.static, occupancy, out=fields.static)
             np.minimum(fields.hardware, occupancy, out=fields.hardware)
         segments, junctions = build_problem(project, router, routing, group, supports)

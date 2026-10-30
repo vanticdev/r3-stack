@@ -414,6 +414,21 @@ class HarnessRouter:
                     distance = np.linalg.norm(centers - node.exit - along[:, None] * delta, axis=1)
                     self._cable_fields[key] = np.minimum(distance - radius, 0.05)
                 np.minimum(out, self._cable_fields[key], out=out)
+        # Required ties are fixed destinations just like connector exits. A
+        # larger bundle must not consume their space before that harness is
+        # planned. Include the permitted support-placement match distance;
+        # placement/access checks still have to find real hardware there.
+        from .supports import HINT_MATCH
+
+        for harness in self.spec.electrical.harnesses:
+            if harness.id in harnesses or not harness.route.tie_points:
+                continue
+            radius = bundle_diameter(self._wire_od(w.awg) for w in harness.wires) / 2 + HINT_MATCH
+            for number, point in enumerate(harness.route.tie_points):
+                key = ("required_support", harness.id, number, tuple(point), radius)
+                if key not in self._cable_fields:
+                    self._cable_fields[key] = np.minimum(np.linalg.norm(centers - point, axis=1) - radius, 0.05)
+                np.minimum(out, self._cable_fields[key], out=out)
         return out
 
     def _nonincident_hardware(self, harness: str, terminals: tuple[str, str], radius: float) -> np.ndarray:
