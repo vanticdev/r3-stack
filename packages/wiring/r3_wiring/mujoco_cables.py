@@ -502,7 +502,9 @@ def _split(piece: Any, depth: int, out: list[tuple[np.ndarray, bool]]) -> None:
             _split(half, depth + 1, out)
 
 
-@functools.lru_cache(maxsize=64)
+# Both the rigid-part builder and cable builder request the same assembly.
+# Keep a bounded working set large enough to reuse ordinary multipart models.
+@functools.lru_cache(maxsize=256)
 def _convex_pieces_cached(key: str, vertices_bytes: bytes, faces_bytes: bytes) -> tuple[tuple[np.ndarray, ...], int]:
     vertices = np.frombuffer(vertices_bytes, dtype=float).reshape(-1, 3)
     faces = np.frombuffer(faces_bytes, dtype=np.int64).reshape(-1, 3)
