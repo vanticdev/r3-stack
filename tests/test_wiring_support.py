@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from native_wiring_fixture import publish_wiring_pull
+
 CATALOG = {
     "components": [
         {"id": "test-plate", "kind": "structure", "name": "Test base plate",
@@ -77,6 +79,7 @@ def write_project(root: Path, *, block: bool = True, moving_end: bool = False, s
         }]},
     }
     (root / "robot.yaml").write_text(yaml.safe_dump(spec, sort_keys=False))
+    publish_wiring_pull(root)
     return root
 
 
@@ -117,4 +120,26 @@ def write_branch_project(root: Path) -> Path:
         ]},
     }
     (root / "robot.yaml").write_text(yaml.safe_dump(spec, sort_keys=False))
+    publish_wiring_pull(root)
     return root
+
+
+def test_native_fixtures_cover_every_described_part_and_cable_node(tmp_path):
+    from r3_model.project import Project
+    from r3_model.spec_files import validate_pulled_spec
+
+    for name, writer in (("moving", lambda root: write_project(root, moving_end=True)),
+                         ("branched", write_branch_project)):
+        root = writer(tmp_path / name)
+        project = Project.load(root)
+        pulled = validate_pulled_spec(root)
+        required = {f"{h.id}.{key}" for h in project.spec.electrical.harnesses
+                    for key, connector in h.connectors.items() if connector.type != "integral"}
+        required |= {f"{h.id}.{key}" for h in project.spec.electrical.harnesses for key in h.splices}
+        assert required <= pulled.parts.keys()
+        assert pulled.parts.keys() == project.spec.components.keys() == pulled.poses.keys()
+        assert all(part.mass > 0 and part.inertia is not None for part in pulled.parts.values())
+        assert all(not part.stl.stat().st_mode & 0o222 for part in pulled.parts.values())
+        if name == "moving":
+            joint, = [mate for mate in pulled.mates if mate.id == "steer"]
+            assert joint.kind == "revolute" and joint.limits == [-.8, .8]
