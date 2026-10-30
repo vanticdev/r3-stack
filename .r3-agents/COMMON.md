@@ -7,17 +7,15 @@ wiring with physically simulated slack, and software deployed through BLITZ. All
 it runs together in a multi-domain digital twin: physics, electrical, wiring, radio,
 sensors, and the real robot software against virtual hardware. The twin emits
 structured diagnostics, so an agent can iterate to a robot that works on its first
-physical build. The first reference robot is an autonomous 1/10 RC car
-(`examples/robots/rc-car/robot.yaml`). Fidelity matters more than speed; compute
+physical build. Fidelity matters more than speed; compute
 cost does not matter.
 
 Read first, in this order:
 1. `docs/architecture/r3-pipeline.md`: stage contract, JSON hand-off formats, co-sim order, interfaces.
 2. `packages/robot-model/r3_model/` (spec.py, graph.py, diagnostics.py, project.py, units.py).
-3. `packages/component-catalog/r3_catalog/` (schema.py, data/*.yaml, data/components/rc_car.yaml).
-4. `examples/robots/rc-car/robot.yaml`.
+3. `packages/component-catalog/r3_catalog/` (schema.py, data/*.yaml, data/components/*.yaml).
+4. The current project’s `robot.yaml`, if one has been created.
 5. `packages/hardware-interface/PROTOCOL.md` and `r3_hal/`, if your area touches software or the twin.
-6. The full product spec: `/Users/godbrigero/.t3/userdata/attachments/cce0127b-4068-4f34-96f6-96da7bef4a52-7ee0cde1-df60-43bc-819d-25ce6d87d30c-txt.txt`.
 
 Rules:
 - You run in your own git worktree. First run `git checkout -b <your branch>`. Commit
@@ -43,7 +41,7 @@ Rules:
   `assumptions`. Distinguish datasheet values from estimates.
 - Physics must be real, not mocked. Use proper equations, real datasheet numbers
   where known, and estimates that are labeled as such. Do not fake passing results.
-  If the RC-car design genuinely violates a limit, emit the diagnostic and report it
+  If a project genuinely violates a limit, emit the diagnostic and report it
   in your summary. The design will be fixed, not the check.
 - Annotate types, keep functions focused, and document non-obvious physics with short
   comments that include the equation or source.
@@ -51,9 +49,8 @@ Rules:
   `build/<stage>/`. A separate panel of reviewer models will judge the project from
   screenshots and logs.
 - Final report, kept short: branch name, commit SHAs, what works (with test output
-  and key numbers), what is approximated, any diagnostics found against the RC-car
-  design, contract-change requests, and the exact commands to run your stage on
-  `examples/robots/rc-car`.
+  and key numbers), what is approximated, any diagnostics found against the project, contract-change requests, and the exact commands to run your stage on
+  the current project.
 
 ## CAD policy (user directive): NO FeatureScript, ever
 CAD is built only with Onshape's standard, user-editable features: sketches,
@@ -142,13 +139,12 @@ Every sourced model is:
 
 ## Generality policy (user directive, 2026-10-30): every feature works for any robot
 Every feature, check, stage, simulation layer, data format and UI you add must work for any robot R3 can
-describe: arms, drones, legged robots, boats and stationary rigs, not only the rc-car and not only wheeled
-vehicles. The rc-car is a test case, not the target.
+describe: arms, drones, legged robots, boats and stationary rigs, including stationary rigs and mobile mechanisms.
 - Do not put robot-, project- or component-specific ids, names, dimensions or special cases in package
   code (`packages/`, `services/`, `integrations/`, `apps/`). Derive everything from robot.yaml, the
   catalog and the build artifacts. Design-specific values belong in robot.yaml or the catalog.
 - Do not assume vehicle concepts (wheels, steering, chassis, top speed) in generic code. Gate them on what
   the spec declares, and give non-vehicle robots a sensible path.
-- Test new behaviour on synthetic, robot-agnostic fixtures, not only through examples/robots/rc-car.
+- Test new behaviour on synthetic, robot-agnostic fixtures, under `tests/fixtures/`.
 - If something can only work for one robot type, say so explicitly in the code and the docs, and emit a
   diagnostic when it is skipped. Never fail silently.

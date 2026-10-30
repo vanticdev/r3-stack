@@ -1,6 +1,0 @@
-# Overview (GPT-6 Astra)
-1. Mobile is a desktop page crushed into 174 px: the sidebar eats half of it and the cards overflow. Use a nav drawer, a compact header, and full-width evidence cards (value, limit, next action).
-2. Five summary cards waste space and duplicate labels; "27 blocking" mixes failed with missing evidence. Use one summary, "Not ready for fabrication: 3 failed · 6 outdated · 1 estimated · 17 not checked", with the failing checks directly below it.
-3. Requirement evidence reads like serialized objects (dotted ids, paths, repeated hashes, duplicated messages). Lead with "Wire voltage drop: 5.30%, limit 3.00%" and "2 harnesses exceed the limit", with ids, hashes and JSON in expandable details.
-4. Failure and freshness are conflated, and requirement and scenario rows duplicate each other; a −237 mm stale violation is styled like a stale pass. Group scenario evidence under its requirement, separate result from freshness, e.g. "Previous result: −237 mm; minimum 8 mm · Rerun required".
-5. The right rail and header repeat stage status. There are two Run buttons, "132 E 11 W" shorthand, and an Environment card disconnected from the stages it affects. Keep one pipeline list with spelled-out counts linked to diagnostics, capability problems shown next to the affected stage, and one primary Run; links become metadata.

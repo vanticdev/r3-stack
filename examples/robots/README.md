@@ -1,12 +1,9 @@
-# Robot examples
+# Robot projects
 
-Reserved for small reproducible robot projects containing authored robot
-specifications, wiring definitions, versioned CAD/electronics references, and
-validation scenarios. Keep generated meshes, recordings, and build outputs out
-of tracked examples.
+This directory is an initially empty project root for `r3 serve --projects-root examples/robots`.
+Only subdirectories containing `robot.yaml` appear in the project list. This README does not create a project.
 
-Documentation only. Select the first reference robot and specification schema
-before adding an example. Deployable module source must follow the existing
-`backend/<language>/<module-folder>` convention within the example project.
-
-See [repository layout](../../docs/architecture/repository-layout.md).
+Create a project from nothing using `r3 create <name> --template blank`, then add components,
+interfaces, wiring, firmware, and validation scenarios. See [build a robot](../../docs/guide/build-a-robot.md).
+Keep generated meshes, recordings, caches, and build outputs out of tracked projects.
+Deployable modules belong in the project’s `backend/<language>/<module-folder>` directories.
