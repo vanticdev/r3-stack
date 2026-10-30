@@ -19,11 +19,10 @@ import re
 from pathlib import Path
 from typing import Any
 
-import yaml
 from pydantic import ValidationError
 
 from r3_model.spec import RobotSpec
-from r3_model.spec_files import (SpecError, atomic_write_files, dump_yaml, load_spec_files, roundtrip, spec_lock)
+from r3_model.spec_files import (SpecError, SpecFiles, atomic_write_files, dump_yaml, load_spec_files, roundtrip, spec_lock)
 
 from ruamel.yaml.comments import CommentedMap
 
@@ -121,7 +120,7 @@ def _graph_diagnostics(root: Path, data: Any) -> list[dict[str, Any]]:
     return [d.model_dump(mode="json") for d in graph.diagnostics]
 
 
-def _patch_documents(files: Any, patch: dict[str, Any]) -> dict[str, str]:
+def _patch_documents(files: SpecFiles, patch: dict[str, Any]) -> dict[str, str]:
     """Route merge patches through include pointers, retaining round-trip nodes."""
     documents = {name: roundtrip(text) for name, text in files.texts.items()}
     changed: set[str] = set()
@@ -161,7 +160,7 @@ def _patch_documents(files: Any, patch: dict[str, Any]) -> dict[str, str]:
     return {name: _restore_unchanged_lines(files.texts.get(name, ""), dump_yaml(*documents[name])) for name in changed}
 
 
-def _check_readonly(files: Any, proposed: Any, patch: dict[str, Any]) -> None:
+def _check_readonly(files: SpecFiles, proposed: SpecFiles, patch: dict[str, Any]) -> None:
     if "attachments" in patch or files.data.get("attachments") != proposed.data.get("attachments"):
         raise files.error("spec_read_only", ("attachments",), "assembly attachments are owned by Onshape pull")
     before = files.data.get("components", {})

@@ -41,7 +41,6 @@ Events (normalized for both providers; ``raw`` events carry anything else):
 from __future__ import annotations
 
 import difflib
-import hashlib
 import json
 import os
 import shutil

@@ -362,3 +362,41 @@ def test_scaffold_handles_nested_robot_and_component_index_includes(root, tmp_pa
     create_project(copied, template=root.name, platform_ref="test")
     spec = Project.load(copied).spec
     assert spec.robot.name == "renamed" and set(spec.components) == {"base", "link"}
+
+
+def test_refresh_rejects_mismatched_manifest_before_writing(root):
+    from r3_model.description import refresh_pulled
+
+    publish_pull(root)
+    before = contents(root)
+    manifest = json.loads((root / "cad/pulled/pull.json").read_text())
+    manifest["version_id"] = "different-version"
+    with pytest.raises(PullError) as error:
+        refresh_pulled(root, manifest)
+    assert error.value.code == "cad_pull_modified"
+    assert contents(root) == before
+
+
+def test_check_pulled_rejects_stale_supplied_model(root):
+    from dataclasses import replace
+    from r3_model.description import check_pulled
+    from r3_model.pulled import load_pulled
+
+    publish_pull(root)
+    refresh_pulled_spec(root)
+    model = load_pulled(root)
+    extra = replace(model.parts["base"], name="undefined")
+    stale = replace(model, parts={**model.parts, "undefined": extra})
+    with pytest.raises(PullError) as error:
+        check_pulled(root, stale)
+    assert error.value.code == "cad_pull_modified"
+
+
+def test_undefined_module_reference_points_to_runs_on_not_module_name(root):
+    path = root / "software/system.yaml"
+    path.write_text("modules: [{name: controller, runs_on: missing}]\n")
+    with pytest.raises(SpecError) as error:
+        Project.load(root)
+    assert error.value.errors[0]["file"] == "software/system.yaml"
+    assert error.value.errors[0]["path"] == ["software", "modules", 0, "runs_on"]
+    assert error.value.errors[0]["source_path"] == ["modules", 0, "runs_on"]

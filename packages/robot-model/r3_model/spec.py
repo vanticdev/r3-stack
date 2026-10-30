@@ -680,7 +680,8 @@ class RobotSpec(_Model):
             if not comp.type and comp.source is None:
                 raise ValueError(f"component {cid!r} needs a catalog `type` or a `source` block")
             if comp.mount != "world" and comp.mount not in ids:
-                raise ValueError(f"component {cid!r} mounts on unknown component {comp.mount!r}")
+                raise PydanticCustomError("spec_reference_undefined", f"component {cid!r} mounts on unknown component {comp.mount!r}",
+                                          {"spec_path": ("components", cid, "mount")})
         self._check_mount_graph()
         for slot, members in self.source_slots().items():
             first = self.components[members[0]].source
@@ -689,10 +690,11 @@ class RobotSpec(_Model):
                 if (other.requires, other.prefer) != (first.requires, first.prefer):
                     raise ValueError(f"components {members[0]!r} and {cid!r} share sourcing group {slot!r} "
                                      "but declare different requires/prefer")
-        for joint in self.mechanical.joints:
-            for end in (joint.parent, joint.child):
+        for index, joint in enumerate(self.mechanical.joints):
+            for label, end in (("parent", joint.parent), ("child", joint.child)):
                 if end != "world" and end not in ids:
-                    raise ValueError(f"joint {joint.id!r} references unknown component {end!r}")
+                    raise PydanticCustomError("spec_reference_undefined", f"joint {joint.id!r} references unknown component {end!r}",
+                                              {"spec_path": ("mechanical", "joints", index, label)})
         self._check_mechanical(ids)
         harness_ids = [h.id for h in self.electrical.harnesses]
         if len(harness_ids) != len(set(harness_ids)):
@@ -702,23 +704,27 @@ class RobotSpec(_Model):
             raise ValueError("wire ids must be unique across harnesses")
         if self.assembly is not None:
             if self.assembly.root not in ids:
-                raise ValueError(f"assembly root {self.assembly.root!r} is not a component")
+                raise PydanticCustomError("spec_reference_undefined", f"assembly root {self.assembly.root!r} is not a component",
+                                          {"spec_path": ("assembly", "root")})
             join_ids = [join.join_id for join in self.assembly.joins]
             if len(join_ids) != len(set(join_ids)):
                 raise ValueError("assembly join ids must be unique")
-            for join in self.assembly.joins:
-                for end in (join.a, join.b):
+            for index, join in enumerate(self.assembly.joins):
+                for label, end in (("a", join.a), ("b", join.b)):
                     obj, dot, iface = end.partition(".")
                     if not dot or not iface:
                         raise ValueError(f"join end {end!r} must be <object>.<interface>")
                     if obj not in ids:
-                        raise ValueError(f"join {join.join_id!r} references unknown component {obj!r}")
-        for board in self.pcb.boards:
+                        raise PydanticCustomError("spec_reference_undefined", f"join {join.join_id!r} references unknown component {obj!r}",
+                                                  {"spec_path": ("assembly", "joins", index, label)})
+        for index, board in enumerate(self.pcb.boards):
             if board.component not in ids:
-                raise ValueError(f"board references unknown component {board.component!r}")
-        for module in self.software.modules:
+                raise PydanticCustomError("spec_reference_undefined", f"board references unknown component {board.component!r}",
+                                          {"spec_path": ("pcb", "boards", index, "component")})
+        for index, module in enumerate(self.software.modules):
             if module.runs_on not in ids:
-                raise ValueError(f"software module {module.name!r} runs on unknown component {module.runs_on!r}")
+                raise PydanticCustomError("spec_reference_undefined", f"software module {module.name!r} runs on unknown component {module.runs_on!r}",
+                                          {"spec_path": ("software", "modules", index, "runs_on")})
         return self
 
     @property
