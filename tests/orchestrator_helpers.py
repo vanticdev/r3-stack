@@ -12,9 +12,8 @@ import yaml
 from r3_catalog import DATA_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
-# Frozen copy of the first bench layout (with its known interferences) and of the
-# catalog entries it was authored against, so these tests do not change whenever
-# the example design or its catalog parts are improved.
+# Independent source fixture. Faults are injected explicitly so model-stage
+# checks do not depend on a project's incidental placement or catalog updates.
 BENCH = ROOT / "tests" / "fixtures" / "bench"
 
 
@@ -30,7 +29,7 @@ def make_project(tmp_path: Path, mutate: Callable[[dict[str, Any]], None] | None
     """Write a copy of the bench robot.yaml (optionally mutated) and a project-local catalog."""
     root = tmp_path / name
     root.mkdir(parents=True)
-    shutil.copytree(BENCH / "catalog", root / "catalog")  # the layout's frozen catalog envelopes
+    shutil.copytree(BENCH / "catalog", root / "catalog")  # independent fixture catalog
     spec = bench_spec()
     if mutate:
         mutate(spec)
