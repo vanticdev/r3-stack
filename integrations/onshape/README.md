@@ -130,6 +130,11 @@ reads. These are conservative estimates before the live diff, rather than a
 promise that every candidate feature will be written. Solid parameter changes
 batch; sketches with changed entities/constraints use the single-feature update
 API. Unchanged features, connector IDs and unaffected assembly IDs survive.
+The report also lists `import_blockers`: missing/unverified model-bank interface
+evidence and incompatible placement frames. A successful dry run is a write plan,
+not approval to bypass these checks. Native import rejects known prerequisites
+before uploading; translated geometry still receives its normal independent
+bounding-box validation.
 
 The lock must match `build/cad/build_state.json`. Restore that pinned build if it
 is missing; incremental mode fails closed rather than silently starting a full

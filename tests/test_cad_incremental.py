@@ -491,6 +491,19 @@ def test_new_import_uses_pinned_document_without_native_geometry(tmp_path, monke
     assert not any("Retired" in json.dumps(b) for _, _, b in api.calls)
 
 
+def test_dry_run_reports_import_evidence_blockers_without_writes(tmp_path, monkeypatch):
+    project, api, parts, _ = setup_project(tmp_path, monkeypatch)
+    parts["a"] = bank_part("a")
+    parts["a"].bank_model["interface_frames"] = {}
+    parts["a"].bank_model["validation"]["status"] = "unverified"
+    dry = inc.incremental_plan(project)
+    assert dry["mode"] == "incremental" and dry["summary"]["parts"] == 2
+    blockers = dry["import_blockers"]["a"]
+    assert blockers[0]["validation_status"] == "unverified"
+    assert blockers[1]["missing_connectors"] == ["mc_mount"]
+    assert api.calls == []
+
+
 @pytest.mark.parametrize("phase", ["connector", "retirement", "assembly", "checkpoint"])
 def test_import_resume_does_not_repeat_acknowledged_writes(tmp_path, monkeypatch, vendor_step, phase):
     project, native, parts, plan = setup_project(tmp_path, monkeypatch, library=True)
@@ -740,3 +753,20 @@ def test_subassembly_add_retire_and_instance_moves_resume(tmp_path, monkeypatch,
     saved = inc._state(project)
     assert saved["sub_instances"] == {"New module": "I102"}
     assert saved["instance_ids"][TOP_LEVEL] == {"untouched": "IU", "b": "I104"}
+
+
+def test_import_rekeys_a_renamed_single_part_variant(tmp_path, monkeypatch, vendor_step):
+    project, native, parts, plan = setup_project(tmp_path, monkeypatch, library=True)
+    del parts["a"]
+    imported = bank_part("replacement", library=True)
+    imported.studio = "a"
+    parts[imported.key] = imported
+    plan.placements["a"].key = imported.key
+    project.model["source"]["recomposed"]["pending_rebuild"] = {imported.key: {}}
+    api = ImportFake(native)
+    report = inc.sync_incremental(project, api, StageResult(stage="cad"))
+    library = report["library_doc"]
+    assert library.studios["Retired a (EA)"].part_ids == {}
+    assert library.part_ref(imported.key)[0].startswith("IMPORT")
+    with pytest.raises(KeyError): library.part_ref("a")
+    assert not any(i["id"] == "IA" for i in api.instances[TOP_LEVEL])

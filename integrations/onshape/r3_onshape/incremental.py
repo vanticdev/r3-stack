@@ -339,6 +339,7 @@ def _replacement_iids(work: list[dict[str, Any]], plan: AssemblyPlan, state: dic
 
 
 def incremental_plan(project: Project) -> dict[str, Any]:
+    from .purchased import import_blockers
     parts, instances = build_part_catalog(project)
     state = _state(project)
     work, reused = _work(project, parts, state)
@@ -371,6 +372,8 @@ def incremental_plan(project: Project) -> dict[str, Any]:
                         "estimated_feature_calls": estimate})
     checkpoint = project.lock.get("cad_incremental_pending") or {}
     return {"mode": "incremental", "dry_run": True, "part_studios": studios,
+            "import_blockers": {key: blockers for item in work if item["action"] == "import"
+                                for key in item["parts"] if (blockers := import_blockers(parts[key]))},
             "reused_parts": reused, "instances_to_insert_or_replace": sorted(replaced),
             "assemblies_to_create": sorted(set(plan.levels) - set(state["robot"]["assemblies"])),
             "assemblies_to_retire": sorted(set(state["robot"]["assemblies"]) - set(plan.levels)),
