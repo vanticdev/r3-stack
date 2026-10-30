@@ -1169,11 +1169,15 @@ def build_problem(project: Any, router: Any, routing: Any, harnesses: list[str],
             key = f"{harness}/B:{node.name}@{index}"
             if key not in junctions:
                 b = float(bo["arc"])
+                # Independently routed lanes carry the diameter and approach of
+                # their own pins, while the node retains the complete connector.
+                lane_od = float(bo.get("lane_od", node.od))
+                lane_lead = float(bo.get("lane_lead_length", node.lead_length))
                 if node.kind == "connector":
                     zone = node.termination_length
-                    lead = min(node.lead_length, max(2 * node.od, 0.003)) if node.lead_length > 0 else 0.0
+                    lead = min(lane_lead, max(2 * lane_od, 0.003)) if lane_lead > 0 else 0.0
                 else:  # floating pair half: its exit zone extends two bundle diameters
-                    zone, lead = 2 * node.od, 0.0
+                    zone, lead = 2 * lane_od, 0.0
                 junctions[key] = Junction(key, "fanout", np.asarray(bo["position"], float).copy(),
                                           np.asarray(bo["direction"], float).copy(), exempt=set(node.exempt),
                                           termination_length=max(zone - b, 0.0), lead=max(lead - b, 0.0),

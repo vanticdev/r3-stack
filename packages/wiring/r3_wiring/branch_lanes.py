@@ -44,9 +44,37 @@ def lane_field(router: Any, nodes: dict[str, dict[str, Any]], current: set[tuple
     return field
 
 
+def _opposed_approaches(a: Any, b: Any, radius: float) -> None:
+    """Budget approach seeds for an S bend between facing exits.
+
+    The normal router reserves a full quarter-turn before choosing a path.
+    Facing terminals can instead share two opposite arcs: for lateral shift y,
+    their axial reach is sqrt(4 R y - y²), or 2 R with a straight middle leg.
+    Keep the existing pin fan-out lengths; only shorten heuristic lead seeds.
+    The curvature and clearance checks still validate the resulting path.
+    """
+    if a.direction is None or b.direction is None or float(a.direction @ b.direction) > -.999:
+        return
+    delta = b.exit - a.exit
+    axial = float(delta @ a.direction)
+    if axial <= 0:
+        return
+    lateral = float(np.linalg.norm(delta - axial * a.direction))
+    turn = 2 * radius if lateral >= 2 * radius else np.sqrt(max(0., lateral * (4 * radius - lateral)))
+    budget = axial - turn
+    minimum = a.fan_length + b.fan_length
+    if budget < minimum:
+        return
+    extra = (budget - minimum) / 2
+    for node in (a, b):
+        node.lead_length = min(node.lead_length, node.fan_length + extra)
+        node.lead_end = node.exit + node.direction * node.lead_length
+
+
 def route_lanes(router: Any, harness: Harness, nodes: dict[str, Any]) -> Any:
     """Use the normal router for each terminal pair, with occupied lanes present."""
     from .geometry import bundle_diameter
+    from .planner import bundle_bend_radius
     from .router import HarnessRoute
 
     branches: dict[tuple[str, str], list[Any]] = {}
@@ -87,6 +115,11 @@ def route_lanes(router: Any, harness: Harness, nodes: dict[str, Any]) -> Any:
                         router._lead(node, [awg for _, awg in refs],
                                      pin_widths={ref.split(".", 1)[1]: router._wire_od(awg)
                                                  for ref, awg in refs})
+            if len(key) == 2:
+                od = bundle_diameter(router._wire_od(w.awg) for w in members)
+                radius = bundle_bend_radius(router.catalog, [w.awg for w in members], od,
+                                            harness.jacket != 'none') * router.opt.bend_margin
+                _opposed_approaches(local_nodes[key[0]], local_nodes[key[1]], radius)
             terminals = {(harness.id, name) for name in key}
             occupied = lane_field(router, {harness.id: nodes}, terminals, previous)
             hardware = np.minimum(original_hardware, occupied)

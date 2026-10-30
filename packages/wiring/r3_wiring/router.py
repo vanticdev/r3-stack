@@ -1139,7 +1139,8 @@ class HarnessRouter:
         tangent = at(b + delta) - at(b - delta)
         norm = float(np.linalg.norm(tangent))
         tangent = tangent / norm if norm > 1e-12 else (points[-1] - points[0]) / arc[-1]
-        return {"node": node.name, "position": q, "direction": tangent, "arc": b}
+        return {"node": node.name, "position": q, "direction": tangent, "arc": b,
+                "lane_od": node.od, "lane_lead_length": node.lead_length}
 
     def _fan_out(self, path: np.ndarray, radius: np.ndarray, count: np.ndarray,
                  ends: tuple[PinEnd | None, PinEnd | None], breakouts: tuple[dict[str, Any] | None, ...],

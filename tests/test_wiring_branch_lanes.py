@@ -71,3 +71,26 @@ def test_single_pin_lane_reserves_only_its_own_fanout(tmp_path):
     assert node.fan_length == .006
     router._lead(node, [22])
     assert node.fan_length > .006
+
+
+def test_stiff_conductors_fit_between_nearby_facing_exits(tmp_path):
+    root = write_project(tmp_path, block=False)
+    path = root / 'robot.yaml'
+    spec = yaml.safe_load(path.read_text())
+    spec['components']['dst']['pose']['xyz'] = ['75 mm', '12 mm', '3 mm']
+    harness = spec['electrical']['harnesses'][0]
+    for connector in harness['connectors'].values():
+        connector['type'] = 'integral'
+    harness['wires'] = [{'id': 'positive', 'from': 'A.1', 'to': 'B.1', 'awg': 12},
+                        {'id': 'negative', 'from': 'A.2', 'to': 'B.2', 'awg': 12}]
+    harness['route'] = {'independent_branches': True}
+    path.write_text(yaml.safe_dump(spec, sort_keys=False))
+    project = Project.load(root)
+    obstacles, _ = build_obstacles(project)
+    router = HarnessRouter(project, obstacles, RouterOptions(plan=True))
+    routing = router.route()
+    checker = HarnessChecker(project, obstacles, routing)
+    checker._wire_intersections()
+    checker._bend_radius()
+    assert not [d for d in checker.diagnostics if d.severity.value == 'error']
+    assert all(plan.feasible for plan in routing.planning.plans)
