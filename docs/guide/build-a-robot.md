@@ -102,6 +102,16 @@ fasteners and materials. Entries retain manufacturer dimensions, model provenanc
 explicitly labelled estimates. A part's model, electrical behavior, interfaces and pin
 functions must match the exact SKU you will use.
 
+For every catalog category, use `r3_list_catalog(kind=...)`, then
+`r3_get_catalog_entry(kind, entry_id)` for full entries and
+`r3_put_catalog_entry(kind, entry)` to add or override one in the project.
+Kinds are `component`, `connector`, `wire`, `fastener`, `material`, `printer`
+and `print_fit`; `r3_get_schema(kind)` describes each entry. Wire identities
+are AWG numbers, print-fit identities are processes (`fdm` or `sls`), and
+other identities are `id` strings. Use actual catalog ids when declaring joins.
+Writes preserve other entries and metadata and reject invalid catalogs.
+No platform catalog file needs editing.
+
 For a part absent from the catalog, declare a requirement-based source slot:
 
 ```yaml

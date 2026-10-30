@@ -1,0 +1,51 @@
+# Deliberately synthetic typed-authoring fixtures, no vendor part data.
+fastener:
+  id: synthetic-clamp
+  name: Synthetic clamp
+  kind: nut
+  thread: synthetic
+  d: 0.004
+  pitch: 0.0007
+  minor_diameter: 0.003
+  tap_drill: 0.0033
+  across_flats: 0.008
+  height: 0.004
+  provenance: {status: estimated, notes: Synthetic test only}
+connector:
+  id: synthetic-contact
+  family: synthetic
+  gender: none
+  mates_with: []
+  pin_count: 1
+  current_rating_per_pin: 1
+  voltage_rating: 5
+  contact_resistance: 0.01
+  awg_min: 20
+  awg_max: 30
+wire:
+  awg: 31
+  conductor_diameter: 0.0002
+  outer_diameter: 0.001
+  resistance_per_m: 1
+  ampacity: 0.1
+  mass_per_m: 0.001
+  bending_stiffness: 0.000001
+material:
+  id: synthetic-material
+  name: Synthetic material
+  density: 1000
+  tensile_strength: 1000000
+  youngs_modulus: 100000000
+  provenance: {status: estimated, notes: Synthetic test only}
+printer:
+  id: synthetic-printer
+  name: Synthetic printer
+  build_volume: [0.1, 0.1, 0.1]
+  provenance: {status: estimated, notes: Synthetic test only}
+print_fit:
+  process: fdm
+  description: Synthetic test fit
+  hole_clearance: [0.0001, 0.0002]
+  sliding_clearance: [0.0001, 0.0002]
+  press_interference: [0.0001, 0.0002]
+  cap_clearance: 0.0001

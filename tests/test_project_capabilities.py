@@ -307,3 +307,57 @@ def test_custom_requirement_uses_actual_project_test_outcome(project):
     source.write_text("import pytest\n@pytest.mark.skip(reason='unmeasured')\ndef test_contract():\n    assert True\n")
     assert not m.r3_run_project_tests(project=str(project))["ok"]
     assert state() == "not_run"
+
+
+@pytest.mark.parametrize('kind', ['fastener', 'connector', 'wire', 'material', 'printer', 'print_fit'])
+def test_all_catalog_domains_are_discoverable_and_project_authored(project, kind):
+    import yaml
+    from r3_catalog import default_catalog
+    from r3_orchestrator.catalog_ops import DOMAINS
+
+    entry = yaml.safe_load((FIXTURES / 'project-capabilities/catalog.yaml').read_text())[kind]
+    _, collection, identity = DOMAINS[kind]
+    before = default_catalog().model_dump(mode='json')
+    schema = m.r3_get_schema(kind)['schema']
+    assert identity in schema['properties']
+    assert m.r3_put_catalog_entry(kind, entry, project=str(project), dry_run=True)['ok']
+    assert not (project / 'catalog' / f'{collection}.yaml').exists()
+    written = m.r3_put_catalog_entry(kind, entry, project=str(project))
+    assert written['ok']
+    identifier = str(entry[identity])
+    loaded = m.r3_get_catalog_entry(kind, identifier, project=str(project))
+    assert loaded['ok'] and loaded['defined_in'].startswith('catalog/')
+    assert str(loaded['entry'][identity]) == identifier
+    assert any(str(e.get(identity)) == identifier for e in m.r3_list_catalog(project=str(project), kind=kind)[collection])
+    # Replacements retain other table records and unrelated table metadata.
+    path = project / written['path']
+    document = yaml.safe_load(path.read_text())
+    if kind == 'fastener':
+        other = {**entry, 'id': 'synthetic-other'}
+        assert m.r3_put_catalog_entry(kind, other, project=str(project))['ok']
+        document = yaml.safe_load(path.read_text())
+        document['joint_defaults'] = {'friction': {'value': .2, 'status': 'estimated', 'source': 'Synthetic fixture'}}
+        path.write_text(yaml.safe_dump(document))
+    assert m.r3_put_catalog_entry(kind, entry, project=str(project))['ok']
+    if kind == 'fastener':
+        assert len(yaml.safe_load(path.read_text())[collection]) == 2
+        assert 'joint_defaults' in yaml.safe_load(path.read_text())
+        assert m.r3_list_catalog(project=str(project), kind=kind, query='synthetic-clamp')[collection][0]['id'] == identifier
+    assert default_catalog().model_dump(mode='json') == before
+
+
+def test_catalog_authoring_rejects_invalid_and_escaping_entries(project, tmp_path):
+    import yaml
+    entry = yaml.safe_load((FIXTURES / 'project-capabilities/catalog.yaml').read_text())['fastener']
+    assert m.r3_put_catalog_entry('fastener', entry, project=str(project))['ok']
+    path = project / 'catalog/fasteners.yaml'
+    before = path.read_bytes()
+    assert not m.r3_put_catalog_entry('fastener', {**entry, 'kind': 'invalid'}, project=str(project))['ok']
+    assert path.read_bytes() == before
+    assert not m.r3_put_catalog_entry('fastener', {**entry, 'id': '../escape'}, project=str(project))['ok']
+    path.unlink()
+    outside = tmp_path / 'outside.yaml'
+    outside.write_bytes(before)
+    path.symlink_to(outside)
+    assert not m.r3_put_catalog_entry('fastener', entry, project=str(project))['ok']
+    assert outside.read_bytes() == before

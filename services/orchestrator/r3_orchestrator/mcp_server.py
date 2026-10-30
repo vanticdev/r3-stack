@@ -144,7 +144,7 @@ def r3_patch_spec(patch: dict[str, Any], expected_sha256: str, project: str = ""
 @_tool(_READ)
 def r3_list_catalog(project: str = "", kind: str = "", query: str = "") -> dict[str, Any]:
     """Catalog components (filter by kind: computer, battery, motor, esc, servo, regulator, sensor, camera, cable, radio,
-    wheel, gearbox, structure, ...; or `connector` / `wire` / `material` / `printer`), with their interfaces (names and
+    wheel, gearbox, structure, ...; or `connector` / `wire` / `fastener` / `material` / `printer` / `print_fit`), with their interfaces (names and
     kinds, for assembly joins), connectors, pin roles and behaviour model. `query` matches id, name and part number.
     Full entries: r3_get_catalog_component."""
     return _guard(lambda: api.list_catalog(project or None, kind or None, query or None))
@@ -167,6 +167,24 @@ def r3_put_catalog_component(entry: dict[str, Any], project: str = "", dry_run: 
 
 
 @_tool(_READ)
+def r3_get_catalog_entry(kind: str, entry_id: str, project: str = "") -> dict[str, Any]:
+    """Full typed entry and origin for component, connector, wire, fastener, material, printer or print_fit.
+    entry_id is the id, AWG number for wire, or process (fdm/sls) for print_fit. Use r3_list_catalog to discover ids."""
+    from .catalog_ops import get_entry
+
+    return _guard(lambda: get_entry(api.resolve_project(project or None), kind, entry_id))
+
+
+@_tool(_EDIT)
+def r3_put_catalog_entry(kind: str, entry: dict[str, Any], project: str = "", dry_run: bool = False) -> dict[str, Any]:
+    """Add or override a typed project catalog entry. Same kinds as r3_get_catalog_entry; use r3_get_schema(kind).
+    Preserves other entries, validates the whole catalog, rolls back invalid replacements. Never edits platform data."""
+    from .catalog_ops import put_entry
+
+    return _guard(lambda: put_entry(api.resolve_project(project or None), kind, entry, dry_run))
+
+
+@_tool(_READ)
 def r3_guide() -> dict[str, Any]:
     """How to build a robot from nothing with R3 (docs/guide/build-a-robot.md): the spec, sourcing, joins and
     interfaces, CAD (standard features only), wiring, electrical, firmware with r3_hal, sim scenarios, the release
@@ -176,14 +194,15 @@ def r3_guide() -> dict[str, Any]:
 
 @_tool(_READ)
 def r3_get_schema(domain: str = "robot") -> dict[str, Any]:
-    """Typed authoring reference. Domains: robot, component, connector, wire, device, model."""
+    """Typed authoring reference. Domains: robot, device, model, component, connector, wire, fastener, material, printer, print_fit."""
     from r3_model.spec import RobotSpec, ProjectDeviceSpec
-    from r3_catalog.schema import ComponentType, ConnectorType, WireGauge
     from r3_catalog.modelbank.schema import ModelEntry
+    from .catalog_ops import DOMAINS
 
-    schema = {"robot": RobotSpec, "component": ComponentType, "connector": ConnectorType, "wire": WireGauge,
-              "device": ProjectDeviceSpec, "model": ModelEntry}.get(domain)
-    return {"ok": True, "schema": schema.model_json_schema()} if schema else {"ok": False, "code": "usage_error", "message": "use robot, component, connector, wire, device or model"}
+    schemas = {"robot": RobotSpec, "device": ProjectDeviceSpec, "model": ModelEntry,
+               **{kind: value[0] for kind, value in DOMAINS.items()}}
+    schema = schemas.get(domain)
+    return {"ok": True, "schema": schema.model_json_schema()} if schema else {"ok": False, "code": "usage_error", "message": f"use {', '.join(schemas)}"}
 
 
 @_tool(_READ)

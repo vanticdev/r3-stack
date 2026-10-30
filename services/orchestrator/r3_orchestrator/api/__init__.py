@@ -188,18 +188,22 @@ def list_catalog(project_path: str | Path | None = None, kind: str | None = None
          "pins": {n: p.role for n, p in c.pins.items()}, "behavior": c.behavior.model if c.behavior else None,
          "interfaces": {n: i.kind for n, i in c.interfaces.items()}, "fabricated": c.mechanical.fabricated,
          "material": c.mechanical.material, "provenance": c.provenance.status}
-        for c in catalog.components.values() if (not kind or c.kind == kind) and matches(c.id, c.name, c.part_number, c.description)]
+        for c in catalog.components.values() if (not kind or kind == "component" or c.kind == kind) and matches(c.id, c.name, c.part_number, c.description)]
     connectors = [{"id": c.id, "family": c.family, "gender": c.gender, "mates_with": c.mates_with, "pin_count": c.pin_count,
                    "current_rating_per_pin": c.current_rating_per_pin, "awg": [c.awg_min, c.awg_max]}
                   for c in catalog.connectors.values() if kind in (None, "", "connector") and matches(c.id, c.family)]
     wires = [{"awg": w.awg, "ampacity": w.ampacity, "resistance_per_m": w.resistance_per_m, "outer_diameter": w.outer_diameter}
-             for w in catalog.wires.values() if kind in (None, "", "wire")]
+             for w in catalog.wires.values() if kind in (None, "", "wire") and matches(str(w.awg))]
     materials = [{"id": m.id, "name": m.name, "process": m.process, "density": m.density, "tensile_strength": m.tensile_strength,
                   "z_strength": m.z_strength, "youngs_modulus": m.youngs_modulus, "hdt": m.hdt, "keywords": m.keywords}
                  for m in catalog.materials.values() if kind in (None, "", "material") and matches(m.id, m.name)]
     printers = [{"id": p.id, "name": p.name, "build_volume": p.build_volume, "nozzle": p.nozzle, "enclosed": p.enclosed}
                 for p in catalog.printers.values() if kind in (None, "", "printer") and matches(p.id, p.name)]
-    return {"ok": True, "components": components, "connectors": connectors, "wires": wires, "materials": materials,
+    fasteners = [f.model_dump(mode="json", exclude_defaults=True) for f in catalog.fasteners.values()
+                 if kind in (None, "", "fastener") and matches(f.id, f.name, f.standard, f.thread)]
+    print_fits = [f.model_dump(mode="json", exclude_defaults=True) for f in catalog.print_fits.values()
+                  if kind in (None, "", "print_fit") and matches(f.process, f.description, *f.materials)]
+    return {"ok": True, "fasteners": fasteners, "print_fits": print_fits, "components": components, "connectors": connectors, "wires": wires, "materials": materials,
             "printers": printers}
 
 
@@ -306,56 +310,17 @@ def guide() -> dict[str, Any]:
 
 
 def get_catalog_component(project_path: str | Path | None, component_id: str) -> dict[str, Any]:
-    """One catalog entry in full (pins, connectors, interfaces, behaviour, provenance) and where it is defined."""
-    project = load_project(project_path)
-    catalog = project.catalog
-    if component_id not in catalog.components:
-        close = sorted(c for c in catalog.components if component_id.lower() in c.lower())[:20]
-        return {"ok": False, "code": "catalog_entry_missing", "message": f"no catalog component {component_id!r}", "similar": close}
-    local = project.root / "catalog" / "components"
-    origin = "platform"
-    for path in sorted(local.glob("*.yaml")) if local.exists() else []:
-        if f"id: {component_id}" in path.read_text():
-            origin = str(path.relative_to(project.root))
-    entry = catalog.components[component_id].model_dump(mode="json", exclude_defaults=True)
-    return {"ok": True, "component": entry, "defined_in": origin}
+    """One component in full, including its project-local origin."""
+    from ..catalog_ops import get_entry
+
+    result = get_entry(resolve_project(project_path), "component", component_id)
+    if result["ok"]:
+        result["component"] = result.pop("entry")
+    return result
 
 
 def put_catalog_component(project_path: str | Path | None, entry: dict[str, Any], dry_run: bool = False) -> dict[str, Any]:
-    """Validate a component entry (schema ``r3_catalog.schema.ComponentType``) and write it to the project's
-    ``catalog/components/<id>.yaml``. This is how a robot gets its own printed parts (``fabricated: true``)
-    and parts that are not in the platform catalog. An existing project entry with the same id is replaced;
-    a platform entry with the same id is overridden for this project (reported)."""
-    import yaml
-    from pydantic import ValidationError
-    from r3_catalog import default_catalog
-    from r3_catalog.schema import ComponentType
+    """Validate and add or override a component in this project's catalog."""
+    from ..catalog_ops import put_entry
 
-    root = resolve_project(project_path)
-    try:
-        component = ComponentType.model_validate(entry)
-    except ValidationError as error:
-        return {"ok": False, "code": "catalog_entry_invalid",
-                "errors": [f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}" for e in error.errors()]}
-    if not component.id or any(c in component.id for c in "/\\ ") or component.id.startswith("."):
-        return {"ok": False, "code": "catalog_entry_invalid", "errors": [f"id {component.id!r}: use letters, digits, '.', '_' or '-'"]}
-    path = root / "catalog" / "components" / f"{component.id}.yaml"
-    overrides = component.id in default_catalog().components
-    payload = {"ok": True, "path": str(path.relative_to(root)), "id": component.id, "overrides_platform_entry": overrides,
-               "dry_run": dry_run}
-    if dry_run:
-        return payload
-    path.parent.mkdir(parents=True, exist_ok=True)
-    previous = path.read_bytes() if path.exists() else None
-    body = component.model_dump(mode="json", exclude_defaults=True, by_alias=True)
-    path.write_text("# Project-local catalog entry (written by r3_put_catalog_component); record provenance for every number.\n"
-                    + yaml.safe_dump({"components": [body]}, sort_keys=False, allow_unicode=True))
-    try:  # the whole project catalog must still load (ids unique, connector types known)
-        Project.load(root).catalog
-    except Exception as error:  # noqa: BLE001 - report and roll back
-        if previous is None:
-            path.unlink()
-        else:
-            path.write_bytes(previous)
-        return {"ok": False, "code": "catalog_entry_invalid", "errors": [f"{type(error).__name__}: {error}"]}
-    return payload
+    return put_entry(resolve_project(project_path), "component", entry, dry_run)
