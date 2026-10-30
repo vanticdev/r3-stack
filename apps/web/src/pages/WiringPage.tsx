@@ -290,13 +290,13 @@ export function WiringPage() {
   );
 }
 
-/** Cable motion: MuJoCo elastic-cable bodies from a recorded scenario (steering sweep by default),
+/** Cable motion: MuJoCo elastic-cable bodies from a recorded project scenario,
  * synchronized with the wire-clearance chart. */
 function CableMotionPanel({ pid, required }: { pid: string; required: number }) {
   const scenarios = useScenarios(pid);
   const { data } = useRobotScene(pid);
   const candidates = (scenarios.data?.scenarios ?? []).filter((s) => s.last?.recording);
-  const preferred = candidates.find((s) => s.id === "steering_sweep") ?? candidates[0];
+  const preferred = candidates[0];
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const chosen = scenarioId ?? preferred?.id ?? null;
   const scenario = useScenario(pid, chosen);

@@ -241,8 +241,10 @@ export function createMockApi(options: MockOptions) {
             const worst = Math.min(...Object.values(moving));
             ev.push(evidence("wiring", "wire_min_clearance_moving", worst, target, worst >= target, "wiring/routes.json", all.wiring.inputs));
           }
-          const c = check("steering_sweep", "min_wire_clearance_m");
-          if (c) ev.push(c);
+          for (const scenario of s.simulation?.scenarios ?? []) {
+            const c = check(scenario.id, "min_wire_clearance_m");
+            if (c) ev.push(c);
+          }
           break;
         }
         case "max_component_temperature_c": {
