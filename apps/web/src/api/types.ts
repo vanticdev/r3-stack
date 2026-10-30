@@ -451,6 +451,7 @@ export interface CadPart {
   mass_status?: string;
 }
 export interface CadResponse {
+  authority?: { ready: boolean; code: string; message: string; hint?: string; subjects?: string[] };
   cad_model: {
     source?: { provider?: string; url?: string; document_id?: string; [key: string]: unknown };
     parts: Record<string, CadPart>;

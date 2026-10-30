@@ -1,0 +1,20 @@
+# Synthetic mechanism-role fixtures; no vendor parts or complete robot design.
+components:
+  - id: synthetic-root
+    kind: structure
+    name: Synthetic root
+    mechanical: {size: [0.02, 0.02, 0.02], mass: 0.01}
+  - id: synthetic-shaft
+    kind: structure
+    name: Synthetic rotating body
+    mechanical: {size: [0.01, 0.01, 0.01], mass: 0.001}
+  - id: synthetic-actuator
+    kind: motor
+    name: Synthetic extensible actuator
+    mechanical: {size: [0.01, 0.01, 0.01], mass: 0.001}
+    behavior: {model: project.fixture, params: {operating_speed: 4, load_torque: 0.01}}
+  - id: synthetic-rim
+    kind: wheel
+    name: Synthetic rotating contact
+    mechanical: {shape: cylinder, size: [0.035, 0.008], mass: 0.001}
+    behavior: {model: wheel, params: {radius: 0.0175}}

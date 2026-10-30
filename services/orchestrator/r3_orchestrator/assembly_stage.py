@@ -180,44 +180,22 @@ def allowed_pairs(project: Project) -> dict[frozenset[str], str]:
     return allowed
 
 
-def check_exact_interference(project: Project, result: StageResult) -> list[dict[str, Any]] | None:
-    """Exact solids (the CAD part plans: catalog solids, datasheet features and the
-    holes/bores the interfaces cut, fasteners included) at the compiled poses,
-    intersected pairwise with manifold3d. None when the CAD planner is unavailable."""
-    try:
-        from r3_onshape.parts import build_part_catalog, instance_poses, world_manifold
-    except ImportError:
-        return None
-    parts, instances = build_part_catalog(project)
-    poses = instance_poses(project)
-    solids = {iid: world_manifold(parts[key], poses[iid]) for iid, key in instances.items()}
-    boxes = {iid: np.asarray(solid.bounding_box()).reshape(2, 3) for iid, solid in solids.items()}
-    allowed = allowed_pairs(project)
-    found = []
-    for a, b in itertools.combinations(sorted(solids), 2):
-        (la, ha), (lb, hb) = boxes[a], boxes[b]
-        if np.any(ha < lb) or np.any(hb < la):
-            continue
-        volume = (solids[a] ^ solids[b]).volume()
-        if volume <= EXACT_VOLUME_TOL:
-            continue
-        reason = allowed.get(frozenset({a, b}))
-        found.append({"a": a, "b": b, "volume": volume, "allowed": reason})
-        if reason is None:
-            region = np.asarray((solids[a] ^ solids[b]).bounding_box()).reshape(2, 3)
-            extent = region[1] - region[0]
-            joins = [j.join_id for j in (project.spec.assembly.joins if project.spec.assembly else [])
-                     if {j.a.partition(".")[0], j.b.partition(".")[0]} == {a, b}]
-            result.add(Diagnostic.error(
-                "object_interference", f"{a} and {b} intersect by {volume * 1e9:.3f} mm^3 (exact solids at the compiled poses)"
-                + (f"; they are joined by {', '.join(joins)}" if joins else ""),
-                subjects=[a, b, *joins], data={"overlap_volume": volume, "method": "exact", "extent": extent.tolist(),
-                                               "depth": float(extent.min()), "center": ((region[0] + region[1]) / 2).tolist(),
-                                               "joined": bool(joins), "joins": joins},
-                hint="A join or a catalog dimension puts one part inside another: check the interface frames and solids."))
-    result.metrics["exact_solids"] = len(solids)
-    project._exact_solids = solids  # reused by the seat-contact check
-    return found
+def check_exact_interference(project: Project, result: StageResult) -> list[dict[str, Any]]:
+    """STEP-derived solids at pulled poses, with the unchanged volume tolerance."""
+    from r3_onshape.step_geometry import load_geometry
+    from r3_onshape.fit import FitChecker
+    from r3_model.pulled import load_pulled
+
+    pulled = load_pulled(project.root)
+    model = load_geometry(project.root)
+    checker = FitChecker(project, model, {n: p.material or "" for n, p in pulled.parts.items()}, result)
+    report = checker.run()
+    project._exact_solids = {name: part.manifold() for name, part in model.parts.items()}
+    result.metrics["exact_solids"] = len(model.parts)
+    return [{"a": a, "b": b, "volume": volume, "allowed": report.allowed.get((a, b)),
+             "center": ((np.maximum(model[a].lo, model[b].lo) + np.minimum(model[a].hi, model[b].hi)) / 2).tolist(),
+             "extent": (np.minimum(model[a].hi, model[b].hi) - np.maximum(model[a].lo, model[b].lo)).tolist()}
+            for (a, b), volume in report.intersections.items() if volume > EXACT_VOLUME_TOL]
 
 
 def check_caps(project: Project, result: StageResult) -> list[dict[str, Any]]:
@@ -426,57 +404,34 @@ def _plot(path, assembly: AssemblyResult, solids: dict[str, Solid], interference
 
 
 def run(project: Project) -> StageResult:
+    from r3_model.pulled import PullError, load_pulled
+    from r3_model.pulled_view import apply_pulled
+
     start = time.time()
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
-    assembly = project.assembly
-    if assembly is None:
-        result.add(Diagnostic.info("assembly_not_declared", "robot.yaml has no assembly section; authored poses are used as-is",
-                                   hint="Add `assembly: {root, joins}` to derive poses from object interfaces."))
+    try:
+        assembly = apply_pulled(project, load_pulled(project.root))
+        result.extend(assembly.diagnostics)
+        interference = check_exact_interference(project, result)
+        # Catalog-only cap dimensions cannot establish a physical cap fit.
+        for join in (project.spec.assembly.joins if project.spec.assembly else []):
+            for end in (join.a, join.b):
+                obj, _, name = end.partition(".")
+                comp = project.spec.components.get(obj)
+                ctype = project.catalog.components.get(comp.type) if comp else None
+                iface = ctype.interfaces.get(name) if ctype else None
+                if iface and iface.params.get("cap_for"):
+                    result.add(Diagnostic.error("cap_geometry_unverified", f"{obj}: cap clearance/PCB keep-out check needs a cap-to-pulled-face association; catalog dimensions cannot certify it", subjects=[obj]))
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
         result.duration_s = time.time() - start
         return result
-    for diagnostic in assembly.diagnostics:
-        result.add(diagnostic.model_copy())
-    result.assume("mechanical", "Object poses are derived from joins; moving joins are compiled at q = 0.")
-    result.assume("mechanical", "Hole patterns pass when every pair's center offset is within the floating/fixed fastener "
-                                "allowance sum((H - F) / 2) over clearance holes; clearance diameters follow ISO 273 fine..coarse.")
-    result.assume("mechanical", "Shaft/bore fits use ISO 286-2 limit deviations; running fits are capped at H11/c11 and "
-                                "press fits at H7/s6. Minimum thread engagement is 1.0 x d unless the interface sets "
-                                "min_engagement_factor (rule of thumb, not a strength calculation).")
-    result.assume("mechanical", "Interference uses catalog envelopes (boxes exact, cylinders as 48-gon prisms); a shaft inside a "
-                                "joined bore is allowed. The exact check is the CAD stage's mesh booleans.")
-    solids = object_solids(project)
-    exact = check_exact_interference(project, result)
-    if exact is None:
-        interference = check_interference(project, assembly, solids, result)
-    else:
-        result.assume("mechanical", "Interference is exact: CAD part plans (catalog solids, datasheet features, interface-cut "
-                                    "holes and bores, every fastener) intersected pairwise at the compiled poses with manifold3d; "
-                                    "threads, press fits and splines are the only allowed overlaps.")
-        interference = [{"a": e["a"], "b": e["b"], "volume": e["volume"], "insertion": e["allowed"]} for e in exact]
-    caps = check_caps(project, result)
-    check_seat_contact(project, assembly, solids, result, getattr(project, "_exact_solids", None))
-
-    out_dir = project.build_dir("model")
     payload = assembly.to_json()
-    payload.update({
-        "tolerance": {"position": float(project.spec.assembly.tolerance.position), "angle": float(project.spec.assembly.tolerance.angle)},
-        "interference": interference,
-        "interference_method": "envelope" if exact is None else "exact",
-        "inputs": project.fingerprint(),
-        "caps": caps,
-        "diagnostics": [d.model_dump(mode="json") for d in result.diagnostics],
-    })
-    (out_dir / "assembly.json").write_text(json.dumps(payload, indent=2, default=float))
-    result.artifact("model/assembly.json", "json", "Compiled poses, join graph, loop residuals, derived joints and interference")
-    if _plot(out_dir / "assembly_graph.png", assembly, solids, interference):
-        result.artifact("model/assembly_graph.png", "plot_png", "Join graph and side view of the compiled assembly")
-    result.metrics.update({
-        "objects": len(project.spec.components), "placed": len(assembly.poses), "joins": len(assembly.joins),
-        "tree_joins": len(assembly.tree), "loop_closures": len(assembly.loops),
-        "max_loop_position_error": max((loop["position_error"] for loop in assembly.loops), default=0.0),
-        "max_loop_angle_error": max((loop["angle_error"] for loop in assembly.loops), default=0.0),
-        "interferences": sum(1 for i in interference if not i.get("insertion")),
-        "derived_joints": [joint.id for joint in assembly.joints],
-    })
+    payload.update(interference=interference, interference_method="pulled_step",
+                   inputs=project.fingerprint(), diagnostics=[d.model_dump(mode="json") for d in result.diagnostics])
+    (project.build_dir("model") / "assembly.json").write_text(json.dumps(payload, indent=2, default=float))
+    result.artifact("model/assembly.json", "json", "Pulled poses, mate closure residuals and STEP fit/interference")
+    result.metrics.update(objects=len(assembly.poses), joins=len(assembly.joins), loop_closures=len(assembly.loops))
+    result.assume("mechanical", "Onshape solved poses are authoritative; fastened mate frames are checked for closure. Fit checks use pulled STEP faces and solids.")
     result.duration_s = time.time() - start
     return result

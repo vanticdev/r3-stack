@@ -288,26 +288,26 @@ def bbox_mismatch(a: trimesh.Trimesh, b: trimesh.Trimesh) -> float:
 
 
 def build_geometry(project: Any, cid: str) -> PartGeometry:
-    """Print geometry of one component: CAD mesh when present and consistent, else the catalog."""
-    comp = project.spec.components[cid]
-    ctype = project.catalog.component(comp.type)
-    catalog_part = catalog_geometry(ctype, comp.params, project.catalog)
-    path = cad_mesh_path(project.root / "build", cid)
-    if path is None:
-        return catalog_part
-    xyz, rotation = project.graph.component_pose(cid)
-    mesh = cad_geometry(path, xyz, rotation)
-    if mesh is None:
-        catalog_part.notes.append(f"CAD mesh {path.name} is not watertight; used the catalog {catalog_part.source}")
-        return catalog_part
-    mismatch = bbox_mismatch(mesh, catalog_part.mesh)
-    tolerance = max(2.0, 0.1 * float(np.max(catalog_part.mesh.extents)))
-    if mismatch > tolerance:
-        catalog_part.notes.append(f"CAD mesh {path.name} differs from the catalog geometry by {mismatch:.1f} mm "
-                                  f"(stale CAD export or a different pose); used the catalog {catalog_part.source}")
-        return catalog_part
-    return PartGeometry(mesh=mesh, source="cad", notes=[f"CAD tessellation {path.relative_to(project.root)}"],
-                        holes=catalog_part.holes)
+    """Read the pulled part-local STL in print units (millimetres)."""
+    from r3_model.pulled import load_pulled, PullError
+    from r3_onshape.step_geometry import part_from_step
+
+    pulled = load_pulled(project.root)
+    if cid not in pulled.parts:
+        raise PullError("cad_pull_missing", f"{cid}: no pulled part")
+    part = pulled.parts[cid]
+    mesh = trimesh.load_mesh(part.stl, process=True)
+    if not isinstance(mesh, trimesh.Trimesh) or not mesh.is_volume:
+        raise PullError("cad_pull_invalid", f"{cid}: pulled STL is not a closed positive-volume mesh")
+    mesh.apply_scale(MM)
+    # Holes are measured from STEP, never synthesized from catalog interfaces.
+    exact = part_from_step(cid, part.step)
+    holes = [{"interface": face.id, "kind": "bore", "d_mm": 2 * face.radius * MM,
+              "center_mm": (face.origin * MM).tolist(), "axis": face.direction.tolist(),
+              "depth_mm": float(np.ptp(face.triangles.reshape(-1, 3) @ face.direction)) * MM}
+             for face in exact.faces_of("CYLINDER") if face.convex is False]
+    return PartGeometry(mesh=mesh, source="pulled_stl", holes=holes,
+                        notes=[f"Pinned pulled STL; bores measured from STEP: {part.step.name}"])
 
 
 def rotation_from_euler_deg(angles: list[float]) -> np.ndarray:

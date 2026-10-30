@@ -1,0 +1,11 @@
+robot: {name: synthetic-rotating-fixture, mobility: mobile}
+components:
+  root: {type: synthetic-root}
+  actuator: {type: synthetic-actuator, mount: root}
+  shaft: {type: synthetic-shaft, mount: root}
+  rim: {type: synthetic-rim, mount: shaft}
+mechanical:
+  joints:
+    - {id: spin, type: continuous, parent: root, child: shaft, origin: [0, 0, 0], axis: [0, 1, 0]}
+  transmissions:
+    - {id: drive, type: direct, actuator: actuator, joints: [spin], ratio: 3, efficiency: 0.7}

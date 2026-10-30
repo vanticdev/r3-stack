@@ -10,13 +10,15 @@ from r3_model.diagnostics import StageResult
 from r3_model.ratings import RatedJointDemand
 from r3_model.spec import ComponentInstance, Interface, Join
 from r3_onshape.fit import FitChecker
-from r3_onshape.geometry import Loop, PartPlan, Plane, Prism
 from r3_onshape.model import GeometryModel
-from r3_onshape.recompose import part_from_plan
+from r3_onshape.step_geometry import geometry_from_pulled
+from r3_model.pulled import load_pulled
+from pulled_fixture import write_pull
+from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
 
 
 @pytest.fixture
-def unit(monkeypatch):
+def unit(monkeypatch, tmp_path):
     rating = RatedInternalJoint(motion='rotational', interface='bearing', member_type='supplied-rotor',
         member_interface='journal', ratings={'torque': 2., 'angular_speed': 5.}, source='https://manufacturer.example/unit.pdf')
     request = RatedJointDemand(unit='drive', joint='output', demand={'torque': 1., 'angular_speed': 3.},
@@ -37,8 +39,8 @@ def unit(monkeypatch):
                 placement={'origin': [0, 0, 0], 'x': [1, 0, 0], 'z': [0, 0, 1]},
                 validation=Validation(status='passed')) for i, c in enumerate(catalog.values())}
     monkeypatch.setattr('r3_onshape.rated_units.bank_entry', lambda c, project=None: entries[c.id])
-    model = GeometryModel({name: part_from_plan(name, PartPlan(name, 'purchased', 'Steel', 7800., ops=[
-        Prism(Plane('TOP'), [Loop.rectangle([-.01, -.01], [.01, .01])], .02)])) for name in components})
+    write_pull(tmp_path, {name: BRepPrimAPI_MakeBox(20, 20, 20).Shape() for name in components})
+    model = geometry_from_pulled(load_pulled(tmp_path))
     project = SimpleNamespace(spec=SimpleNamespace(components=components, assembly=SimpleNamespace(joins=[join])),
                               catalog=SimpleNamespace(component=by_type.__getitem__),
                               assembly=SimpleNamespace(poses={name: np.eye(4) for name in components}))

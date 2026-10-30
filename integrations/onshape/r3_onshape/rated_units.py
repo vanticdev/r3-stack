@@ -14,7 +14,12 @@ from r3_connectors.frames import Frame
 from r3_catalog.schema import Placement
 from r3_model.diagnostics import Diagnostic
 
-from .purchased import bank_entry
+from r3_catalog.modelbank import ModelBank
+
+
+def bank_entry(component: Any, project: Any = None):
+    """Read vendor provenance without importing the removed CAD generator."""
+    return ModelBank(project=project.root if project else None).resolve(component)
 
 if TYPE_CHECKING:
     from .fit import FitChecker

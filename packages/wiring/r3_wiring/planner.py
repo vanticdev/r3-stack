@@ -60,7 +60,7 @@ from typing import Any
 
 import numpy as np
 from scipy import sparse
-from scipy.optimize import minimize
+from scipy.optimize import NonlinearConstraint, minimize
 
 from r3_model.diagnostics import Diagnostic
 
@@ -81,6 +81,7 @@ SURFACE_BAND = 0.006  # m: bundle surface farther than this from structure canno
 SURFACE_WEIGHT = 4.0  # per metre of bundle at one band of excess distance (vs. 1 per metre of length)
 PENALTY_WEIGHTS = (1.0, 10.0, 100.0, 1000.0)
 ELASTIC_WEIGHT = 50.0  # objective units (~m) per unit of the largest scaled violation
+DENSE_SLSQP_MAX_VARIABLES = 256  # dense QP work grows cubically; larger systems retain sparse Jacobians
 FEASIBILITY_TOL = {"curvature": 0.005, "clearance": 0.0002, "tangent": 0.001, "edge": 0.02, "move": 0.0, "cone": 0.002}
 
 
@@ -718,6 +719,36 @@ class _Problem:
 
 
 # ------------------------------------------------------------------ solve
+def _constrained(fun: Any, x: np.ndarray, jac: Any, bounds: list[tuple[float, float]],
+                 cons: Any, cons_jac: Any, max_iterations: int) -> Any:
+    """Unchanged physical inequalities, using SciPy's sparse solver at scale.
+
+    Analytical Jacobians plus finite-difference Hessian products avoid both the
+    dense SLSQP QP and dense quasi-Newton Hessian storage. The result still goes
+    through the unchanged physical constraint audit below.
+    """
+    if len(x) <= DENSE_SLSQP_MAX_VARIABLES:
+        return minimize(fun, x, jac=jac, method="SLSQP", bounds=bounds,
+                        constraints=[{"type": "ineq", "fun": cons, "jac": lambda z: cons_jac(z).toarray()}],
+                        options={"maxiter": max_iterations, "ftol": 1e-10})
+    # Position, unit-axis and elastic-slack coordinates have different units.
+    # Scale columns using the actual analytic derivatives before applying a
+    # dimensionless trust region. This changes coordinates, not constraints.
+    column_norm = np.asarray(abs(cons_jac(x)).max(axis=0).toarray()).ravel()
+    scale = 1.0 / np.maximum(1.0, np.maximum(column_norm, np.abs(jac(x))))
+    origin = x.copy()
+    physical = lambda y: origin + scale * y
+    scaled_jac = lambda y: cons_jac(physical(y)).multiply(scale).tocsr()
+    constraint = NonlinearConstraint(lambda y: cons(physical(y)), 0.0, np.inf, jac=scaled_jac, hess="2-point")
+    scaled_bounds = [((lo - value) / factor, (hi - value) / factor) for (lo, hi), value, factor in zip(bounds, origin, scale)]
+    result = minimize(lambda y: fun(physical(y)), np.zeros_like(x), jac=lambda y: jac(physical(y)) * scale,
+                      hess="2-point", method="trust-constr", bounds=scaled_bounds, constraints=[constraint],
+                      options={"maxiter": max_iterations, "gtol": 1e-12, "xtol": 1e-12, "barrier_tol": 1e-12,
+                               "sparse_jacobian": True, "factorization_method": "AugmentedSystem"})
+    result.x = physical(result.x)
+    return result
+
+
 def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields: ClearanceField,
                 requirement: float, *, max_iterations: int = 300, obstacles: Any = None) -> BundlePlan:
     """Plan one bundle group (harnesses joined by floating mates) as a single
@@ -806,32 +837,28 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     def cons(z: np.ndarray) -> np.ndarray:
         return np.concatenate([problem.constraints(z[:-1])[0] + z[-1], [z[-1]]])
 
-    def cons_jac(z: np.ndarray) -> np.ndarray:
-        jx = problem.jacobian_dense(z[:-1])
-        top = np.hstack([jx, np.ones((len(jx), 1))])
-        bottom = np.zeros((1, problem.n + 1))
-        bottom[0, -1] = 1.0
-        return np.vstack([top, bottom])
+    def cons_jac(z: np.ndarray) -> sparse.csr_matrix:
+        jx = problem.constraints(z[:-1])[1]
+        top = sparse.hstack([jx, np.ones((jx.shape[0], 1))])
+        bottom = sparse.csr_matrix(([1.0], ([0], [problem.n])), shape=(1, problem.n + 1))
+        return sparse.vstack([top, bottom], format="csr")
 
     g1, _, _ = problem.constraints(x1)
     z1 = np.concatenate([x1, [max(0.0, -float(g1.min())) + 1e-3]])
     try:
-        result = minimize(fun, z1, jac=jac, method="SLSQP",
-                          bounds=[*bounds, (0.0, np.inf)],
-                          constraints=[{"type": "ineq", "fun": cons, "jac": cons_jac}],
-                          options={"maxiter": max_iterations, "ftol": 1e-10})
+        result = _constrained(fun, z1, jac, [*bounds, (0.0, np.inf)], cons, cons_jac, max_iterations)
         x2, message, iterations = result.x[:-1], str(result.message), int(result.nit)
         stats["elastic_slack"] = float(result.x[-1])
+        stats["elastic_solver"] = "SLSQP" if len(z1) <= DENSE_SLSQP_MAX_VARIABLES else "trust-constr"
     except (ValueError, np.linalg.LinAlgError) as exc:  # pragma: no cover - SLSQP numerical failure
-        x2, message, iterations = x1, f"SLSQP failed: {exc}", 0
+        x2, message, iterations = x1, f"Constrained solve failed: {exc}", 0
     # Phase 3: hard-constraint SLSQP polish from the elastic solution (removes the residual slack).
     x3 = x2
     try:
-        polish = minimize(lambda x: problem.objective(x)[0], x2, jac=lambda x: problem.objective(x)[1],
-                          method="SLSQP", bounds=bounds, options={"maxiter": 2 * max_iterations, "ftol": 1e-10},
-                          constraints=[{"type": "ineq", "fun": lambda x: problem.constraints(x)[0],
-                                        "jac": problem.jacobian_dense}])
+        polish = _constrained(lambda x: problem.objective(x)[0], x2, lambda x: problem.objective(x)[1], bounds,
+                              lambda x: problem.constraints(x)[0], lambda x: problem.constraints(x)[1], 2 * max_iterations)
         x3 = polish.x
+        stats["polish_solver"] = "SLSQP" if len(x2) <= DENSE_SLSQP_MAX_VARIABLES else "trust-constr"
         stats["polish_message"] = str(polish.message)
         stats["polish_iterations"] = int(polish.nit)
     except (ValueError, np.linalg.LinAlgError):  # pragma: no cover

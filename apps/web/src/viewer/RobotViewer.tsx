@@ -1,11 +1,11 @@
-// The 3D robot view: CAD STL meshes (catalog envelopes as fallback) posed from the compiled
+// The 3D robot view: pulled STL meshes posed from the Onshape
 // assembly, harness tubes in wire colours, interface/join/joint overlays, joint sliders,
 // exploded view, click-to-inspect, diagnostic highlighting, simulation playback and route editing.
 import { Edges, GizmoHelper, GizmoViewport, Grid, Html, Line, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
 import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  BoxGeometry, BufferGeometry, CatmullRomCurve3, Color, ConeGeometry, CylinderGeometry, DoubleSide, Group, LineCurve3, Matrix4,
+  CatmullRomCurve3, Color, ConeGeometry, DoubleSide, Group, LineCurve3, Matrix4,
   Mesh, MeshStandardMaterial, Object3D, Quaternion, TubeGeometry, Vector3,
 } from "three";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
@@ -14,13 +14,13 @@ import type { PlaybackRecording, Vec3 } from "../api/types.ts";
 import { resolveSubjects, wireColor, type SceneComponent, type SceneWire } from "../lib/scene.ts";
 import {
   ackermann, bodyDelta, bounds, chainMatrix, clampJoint, componentBody, explodeOffsets, frameAt, interpolatePoints,
-  interpolatePose, poseMatrix, restPoses,
+  interpolatePose, restPoses,
 } from "../lib/transforms.ts";
 import { humanize } from "../lib/units.ts";
 import { Icon } from "../components/icons.tsx";
 import { Popover } from "../components/ui.tsx";
 import { cssVar, useThemeVersion } from "../state/prefs.ts";
-import { ConnectorLayer, detailedComponents } from "./ConnectorLayer.tsx";
+import { ConnectorLayer } from "./ConnectorLayer.tsx";
 import { RouteEditor, type RouteEditState } from "./RouteEditor.tsx";
 import { interfaceFrame } from "./interfaceFrame.ts";
 import type { RobotData } from "./useRobotScene.ts";
@@ -84,19 +84,6 @@ type PartState = "normal" | "highlight" | "selected" | "ghost";
 
 // ------------------------------------------------------------------ geometry helpers
 
-function envelopeGeometry(c: SceneComponent): BufferGeometry {
-  const [a = 0.01, b = 0.01, cz = 0.01] = c.size;
-  if (c.shape === "cylinder") {
-    const geometry = new CylinderGeometry(a / 2, a / 2, b, 40); // axis along local +y
-    if (c.axis === "x") geometry.rotateZ(-Math.PI / 2);
-    if (c.axis === "z") { geometry.rotateX(Math.PI / 2); geometry.translate(0, 0, b / 2); } // rises from the mount face
-    return geometry;
-  }
-  const geometry = new BoxGeometry(a, b, cz);
-  geometry.translate(0, 0, cz / 2); // component origin is the bottom (mounting) face
-  return geometry;
-}
-
 function tubeGeometry(points: readonly Vec3[], radius: number, radial = 8): TubeGeometry {
   const vectors = points.map((p) => new Vector3(p[0], p[1], p[2]));
   const curve = vectors.length > 2 ? new CatmullRomCurve3(vectors, false, "centripetal") : new LineCurve3(vectors[0]!, vectors[1] ?? vectors[0]!);
@@ -142,22 +129,6 @@ function StlMesh({ url, material, outline, onClick, onHover }: {
   );
 }
 
-function Envelope({ c, material, outline, onClick, onHover }: {
-  c: SceneComponent; material: MeshStandardMaterial; outline: Outline | null;
-  onClick: (e: ThreeEvent<MouseEvent>) => void; onHover: (on: boolean) => void;
-}) {
-  const geometry = useMemo(() => envelopeGeometry(c), [c]);
-  const matrix = useMemo(() => poseMatrix(c.xyz, c.rpy), [c]);
-  return (
-    <group matrixAutoUpdate={false} matrix={matrix}>
-      <mesh geometry={geometry} material={material} onClick={onClick}
-            onPointerOver={(e) => { e.stopPropagation(); onHover(true); }} onPointerOut={() => onHover(false)}>
-        {outline && <Edges threshold={20} color={outline.color} lineWidth={outline.width} transparent opacity={outline.opacity} depthTest={!outline.onTop} renderOrder={outline.onTop ? 10 : 0} />}
-      </mesh>
-    </group>
-  );
-}
-
 function Part({ c, url, matrix, state, xray, error, edge, register, onSelect, onHover }: {
   c: SceneComponent; url: string | undefined; matrix: Matrix4; state: PartState; xray: boolean; error: boolean; edge: string;
   register: (id: string, group: Group | null) => void; onSelect?: (s: Selection) => void; onHover: (id: string | null) => void;
@@ -168,16 +139,15 @@ function Part({ c, url, matrix, state, xray, error, edge, register, onSelect, on
     : state === "normal" && !xray ? { color: edge, width: 1, opacity: 0.55 } : null;
   const click = (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onSelect?.({ kind: "component", id: c.id }); };
   const hover = (on: boolean) => onHover(on ? c.id : null);
-  const envelope = <Envelope c={c} material={material} outline={outline} onClick={click} onHover={hover} />;
   return (
     <group ref={(g) => register(c.id, g)} matrixAutoUpdate={false} matrix={matrix} name={c.id}>
       {url ? (
-        <MeshBoundary fallback={envelope}>
-          <Suspense fallback={envelope}>
+        <MeshBoundary fallback={null}>
+          <Suspense fallback={null}>
             <StlMesh url={url} material={material} outline={outline} onClick={click} onHover={hover} />
           </Suspense>
         </MeshBoundary>
-      ) : envelope}
+      ) : null}
     </group>
   );
 }
@@ -457,7 +427,7 @@ function PlaybackConnectors({ playback, data, register }: {
   return <>{layers.map(({ body, connectors }) => (
     <group key={body} matrixAutoUpdate={false} ref={(g) => register(`body:${body}`, g)}>
       <ConnectorLayer data={connectors} assetUrl={data.connectorAsset!} matrices={{}} harness={null}
-                      showBodies showPins ghost={() => false} />
+                      showBodies={false} showPins ghost={() => false} />
     </group>
   ))}</>;
 }
@@ -572,7 +542,6 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
   const hovered = hover ? data.components.find((c) => c.id === hover) ?? data.wires.find((w) => w.id === hover) : null;
   const meshCount = data.components.filter((c) => data.meshes[c.id]).length;
   const showConnectors = !!data.connectors && options.connectors;
-  const detailed = useMemo(() => (showConnectors ? detailedComponents(data.connectors ?? null) : new Set<string>()), [showConnectors, data.connectors]);
   const selectedHarness = selected?.kind === "wire" ? data.connectors?.wires[selected.id]?.harness ?? null : null;
   const layers = SHOW_LAYERS.filter((l) => l.available?.(data, !!playback) ?? true);
 
@@ -645,7 +614,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         <Grid rotation={[Math.PI / 2, 0, 0]} position={[0, 0, -0.0005]} cellSize={0.01} sectionSize={0.1} infiniteGrid fadeDistance={4}
               fadeStrength={1.4} cellColor={dark ? "#2e2e2a" : "#d6d5cf"} sectionColor={dark ? "#45453f" : "#b5b4ad"} cellThickness={0.6} sectionThickness={1} />
 
-        {data.components.filter((c) => !detailed.has(c.id)).map((c) => (
+        {data.components.map((c) => (
           <Part key={c.id} c={c} url={data.meshes[c.id]} matrix={playback ? IDENTITY : matrices[c.id] ?? IDENTITY} state={stateOf(c.id)}
                 xray={options.xray} error={options.issues && !anyFocus && errorParts.has(c.id)} edge={dark ? "#77766f" : "#3a3a36"} register={register} onSelect={onSelect} onHover={setHover} />
         ))}
@@ -664,7 +633,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         ))}
         {showConnectors && !playback && data.connectors && data.connectorAsset && (
           <ConnectorLayer data={data.connectors} assetUrl={data.connectorAsset} matrices={matrices} harness={selectedHarness}
-                          showBodies showPins={options.explode < 0.02} ghost={(id) => stateOf(id) === "ghost" || (options.xray && stateOf(id) === "normal")} />
+                          showBodies={false} showPins={options.explode < 0.02} ghost={(id) => stateOf(id) === "ghost" || (options.xray && stateOf(id) === "normal")} />
         )}
         {!playback && markers.map((m, i) => <MarkerPoint key={`mk${i}`} marker={m} />)}
         {options.interfaces && <InterfacesOverlay data={data} matrices={playback ? {} : matrices} />}
@@ -699,7 +668,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         ) : anyFocus ? (
           <span><span className="swatch" style={{ background: "#f97316" }} /> Highlighted: {[focus.components.size ? `${focus.components.size} part${focus.components.size === 1 ? "" : "s"}` : "", focus.wires.size ? `${focus.wires.size} wire${focus.wires.size === 1 ? "" : "s"}` : ""].filter(Boolean).join(", ")}</span>
         ) : (
-          <span>{meshCount === data.components.length ? "All parts from CAD" : `${meshCount} of ${data.components.length} parts from CAD, the rest as catalog envelopes`} · click a part to inspect</span>
+          <span>{meshCount === data.components.length ? "All parts from pulled CAD" : `${meshCount} of ${data.components.length} parts have pulled meshes; missing parts are hidden`} · click a part to inspect</span>
         )}
         {options.issues && !anyFocus && <span><span className="swatch" style={{ background: "#d03b3b" }} /> part with an error</span>}
         {options.interference && !playback && data.interference.length > 0 && <span><span className="swatch outline" style={{ borderColor: "#d03b3b" }} /> interference region ({data.interference.length})</span>}

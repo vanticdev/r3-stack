@@ -1,83 +1,105 @@
-"""Fit verification on geometry recorded from the phase B Onshape build (each
-part's Part Studio bodydetails + tessellation, placed by the assembly's solved
-transforms) of the front-left corner: fastener math, interface probes, retention
-graph and the probe -> diagnostic mapping. No Onshape access."""
-
-import copy
-import shutil
-from pathlib import Path
-
+"""Unchanged fit limits checked against explicit synthetic STEP solids."""
+from types import SimpleNamespace
+import numpy as np
 import pytest
-import yaml
-
+from OCP.BRepPrimAPI import BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeBox
+from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
+from OCP.gp import gp_Ax2, gp_Pnt, gp_Dir
 from r3_model.diagnostics import StageResult
-from r3_model.project import Project
-from r3_onshape.fit import verify_fit
-from cad_helpers import geometry_for
-from r3_onshape.organized import plan_assembly
-from r3_onshape.parts import build_part_catalog
-
-ROOT = Path(__file__).resolve().parents[1]
-COUPON = ROOT / "tests/fixtures/mechanism"
-PARTS = {"base", "support", "sleeve", "rotor", "fastener:support_mount_1", "fastener:support_mount_2"}
+from r3_model.spec import Interface
+from r3_model.pulled import load_pulled
+from r3_onshape.fit import FitChecker, VOLUME_TOL, plane_contacts
+from r3_onshape.step_geometry import geometry_from_pulled
+from pulled_fixture import write_pull
 
 
-@pytest.fixture(scope="module")
-def model(project):
-    return geometry_for(project)[0]
+def cylinder(radius, height, z=0):
+    return BRepPrimAPI_MakeCylinder(gp_Ax2(gp_Pnt(0,0,z),gp_Dir(0,0,1)),radius,height).Shape()
 
 
-@pytest.fixture(scope="module")
-def project():
-    return Project.load(COUPON)
+def checker(tmp_path, radius=3.1, length=8):
+    shapes = {'shaft': cylinder(3, 8), 'hub': BRepAlgoAPI_Cut(cylinder(6, length), cylinder(radius, length+2,-1)).Shape()}
+    write_pull(tmp_path, shapes)
+    model = geometry_from_pulled(load_pulled(tmp_path))
+    project = SimpleNamespace(spec=SimpleNamespace(components={}, assembly=None), catalog=SimpleNamespace())
+    result = StageResult(stage='cad')
+    return FitChecker(project,model,{},result), Interface(id='axis',kind='revolute_fit',parts=['shaft','hub'],
+        axis_point=[0,0,0],axis_dir=[0,0,1],params={'clearance':[.00005,.00015],'min_engagement':.008})
 
 
-def _run(project, model, names=None):
-    parts, instance_part = build_part_catalog(project)
-    plan = plan_assembly(project, parts, instance_part)
-    materials = {iid: parts[placement.key].plan.material for iid, placement in plan.placements.items()}
-    if names is not None:
-        model = copy.copy(model)
-        model.parts = {n: p for n, p in model.parts.items() if n in names}
-    result = StageResult(stage="cad")
-    report = verify_fit(project, model, materials, result, scoped=True)
-    return report, result
+def test_step_running_fit_verifies_and_reports_measured_geometry(tmp_path):
+    check, interface = checker(tmp_path)
+    check.check_interface(interface)
+    check.check_interference()
+    assert not check.result.errors
+    assert check.report.verified_interfaces == {'axis'}
+    assert check.report.interfaces['axis']['radial_clearance_mm'] == pytest.approx(.1)
+    assert check.report.interfaces['axis']['engagement_mm'] == pytest.approx(8)
+    assert check.report.interface_axes['axis']['axis'] == pytest.approx([0,0,1])
 
 
-def _codes(result):
-    return {d.code for d in result.diagnostics if d.severity.value == "error"}
+def test_fit_limits_map_to_diagnostics(tmp_path):
+    check, interface = checker(tmp_path)
+    interface.params['clearance'] = [.00001,.00005]
+    check.check_interface(interface)
+    error = next(d for d in check.result.errors if d.code == 'interface_fit_out_of_range')
+    assert error.data['value'] == pytest.approx(.0001)
+    assert error.data['limits'] == pytest.approx([.00001,.00005])
 
 
-def test_generated_coupon_verifies(project, model):
-    assert PARTS == set(model.parts)
-    report, result = _run(project, model)
-    assert _codes(result) == set()
-    assert report.verified_fasteners == {"support_mount_1", "support_mount_2"}
-    assert report.verified_interfaces == {"sleeve_press", "rotor_pivot"}
-    assert report.retained == PARTS
-    assert report.interfaces["rotor_pivot"]["radial_clearance_mm"] == pytest.approx(.1, abs=1e-4)
-    assert report.interfaces["rotor_pivot"]["engagement_mm"] == pytest.approx(8, abs=1e-3)
-    press = report.interfaces["sleeve_press"]
-    assert press["radial_clearance_mm"] == pytest.approx(-.01, abs=1e-4)
-    assert press["overlap_mm3"] == pytest.approx(press["expected_overlap_mm3"], rel=1e-3)
-    for fastener in report.fasteners.values():
-        assert fastener["engagement_mm"] == pytest.approx(8, abs=.02)
-        assert fastener["head_contact_mm2"] > 10
+def test_short_axial_engagement_fails(tmp_path):
+    check, interface = checker(tmp_path,length=4)
+    check.check_interface(interface)
+    assert 'interface_engagement_short' in {d.code for d in check.result.errors}
 
 
-def test_contact_alone_does_not_retain(project, model):
-    _, result = _run(project, model, PARTS - {"fastener:support_mount_1", "fastener:support_mount_2"})
-    errors = [d for d in result.errors if d.code == "part_not_retained"]
-    assert errors and {"support", "sleeve", "rotor"} <= set(errors[0].subjects)
+def test_offset_bore_does_not_verify(tmp_path):
+    check, interface = checker(tmp_path)
+    interface.axis_point = [.001,0,0]
+    check.check_interface(interface)
+    assert 'interface_geometry_missing' in {d.code for d in check.result.errors}
 
 
-def test_fit_limits_map_to_diagnostics(project, model, tmp_path):
-    mutated = copy.deepcopy(project)
-    interface = next(i for i in mutated.spec.mechanical.interfaces if i.id == "rotor_pivot")
-    interface.params["clearance"] = [.00001, .00005]
-    mutated.spec.mechanical.fasteners[0].thread_into = "rotor"
-    _, result = _run(mutated, model)
-    assert {"interface_fit_out_of_range", "thread_geometry_missing"} <= _codes(result)
-    failing = next(d for d in result.errors if d.code == "interface_fit_out_of_range")
-    assert failing.data["value"] == pytest.approx(1e-4, abs=1e-7)
-    assert failing.data["limits"] == pytest.approx([1e-5, 5e-5])
+def test_running_interference_is_not_relaxed(tmp_path):
+    check, interface = checker(tmp_path,radius=2.99)
+    check.check_interface(interface)
+    check.check_interference()
+    assert check.intersection('shaft','hub') > VOLUME_TOL
+    assert {'interface_fit_out_of_range','cad_interference'} <= {d.code for d in check.result.errors}
+
+
+def test_contact_alone_does_not_retain(tmp_path):
+    check, _ = checker(tmp_path)
+    check.check_retention(root='shaft')
+    assert check.report.retained == {'shaft'}
+    assert next(d for d in check.result.errors if d.code == 'part_not_retained').subjects == ['hub']
+
+
+def test_press_fit_uses_measured_intersection(tmp_path):
+    check, interface = checker(tmp_path,radius=2.99)
+    interface.kind='press_fit'
+    interface.params={'interference':[.000005,.000015],'min_engagement':.008}
+    check.check_interface(interface)
+    assert not check.result.errors
+    assert check.report.interfaces['axis']['radial_clearance_mm'] == pytest.approx(-.01)
+    assert check.report.interfaces['axis']['overlap_mm3'] == pytest.approx(check.report.interfaces['axis']['expected_overlap_mm3'],rel=.01)
+
+
+def test_step_plane_contact_area(tmp_path):
+    poses = {'a':np.eye(4),'b':np.eye(4)};poses['b'][2,3]=.01
+    write_pull(tmp_path,{n:BRepPrimAPI_MakeBox(10,20,10).Shape() for n in poses},poses=poses)
+    model=geometry_from_pulled(load_pulled(tmp_path))
+    contacts=plane_contacts(model['a'],model['b'])
+    assert len(contacts)==1
+    assert contacts[0].area==pytest.approx(.0002,rel=1e-5)
+
+
+def test_thread_geometry_check_still_runs_and_missing_definition_blocks(tmp_path):
+    check, _ = checker(tmp_path,radius=2.5)
+    fastener=SimpleNamespace(id='thread',part='shaft')
+    kind=SimpleNamespace(d=.006,tap_drill=.005,pitch=.001)
+    info={}
+    check.check_thread(fastener,kind,'shaft','hub',np.zeros(3),np.array([0,0,1]),False,info)
+    assert info['geometric_engagement_mm']==pytest.approx(8)
+    assert info['engagement_mm']==pytest.approx(8,rel=.01)
+    assert {'thread_definition_unavailable','thread_engagement_short'} <= {d.code for d in check.result.errors}

@@ -153,54 +153,27 @@ def scene_from_environment(environment: Any, receiver_params: dict[str, Any]) ->
 
 
 def _part_mesh(project: Any, cid: str, cad_parts: dict[str, Any]) -> tuple[np.ndarray, np.ndarray] | None:
-    """Triangles of one component in the robot frame: CAD mesh, else the catalog primitive."""
-    import trimesh
-
-    part = cad_parts.get(cid) or {}
-    mesh_rel = part.get("mesh")
-    if mesh_rel:
-        path = project.root / "build" / "cad" / mesh_rel
-        if path.exists():
-            mesh = trimesh.load(path, force="mesh")
-            return np.asarray(mesh.vertices, dtype=float), np.asarray(mesh.faces, dtype=np.int64)
-    ctype = project.catalog.component(project.spec.components[cid].type)
-    mech = ctype.mechanical
-    size = [float(to_si(v)) for v in mech.size]
-    position, rotation = project.graph.component_pose(cid)
-    outline = (project.spec.components[cid].params or {}).get("outline")
-    if outline and len(size) >= 3:
-        import manifold3d
-
-        solid = manifold3d.CrossSection([[(to_si(x), to_si(y)) for x, y in outline]]).extrude(size[2]).to_mesh()
-        mesh = trimesh.Trimesh(np.asarray(solid.vert_properties)[:, :3], np.asarray(solid.tri_verts), process=False)
-    elif mech.shape == "cylinder":
-        mesh = trimesh.creation.cylinder(radius=size[0] / 2.0, height=size[1], sections=16)
-        if mech.axis == "x":
-            mesh.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [0, 1, 0]))
-        elif mech.axis == "y":
-            mesh.apply_transform(trimesh.transformations.rotation_matrix(np.pi / 2, [1, 0, 0]))
-    else:
-        mesh = trimesh.creation.box(extents=size[:3])
-        mesh.apply_translation(np.asarray(mech.envelope_offset) + [0.0, 0.0, size[2] / 2.0])  # catalog box frame: bottom-face center
-    vertices = np.asarray(mesh.vertices, dtype=float) @ np.asarray(rotation).T + np.asarray(position)
-    return vertices, np.asarray(mesh.faces, dtype=np.int64)
+    """Pulled part-local STL transformed into the robot frame."""
+    from r3_model.pulled import load_pulled
+    from r3_model.pulled_view import world_mesh
+    mesh = world_mesh(load_pulled(project.root), cid)
+    return np.asarray(mesh.vertices), np.asarray(mesh.faces)
 
 
 def robot_body(project: Any, exclude: tuple[str, ...] = ()) -> list[BodyMesh]:
     """robot body grouped by radio material (robot frame)."""
-    cad_parts = (project.read_build_json("cad/cad_model.json") or {}).get("parts") or {}
+    from r3_model.pulled_view import cad_view
+    cad_parts = cad_view(project)["parts"]
     groups: dict[str, BodyMesh] = {}
-    for cid in sorted(project.spec.components):
+    for cid in sorted(cad_parts):
         if cid in exclude:
             continue
-        try:
-            ctype = project.catalog.component(project.spec.components[cid].type)
-            triangles = _part_mesh(project, cid, cad_parts)
-        except Exception:  # noqa: BLE001 - an unknown part never blocks the radio model
-            continue
+        comp = project.spec.components.get(cid)
+        ctype = project.catalog.components.get(comp.type) if comp else None
+        triangles = _part_mesh(project, cid, cad_parts)
         if triangles is None:
             continue
-        material = material_for(cad_parts.get(cid, {}).get("material") or ctype.mechanical.material, ctype.kind)
+        material = material_for(cad_parts[cid].get("material"), ctype.kind if ctype else "structure")
         group = groups.setdefault(material, BodyMesh(material, np.zeros((0, 3)), np.zeros((0, 3), dtype=np.int64)))
         vertices, faces = triangles
         group.faces = np.vstack([group.faces, faces + len(group.vertices)])
@@ -220,33 +193,16 @@ def antenna_component(project: Any) -> str | None:
     return None
 
 
-def _catalog_feed_point(project: Any, antenna_id: str) -> np.ndarray | None:
-    """Feed point of an antenna component without CAD: the middle of its catalog ``dipole`` solid, in the robot frame."""
-    mech = project.catalog.component(project.spec.components[antenna_id].type).mechanical
-    dipole = next((s for s in mech.solids if s.kind == "cylinder" and s.name == "dipole"), None)
-    if dipole is None:
-        return None
-    axis = np.asarray(dipole.axis, dtype=float)
-    local = np.asarray([to_si(v) for v in dipole.position], dtype=float) + axis / np.linalg.norm(axis) * to_si(dipole.length) / 2.0
-    position, rotation = project.graph.component_pose(antenna_id)
-    return np.asarray(position, dtype=float) + np.asarray(rotation) @ local
-
-
 def antenna_offset(project: Any, receiver_id: str | None, height_above_mount: float) -> tuple[np.ndarray, str]:
-    """robot antenna position in the robot frame: CAD ``rf.antenna_position`` when exposed, else the catalog dipole
-    center of the antenna component, else receiver pose + height."""
-    cad = project.read_build_json("cad/cad_model.json") or {}
-    rf = cad.get("rf") or {}
-    if rf.get("antenna_position") is not None:
-        return np.asarray([to_si(v) for v in rf["antenna_position"]], dtype=float), "cad"
-    antenna = antenna_component(project)
-    feed = _catalog_feed_point(project, antenna) if antenna else None
-    if feed is not None:
-        return feed, "catalog"
-    if receiver_id and receiver_id in project.spec.components:
-        position, _ = project.graph.component_pose(receiver_id)
-        return np.asarray(position, dtype=float) + np.array([0.0, 0.0, height_above_mount]), "catalog"
-    return np.array([0.0, 0.0, height_above_mount]), "default"
+    """An explicit pulled feed connector is required for an antenna phase centre."""
+    from r3_model.pulled import load_pulled, PullError
+    pulled = load_pulled(project.root)
+    antenna = antenna_component(project) or receiver_id
+    part = pulled.parts.get(antenna)
+    feed = part.mate_connectors.get("feed") if part else None
+    if feed is None:
+        raise PullError("cad_antenna_feed_missing", f"{antenna or 'antenna'}: add a feed mate connector in Onshape and pull it; catalog envelopes cannot locate the phase centre")
+    return (pulled.poses[antenna] @ feed)[:3, 3], "pulled"
 
 
 def scene_for_project(project: Any, receiver_id: str | None, receiver_params: dict[str, Any], include_body: bool = True) -> RadioScene:

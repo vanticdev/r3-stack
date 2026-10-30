@@ -550,90 +550,30 @@ class ModelChecker:
 
     # ------------------------------------------------------------ mechanics
     def solids(self) -> dict[str, Solid]:
-        result: dict[str, Solid] = {}
-        for cid, comp in self.spec.components.items():
-            if comp.type not in self.catalog.components:
-                continue
-            mech = self.catalog.component(comp.type).mechanical
-            outline = comp.params.get("outline") if mech.shape == "custom" else None
-            if outline:
-                # Plates authored as an outline polygon: extrude it (convex hull) instead of using the bounding box.
-                result[cid] = outline_solid(cid, [[to_si(a), to_si(b)] for a, b in outline], float(mech.size[2]),
-                                            comp.pose.xyz, comp.pose.rpy)
-            elif mech.shape == "custom" and mech.solids and (piecewise := solids_solid(
-                    cid, mech.solids, comp.params, comp.pose.xyz, comp.pose.rpy, comp.params.get("mirror"))) is not None:
-                result[cid] = piecewise  # union of the catalog primitives, not the bounding box
-            else:
-                result[cid] = make_solid(cid, mech.shape, list(mech.size), mech.axis, comp.pose.xyz, comp.pose.rpy, mech.envelope_offset)
+        """Pulled mesh bounds for the 2D layout; never used for fit evidence."""
+        from r3_model.pulled_view import cad_view
+        parts = cad_view(self.project)["parts"]
+        result = {}
+        for cid in self.spec.components:
+            part = parts[cid]
+            lo, hi = np.asarray(part["bbox_min"]), np.asarray(part["bbox_max"])
+            result[cid] = make_solid(cid, "box", (hi-lo).tolist(), "z",
+                [(lo[0]+hi[0])/2, (lo[1]+hi[1])/2, lo[2]], [0, 0, 0])
         return result
 
     def check_interference(self, solids: dict[str, Solid]) -> list[dict[str, Any]]:
-        # Exact B-rep interference from the CAD stage supersedes envelope estimates,
-        # but only when it was computed for this exact component set. The direct-CAD
-        # stage records it in its ``fit`` report (allowed thread/press-fit
-        # intersections, every other pair checked); older builds wrote ``contacts``.
-        from .release import is_stale
-
-        fingerprint = self.project.fingerprint()
-        cad = self.project.read_build_json("cad/cad_model.json") or {}
-        checked = isinstance(cad, dict) and ("fit" in cad or "contacts" in cad)
-        if checked and not is_stale(cad.get("inputs"), fingerprint) and set(cad.get("parts", {})) >= set(self.spec.components):
-            fit = cad.get("fit") or {}
-            self.add(Diagnostic.info("interference_checked_by_cad",
-                                     "static interference evaluated on exact Onshape B-rep by the cad stage; envelope check skipped",
-                                     data={"document": cad.get("source", {}).get("url"), "parts": len(cad.get("parts", {})),
-                                           "verified_fasteners": len(fit.get("verified_fasteners", [])),
-                                           "verified_interfaces": len(fit.get("verified_interfaces", []))}))
-            return []
-        assembly = self.project.read_build_json("model/assembly.json") or {}
-        current = not is_stale(assembly.get("inputs"), fingerprint)
-        if (assembly.get("interference_method") == "exact" and current
-                and set(assembly.get("poses", {})) >= set(self.spec.components)):
-            # The assembly stage intersected the exact part plans (solids, datasheet features, interface-cut
-            # holes and bores, fasteners) at the compiled poses; its object_interference errors are the result.
-            self.add(Diagnostic.info("interference_checked_by_assembly",
-                                     "static interference evaluated on the exact part plans by the assembly stage; envelope check skipped",
-                                     data={"pairs_in_contact": len(assembly.get("interference", []))}))
-            return []
-        self.result.assume("mechanical", "Interference uses catalog envelopes: boxes exact, cylinders as 48-gon prisms, 'custom' "
-                                         "shapes as the union of their catalog solids (concave profiles as their hull). Overlaps thinner than 0.1 mm count as contact.")
-        self.result.assume("mechanical", "Static interference at the authored pose only; steering and wheel sweep are checked in simulation.")
-        overlaps = []
-        for a, b in itertools.combinations(sorted(solids), 2):
-            hit = overlap(solids[a], solids[b])
-            if hit is None:
-                continue
-            mount_related = self.spec.components[a].mount == b or self.spec.components[b].mount == a
-            overlaps.append({"a": a, "b": b, **hit, "mount_related": mount_related})
-            extent_mm = " x ".join(f"{v * 1e3:.1f}" for v in hit["extent"])
-            self.add(Diagnostic.error(
-                "component_interference",
-                f"{a} and {b} overlap by {hit['volume'] * 1e9:.0f} mm^3 (region {extent_mm} mm at "
-                f"[{', '.join(f'{v * 1e3:.1f}' for v in hit['center'])}] mm)",
-                subjects=[a, b],
-                data={"overlap_volume": hit["volume"], "depth": hit["depth"], "extent": hit["extent"], "center": hit["center"],
-                      "mount_related": mount_related},
-                hint="Move one component (pose.xyz) by at least `depth` along the thinnest overlap axis, or resize the envelope."))
-        return overlaps
+        from .assembly_stage import check_exact_interference
+        return check_exact_interference(self.project, self.result)
 
     def check_mass(self) -> dict[str, Any]:
-        cad = self.project.read_build_json("cad/cad_model.json") or {}
+        from r3_model.pulled_view import cad_view
+        cad = cad_view(self.project, mass_required=True)
         cad_parts = cad.get("parts", {}) if isinstance(cad, dict) else {}
         routes = self.project.read_build_json("wiring/routes.json") or {}
         routed = routes.get("wires", {}) if isinstance(routes, dict) else {}
         components: dict[str, dict[str, Any]] = {}
-        for cid, comp in self.spec.components.items():
-            if comp.type not in self.catalog.components:
-                continue
-            mech = self.catalog.component(comp.type).mechanical
-            if cid in cad_parts and cad_parts[cid].get("mass"):
-                components[cid] = {"mass": float(cad_parts[cid]["mass"]), "source": "cad"}
-            elif "mass" in comp.params:
-                from r3_model.units import to_si
-
-                components[cid] = {"mass": to_si(comp.params["mass"]), "source": "spec_override"}
-            else:
-                components[cid] = {"mass": mech.mass, "source": mech.provenance.status}
+        for cid in self.spec.components:
+            components[cid] = {"mass": float(cad_parts[cid]["mass"]), "source": "pulled"}
         wires: dict[str, dict[str, Any]] = {}
         estimated_wires = 0
         for harness in self.spec.electrical.harnesses:
@@ -906,9 +846,18 @@ def _plot_layout(path: Any, geometry: dict[str, Any], overlaps: list[dict[str, A
 def run(project: Project) -> StageResult:
     start = time.time()
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
-    from r3_model.connections import compile_connections
+    from r3_model.pulled import load_pulled, PullError
+    from r3_model.pulled_view import apply_pulled, require_mass
+    try:
+        pulled = load_pulled(project.root)
+        require_mass(pulled)
+        apply_pulled(project, pulled)
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
+        return result
+    from r3_sim.pulled_connections import pulled_connections
 
-    connections = compile_connections(project)
+    connections = pulled_connections(project)
     result.extend(connections.diagnostics)
     result.metrics["connections"] = len(connections.connections)
     result.artifact("model/connections.json", "json", "Sourced assembly connection capacities and explicit estimates")

@@ -19,6 +19,13 @@ def run(project: Project, scenarios: list[str] | None = None, software_cmd: list
     """Run the scenarios (all by default) and aggregate diagnostics, metrics and artifacts."""
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
     started = time.monotonic()
+    from r3_model.pulled import PullError, load_pulled
+    from r3_model.pulled_view import apply_pulled
+    try:
+        apply_pulled(project, load_pulled(project.root))
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
+        return result
     from .load_cases import all_scenarios
 
     selected = [s for s in all_scenarios(project) if scenarios is None or s.id in scenarios]

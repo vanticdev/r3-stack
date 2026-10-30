@@ -63,6 +63,8 @@ def resolve_material(catalog: Any, text: str | None) -> Any | None:
 
 def select_parts(project: Project, result: StageResult) -> dict[str, PrintedPart]:
     """Fabricated components printed in an FDM material; the others are reported as not printed."""
+    from r3_model.pulled import load_pulled
+    pulled = load_pulled(project.root)
     fab = project.spec.fabrication
     catalog = project.catalog
     printed: dict[str, PrintedPart] = {}
@@ -74,17 +76,17 @@ def select_parts(project: Project, result: StageResult) -> dict[str, PrintedPart
             continue
         ctype = catalog.component(comp.type)
         options = dict(fab.parts.get(cid, {}))
-        if not ctype.mechanical.fabricated and "material" not in options:
+        if cid not in pulled.parts or pulled.parts[cid].purchased:
             continue
         if options.get("print") is False:
             not_printed[cid] = f"{ctype.mechanical.material or 'unknown material'} (print: false)"
             continue
-        text = ctype.mechanical.material or ""
+        text = pulled.parts[cid].material or ""
         material, source = None, ""
         if options.get("material"):
             material, source = resolve_material(catalog, str(options["material"])), "fabrication.parts override"
         if material is None:
-            material, source = resolve_material(catalog, text), "catalog mechanical.material"
+            material, source = resolve_material(catalog, text), "pulled material"
         if material is None and fab.material and (not text or any(word in text.lower() for word in GENERIC_PRINTED)):
             material, source = resolve_material(catalog, fab.material), "fabrication.material default"
         if material is None or material.process != "fdm":
@@ -108,7 +110,8 @@ def load_cases(project: Project) -> tuple[list[dict[str, Any]], bool]:
 
 
 def _cad_parts(project: Project) -> dict[str, Any]:
-    data = project.read_build_json("cad/cad_model.json") or {}
+    from r3_model.pulled_view import cad_view
+    data = cad_view(project, mass_required=True)
     return data.get("parts", {}) if isinstance(data, dict) else {}
 
 
@@ -297,6 +300,13 @@ def process_part(project: Project, part: PrintedPart, printer: Any, cases: list[
 def run(project: Project) -> StageResult:
     started = time.time()
     result = StageResult(stage=STAGE, inputs=project.fingerprint())
+    from r3_model.pulled import PullError, load_pulled
+    from r3_model.pulled_view import apply_pulled
+    try:
+        apply_pulled(project, load_pulled(project.root))
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
+        return result
     fab = project.spec.fabrication
     out_dir = project.build_dir(STAGE)
     printer = project.catalog.printers.get(fab.printer)

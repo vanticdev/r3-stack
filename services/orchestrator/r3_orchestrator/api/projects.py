@@ -263,15 +263,17 @@ def model_view(ref: ProjectRef) -> dict[str, Any]:
 def cad_view(ref: ProjectRef) -> dict[str, Any]:
     project = load(ref)
     build = ref.root / "build"
-    model = _read_json(build / "cad" / "cad_model.json")
+    from r3_model.pulled_view import cad_view as pulled_view
+    from r3_model.pulled import PullError
+    try:
+        model = pulled_view(project)
+        authority = {"ready": True, "code": "cad_pulled", "message": "Pinned pulled CAD"}
+    except PullError as error:
+        model = None
+        authority = {"ready": False, "code": error.code, "message": str(error)}
     meshes: dict[str, str] = {}
-    if isinstance(model, dict):
-        for cid, part in (model.get("parts") or {}).items():
-            mesh = part.get("mesh") if isinstance(part, dict) else None
-            if mesh and (build / "cad" / mesh).exists():
-                meshes[cid] = artifact_url(ref.id, f"cad/{mesh}")
-    for path in _files(build, "cad/meshes", (".stl", ".glb", ".obj")):
-        meshes.setdefault(Path(path).stem, artifact_url(ref.id, path))
+    if model:
+        meshes = {cid: artifact_url(ref.id, f"cad/{part['mesh']}") for cid, part in model["parts"].items()}
     lock = project.lock.get("cad") or {}
     source = (model or {}).get("source") or {}
     urls = {"document": lock.get("url")}
@@ -281,7 +283,7 @@ def cad_view(ref: ProjectRef) -> dict[str, Any]:
         urls["document"] = urls["document"] or f"https://cad.onshape.com/documents/{did}/w/{wid}"
         if source.get("element_id"):
             urls["part_studio"] = f"https://cad.onshape.com/documents/{did}/w/{wid}/e/{source['element_id']}"
-    return {"cad_model": model, "meshes": meshes, "onshape": {**urls, "lock": lock},
+    return {"authority": authority, "cad_model": model, "meshes": meshes, "onshape": {**urls, "lock": lock},
             "views": _urls(ref.id, _files(build, "cad", IMAGE_SUFFIXES)),
             "result": _stage_block(project, ref.id, "cad", project.fingerprint()),
             "missing": [] if model else ["cad_model"]}

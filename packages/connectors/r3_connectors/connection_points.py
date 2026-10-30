@@ -19,23 +19,10 @@ from .frames import Frame
 
 
 def _envelopes(project: Project) -> dict[str, tuple[np.ndarray, np.ndarray, str]]:
-    from r3_wiring.obstacles import _catalog_shape
-
-    cad = project.read_build_json("cad/cad_model.json") or {}
-    parts = cad.get("parts", {})
-    envelopes = {}
-    for cid, comp in project.spec.components.items():
-        if comp.type not in project.catalog.components:
-            continue
-        part = parts.get(cid, {})
-        if "bbox_min" in part and "bbox_max" in part:
-            lo, hi = np.asarray(part["bbox_min"], float), np.asarray(part["bbox_max"], float)
-            source = "cad_aabb"
-        else:
-            lo, hi = _catalog_shape(project, cid).aabb()
-            source = "catalog_aabb"
-        envelopes[cid] = (lo, hi, source)
-    return envelopes
+    from r3_model.pulled import load_pulled
+    from r3_model.pulled_view import world_mesh
+    pulled = load_pulled(project.root)
+    return {name: (*world_mesh(pulled, name).bounds, "pulled_aabb") for name in pulled.parts}
 
 
 def _access(points: list[dict[str, Any]], envelopes: dict[str, tuple[np.ndarray, np.ndarray, str]]) -> None:
