@@ -35,7 +35,10 @@ plastic interference. The legacy offline header solid rounds its top by 4 um,
 so its fit report reads 5.774 mm insertion; the measured source datum gives
 **5.770 mm**. This distinction is retained in the proof test, without changing
 the fit tolerance. Zero Pi/HAT boolean intersection is verified in that offline
-fit model. The manufacturer's full tolerance stack remains unavailable.
+fit model. An independent Open CASCADE read of the official STEP finds all 40 square
+posts at Z = 9.876000 mm (spread below 0.000001 mm); the compiled socket mouth
+is Z = 4.106000 mm in the same frame, confirming 5.770000 mm engagement.
+The manufacturer's full tolerance stack remains unavailable.
 
 Sources: official Raspberry Pi STEP RP-010083-CA-1 (pinned catalog SHA-256);
 [norelem DIN 988 dimension table](https://norelem.co.uk/medias/07522-Datasheet-32778-Shim-washers-DIN-988-en.pdf)

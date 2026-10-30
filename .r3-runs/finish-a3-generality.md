@@ -31,3 +31,12 @@ unrelated connector with asymmetric contacts. The audit's targeted run passed
 10 tests in 1.57 s; all 13 migrated proxy specifications compared equal before
 and after migration. Full-suite and integrated-stage evidence is reported
 separately; these tests do not establish manufacturing release.
+
+Follow-up after the measured-part merge: asymmetric mount patterns now accept
+an explicit dimensionless 2 x 2 coordinate transform; the fixture test uses an
+unrelated sensor. Source-only custom purchased parts now use Open CASCADE to
+read unchanged STEP solids and analytic faces in both offline CAD and assembly
+checks. A synthetic supplied plate proves the real bore, thickness and seat
+face survive; source-only purchased parts cannot be silently mirrored. No robot,
+harness, connector or component IDs occur in these new code paths. The models
+extra now declares cadquery-ocp (already installed in the shared environment).
