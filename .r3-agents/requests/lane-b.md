@@ -96,10 +96,31 @@ it alternates 1460/1484 us for 3 s, then neutral. Both pulses remain outside
 the ESC's neutral band, so modulation does not arm reverse. Its servo remains
 on the Pi's PWM path; the tested Pi-hang mission was driving straight.
 
-With real Pi firmware and the copied integration wiring, the final control
-settings pass: full_throttle 8.519 m/s; top_speed_failsafe 8.340 m from
-8.512 m/s, maximum unwrapped yaw 0.077 deg; pi_hang 2.820 m from 3.995 m/s,
-yaw 0.049 deg, heartbeat-to-arbiter latency 70 ms. The 9 m / 3 m stop limits
+With real Pi firmware and freshly generated wiring after merging integration
+through 8b35426, the final control settings pass: full_throttle 8.490 m/s;
+top_speed_failsafe 8.424 m from 8.483 m/s, maximum unwrapped yaw 0.474 deg;
+pi_hang 2.847 m from 3.995 m/s, yaw 0.064 deg, heartbeat-to-arbiter latency
+70 ms. The 9 m / 3 m stop limits
 and 8 m/s minimum speed are unchanged. Both failsafe scenarios now enforce
 a 30 deg maximum yaw through the end of the run. Hardware brake pulse
 strength is a twin-tested setting, still requiring ESC bench calibration.
+
+The merged connector-body check confirms minimum Pi surface clearances of
+14.286 mm for `power_y.P3`, 15.612 mm for `rx_lead.B`, and 15.612 mm for
+`imu_lead.A`. The original RX conductor/Pi intersection is also gone.
+The provisional IMU lead still requires lane A's final route: its conductor
+intersects the Pi by 2.0 mm in the static audit and `steering_sweep` measures
+-0.13 mm against the gearbox (required 8 mm). Do not release this harness.
+
+The integration electrical test failures were real DC-equilibrium errors:
+ngspice's transient operating-point fallback retained motor-inductor voltage
+and an unsettled battery RC state. Operating-point netlists now use the DC
+equivalents and alterable sources; transient netlists retain their dynamic
+elements and callbacks. The hand calculation finds motor leads by graph
+topology. Neither its tolerance nor the fuse-short assertions were weakened.
+
+See [the finish-b2 report](../../.r3-runs/finish-b2.md) for final validation,
+remaining layout findings, and the complete commit list.
+Final full suite: 731 passed in 1672.20 s; web typecheck passes and Vitest
+68 passed. All seven real-firmware scenarios ran: six pass, with only the
+provisional IMU route failing steering clearance as quantified above.
