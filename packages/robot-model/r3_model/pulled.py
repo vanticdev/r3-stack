@@ -105,6 +105,8 @@ def load_pulled(project_root: Path) -> PulledModel:
     root = Path(project_root).resolve()
     folder = root / "cad" / "pulled"
     manifest = folder / "pull.json"
+    if root not in folder.resolve().parents:
+        raise PullError("cad_pull_invalid", "cad/pulled escapes the project root")
     if not manifest.is_file():
         raise PullError("cad_pull_missing", "No pulled CAD. Model and mate in Onshape, then run r3 cad pull.")
     try:
@@ -116,11 +118,21 @@ def load_pulled(project_root: Path) -> PulledModel:
         data = json.loads(manifest.read_text())
         if data["schema"] != SCHEMA or not data["document_id"] or not data["version_id"]:
             raise PullError("cad_pull_invalid", "CAD requires a pinned Onshape document and version")
+        if not data["parts"]:
+            raise PullError("cad_pull_invalid", "Pulled CAD contains no parts")
+        pin = lock["cad_pull"]
+        for key in ("document_id", "version_id"):
+            if key in pin and pin[key] != data[key]:
+                raise PullError("cad_pull_modified", f"Pinned {key} differs from the manifest")
         parts = {}
         for name, item in data["parts"].items():
             if not name or item.get("name", name) != name:
                 raise PullError("cad_pull_invalid", f"Invalid part identity {name!r}")
             hashes = item["sha256"]
+            if set(hashes) != {"stl", "step"} or not all(isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdef" for c in v) for v in hashes.values()):
+                raise PullError("cad_pull_invalid", f"{name}: expected STL and STEP SHA-256 hashes")
+            if type(item["purchased"]) is not bool:
+                raise PullError("cad_pull_invalid", f"{name}: purchased must be a boolean")
             mass = item.get("mass")
             if mass is not None and (not np.isfinite(mass) or mass <= 0):
                 raise PullError("cad_pull_invalid", f"{name}: mass must be finite and positive")
@@ -145,6 +157,8 @@ def load_pulled(project_root: Path) -> PulledModel:
             ids.add(item["id"])
             mates.append(PulledMate(item["id"], item["kind"], *ends,
                 _numbers(item.get("axis"), 3, "mate axis"), _numbers(item.get("limits"), 2, "mate limits")))
+        for item in data.get("images", []):
+            _file(folder, item["path"], item["sha256"], "viewport evidence")
         return PulledModel(data["document_id"], data["version_id"], parts, mates, poses)
     except PullError:
         raise

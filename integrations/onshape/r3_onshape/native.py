@@ -6,7 +6,6 @@ Writes are submitted exactly once. Unknown outcomes require inspection.
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import re
 import time
@@ -75,6 +74,10 @@ class NativeCadTransport:
                    "assembly_feature", "open_document", "editor_tab", "artifact_page"}
         if tool not in allowed:
             raise PullError("cad_native_route_forbidden", f"Unsupported local operation {tool!r}")
+        from .policy import check_request
+        check_request("POST", "/local/" + tool, arguments)
+        if str(arguments.get("element_type", "")).lower() == "featurestudio":
+            raise PullError("cad_native_route_forbidden", "Feature Studios are disabled")
         result = json.loads(self._request("POST", "/local/" + tool, arguments, timeout=300))
         if result.get("error"):
             raise PullError("cad_native_request_failed", str(result["error"]))
