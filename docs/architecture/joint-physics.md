@@ -132,3 +132,16 @@ vibration, arbitrary scenarios and a stationary two-link arm using the public as
 vehicle dynamics and HAL performance checks use an intact generic mounting bench, while the actual
 reference robot's unqualified connections remain failures. Never repair the reference design inside
 the simulator or suppress its diagnostics to recover a legacy pass.
+
+## Already-failed runs and replay
+
+`simulation.joint_failure_replay_duration` defaults to 2 seconds after the first
+irreversible `joint_failed` or `part_detached` event. All native load, contact,
+detachment and cable checks continue during this fully coupled replay tail.
+A shortened case reports `scenario_incomplete`, `simulation_complete: false`,
+and a `joint_failure_stop` event. Every expectation is non-qualifying when its
+requested time window is incomplete. It cannot pass the scenario or release gate.
+Healthy designs still run the full requested duration. Set this field to `null`,
+or pass `--full-duration` to `r3_sim_worker`, to continue a failed assembly for the
+entire case. The two-second tail is a recording/runtime policy, not an engineering
+allowable or a substitute for the sustained vibration requirement.

@@ -187,6 +187,7 @@ def run_scenario(
     out_dir.mkdir(parents=True, exist_ok=True)
     wall_start = time.monotonic()
     kernel = CoSimKernel(project, scenario, seed=seed)
+    kernel.set_failure_replay(project.spec.simulation.joint_failure_replay_duration)
     radio_cache = kernel.prepare_radio()
     if progress and radio_cache:
         progress(f"{scenario_id}: radio path cache " + ", ".join(f"{k} {v['traced']}/{v['keys']} cells in {v['seconds']} s"
@@ -210,13 +211,13 @@ def run_scenario(
     software = _Software(cmd, kernel, server, out_dir / "software.log", project.root)
     kernel.on_brownout = lambda t: None
 
-    duration = kernel.duration
+    duration = float(scenario.duration)
     last_report = 0.0
     hung = False
     from .dynamics import SimulationInstability
 
     try:
-        while kernel.t < duration - 1e-9 and not server.ended:
+        while kernel.t < min(duration, kernel.duration) - 1e-9 and not server.ended:
             if progress and kernel.t - last_report >= min(10.0, max(0.1, duration / 10)):
                 last_report = kernel.t
                 progress(f"{scenario_id}: t={kernel.t:.1f}s / {duration:.0f}s")
@@ -303,6 +304,12 @@ def run_scenario(
         )
         if not kernel.recorder.channels:
             kernel._record(kernel.last_outputs, kernel.vehicle.position())
+    if kernel.t < duration - 1e-9 and kernel.failure_stop_joint is not None:
+        kernel.recorder.events.append(dict(
+            event="joint_failure_stop", t=kernel.t, joint=kernel.failure_stop_joint,
+            requested_s=duration, replay_tail_s=kernel.failure_replay_seconds,
+            message="Stopped after an irreversible joint failure and its coupled replay tail; remaining checks cannot qualify.",
+        ))
     if kernel.t < duration - 1e-9:
         diagnostics.append(Diagnostic.error(
             "scenario_incomplete",
@@ -395,6 +402,10 @@ def _finish(
         "snr_required_db": radio.snr_required_db,
     }
     checks = evaluate(scenario.expect or {}, rec, context)
+    if kernel.t < float(scenario.duration) - 1e-9:
+        for check in checks:
+            check.passed = False
+            check.detail += "; requested time window incomplete; cannot qualify"
     for check in checks:
         if check.passed:
             continue
@@ -444,6 +455,7 @@ def _finish(
         "min_wire_clearance_m": (round(kernel.min_wire_clearance[0], 5) if math.isfinite(kernel.min_wire_clearance[0]) else None),
         "min_wire_clearance_wire": kernel.min_wire_clearance[1], "min_wire_clearance_component": kernel.min_wire_clearance[2],
         "physics_timestep_s": float(kernel.vehicle.model.opt.timestep), "physics_substeps": kernel.vehicle.substeps,
+        "requested_duration_s": float(scenario.duration), "simulation_complete": kernel.t >= float(scenario.duration) - 1e-9,
         "vehicle_mass_kg": round(kernel.vm.total_mass, 4), "sim_time_s": round(kernel.t, 3), "wall_time_s": round(wall, 2),
         "realtime_factor": round(kernel.t / wall, 2) if wall > 0 else None,
         # Setup (model build, cable layout and settling) is a fixed cost; the loop factor is what

@@ -164,6 +164,8 @@ class CoSimKernel:
         self.assumptions: list[tuple[str, str]] = []
         self.step_index = 0
         self.duration = float(scenario.duration)
+        self.failure_replay_seconds: float | None = None
+        self.failure_stop_joint: str | None = None
         initial = scenario.initial or {}
         pose = initial.get("pose", [0.0, 0.0, 0.0])
         self.initial_pose = (to_si(pose[0]), to_si(pose[1]), to_si(pose[2]) if len(pose) > 2 else 0.0)
@@ -758,6 +760,20 @@ class CoSimKernel:
         if self.steering:
             vehicle.step_servo(0, self.dt, servo_pulse, servo_v)
 
+    def set_failure_replay(self, seconds: float | None) -> None:
+        """End only already-failed runs after a replay tail; never qualify a prefix."""
+        self.failure_replay_seconds = seconds
+        self._update_failure_deadline()
+
+    def _update_failure_deadline(self) -> None:
+        if self.failure_replay_seconds is None or self.failure_stop_joint is not None:
+            return
+        failure = next((event for event in self.vehicle.joints.events
+                        if event.get("event") in ("joint_failed", "part_detached")), None)
+        if failure is not None:
+            self.failure_stop_joint = failure["joint"]
+            self.duration = min(self.duration, float(failure["t"]) + self.failure_replay_seconds)
+
     def step(self) -> None:
         """One master step, serially except that mj_step1 runs while the circuit is solved."""
         t0 = self.t
@@ -827,6 +843,7 @@ class CoSimKernel:
     def _post(self, t0: float, out: dict[str, Any], state: Any) -> None:
         """Steps 5-8 after the MuJoCo step: cable clearance, radio, sensors, UARTs, recording.
         ``state`` is the vehicle or a snapshot of it taken right after the step."""
+        self._update_failure_deadline()
         dt, t1 = self.dt, self.t
         position = state.position()
         rotation = state.rotation()

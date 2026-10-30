@@ -26,6 +26,7 @@ def main() -> int:
     parser.add_argument("--authored-only", action="store_true")
     parser.add_argument("--scenario", action="append")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--full-duration", action="store_true", help="Continue after joint failures (new-layer checkouts only)")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
@@ -53,13 +54,16 @@ def main() -> int:
         if args.resume and summary_path.exists():
             candidate = json.loads(summary_path.read_text())
             inputs = candidate.get("inputs", {})
-            if all(inputs.get(key) == value for key, value in fingerprint.items() if key != "git_commit"):
+            if (all(inputs.get(key) == value for key, value in fingerprint.items() if key != "git_commit")
+                    and (not args.full_duration or candidate["metrics"]["sim_time_s"] >= float(case.duration) - 0.0005)):
                 summary, reused = candidate, True
         code = int(not summary["passed"]) if reused else 0
         worker_started = time.monotonic()
         if summary is None:
             summary_path.unlink(missing_ok=True)
             command = [sys.executable, "-m", "r3_sim_worker", str(project.root), "--scenario", case.id, "--no-render"]
+            if args.full_duration and hasattr(project.spec.simulation, "joint_failure_replay_duration"):
+                command.append("--full-duration")
             with (folder / (case.id + ".log")).open("w") as log:
                 code = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT).returncode
             if summary_path.exists():
@@ -69,6 +73,7 @@ def main() -> int:
         metrics = summary["metrics"]
         return case.id, {
             "worker_exit": code, "reused": reused, "passed": summary["passed"],
+            "stopped_after_joint_failure": any(event.get("event") == "joint_failure_stop" for event in summary.get("events", [])),
             "requested_s": float(case.duration), "simulated_s": metrics["sim_time_s"],
             "wall_s": metrics["wall_time_s"], "setup_s": metrics["setup_time_s"],
             "worker_wall_s": time.monotonic() - worker_started if not reused else None,

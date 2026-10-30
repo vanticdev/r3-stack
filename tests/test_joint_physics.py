@@ -752,3 +752,26 @@ def test_early_software_shutdown_cannot_qualify(tmp_path: Path) -> None:
     assert "scenario_incomplete" in {diagnostic.code for diagnostic in outcome.diagnostics}
     assert outcome.summary["metrics"]["sim_time_s"] < 0.2
     assert (project.root / "build/sim/early_exit/recording.npz").exists()
+
+
+@pytest.mark.parametrize("nut,tail,expected", [(True, 0.02, 0.08), (False, 0.02, 0.02), (False, None, 0.08)])
+def test_failed_case_replay_tail_never_qualifies_a_prefix(tmp_path, nut, tail, expected):
+    from r3_model.spec import Scenario
+    from r3_sim.scenario import run_scenario
+
+    project = fixture_project(tmp_path, nut=nut)
+    project.spec.simulation.joint_failure_replay_duration = tail
+    project.spec.simulation.scenarios.append(Scenario(id="tail", duration=0.08, expect={"brownouts": 0}))
+    outcome = run_scenario(project, "tail", render=False)
+    assert outcome.summary["metrics"]["sim_time_s"] == pytest.approx(expected)
+    if nut:
+        assert outcome.passed
+    else:
+        assert not outcome.passed
+        assert "joint_capacity_zero" in {d.code for d in outcome.diagnostics}
+    if expected < 0.08:
+        assert "scenario_incomplete" in {d.code for d in outcome.diagnostics}
+        assert not any(check["pass"] for check in outcome.summary["checks"])
+        assert any(event["event"] == "joint_failure_stop" for event in outcome.summary["events"])
+    else:
+        assert outcome.summary["metrics"]["simulation_complete"]
