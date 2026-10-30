@@ -42,8 +42,8 @@ components:
       power_lead_post: {kind: hole_pattern, origin: [50 mm, -44 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
       cap_motor_lead_post: {kind: adhesive_pad, origin: [-55 mm, 47 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       cap_power_lead_post: {kind: adhesive_pad, origin: [50 mm, -44 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
-      encoder_lead_post: {kind: hole_pattern, origin: [-65 mm, -59 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}}
-      cap_encoder_lead_post: {kind: adhesive_pad, origin: [-65 mm, -59 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
+      encoder_lead_post: {kind: hole_pattern, origin: [-78.20718 mm, -62 mm, 3 mm], params: {holes: [[0, 0, 3.4 mm, clearance, 3 mm]]}, x: [1, 0, 0], z: [0, 0, 1]}
+      cap_encoder_lead_post: {kind: adhesive_pad, origin: [-78.20718 mm, -62 mm, 0], x: [1, 0, 0], z: [0, 0, -1]}
       # ESC beside the battery (left), clear of the motor's bullet terminals, which point +y off the end bell.
       esc_pad: {kind: adhesive_pad, origin: [-7 mm, 47 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0], params: {area: 1408 mm^2}}
       # Battery 17 mm aft of the servo posts' line: its 12 AWG lead (16 mm bend radius) turns back clear of post A.
@@ -894,7 +894,7 @@ components:
       OUT: {role: gpio, logic_level: 3.3}
       GND: {role: ground}
     connectors:
-      J1: {type: integral, position: [-6 mm, 3 mm, 2 mm], direction: [-1, 0, 0], pins: {"1": VCC, "2": OUT, "3": GND}}
+      J1: {type: integral, position: [-6 mm, 3 mm, 2 mm], direction: [-0.707106781, 0.707106781, 0], pins: {"1": VCC, "2": OUT, "3": GND}}
     behavior:
       model: encoder.hall
       params: {pulses_per_wheel_rev: 4, output: open_drain_active_low, jitter: 20 us, die_depth: 0.5 mm, b_op_max: 0.0175,
@@ -1632,13 +1632,81 @@ components:
   - id: encoder-lead-post-petg
     extends: lead-post-petg
     cad_name: Encoder cable post
-    name: Printed encoder cable tie post, PETG, 7 x 80 mm
-    description: Chassis-mounted post beside the deck edge; ties bound the encoder lead's vertical climb away from the gearbox.
+    name: Printed encoder lead tower with raised return rail and tie collars
+    description: Capped chassis-mounted tower holds the Hall lead clear of the gearbox
+      lid under vibration.
     mechanical:
-      size: [7 mm, 80 mm]
-      mass: 0.0039
+      size:
+      - 11 mm
+      - 57 mm
+      - 110 mm
+      mass: 0.008
       solids:
-        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 80 mm}
+      - kind: cylinder
+        name: tower
+        position:
+        - 0
+        - 0
+        - 0
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 7 mm
+        length: 110 mm
+      - kind: cylinder
+        name: upper lead rail
+        position:
+        - 0
+        - 0
+        - 92 mm
+        axis:
+        - 0
+        - 1
+        - 0
+        diameter: 7 mm
+        length: 50 mm
+      - kind: cylinder
+        name: tie collar 1
+        position:
+        - 0
+        - 0
+        - 29.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+      - kind: cylinder
+        name: tie collar 2
+        position:
+        - 0
+        - 0
+        - 75.4 mm
+        axis:
+        - 0
+        - 0
+        - 1
+        diameter: 11 mm
+        length: 1.2 mm
+      - kind: cylinder
+        name: rail tie collar
+        position:
+        - 0
+        - 36.4 mm
+        - 92 mm
+        axis:
+        - 0
+        - 1
+        - 0
+        diameter: 11 mm
+        length: 1.2 mm
+      shape: custom
+      envelope_offset:
+      - 0
+      - 25 mm
+      - 0
   - id: sensor-lead-post-petg
     extends: lead-post-petg
     cad_name: Sensor cable post
