@@ -363,7 +363,7 @@ class Pcb(_Model):
 
 class Cad(_Model):
     provider: Literal["onshape", "none"] = "onshape"
-    generator: str | None = Field(default=None, description="Project-relative FeatureScript/CAD source.")
+    generator: str | None = Field(default=None, description="Legacy project CAD generator reference; the supported CAD path uses standard Onshape features, never FeatureScript.")
     folder: str | None = Field(default=None, description="Provider folder id where documents are created.")
     document_name: str | None = None
     parts: dict[str, str] = Field(default_factory=dict, description="component id -> CAD part name.")
@@ -449,7 +449,33 @@ class Scenario(_Model):
     expect: dict[str, Any] = Field(default_factory=dict, description="Pass criteria evaluated on the recording.")
 
 
+class DeviceProvenance(_Model):
+    status: Literal["estimated", "datasheet", "measured"] = "estimated"
+    source: str = ""
+    notes: str = ""
+
+    @model_validator(mode="after")
+    def sourced(self) -> "DeviceProvenance":
+        if self.status != "estimated" and not self.source.strip():
+            raise ValueError("qualified device models need a source or calibration reference")
+        return self
+
+
+class ProjectDeviceSpec(_Model):
+    """Project-owned device bridge using native simulators and the HAL extension API."""
+
+    component: str
+    source: str = Field(pattern=r"^simulation/.+\.py$")
+    factory: str = Field(default="create_device", pattern=r"^[A-Za-z_]\w*$")
+    electrical_factory: str | None = Field(default=None, pattern=r"^[A-Za-z_]\w*$")
+    params: dict[str, Any] = Field(default_factory=dict)
+    provenance: DeviceProvenance = Field(default_factory=DeviceProvenance)
+
+
 class Simulation(_Model):
+    devices: dict[str, ProjectDeviceSpec] = Field(default_factory=dict, description=(
+        "Project Python device bridges. Source stays under simulation/; factories implement r3_sim.project_devices. "
+        "Existing physics, circuit solvers and release checks remain authoritative."))
     base_mount: Literal["auto", "free", "fixed"] = Field(default="auto", description="auto fixes a stationary base to the world; drop cases release the test fixture.")
     joint_failure_replay_duration: Quantity | None = Field(default=None, gt=0, description="Optional replay-only cutoff after an irreversible joint failure; default null runs the full requested duration. Truncated evidence always fails.")
     timestep: Quantity = 0.001

@@ -50,7 +50,7 @@ def verify_rated_internal(checker: FitChecker, interface: Any, info: dict[str, A
             or (rating.motion == 'translational' and join.kind != 'slider')):
         checker.err('rated_joint_scope_invalid', f'{interface.id}: interfaces do not identify the rated factory joint', parts)
         return None
-    entries = [bank_entry(c) for c in (a, b)]
+    entries = [bank_entry(c, checker.project) for c in (a, b)]
     sources = [next((s for s in e.sources if s.direct and not s.requires_login and s.sha256 and s.solid_indices), None)
                if e else None for e in entries]
     s0, s1 = sources

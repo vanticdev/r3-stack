@@ -165,6 +165,10 @@ class VirtualHal(Hal):
     def log(self, level: str, message: str, **fields: object) -> None:
         self._conn.call("log", level=level, message=message, fields=fields)
 
+    def device_request(self, device: str, operation: str, payload: dict | None = None, timeout: float = 0.0) -> dict:
+        return self._conn.call("device.request", device=device, operation=operation,
+                               payload=payload or {}, timeout=timeout)["result"]
+
     def bindings(self) -> dict[str, dict]:
         return dict(self._bindings)
 

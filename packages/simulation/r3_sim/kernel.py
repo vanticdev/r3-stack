@@ -396,6 +396,8 @@ class CoSimKernel:
         self.temperature_c = env.ambient_temperature_c
         self.on_brownout: Callable[[float], None] | None = None
         self.on_power_restored: Callable[[float], None] | None = None
+        from .project_devices import create_devices
+        self.project_devices = create_devices(self)
 
     # ------------------------------------------------------------------ setup helpers
     def _setup_rtk(self, project: Project, radio_scene: Any) -> None:
@@ -914,6 +916,8 @@ class CoSimKernel:
             uart.deliver(t1)
         for camera in self.cameras.values():
             camera.sample(t1, state)
+        for context, device in self.project_devices.values():
+            device.step(t1 - t0)
         # 8. record.
         if t1 + 1e-9 >= self._next_record:
             self._next_record += RECORD_PERIOD
@@ -1006,7 +1010,7 @@ class CoSimKernel:
                 return "freeze"
             if self.t >= end - 1e-9:
                 return "end" if self.t >= self.duration - 1e-9 else "done"
-            if deadline is not None and self.vehicle.overlapped:
+            if deadline is not None and self.vehicle.overlapped and not self.project_devices:
                 frozen_by = self.freeze_at if self.freeze_at is not None and not self.software_frozen else math.inf
                 steps = self._steps_until(min(deadline, frozen_by), end)
                 if steps > 1:

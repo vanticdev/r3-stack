@@ -346,12 +346,16 @@ def put_catalog_component(project_path: str | Path | None, entry: dict[str, Any]
     if dry_run:
         return payload
     path.parent.mkdir(parents=True, exist_ok=True)
+    previous = path.read_bytes() if path.exists() else None
     body = component.model_dump(mode="json", exclude_defaults=True, by_alias=True)
     path.write_text("# Project-local catalog entry (written by r3_put_catalog_component); record provenance for every number.\n"
                     + yaml.safe_dump({"components": [body]}, sort_keys=False, allow_unicode=True))
     try:  # the whole project catalog must still load (ids unique, connector types known)
         Project.load(root).catalog
     except Exception as error:  # noqa: BLE001 - report and roll back
-        path.unlink()
+        if previous is None:
+            path.unlink()
+        else:
+            path.write_bytes(previous)
         return {"ok": False, "code": "catalog_entry_invalid", "errors": [f"{type(error).__name__}: {error}"]}
     return payload

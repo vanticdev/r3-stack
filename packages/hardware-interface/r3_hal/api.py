@@ -140,6 +140,10 @@ class Hal(abc.ABC):
         """Open the camera on a CSI port (``cam0``/``cam1``; robot.yaml ``csi`` binding ``device``)."""
         raise HalError("not_supported", "this backend has no camera support")
 
+    def device_request(self, device: str, operation: str, payload: dict | None = None, timeout: float = 0.0) -> dict:
+        """Project-defined device operation. Physical backends require the project's vendor driver."""
+        raise HalError("not_supported", "project devices need a physical vendor-driver adapter on this backend")
+
     def log(self, level: str, message: str, **fields: object) -> None:
         print(f"[{level}] {message} {fields if fields else ''}", flush=True)
 

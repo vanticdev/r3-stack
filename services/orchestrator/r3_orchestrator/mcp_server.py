@@ -18,12 +18,13 @@ so tests and other Python code can call them directly.
 from __future__ import annotations
 
 from typing import Any
+import json
 
 try:  # mcp >= 2 renamed FastMCP to MCPServer
     from mcp.server.mcpserver import MCPServer as _Server
 except ImportError:  # pragma: no cover - mcp 1.x
     from mcp.server.fastmcp import FastMCP as _Server
-from mcp.types import ToolAnnotations
+from mcp.types import ToolAnnotations, CallToolResult, ImageContent, TextContent
 
 from . import api, spec_ops
 from .cli import configure_headless
@@ -171,6 +172,43 @@ def r3_guide() -> dict[str, Any]:
     interfaces, CAD (standard features only), wiring, electrical, firmware with r3_hal, sim scenarios, the release
     gate, the policies and every tool. Read it before starting a new robot."""
     return api.guide()
+
+
+@_tool(_READ)
+def r3_get_schema(domain: str = "robot") -> dict[str, Any]:
+    """Typed authoring reference. Domains: robot, component, connector, wire, device, model."""
+    from r3_model.spec import RobotSpec, ProjectDeviceSpec
+    from r3_catalog.schema import ComponentType, ConnectorType, WireGauge
+    from r3_catalog.modelbank.schema import ModelEntry
+
+    schema = {"robot": RobotSpec, "component": ComponentType, "connector": ConnectorType, "wire": WireGauge,
+              "device": ProjectDeviceSpec, "model": ModelEntry}.get(domain)
+    return {"ok": True, "schema": schema.model_json_schema()} if schema else {"ok": False, "code": "usage_error", "message": "use robot, component, connector, wire, device or model"}
+
+
+@_tool(_READ)
+def r3_cad_plan(project: str = "") -> dict[str, Any]:
+    """Offline standard-feature plan and estimated Onshape quota calls. Does not build CAD or claim measured geometry."""
+    from r3_onshape.dry_run import rebuild_plan
+
+    return _guard(lambda: {"ok": True, "plan": rebuild_plan(api.load_project(project or None))})
+
+
+@_tool(_DESIGN)
+def r3_run_project_tests(project: str = "") -> dict[str, Any]:
+    """Run this project's tests/test_*.py with pytest, store logs/JUnit under build/tests, and preserve all standard checks."""
+    return _guard(lambda: api.run_stage(project or None, "tests"))
+
+
+@_tool(_READ)
+def r3_view_artifact(path: str, project: str = "") -> Any:
+    """See an actual build PNG/JPEG as an MCP image (e.g. cad/views/iso.png), rather than base64 text."""
+    result = _guard(lambda: api.get_artifact(project or None, path))
+    if not result.get("ok") or result.get("mime") not in ("image/png", "image/jpeg") or "base64" not in result:
+        return result if not result.get("ok") else {"ok": False, "code": "artifact_not_image", "message": "choose an inline PNG/JPEG artifact"}
+    data = result.pop("base64")
+    return CallToolResult(content=[TextContent(type="text", text=json.dumps(result)),
+                                   ImageContent(type="image", mimeType=result["mime"], data=data)])
 
 
 @_tool(_DESIGN)

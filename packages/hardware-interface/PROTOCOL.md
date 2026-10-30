@@ -42,6 +42,7 @@ base64 strings (`"encoding": "base64"`).
 | `camera.configure` | `port` (`cam0`/`cam1`, the `csi` binding `device`), `width`, `height`, `fps`, `format` (`rgb888`/`gray8`) | `width`, `height`, `fps`, `format`, `intrinsics` (`fx`, `fy`, `cx`, `cy` px, `hfov_deg`, `vfov_deg`, `distortion`) |
 | `camera.capture` | `port`, `timeout` | `frame_t` (exposure start), `sequence`, `width`, `height`, `format`, `exposure_s`, `encoding: base64`, `data` (row-major, top row first); blocks until a frame completes |
 | `camera.close` | `port` | – |
+| `device.request` | `device` (`simulation.devices` key), `operation`, `payload` (object), `timeout` | `result` object; waits in lockstep for project device data |
 | `log` | `level`, `message`, `fields` | – (stored in the run recording) |
 | `bye` | – | twin finishes the scenario |
 

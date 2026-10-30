@@ -256,6 +256,9 @@ class ElectricalSystem:
                 continue
             factory = MODELS.get(behavior.model)
             if factory is None:
+                from ..project_devices import electrical_factory
+                factory = electrical_factory(self.project, cid, behavior.model)
+            if factory is None:
                 if powered:
                     self.diagnostics.append(Diagnostic.warning(
                         "behavior_model_unsupported", f"{cid}: behavior model {behavior.model!r} has no electrical implementation",

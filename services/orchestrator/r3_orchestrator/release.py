@@ -147,6 +147,7 @@ class _Context:
         inputs = summary.get("inputs") or {}
         fallbacks = summary.get("fallbacks") or {}
         estimated = [name for name, used in fallbacks.items() if used]
+        estimated.extend(sorted({d.get("code", "") for d in summary.get("diagnostics", []) if d.get("code", "").endswith("_estimated")}))
         if summary.get("estimated_joint_inputs"):
             estimated.append("joint inputs")
         passed = check.get("pass", check.get("passed"))
@@ -414,7 +415,7 @@ def _stage_items(ctx: _Context) -> list[Item]:
         elif stage_runner.status_of(result) == "unavailable":
             item.message = "stage is not installed here"
             item.evidence = [ctx.stage_evidence(name, "stage_unavailable", None, None, None, f"{name}/result.json")]
-        elif (pending := [d for d in result.diagnostics if d.code == "not_configured"]) and result.ok:
+        elif (pending := [d for d in result.diagnostics if d.code in ("not_configured", "onshape_dry_run")]) and result.ok:
             # A section the robot still needs (no assembly for CAD, no scenarios for the twin): nothing was
             # checked, so it cannot count as evidence. ``not_applicable`` (no PCB in a robot without a custom
             # board) is a real pass and falls through to the error count below.

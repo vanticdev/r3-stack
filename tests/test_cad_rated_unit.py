@@ -36,7 +36,7 @@ def unit(monkeypatch):
                                 sha256='a'*64, solid_indices=[i])],
                 placement={'origin': [0, 0, 0], 'x': [1, 0, 0], 'z': [0, 0, 1]},
                 validation=Validation(status='passed')) for i, c in enumerate(catalog.values())}
-    monkeypatch.setattr('r3_onshape.rated_units.bank_entry', lambda c: entries[c.id])
+    monkeypatch.setattr('r3_onshape.rated_units.bank_entry', lambda c, project=None: entries[c.id])
     model = GeometryModel({name: part_from_plan(name, PartPlan(name, 'purchased', 'Steel', 7800., ops=[
         Prism(Plane('TOP'), [Loop.rectangle([-.01, -.01], [.01, .01])], .02)])) for name in components})
     project = SimpleNamespace(spec=SimpleNamespace(components=components, assembly=SimpleNamespace(joins=[join])),

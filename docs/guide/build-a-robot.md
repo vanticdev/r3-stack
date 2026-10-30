@@ -18,6 +18,22 @@ a GitHub repository. The scaffold includes `robot.yaml`, a local `catalog/`, CAD
 folders, a `backend/` for deployable software, agent instructions and a validation workflow.
 No reference robot or previous build directory is required.
 
+An Agent-tab Codex session has a network-enabled shell, live web search, `gh`,
+normal git and the R3 MCP tools. The user message is passed unchanged. Use
+`r3_get_schema(domain="robot"|"component"|"device"|"model")` for the complete
+typed authoring reference, including field descriptions and nested definitions
+(also `connector` and `wire` for project catalog additions).
+Use these tools and this guide; reading platform source is not required.
+
+When the user explicitly requests GitHub publication, initialize a repository
+inside the project (`git init -b main`) before staging files, then use `gh repo
+create <owner>/<name> --private --source . --remote origin --push`. Verify
+`git rev-parse --show-toplevel` names this project, especially when it lives
+inside a checkout of R3. Follow the scaffold's `.gitignore`; never stage `build/`
+or another repository. The session permits networking and writes to its own
+`.git`; other workspace protections remain in effect. Creating the local
+scaffold alone does not authorize publication or physical deployment.
+
 For the web interface, build `apps/web` and run `r3 serve --projects-root <parent-directory>`.
 An empty project root displays an empty project list. Create a project before adding parts.
 The MCP equivalent is `r3_create_project(name="sensor-rig", template="blank")`.
@@ -97,6 +113,26 @@ values and measure any uncertain mechanical interfaces before fabrication.
 Use `owned: true` on parts already on hand. They remain in the model but are excluded
 from purchasing and sourcing; see [owned parts](owned-parts.md).
 
+For public research, use the session's live web search and shell downloads
+(`curl --fail --location URL -o project-file`). Find official datasheets and exact
+vendor CAD, not a visually similar SKU. Record the source URL, license, checksum,
+dimensions, mass and which values are estimated in the project catalog. Add a real
+download with `r3_models_add(name, category, url, license, catalog_component)`;
+for an archive also supply `format="stp.zip"` or `"stp.rar"` and its exact `member`.
+For a public Onshape model, supply its immutable `/documents/D/v/V/e/E` URL as
+`onshape` instead of `url`. A connected browser transport works for local
+development as well as API keys. It must be a public document; keep the source
+unchanged and insert the supplied version.
+
+`r3_models_search(query)` searches the shared bank plus project records;
+`r3_models_fetch(model_id)` downloads a pinned source and reports geometry or a
+specific acquisition error. In a project session, added records live under
+`catalog/modelbank/` and override the read-only platform bank. These human-editable
+R3 records travel with the project. Use the `model` schema when recording reviewed
+datasheet specs, model placement and interface frames. Never invent a passing
+validation status: measured geometry must support the review. Unverified or
+mismatched models remain explicit in CAD diagnostics.
+
 ## 4. Join the assembly
 
 Treat assembly as a geometric puzzle: pair compatible connection sites, declare each join, and let the compiler derive poses and check the fit.
@@ -131,6 +167,29 @@ If no real model exists, an explicitly labelled datasheet proxy remains estimate
 assemblies through the official API transport. No FeatureScript is used. Without a CAD
 transport, diagnostics identify catalog geometry as estimated. Server rendering uses the
 REST shaded-view endpoints.
+
+Create or update your own printed-part type with `r3_put_catalog_component(entry)`.
+The `component` schema describes `mechanical.solids` and `mechanical.features`:
+additive/subtractive boxes, cylinders, prisms and revolutions, holes and other
+supported standard operations. Define connection interfaces at real seating
+faces and hole axes; the assembly compiler derives placement from `assembly.joins`.
+The same tool adds or overrides a purchased component's electrical and software
+metadata. It writes only `catalog/components/` in this project. New connector and
+wire types can be authored in the project's `catalog/connectors.yaml` and
+`catalog/wires.yaml`, using the `connector` and `wire` schemas and existing
+catalog entries as typed examples.
+
+Before building, set `cad.folder` to the user-approved provider folder and
+`cad.document_name` to the project name through `r3_patch_spec`. Call
+`r3_cad_plan` for a quota estimate before `r3_run_stage("cad")`. The offline plan
+does not create or verify geometry. The CAD stage makes the real standard Onshape
+features and editable assemblies, then reads native body details, mass, meshes,
+fits and mates. Read `cad/cad_model.json` and `cad/report.json` through
+`r3_get_artifact`; list `cad/` to find exact artifact names. Use `r3_view_artifact`
+on a file under `cad/views/` to see the actual server-rendered image. Read the
+numeric diagnostics, edit the design through the tools, and run CAD again; pinned
+documents update incrementally. Never edit generated meshes or use an offline
+preview as the real model.
 
 Run `r3 validate --stage fabrication` for printable parts. Review wall thickness, overhangs,
 loads, strength margins, material orientation and manufacturing artifacts. Tests and
@@ -198,6 +257,86 @@ in the coordinated twin. Estimated models and fallbacks remain visible in the ev
 Choose expectations that measure your task: position or joint motion, sensor behavior,
 retention, clearance, supply limits, fault response or other supported quantities. Add
 requirements as the project grows; do not weaken checks to fit a failing design.
+
+### Project-owned devices and tests
+
+When a device is absent from the platform, implement its bridge in this project's
+`simulation/` directory. Do not edit R3 source. Declare it with `r3_patch_spec`:
+
+```yaml
+simulation:
+  devices:
+    instrument:
+      component: fixture
+      source: simulation/instrument.py
+      factory: create_device
+      params: {}
+```
+
+`factory(context)` returns an object with `step(dt)` and
+`request(operation, payload)` methods. `step` runs after each native physics and
+circuit step. `request` returns a JSON object, or `None` until data is ready.
+`context` provides `t` (simulation seconds), `component`, authored `params`, the
+real MuJoCo `model` and `data`, `powered` (from the circuit), and `bindings` (only
+electrically reachable interfaces for that component and computer). Use MuJoCo's
+public APIs for physical observations and vendor SDK semantics for register or
+packet logic. Keep state and clock timing inside the device object. A source path
+or symlink that escapes this project's `simulation/` directory is rejected.
+
+For example, a synthetic fixture position readout can use native rigid-body state:
+
+```python
+import mujoco
+
+class Instrument:
+    def __init__(self, context):
+        self.context, self.ready = context, False
+
+    def step(self, dt):
+        self.ready = self.context.powered
+
+    def request(self, operation, payload):
+        if operation != "position":
+            raise ValueError("unknown operation")
+        if not self.ready:
+            return None
+        c = self.context
+        body = mujoco.mj_name2id(c.model, mujoco.mjtObj.mjOBJ_BODY, c.component)
+        return {"t": c.t, "xyz": c.data.xpos[body].tolist()}
+
+def create_device(context):
+    return Instrument(context)
+```
+
+Firmware calls `hal.device_request("instrument", "position", timeout=0.1)`.
+Waiting advances the same simulation clock as normal HAL sleeps. Missing devices,
+unpowered circuits, unreachable software pins and timeouts remain errors. This
+generic extension is a virtual-device API: physical operation requires your
+project's real vendor-driver implementation. Never substitute simulated data on
+physical hardware.
+
+An electrical device may also declare `electrical_factory` in the same device
+entry, and use catalog `behavior.model: project.instrument`. That factory has
+signature `(component_id, component_type, params, build_context)` and returns an
+`r3_sim.electrical.models.BehaviorModel`. For a measured constant-current load,
+reuse `r3_sim.electrical.models.ConstantLoad(..., model="project.instrument")`
+with the catalog's sourced `current` parameter; for complex circuits integrate
+ngspice through that public model API. Do not implement another domain solver.
+Device logic cannot replace the native rigid-body, circuit or cable solver, or
+change standard checks. Calibration limits and approximation assumptions stay
+visible in the report. Device models default to `provenance.status: estimated`;
+datasheet or measured provenance requires a nonempty source/calibration reference.
+Unqualified behavior stays estimated in release evidence.
+
+Write Python design tests under `tests/test_*.py`. They can assert properties of
+the authored spec, run their own native-simulator experiments, exercise the device
+factory, or inspect the twin's `build/sim/<scenario>/recording.npz` and summary.
+Test real physical quantities and the actual firmware's behavior, not a
+hand-authored success flag. Run them with `r3_run_project_tests`,
+`r3_run_stage("tests")`, or `r3 validate --stage tests`. Full validation runs this
+stage after simulation. Logs and JUnit results are in `build/tests/`; an empty or
+entirely skipped suite cannot pass. Standard pipeline checks remain in force.
+Firmware, device-source and test edits invalidate older release evidence.
 
 ## 9. Iterate to release evidence
 

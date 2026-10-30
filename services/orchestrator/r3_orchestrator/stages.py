@@ -43,6 +43,7 @@ STAGES: tuple[StageSpec, ...] = (
     StageSpec("connectors", "r3_connectors.stage", "Connector and pin geometry: KiCad/vendor models, mated pairs, wire ends on pins"),
     StageSpec("electrical", "r3_sim.electrical.stage", "Static worst-case electrical operating points"),
     StageSpec("sim", "r3_sim.stage", "Multi-domain digital twin scenarios"),
+    StageSpec("tests", "r3_orchestrator.project_tests", "Project-authored Python checks against the design and twin artifacts"),
 )
 REPORT = StageSpec("report", "r3_orchestrator.report_stage", "HTML report and summary.json")
 ALL_STAGES: dict[str, StageSpec] = {s.name: s for s in (*STAGES, REPORT)}

@@ -5,6 +5,9 @@ from pathlib import Path
 import subprocess
 import sys
 import tomllib
+import shutil
+
+import pytest
 
 from r3_orchestrator.environment import r3_pythonpath
 from r3_orchestrator import doctor
@@ -40,3 +43,26 @@ def test_doctor_refuses_unimportable_requested_stage(monkeypatch):
     assert not result["ok"] and result["code"] == "stage_not_importable"
     stage = next(s for s in result["stages"] if s["stage"] == "fabrication")
     assert stage["level"] == "unavailable" and not stage["headless"]
+
+
+@pytest.mark.skipif(sys.platform != "darwin" or shutil.which("codex") is None,
+                    reason="native Codex/Seatbelt integration probe requires macOS and the CLI")
+def test_session_sandbox_can_commit_and_push_its_own_project(tmp_path):
+    from r3_orchestrator.api.agents import codex_permission_profile, _toml
+
+    root = (tmp_path / "synthetic-project").resolve()
+    root.mkdir()
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    remote = root / "synthetic-remote.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+    (root / "probe.txt").write_text("unrelated synthetic session test\n")
+    sandbox = ["codex", "sandbox", "--permission-profile", "r3_session", "-C", str(root), "-c",
+               "permissions.r3_session=" + _toml(codex_permission_profile(root)), "--"]
+    for command in (["git", "add", "probe.txt"],
+                    ["git", "-c", "user.name=R3 Synthetic Test", "-c", "user.email=r3-synthetic@example.invalid", "commit", "-m", "Synthetic probe"],
+                    ["git", "push", str(remote), "HEAD:refs/heads/probe"]):
+        process = subprocess.run([*sandbox, *command], capture_output=True, text=True, timeout=30)
+        assert process.returncode == 0, process.stderr
+    head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    pushed = subprocess.check_output(["git", "--git-dir", str(remote), "rev-parse", "refs/heads/probe"], text=True).strip()
+    assert pushed == head

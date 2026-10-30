@@ -102,7 +102,7 @@ def resolve_step(ref: ModelRef, project: "Project | None" = None) -> Path:
     if ref.params.get("bank_id"):
         from r3_catalog.modelbank import ModelBank
         from r3_catalog.modelbank.fetch import acquire, unpack
-        entry = ModelBank().get(ref.params["bank_id"])
+        entry = ModelBank(project=project.root if project else None).get(ref.params["bank_id"])
         errors = []
         for source in entry.sources:
             if source.format not in ("step", "stp", "stp.zip", "stp.rar") or source.kind == "onshape_public":

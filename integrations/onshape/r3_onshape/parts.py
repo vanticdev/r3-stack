@@ -303,7 +303,7 @@ def build_part_catalog(project: Project) -> tuple[dict[str, LocalPart], dict[str
                 parts[key].source_model = ctype.model.model_copy(deep=True)
         if not ctype.mechanical.fabricated and ctype.kind != "pcb":
             from .purchased import bank_entry
-            entry = bank_entry(ctype)
+            entry = bank_entry(ctype, project)
             if entry and entry.available:
                 parts[key].bank_model = entry.model_dump(mode="json")
                 parts[key].studio = parts[key].name
@@ -338,7 +338,7 @@ def build_part_catalog(project: Project) -> tuple[dict[str, LocalPart], dict[str
                                                    "catalog_type": type_id})
             from r3_catalog.modelbank import ModelBank
             from .purchased import fastener_model_id
-            bank = ModelBank()
+            bank = ModelBank(project=project.root)
             entry = next((e for e in bank.entries() if e.id == fastener_model_id(type_id, length)), None)
             if entry and entry.available:
                 parts[key].bank_model = entry.model_dump(mode="json")

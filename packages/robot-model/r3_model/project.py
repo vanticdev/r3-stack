@@ -5,7 +5,7 @@ Layout of an R3 project (also the layout of its GitHub repository)::
     robot.yaml              unified spec (source of truth)
     r3.lock.yaml            pinned external revisions (Onshape microversion, PCB hashes)
     catalog/                optional project-local catalog additions
-    cad/                    CAD generator source (FeatureScript) and part mapping
+    cad/                    CAD notes and source mapping; geometry lives in Onshape
     pcb/<board>/            KiCad generator + generated KiCad project
     backend/                BLITZ deployable modules (backend/<language>/<module>)
     build/                  generated artifacts (ignored by git)
@@ -114,6 +114,18 @@ class Project:
         from r3_catalog.revision import catalog_modelbank_revision
 
         result["catalog_modelbank_revision"] = catalog_modelbank_revision(self.root / "catalog")
+        sources = hashlib.sha256()
+        for folder in ("backend", "simulation", "tests"):
+            for path in sorted((self.root / folder).rglob("*")):
+                if not path.is_file() or any(part in ("__pycache__", ".pytest_cache", ".venv", "build") for part in path.relative_to(self.root).parts):
+                    continue
+                if self.root not in path.resolve().parents:
+                    raise ValueError(f"project source escapes its root: {path.relative_to(self.root)}")
+                name, content = str(path.relative_to(self.root)).encode(), path.read_bytes()
+                for value in (name, content):
+                    sources.update(len(value).to_bytes(8, "big"))
+                    sources.update(value)
+        result["project_sources_revision"] = sources.hexdigest()
         try:
             sha = subprocess.run(["git", "-C", str(self.root), "rev-parse", "HEAD"], capture_output=True, text=True, check=True)
             result["git_commit"] = sha.stdout.strip()

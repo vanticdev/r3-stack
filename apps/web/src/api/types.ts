@@ -8,11 +8,11 @@ export type Vec3 = [number, number, number];
 /** World pose: position (m) + quaternion (w, x, y, z), as MuJoCo xpos/xquat. */
 export type Pose7 = [number, number, number, number, number, number, number];
 export type Severity = "error" | "warning" | "info";
-export type StageName = "assembly" | "model" | "cad" | "pcb" | "wiring" | "electrical" | "software" | "sim" | "report";
+export type StageName = "assembly" | "model" | "cad" | "fabrication" | "pcb" | "wiring" | "connectors" | "electrical" | "software" | "sim" | "tests" | "report";
 /** Raw robot.yaml values may be quantities ("20 mm"); the API's parsed `spec` holds SI numbers. */
 export type Quantity = number | string;
 
-export const STAGES: StageName[] = ["assembly", "model", "cad", "pcb", "wiring", "electrical", "software", "sim", "report"];
+export const STAGES: StageName[] = ["assembly", "model", "cad", "fabrication", "pcb", "wiring", "connectors", "electrical", "software", "sim", "tests", "report"];
 
 /** Every API error body. */
 export interface ApiErrorBody {

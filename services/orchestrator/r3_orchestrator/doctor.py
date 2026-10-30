@@ -296,6 +296,8 @@ results = {}
 for name, module in MODULES.items():
     try:
         loaded = importlib.import_module(module)
+        if name == 'tests':
+            importlib.import_module('pytest')
         if not callable(getattr(loaded, 'run', None)):
             raise ImportError(f'{module} has no callable run')
         results[name] = {'available': True, 'module': module, 'detail': ''}
@@ -359,6 +361,7 @@ def _stages(tools: dict[str, Tool]) -> list[StageReadiness]:
                               "Physics always; renders need a GL backend; container software mode needs Docker; "
                               "ray-traced radio needs sionna-rt (else analytic link model)."))
     out.append(StageReadiness("report", True, "full", [], "Static HTML + JSON."))
+    out.append(StageReadiness("tests", True, "full", [], "Project-authored pytest checks; no display."))
     return out
 
 

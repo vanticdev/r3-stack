@@ -7,8 +7,11 @@ directory:
 * Claude Code: ``claude -p --output-format stream-json --verbose
   --mcp-config <session>/.mcp.json --strict-mcp-config --permission-mode default
   --allowedTools <ungated R3 tools, Read, Glob, Grep> --disallowedTools <gated R3 tools>``
-* Codex: ``codex exec --json --skip-git-repo-check -C <project> --sandbox workspace-write
-  -c approval_policy="never" -c mcp_servers.r3.{command,args,env,disabled_tools}=...``
+* Codex: ``codex exec --json --skip-git-repo-check -C <project>
+  -c approval_policy="never" -c default_permissions="r3_session"
+  -c permissions.r3_session=... -c mcp_servers.r3.{command,args,env,disabled_tools}=...``
+  The profile keeps workspace restrictions, enables networking and grants writes
+  to the project's own .git so explicitly requested publication can run.
 
 The prompt goes to stdin. ``<project>/build/agent/<session>/`` keeps the
 generated ``.mcp.json``, ``transcript.jsonl`` (raw CLI output) and ``stderr.log``.
@@ -61,14 +64,17 @@ MCP_SERVER = "r3"
 #: Built-in Claude Code tools a headless session may use without asking (read-only).
 CLAUDE_READ_TOOLS = ("Read", "Glob", "Grep")
 #: Tools that start pipeline work inside the MCP server.
-RUN_TOOLS = ("r3_validate", "r3_run_stage", "r3_run_scenario")
+RUN_TOOLS = ("r3_validate", "r3_run_stage", "r3_run_scenario", "r3_run_project_tests")
 MAX_CONTENT = 20_000  # characters of a tool result kept in an event
 MCP_TOOL_TIMEOUT_S = 3600  # a full validation with every scenario takes many minutes
 
 SYSTEM_PROMPT = """You are independently building an R3 robot project, launched headless from the R3 web app.
 Read r3_guide first. robot.yaml is the robot specification: change it through r3_get_spec -> r3_patch_spec
 (pass the sha256 you read; on spec_conflict re-read and re-apply). Firmware and other authored project files
-may be edited directly. Use the catalog and sourcing tools for parts and the pipeline tools to validate.
+may be edited directly. Use r3_get_schema for typed authoring details, the catalog and sourcing tools for parts,
+r3_cad_plan for quota estimates, r3_view_artifact to inspect images, and the pipeline tools to validate.
+Author device bridges under simulation/ and tests under tests/ in this project; the guide documents the
+simulation.devices extension API and r3_run_project_tests. Do not edit platform code to add a project device.
 CAD changes must happen only in a real Onshape document, using standard editable features and assemblies.
 No FeatureScript, locally fabricated CAD, hand-written external tool formats, or sculpted purchased parts.
 Catalog envelopes and offline previews are estimates, never completed CAD. Use real MuJoCo, ngspice and Sionna.
@@ -134,13 +140,26 @@ def _toml(value: Any) -> str:
     return json.dumps(value)
 
 
+def codex_permission_profile(project_root: Path) -> dict[str, Any]:
+    """Keep workspace protections, but allow this project's explicitly requested Git operations.
+
+    The standard workspace profile protects .git. Noninteractive sessions cannot
+    ask to escalate a normal commit/push, so grant that exact directory rather
+    than disabling the sandbox or making other repositories writable.
+    """
+    return {"extends": ":workspace", "filesystem": {str(project_root.resolve() / ".git"): "write"},
+            "network": {"enabled": True}}
+
+
 def codex_command(executable: str, project_root: Path, config: dict[str, Any], model: str | None = None) -> list[str]:
     _, gated = _tools()
     server = config["mcpServers"][MCP_SERVER]
     prefix = f"mcp_servers.{MCP_SERVER}"
     command = [executable, "exec", "--json", "--skip-git-repo-check", "--color", "never", "-C", str(project_root),
-               "--sandbox", "workspace-write", "-c", 'approval_policy="never"',
-               "-c", "sandbox_workspace_write.network_access=true",
+               "-c", 'approval_policy="never"',
+               "-c", 'default_permissions="r3_session"',
+               "-c", f"permissions.r3_session={_toml(codex_permission_profile(project_root))}",
+               "-c", 'web_search="live"',
                "-c", f"developer_instructions={_toml(SYSTEM_PROMPT)}",
                "-c", f"{prefix}.command={_toml(server['command'])}", "-c", f"{prefix}.args={_toml(server['args'])}",
                "-c", f"{prefix}.env={_toml(server['env'])}", "-c", f"{prefix}.disabled_tools={_toml(gated)}",
@@ -456,6 +475,8 @@ class AgentManager:
                 arguments = payload.get("input") or {}
                 stages = arguments.get("stages") or ([arguments["stage"]] if arguments.get("stage") else None)
                 scenarios = arguments.get("scenarios") or ([arguments["scenario"]] if arguments.get("scenario") else None)
+                if payload.get("name") == "r3_run_project_tests":
+                    stages = ["tests"]
                 self._emit(session, "run_started", tool_call_id=payload.get("id"), tool=payload.get("name"),
                            stages=stages if payload.get("name") != "r3_run_scenario" else ["sim"], scenarios=scenarios)
             return

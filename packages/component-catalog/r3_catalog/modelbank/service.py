@@ -12,18 +12,18 @@ from .schema import ModelEntry, Source
 
 
 def search(query: str = '', category: str | None = None, manufacturer: str | None = None,
-           specs: dict[str, list[float | None]] | None = None, limit: int = 30) -> dict[str, Any]:
-    return {'ok': True, 'models': ModelBank().search(query, category=category, manufacturer=manufacturer, specs=specs, limit=limit)}
+           specs: dict[str, list[float | None]] | None = None, limit: int = 30, *, project: str | Path | None = None) -> dict[str, Any]:
+    return {'ok': True, 'models': ModelBank(project=project).search(query, category=category, manufacturer=manufacturer, specs=specs, limit=limit)}
 
 
-def show(model_id: str) -> dict[str, Any]:
-    return {'ok': True, 'model': ModelBank().get(model_id).model_dump(mode='json')}
+def show(model_id: str, *, project: str | Path | None = None) -> dict[str, Any]:
+    return {'ok': True, 'model': ModelBank(project=project).get(model_id).model_dump(mode='json')}
 
 
 def add(name: str, category: str, mpn: str = '', manufacturer: str = '', url: str = '', onshape: str = '',
         model_id: str = '', license: str = 'unspecified; verify redistribution terms', format: str = 'step',
-        member: str = '', catalog_component: str | None = None) -> dict[str, Any]:
-    bank = ModelBank()
+        member: str = '', catalog_component: str | None = None, *, project: str | Path | None = None) -> dict[str, Any]:
+    bank = ModelBank(project=project)
     identifier = model_id or slug(f'{manufacturer}-{mpn or name}')
     if any(e.id == identifier for e in bank.entries()):
         raise ValueError(f'model already exists: {identifier}')
@@ -33,10 +33,10 @@ def add(name: str, category: str, mpn: str = '', manufacturer: str = '', url: st
         match = re.search(r'/documents/([a-f0-9]{24})/v/([a-f0-9]{24})/e/([a-f0-9]{24})', onshape)
         if not match:
             raise ValueError('Onshape URL must point to an immutable public version (/v/, not /w/)')
-        from r3_onshape.client import ApiKeyTransport
-        transport = ApiKeyTransport.from_env()
+        from r3_onshape.client import default_transport
+        transport = default_transport()
         if transport is None:
-            raise ValueError('Onshape source validation requires ONSHAPE_ACCESS_KEY and ONSHAPE_SECRET_KEY')
+            raise ValueError('Onshape source validation requires a connected Onshape transport')
         did, vid, eid = match.groups()
         document = transport.json('GET', f'/documents/{did}')
         if document.get('isPublic') is not True:
@@ -55,12 +55,12 @@ def add(name: str, category: str, mpn: str = '', manufacturer: str = '', url: st
     return {'ok': True, 'model': entry.model_dump(mode='json')}
 
 
-def fetch_model(model_id: str) -> dict[str, Any]:
-    return fetch(ModelBank().get(model_id))
+def fetch_model(model_id: str, *, project: str | Path | None = None) -> dict[str, Any]:
+    return fetch(ModelBank(project=project).get(model_id))
 
 
-def validate_model(model_id: str) -> dict[str, Any]:
-    bank = ModelBank()
+def validate_model(model_id: str, *, project: str | Path | None = None) -> dict[str, Any]:
+    bank = ModelBank(project=project)
     entry = bank.get(model_id)
     result = fetch(entry)
     if not result['ok']:

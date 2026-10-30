@@ -109,7 +109,14 @@ def test_codex_session(env):
     assert argv[:2] == ["exec", "--json"] and argv[argv.index("-C") + 1] == str(root) and argv[-1] == "-"
     overrides = [argv[i + 1] for i, a in enumerate(argv) if a == "-c"]
     assert 'approval_policy="never"' in overrides
-    assert 'sandbox_workspace_write.network_access=true' in overrides
+    assert 'default_permissions="r3_session"' in overrides
+    permission = next(o for o in overrides if o.startswith("permissions.r3_session="))
+    import tomllib
+    parsed = tomllib.loads(permission)["permissions"]["r3_session"]
+    assert parsed["network"]["enabled"] is True
+    assert parsed["filesystem"] == {str(root / ".git"): "write"}
+    assert parsed["extends"] == ":workspace"
+    assert 'web_search="live"' in overrides
     assert any(o.startswith("developer_instructions=") for o in overrides)
     assert 'mcp_servers.r3.args=["-m", "r3_orchestrator.mcp_server"]' in overrides
     disabled = next(o for o in overrides if o.startswith("mcp_servers.r3.disabled_tools="))

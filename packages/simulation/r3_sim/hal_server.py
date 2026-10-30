@@ -204,6 +204,8 @@ class TwinHalServer:
             return self._uart(op, req)
         if op.startswith("camera."):
             return self._camera(op, req)
+        if op == "device.request":
+            return self._project_device(req)
         if op == "log":
             k.log(str(req.get("level", "info")), str(req.get("message", "")), dict(req.get("fields") or {}))
             return {}, "ok"
@@ -300,6 +302,48 @@ class TwinHalServer:
             del uart.ready[:maximum]
             return {"data": list(data)}, "ok"
         raise HalRequestError("unknown_op", op)
+
+    def _project_device(self, req: dict[str, Any]) -> tuple[dict[str, Any], str]:
+        import math
+
+        k = self.kernel
+        name = str(req.get("device", ""))
+        found = k.project_devices.get(name)
+        if found is None:
+            raise HalRequestError("no_such_device", f"no project device {name!r}")
+        context, device = found
+        component = k.project.catalog.component(k.project.spec.components[context.component].type)
+        if any(interface.bus != "none" for interface in component.software) and not context.bindings:
+            raise HalRequestError("pin_not_bound", f"project device {name} has no electrically reachable software binding")
+        payload = req.get("payload", {})
+        timeout = float(req.get("timeout", 0))
+        if not isinstance(payload, dict) or not math.isfinite(timeout) or timeout < 0:
+            raise HalRequestError("bad_request", "payload must be an object and timeout finite and nonnegative")
+        result = None
+
+        def ready() -> bool:
+            nonlocal result
+            if not context.powered:
+                return False
+            try:
+                result = device.request(str(req.get("operation", "")), payload)
+                json.dumps(result, allow_nan=False)
+            except Exception as error:
+                raise HalRequestError("project_device_error", f"{name}: {type(error).__name__}: {error}") from None
+            if result is not None and not isinstance(result, dict):
+                raise HalRequestError("bad_device_response", f"{name} must return an object or None")
+            return result is not None
+
+        if not ready() and timeout > 0:
+            deadline = k.t + timeout
+            reason = self._advance(lambda: ready() or k.t + 1e-9 >= deadline)
+            if self._blocked(reason):
+                return {}, reason
+        if not context.powered:
+            raise HalRequestError("electrically_unpowered", f"project device {name} has no adequate supply")
+        if result is None:
+            raise HalRequestError("timeout", f"project device {name} has no result within {timeout} s")
+        return {"result": result}, "ok"
 
     def _camera(self, op: str, req: dict[str, Any]) -> tuple[dict[str, Any], str]:
         """CSI cameras: frames rendered by MuJoCo at the exposure instants (``r3_sim.devices.camera``)."""

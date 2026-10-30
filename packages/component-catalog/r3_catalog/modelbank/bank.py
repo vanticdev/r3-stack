@@ -30,22 +30,33 @@ def normalized(value: str) -> str:
 class ModelBank:
     _datasets: dict[str, tuple[tuple, list[ModelEntry]]] = {}
 
-    def __init__(self, dataset: str | Path | None = None, index: str | Path | None = None) -> None:
-        self.dataset = Path(dataset or os.environ.get('R3_MODEL_BANK', DATA))
+    def __init__(self, dataset: str | Path | None = None, index: str | Path | None = None,
+                 *, project: str | Path | None = None) -> None:
+        base = Path(dataset or os.environ.get('R3_MODEL_BANK', DATA))
+        context = project or (os.environ.get('R3_PROJECT') if dataset is None else None)
+        if context is None and dataset is None:
+            context = next((parent for parent in (Path.cwd(), *Path.cwd().parents) if (parent / 'robot.yaml').is_file()), None)
+        self.base = base if context else None
+        self.dataset = Path(context).resolve() / 'catalog' / 'modelbank' if context else base
         key = hashlib.sha256(str(self.dataset.resolve()).encode()).hexdigest()[:16]
         self.index = Path(index) if index else cache_root() / f'index-{key}.sqlite'
 
     def entries(self, *, copy: bool = True) -> list[ModelEntry]:
-        paths = sorted(self.dataset.glob('*.yaml'))
-        signature = tuple((p.name, p.stat().st_mtime_ns, p.stat().st_size) for p in paths)
-        key = str(self.dataset.resolve())
+        roots = [self.base, self.dataset] if self.base else [self.dataset]
+        paths = [p for root in roots for p in sorted(root.glob('*.yaml'))]
+        signature = tuple((str(p), p.stat().st_mtime_ns, p.stat().st_size) for p in paths)
+        key = '|'.join(str(root.resolve()) for root in roots)
         cached = self._datasets.get(key)
         if cached is not None and cached[0] == signature:
             return [e.model_copy(deep=True) for e in cached[1]] if copy else cached[1]
-        records = [ModelEntry.model_validate(yaml.safe_load(p.read_text())) for p in paths]
-        ids = [r.id for r in records]
-        if len(set(ids)) != len(ids):
-            raise ValueError('duplicate model-bank id')
+        merged = {}
+        for root in roots:
+            records = [ModelEntry.model_validate(yaml.safe_load(p.read_text())) for p in paths if p.parent == root]
+            ids = [r.id for r in records]
+            if len(set(ids)) != len(ids):
+                raise ValueError('duplicate model-bank id')
+            merged.update((record.id, record) for record in records)
+        records = list(merged.values())
         self._datasets[key] = (signature, records)
         return [e.model_copy(deep=True) for e in records] if copy else records
 

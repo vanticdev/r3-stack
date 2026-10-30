@@ -57,8 +57,20 @@ def test_manual_add_pins_and_converts(bank, monkeypatch):
 
 
 def test_onshape_missing_keys_is_structured(bank, monkeypatch):
-    monkeypatch.delenv('ONSHAPE_ACCESS_KEY', raising=False)
-    monkeypatch.delenv('ONSHAPE_SECRET_KEY', raising=False)
+    from r3_onshape import client
+    monkeypatch.setattr(client, 'default_transport', lambda: None)
     from r3_catalog.modelbank.ingest import ingest
     result = service.guard(lambda: ingest(bank, 'onshape', query='Pi'))
-    assert result['code'] == 'model_bank_error' and 'ONSHAPE_ACCESS_KEY' in result['message']
+    assert result['code'] == 'model_bank_error' and 'connected transport' in result['message']
+
+
+def test_cli_explicit_project_uses_local_overlay(bank, tmp_path, capsys):
+    project = tmp_path / 'unrelated-instrument'
+    local = ModelBank(project=project)
+    local.put(ModelEntry(id='synthetic-local', name='Synthetic local fixture', category='other'))
+    assert main(['models', 'search', 'synthetic-local', '--project', str(project), '--json']) == 0
+    assert '"id": "synthetic-local"' in capsys.readouterr().out
+    assert main(['models', 'show', 'synthetic-local', '--project', str(project), '--json']) == 0
+    assert '"id": "synthetic-local"' in capsys.readouterr().out
+    with pytest.raises(KeyError):
+        bank.get('synthetic-local')

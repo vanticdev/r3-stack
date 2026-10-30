@@ -180,7 +180,7 @@ export function AgentPage() {
 
   const send = async (mode: "new" | "reply") => {
     setError(null);
-    const visible = prompt.trim();
+    const visible = prompt;
     // The API has no session resume: a reply starts a new session that carries the previous task and its result.
     const previous = mode === "reply" ? current : null;
     const previousResult = previous ? [...previous.events].reverse().find((e) => e.type === "session_finished")?.result : undefined;

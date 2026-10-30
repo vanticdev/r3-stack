@@ -19,11 +19,11 @@ def register(sub: Any, common: argparse.ArgumentParser) -> None:
     p.add_argument('--manufacturer')
     p.add_argument('--specs', default='{}', help='JSON spec ranges in SI: {"mass": [0, 0.1]}')
     p.add_argument('--limit', type=int, default=30)
-    p.set_defaults(func=lambda a: service.guard(lambda: service.search(a.query, a.category, a.manufacturer, json.loads(a.specs), a.limit)))
+    p.set_defaults(func=lambda a: service.guard(lambda: service.search(a.query, a.category, a.manufacturer, json.loads(a.specs), a.limit, project=a.project)))
     for action, function in [('show', service.show), ('fetch', service.fetch_model), ('validate', service.validate_model)]:
         p = commands.add_parser(action, parents=[common])
         p.add_argument('model_id')
-        p.set_defaults(func=lambda a, f=function: service.guard(lambda: f(a.model_id)))
+        p.set_defaults(func=lambda a, f=function: service.guard(lambda: f(a.model_id, project=a.project)))
     p = commands.add_parser('add', parents=[common])
     p.add_argument('--name', required=True)
     p.add_argument('--mpn', default='')
@@ -38,10 +38,10 @@ def register(sub: Any, common: argparse.ArgumentParser) -> None:
     p.add_argument('--member', default='')
     p.add_argument('--catalog-component')
     fields = ['name', 'category', 'mpn', 'manufacturer', 'url', 'onshape', 'model_id', 'license', 'format', 'member', 'catalog_component']
-    p.set_defaults(func=lambda a: service.guard(lambda: service.add(**{k: getattr(a, k) for k in fields})))
+    p.set_defaults(func=lambda a: service.guard(lambda: service.add(**{k: getattr(a, k) for k in fields}, project=a.project)))
     p = commands.add_parser('ingest', parents=[common])
     p.add_argument('provider', choices=['kicad', 'onshape', *PROVIDERS])
     for field in ['url', 'name', 'mpn', 'root', 'query']:
         p.add_argument('--' + field, default='')
     p.add_argument('--category', default='other')
-    p.set_defaults(func=lambda a: service.guard(lambda: ingest(ModelBank(), a.provider, **{k: getattr(a, k) for k in ['url', 'name', 'mpn', 'root', 'query', 'category']})))
+    p.set_defaults(func=lambda a: service.guard(lambda: ingest(ModelBank(project=a.project), a.provider, **{k: getattr(a, k) for k in ['url', 'name', 'mpn', 'root', 'query', 'category']})))

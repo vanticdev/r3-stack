@@ -126,7 +126,7 @@ def load_catalog(*extra_dirs: Path) -> Catalog:
     # component schema or project configuration format is introduced.
     from .modelbank import ModelBank
     from .modelbank.catalog import resolve_model
-    bank = ModelBank()
+    bank = ModelBank(project=extra_dirs[-1].parent) if extra_dirs else ModelBank()
     for component in catalog.components.values():
         if not component.mechanical.fabricated and component.kind != "pcb":
             component.model = resolve_model(component, bank)

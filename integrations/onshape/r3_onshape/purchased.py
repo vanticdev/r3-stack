@@ -17,7 +17,7 @@ from r3_model.diagnostics import Diagnostic
 
 
 def diagnostics(project: Any, result: Any, bank: ModelBank | None = None) -> None:
-    bank = bank or ModelBank()
+    bank = bank or ModelBank(project=project.root)
     for cid, comp in project.spec.components.items():
         component = project.catalog.component(comp.type)
         if component.mechanical.fabricated or component.kind == 'pcb':
@@ -62,8 +62,8 @@ def fastener_model_id(type_id: str, length: float | None) -> str:
     return f'fastener-{type_id}' + (f'-{length * 1000:g}mm' if length else '')
 
 
-def bank_entry(component: Any) -> ModelEntry | None:
-    return ModelBank().resolve(component)
+def bank_entry(component: Any, project: Any = None) -> ModelEntry | None:
+    return ModelBank(project=project.root if project else None).resolve(component)
 
 
 def _interface_frame(entry: ModelEntry, connector: Any) -> dict[str, list[float]] | None:
