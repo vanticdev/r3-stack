@@ -2,13 +2,13 @@
 
 The `pcb` stage builds each board in `robot.yaml` `pcb.boards` with KiCad's own engine, without ever opening a
 window. The design intent (official library parts, nets, placement, hand-routed power copper, mounting) lives
-in the board folder (`examples/robots/robot/pcb/carrier-hat/carrier_hat.py`).
+in the board folder (`path/to/project/pcb/controller/board.py`).
 
 ```sh
 # regenerate the KiCad project (schematic -> ERC -> netlist -> board -> Freerouting -> pours -> DRC)
-PYTHONPATH=integrations/kicad python -m r3_kicad.flow examples/robots/robot/pcb/carrier-hat
+PYTHONPATH=integrations/kicad python -m r3_kicad.flow path/to/project/pcb/controller
 # stage: reuses the project if the inputs are unchanged, then ERC/DRC, exports, board.json, board.step
-python -c "from r3_model.project import Project; from r3_kicad import stage; stage.run(Project.load('examples/robots/robot'))"
+python -c "from r3_model.project import Project; from r3_kicad import stage; stage.run(Project.load('path/to/project'))"
 ```
 
 | Step | Tool (headless) |

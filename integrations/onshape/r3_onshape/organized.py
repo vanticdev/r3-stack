@@ -211,6 +211,7 @@ def robot_variables(project: Project) -> tuple[dict[str, Variable], dict[str, di
     parts, _ = build_part_catalog(project)
     variables: dict[str, Variable] = {}
     bindings: dict[str, dict[str, Any]] = {}
+    conflicts: set[tuple[str, str]] = set()
     for part in sorted(parts.values(), key=lambda p: p.key):
         if part.library:
             continue
@@ -219,10 +220,24 @@ def robot_variables(project: Project) -> tuple[dict[str, Variable], dict[str, di
                 continue
             # Variables describe authored geometry; no inferred robot layout or
             # relationship between unrelated parts is introduced here.
+            key = (part.studio, operation.name)
+            if key in conflicts:
+                continue
+            group = bindings.setdefault(part.studio, {}).setdefault("extrude", {})
+            previous = group.get(operation.name)
+            if previous is not None:
+                if variables[previous].value != float(operation.depth):
+                    # A family can contain variants with different depths. The
+                    # builder's shared operation binding cannot represent them;
+                    # retain literal depths rather than coupling those variants.
+                    conflicts.add(key)
+                    group.pop(operation.name)
+                    variables.pop(previous)
+                continue
             name = "dim_" + re.sub(r"[^A-Za-z0-9_]", "_", f"{part.key}_{index}")
             depth = float(operation.depth)
             variables[name] = Variable(name, f"{depth * 1e3:g} mm", f"{part.name}: {operation.name} depth", depth)
-            bindings.setdefault(part.studio, {}).setdefault("extrude", {})[operation.name] = name
+            group[operation.name] = name
     return variables, bindings
 
 

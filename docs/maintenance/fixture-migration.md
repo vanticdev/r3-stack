@@ -1,6 +1,6 @@
 # Synthetic fixture migration
 
-Work in progress. Infrastructure tests are being moved to independent instrument, mechanism, connector, wiring and PCB coupons.
+Infrastructure tests use independent instrument, mechanism, connector, wiring and PCB coupons. Each project is copied without build outputs and generates its evidence in temporary directories.
 
 ## Removed application-only tests
 
@@ -50,3 +50,47 @@ Work in progress. Infrastructure tests are being moved to independent instrument
 The following entries retain their data and provenance in `purchased.yaml`:
 
 `ball-stud-m3-5.8x6`, `ball-stud-m3-5.8x8`, `bearing-mr106zz`, `elrs-receiver-2g4`, `elrs-t-antenna`, `esc-brushed-60a`, `foam-tape-3m-4026`, `fuse-atc-10a`, `fuse-atc-5a`, `fuse-atc-7.5a`, `gearbox-spur-diff`, `gnss-rtk-zed-f9p`, `gps-ublox-m10`, `hat-standoff-mf-m2.5-11`, `kingpin-screw-m3x20`, `lipo-2s-5000-25c`, `magnet-n52-2x1`, `motor-540-brushed`, `raspberry-pi-5-8gb`, `servo-digital-20kg`, `servo-output-25t`, `shim-din988-3x6x0.3`, `spacer-m2.5-ff-10`, `standoff-m3-47`, `strap-hook-loop-20`, `telemetry-sik-915-100mw`, `wheel-110x45`, `wheel-110x45-d`, `wheel-nut-m6-nyloc`, `zip-tie-2.5`.
+
+
+## Fixture coverage
+
+- `bench`: stationary instrument with a sensor arm, computer, explicit controller, actuators, radio, navigation sensors and ten harnesses. Exercises graph validation, electrical models, firmware/HAL, sensing, radio, sourcing, orchestration and release evidence.
+- `mechanism`: small rotary coupon with a support, sleeve, rotor and two screws. Generates exact solids locally for mating, retention, interference, motion, mesh hand-offs and fabrication checks.
+- `connector_stack`: header/socket coupon with its own pin-field and socket geometry. Exercises seating, insertion, pin alignment and connector interference without recorded CAD.
+- `wiring`: branched power loom with pigtail, floating pair, splices, two sockets and a separate sensor pivot. Exercises routing, manufacturing, supports and native elastic cables. Smaller generated arm benches cover cable equations and deterministic stepping.
+- `pcb`: passive filter with two connectors, a resistor, capacitor and mounting holes. KiCad generates every source and output in a temporary directory; ERC, DRC, parity, netlist and placement checks remain enforced.
+- `drive_bench`: triangular three-roller base, independently arranged purchased power components and a minimal HAL controller. Exercises the reusable drive adapter, transmission inertia, tire contact and scenario runner; it is not a vehicle replica.
+- `transmission`: standalone purchased gearbox/motor mating coupon.
+- Existing stationary `printbot` and `assembly_bench` fixtures remain independent examples of camera and assembly infrastructure.
+
+## Replaced design-only assertions
+
+- Reference component counts, joint names and coordinate tables are replaced by counts/sets derived from each fixture's declaration and independent geometry calculations.
+- Frozen CAD exports are replaced by synthetic exact solids, including the socket insertion and bore/thread engagement cases. Tests read no project build directory.
+- Board-specific regulator choices, connector positions, net membership and component references are replaced by declared passive-board intent, real KiCad read-back and separate generic converter/arbiter physics checks.
+- The reference mounting-offset, printed-cap sizing and firmware encoder-calibration tests were removed individually (listed above); they pin retired design results.
+- Purchased-drive wheel-center/track assertions are replaced by standalone motor/gearbox compiled connector poses. Unsafe-drive rejection still uses real firmware and the same 2 m/s requirement, zero brownouts and supply threshold; its replay tail is explicitly bounded after irreversible release.
+- Receiver cable core/pin-end checks use independent three-pin harnesses; endpoint counts are computed from the declared crimp terminations.
+- The original application firmware's navigation, traction and supervisor tests are removed with that application. Generic device protocols, estimation math, HAL transport, launch/deployment adapters, electrical failsafe models and simulation infrastructure remain covered.
+
+## Generality corrections
+
+- Empty project roots are supported and new projects default to the blank scaffold in CLI, MCP, HTTP and web flows.
+- Retention and CAD mate planning derive the root from the declared assembly or an unambiguous world-mounted component.
+- CAD variables come from fabricated operation depths. Family variants with incompatible shared operation depths retain literal dimensions. Camera targets and full-lock framing derive from geometry; no installed layout coordinates remain.
+- Ackermann geometry requires an explicitly declared positive wheelbase; track can derive from joint origins.
+- Passive PCB intent exports only declared regulators and arbiters. Generic converter sizing, SPICE export, copper, parity and manufacturing infrastructure remain available.
+- Electrical operating points derive mass, dimensions, wheel loading, motor speed/torque and servo loads from the project. Zero requested load can select zero throttle without an invalid root bracket.
+- Supply telemetry accepts the declared computer model's voltage output without requiring a particular net label.
+- Connector close-ups choose the actual mating component rather than a particular board or connector identifier.
+- Fast KiCad coupons use a shorter real GUI audit polling interval, preserving the sample-count and no-window checks.
+
+## Intentionally retained generic terms and purchased data
+
+`chassis` remains in simulation frame/API names and generic wiring terminology: it means the robot's rigid base, with no design dimensions or component identity. Steering vocabulary (knuckle, horn, kingpin, wheel and Ackermann) remains in reusable joint/steering equations and vendor interfaces. Bought catalog IDs, including wheel, motor, gearbox, ball-stud and HAT stacking hardware, describe purchased products. Supplier CAD models and their provenance remain; no removed custom part has a model-bank entry.
+
+The Raspberry Pi, GY-521 and UC-717 entries are unchanged. Purchased consumable cross-section/material/mass data remain; installed strap/tie loops, magnet arrangement notes and project mount descriptions were removed. Supplier-specific screw interface splits are labeled proxy estimates rather than copied installed engagement lengths.
+
+## Ported reference-dependent Python files
+
+`tests/api_helpers.py`, `tests/conftest.py`, `tests/firmware_fake_hal.py`, `tests/orchestrator_helpers.py`, `tests/sim_test_controller.py`, `tests/sourcing_helpers.py`, `tests/test_api_agents.py`, `tests/test_api_release.py`, `tests/test_api_robustness.py`, `tests/test_api_runs.py`, `tests/test_api_server.py`, `tests/test_assembly_compiler.py`, `tests/test_cad_consumers.py`, `tests/test_cad_kinematics.py`, `tests/test_cad_library_aliases.py`, `tests/test_cad_phaseb.py`, `tests/test_cad_plan.py`, `tests/test_cad_spec.py`, `tests/test_connector_mesh_mates.py`, `tests/test_connectors_connection_sites.py`, `tests/test_connectors_geometry.py`, `tests/test_connectors_onshape.py`, `tests/test_connectors_stage.py`, `tests/test_electrical_finish_b2.py`, `tests/test_electrical_stage.py`, `tests/test_electrical_system.py`, `tests/test_firmware_container.py`, `tests/test_firmware_deploy.py`, `tests/test_mechanical_pi_stack.py`, `tests/test_model_core.py`, `tests/test_modelbank_pi5.py`, `tests/test_orchestrator_cli.py`, `tests/test_orchestrator_mcp.py`, `tests/test_orchestrator_model_stage.py`, `tests/test_orchestrator_scaffold.py`, `tests/test_pcb_board.py`, `tests/test_pcb_intent.py`, `tests/test_pcb_rollout.py`, `tests/test_pcb_stage.py`, `tests/test_sim_cables.py`, `tests/test_sim_hal.py`, `tests/test_sim_radio.py`, `tests/test_sim_radio_sionna.py`, `tests/test_sim_rtk.py`, `tests/test_sim_scenario.py`, `tests/test_sim_vehicle.py`, `tests/test_sourcing_pipeline.py`, `tests/test_sourcing_requirements.py`, `tests/test_wiring_layout_fixes.py`, `tests/test_wiring_overhaul.py`, `tests/test_wiring_sim.py`, `tests/test_wiring_stage.py`.

@@ -313,8 +313,21 @@ def full_lock_views(model: GeometryModel, plans: dict[str, Any], kinematics: dic
         sample = pose["sample"]
         angles = ", ".join(f"{k} {v:+.3f} rad" for k, v in sample.items() if k != "servo_rad")
         title = f"Full {label} lock: servo {sample['servo_rad']:+.3f} rad; {angles} (Onshape meshes, solved pose)"
-        for suffix, view, center, width in (("", [0.0, 0.0, 1.0], [0.245, 0.0, 0.06], 0.11),
-                                             ("_iso", [0.9, -0.6, 1.0], [0.245, 0.0, 0.07], 0.09)):
+        vertices = []
+        for name, part in model.parts.items():
+            points = part.vertices
+            if name in pose["parts"]:
+                transform = np.asarray(pose["parts"][name])
+                points = points @ transform[:, :3].T + transform[:, 3]
+            if len(points):
+                vertices.append(points)
+        if not vertices:
+            continue
+        points = np.vstack(vertices)
+        low, high = points.min(axis=0), points.max(axis=0)
+        center = ((low + high) / 2).tolist()
+        width = max(float(np.linalg.norm(high - low)) * .7, .001)
+        for suffix, view in (("", [0.0, 0.0, 1.0]), ("_iso", [0.9, -0.6, 1.0])):
             filename = f"cad_full_lock_{label}{suffix}.png"
             render_mesh_pose(model, colors, pose["parts"], out_dir / filename, view, center, width, title)
             report.images.append(filename)

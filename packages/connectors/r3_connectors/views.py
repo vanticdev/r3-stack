@@ -110,8 +110,8 @@ def pi_hat_stack(stage: "ConnectorStage", out: Path) -> Path | None:
             scene.label(_frame(conn).origin, f"{conn['mates'].split('.')[1]} <- {harness_ref}")
             _add_wires(stage, scene, _harness_wires(stage, harness_ref), _frame(conn).origin, 0.03)
     return render(scene, out / "pi_hat_connectors.png", center + np.array([0.0, -0.025, 0.012]), 0.2, 135.0, -35.0,
-                  title="Pi 5 + carrier HAT: KiCad board.step with every harness half mated at its pins",
-                  subtitle=f"J8/J_GPIO: lateral {pair['lateral_offset'] * 1e3:.3f} mm, faces {pair['axial_gap'] * 1e3:.2f} mm "
+                  title=f"{a['component']} + {b['component']}: direct connector stack",
+                  subtitle=f"{pair['a']}/{pair['b']}: lateral {pair['lateral_offset'] * 1e3:.3f} mm, faces {pair['axial_gap'] * 1e3:.2f} mm "
                            f"apart, posts overlap socket contacts {pair['contact_overlap'] * 1e3:.2f} mm")
 
 
@@ -158,18 +158,18 @@ def render_closeups(stage: "ConnectorStage") -> list[Path]:
     if floating:
         paths.append(mated_closeup(stage, out, "xt60_pair_closeup.png", floating["a"],
                                    f"XT60 pair {floating['a']} / {floating['b']} (KiCad Amass XT60 models)", 0.075, 120, -25))
-    hat = next((cid for cid, c in stage.data["components"].items() if c["kind"] == "pcb"), None)
     for harness_ref, conn in stage.data["connectors"].items():
         if conn["owner"] != "harness" or not conn.get("mates"):
             continue
-        if conn["type"] == "jst-gh-4-housing" and conn["mates"].endswith("J_RX"):
-            paths.append(mated_closeup(stage, out, "jst_gh_hat_closeup.png", harness_ref,
+        board = conn["mates"].split(".")[0]
+        if conn["type"] == "jst-gh-4-housing":
+            paths.append(mated_closeup(stage, out, f"jst_gh_{harness_ref.replace('.', '_')}_closeup.png", harness_ref,
                                        f"JST GH {conn['mates']} (KiCad SM04B-GHS-TB) with {harness_ref} (GHR-04V-S proxy)",
-                                       0.05, 145, -32, board=hat))
-        if conn["type"] == "servo-3-female" and conn["mates"].endswith("J_SERVO"):
-            paths.append(mated_closeup(stage, out, "servo_plug_closeup.png", harness_ref,
+                                       0.05, 145, -32, board=board))
+        if conn["type"] == "servo-3-female":
+            paths.append(mated_closeup(stage, out, f"servo_{harness_ref.replace('.', '_')}_closeup.png", harness_ref,
                                        f"Servo plug {harness_ref} on {conn['mates']} (KiCad 1x3 header)", 0.06, 150, -30,
-                                       board=hat))
+                                       board=board))
     return [p for p in paths if p is not None]
 
 
