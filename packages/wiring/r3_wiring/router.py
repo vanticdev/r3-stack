@@ -537,7 +537,7 @@ class HarnessRouter:
             out[harness.id] = nodes
         return out
 
-    def _lead(self, node: NodePoint, awgs: list[int]) -> None:
+    def _lead(self, node: NodePoint, awgs: list[int], *, pin_widths: dict[str, float] | None = None) -> None:
         """Straight strain-relief run out of a connector, long enough for a
         target-radius 90 deg turn, shortened if it would hit something or enter
         a moving part's clearance band (``min_wire_clearance_moving``): the checks
@@ -547,9 +547,10 @@ class HarnessRouter:
             return
         r = node.od / 2
         harness = next(h for h in self.spec.electrical.harnesses if h.id == node.harness)
-        by_pin = {ref.split(".", 1)[1]: self._wire_od(w.awg)
-                  for w in harness.wires for ref in (w.from_, w.to)
-                  if ref.startswith(node.name + ".")}
+        by_pin = pin_widths if pin_widths is not None else {
+            ref.split(".", 1)[1]: self._wire_od(w.awg)
+            for w in harness.wires for ref in (w.from_, w.to)
+            if ref.startswith(node.name + ".")}
         self._fan_length(node, by_pin)
         r_min = bundle_bend_radius(self.catalog, awgs or [22], node.od, harness.jacket != "none")
         r_pref = self.opt.bend_margin * r_min

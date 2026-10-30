@@ -55,3 +55,19 @@ def test_integral_pin_positions_do_not_change_when_a_branch_is_selected(tmp_path
         np.testing.assert_array_equal(complete.position, isolated.position)
     assert np.linalg.norm(router._pin_end(node, 'A.1', {}).position -
                           router._pin_end(node, 'A.3', {}).position) == .0032
+
+
+def test_single_pin_lane_reserves_only_its_own_fanout(tmp_path):
+    from r3_connectors.frames import Frame
+    from r3_wiring.router import NodePoint
+    root = write_project(tmp_path, block=False)
+    project = Project.load(root)
+    obstacles, _ = build_obstacles(project)
+    router = HarnessRouter(project, obstacles, RouterOptions(plan=False))
+    node = NodePoint('lead', 'A', 'connector', np.zeros(3), np.array([0., 0., 1.]),
+                     connector_type='integral', frame=Frame.identity(), od=.0016)
+    node.exit = router._pin_end(node, 'A.1', {}).position.copy()
+    router._lead(node, [22], pin_widths={'1': .0016})
+    assert node.fan_length == .006
+    router._lead(node, [22])
+    assert node.fan_length > .006

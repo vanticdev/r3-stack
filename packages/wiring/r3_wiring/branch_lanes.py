@@ -84,7 +84,9 @@ def route_lanes(router: Any, harness: Harness, nodes: dict[str, Any]) -> Any:
                         offset = center - node.exit
                         offset -= (offset @ node.direction) * node.direction
                         node.exit += offset
-                        router._lead(node, [awg for _, awg in refs])
+                        router._lead(node, [awg for _, awg in refs],
+                                     pin_widths={ref.split(".", 1)[1]: router._wire_od(awg)
+                                                 for ref, awg in refs})
             terminals = {(harness.id, name) for name in key}
             occupied = lane_field(router, {harness.id: nodes}, terminals, previous)
             hardware = np.minimum(original_hardware, occupied)
