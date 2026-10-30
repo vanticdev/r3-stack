@@ -141,9 +141,8 @@ capacity and cause.
 `tests/test_joint_physics.py` exercises hand-calculated screw/fit/snap capacities, retained and missing-nut
 plates in all gravity orientations, tape peeling, contact-only resting parts, locked/unlocked native
 vibration, arbitrary scenarios and a stationary two-link arm using the public assembly API. Existing
-vehicle dynamics and HAL performance checks use an intact generic mounting bench, while the actual
-reference robot's unqualified connections remain failures. Never repair the reference design inside
-the simulator or suppress its diagnostics to recover a legacy pass.
+vehicle dynamics and HAL performance checks use an intact generic mounting bench, and separate unsafe fixtures verify rejection of unqualified connections. Never repair a project
+inside the simulator or suppress its diagnostics to recover a legacy pass.
 
 ## Already-failed runs and replay
 
@@ -158,4 +157,4 @@ Healthy designs still run the full requested duration. Set this field to `null`,
 or pass `--full-duration` to `r3_sim_worker`, to continue a failed assembly for the
 entire case. An explicit replay cutoff is not qualification evidence or a substitute for the
 sustained vibration requirement. Qualification requires full requested durations;
-historical truncated rc-car recordings are explicitly labeled in the run report.
+historical truncated robot recordings are explicitly labeled in the run report.

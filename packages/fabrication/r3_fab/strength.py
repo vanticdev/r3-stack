@@ -43,7 +43,7 @@ COS45 = math.cos(math.radians(45.0))
 
 DEFAULT_LOAD_CASES = (
     {"id": "bump_5g", "accel": [0.0, 0.0, -5.0],
-     "description": "5 g vertical landing/bump (estimate for a 1/10 RC car jump; gravity included)"},
+     "description": "5 g vertical landing/bump (estimate for a 1/10 robot jump; gravity included)"},
     {"id": "crash_10g", "accel": [-10.0, 0.0, 0.0],
      "description": "10 g frontal impact along robot x (estimate; sign does not change von Mises stress)"},
 )

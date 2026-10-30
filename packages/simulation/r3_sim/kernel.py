@@ -256,7 +256,7 @@ class CoSimKernel:
         rx_uart = next((u for u in self.uarts.values() if u.component == self.receiver_id), None)
         self.rx_uart = rx_uart
         self.receiver = ElrsReceiver(self.radio, float(rx_uart.device_baud if rx_uart else 420000), self.rng_radio)
-        # Car antenna in the robot frame: CAD rf.antenna_position when exposed, else receiver pose + antenna height.
+        # robot antenna in the robot frame: CAD rf.antenna_position when exposed, else receiver pose + antenna height.
         self.rx_antenna_offset = np.asarray(radio_scene.antenna_offset, dtype=float)
 
         origin = initial.get("gps_origin") or env.radio_environment.get("gps_origin") or DEFAULT_GPS_ORIGIN
@@ -401,7 +401,7 @@ class CoSimKernel:
     def _setup_rtk(self, project: Project, radio_scene: Any) -> None:
         """Base station + SiK correction link into the rover's UART2 (only if the harness actually connects them)."""
         from .correction_link import GnssBaseStation, SikCorrectionLink, correction_scene
-        from .radio_scene import car_body
+        from .radio_scene import robot_body
 
         spec, env = project.spec, project.spec.simulation.environment
         base = env.gnss_base
@@ -447,7 +447,7 @@ class CoSimKernel:
         scene = correction_scene(radio_scene, to_si(base_radio_params.get("frequency", 915e6)), tx_position,
                                  float(overrides.get("power_dbm", base_radio_params.get("tx_power_dbm", 20.0))),
                                  float(base_radio_params.get("antenna_gain_dbi", 2.0)), float(rover_params.get("antenna_gain_dbi", 2.0)),
-                                 self.rtk_antenna_offset, car_body(project, exclude=(self.rtk_radio_id,)) if radio_scene.body else [])
+                                 self.rtk_antenna_offset, robot_body(project, exclude=(self.rtk_radio_id,)) if radio_scene.body else [])
         self.rtk_link = SikCorrectionLink(scene, base_radio_params, rover_params, env, overrides, self.rng_rtk_link,
                                           scene_dir=project.build_dir("sim") / "radio" / f"rtk_scene_{scene.digest()}")
         self.diagnostics.extend(self.rtk_link.diagnostics)
@@ -457,7 +457,7 @@ class CoSimKernel:
         self._rtk_preroll(RTK_PREROLL_S)
 
     def _rtk_preroll(self, seconds: float) -> None:
-        """Run base, link and rover for ``seconds`` before t = 0 with the car parked at its start pose: the rover is
+        """Run base, link and rover for ``seconds`` before t = 0 with the robot parked at its start pose: the rover is
         warm at scenario start (as ``GpsReceiver`` assumes), with whatever solution the corrections gave it."""
         position = np.asarray(self.vehicle.position(), dtype=float)
         rotation = np.asarray(self.vehicle.rotation(), dtype=float)
@@ -475,13 +475,13 @@ class CoSimKernel:
         self.gps.tx_free_t = 0.0
         stats = self.gps.stats()
         self.gps.reset_statistics()  # scenario metrics count epochs from t = 0
-        self.assumptions.append(("sensors", f"RTK base and rover run {seconds:.0f} s before the scenario with the car parked at the "
+        self.assumptions.append(("sensors", f"RTK base and rover run {seconds:.0f} s before the scenario with the robot parked at the "
                                             f"start (warm receivers): rover in {self.gps.mode} at t = 0 (first fix at "
                                             f"t = {stats['rtk_time_to_first_fix_s']} s)."))
 
     # ------------------------------------------------------------------ radio path cache
     def _route_poses(self, spacing: float, band: float, corner_radius: float = 3.0) -> list[tuple[np.ndarray, float]]:
-        """(robot-origin position, heading) samples the car will occupy: along the mission polyline (from the start
+        """(robot-origin position, heading) samples the robot will occupy: along the mission polyline (from the start
         pose, closed when it has more than two waypoints), +-``band`` across it, every heading between the
         adjacent segments within ``corner_radius`` of a waypoint."""
         mission = self.scenario.mission or {}
@@ -967,7 +967,7 @@ class CoSimKernel:
             battery_v=battery_v, battery_i=float(_first(out, [(self.battery_id, "current")], 0.0)),
             soc=float(_first(out, [(self.battery_id, "soc")], 0.0)),
             cell_v=float(_first(out, [(self.battery_id, "cell_voltage")], battery_v / max(self.cells, 1))),
-            rail_5v=float(_first(out, [("_nets", "5V"), (self.computer, "v_in")], 0.0)),
+            rail_5v=float(_first(out, [(self.computer, "voltage"), ("_nets", "5V"), (self.computer, "v_in")], 0.0)),
             bec_v=float(_first(out, [("_nets", "SERVO_6V"), ("_nets", "BEC_6V"), (self.esc_id, "bec_voltage")], 0.0)),
             esc_pulse_pi=next((v for k, v in self.pi_pulses.items() if k in self.arbiters), self.esc_pulse),
             arbiter_failsafe=1.0 if any(a.failsafe for a in self.arbiters.values()) else 0.0,

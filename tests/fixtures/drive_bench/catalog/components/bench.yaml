@@ -1,0 +1,74 @@
+components:
+- id: bench-base
+  kind: structure
+  mechanical:
+    mass: 1.0
+    material: Aluminum 6061-T6
+    shape: box
+    size:
+    - 0.24
+    - 0.2
+    - 0.004
+  name: Bench base
+- behavior:
+    model: load.computer
+    params:
+      boot_time: 0
+      brownout_voltage: 4.5
+      power_active: 0.2
+      power_idle: 0.1
+  connectors:
+    J1:
+      direction:
+      - 0
+      - 0
+      - 1
+      pins:
+        '1': PWM
+        '2': 6V
+        '3': GND
+      position:
+      - 0
+      - 0
+      - 0
+      type: header-1x3-2.54
+  id: bench-controller
+  kind: computer
+  mechanical:
+    mass: 0.02
+    material: Aluminum 6061-T6
+    shape: box
+    size:
+    - 0.02
+    - 0.02
+    - 0.01
+  name: 6 V bench controller
+  pins:
+    6V:
+      role: power_in
+      voltage_max: 6.5
+      voltage_min: 4.5
+      voltage_nominal: 6
+    GND:
+      role: ground
+    PWM:
+      role: pwm_out
+- id: test-roller
+  name: Synthetic bench roller
+  kind: wheel
+  mechanical:
+    shape: cylinder
+    axis: y
+    size:
+    - 0.14
+    - 0.025
+    mass: 0.04
+    moving: true
+    material: Rubber
+  behavior:
+    model: wheel.tire
+    params:
+      radius: 0.07
+      width: 0.025
+      friction: 0.9
+      rolling_resistance: 0.015

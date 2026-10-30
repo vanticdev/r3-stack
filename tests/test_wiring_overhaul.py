@@ -22,7 +22,7 @@ from r3_wiring.planner import ClearanceField, Junction, Segment, bundle_bend_rad
 from r3_wiring.supports import load_catalog, max_unsupported_span
 from test_wiring_witness import box_mesh
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
 
 
 # ------------------------------------------------------------------ planner
@@ -85,7 +85,7 @@ def test_planner_reports_an_infeasible_bend_with_its_constraint():
 
 
 def test_bundle_bend_radius_rule():
-    catalog = Project.load(RC_CAR).catalog
+    catalog = Project.load(BENCH).catalog
     od12 = float(catalog.wire(12).outer_diameter)
     assert bundle_bend_radius(catalog, [12], od12, False) == pytest.approx(4 * od12)
     # Loose pair: the inner conductor keeps 4 x its own OD (SAE AS50881: largest wire).
@@ -201,7 +201,7 @@ def test_pinned_support_becomes_ball_and_connect_in_mujoco(small):
 
 def test_bundle_occupancy_detects_interference_and_segregation():
     """A motor pair laid 1.5 mm from a GPS lead: the bundles overlap and share a corridor."""
-    catalog = Project.load(RC_CAR).catalog
+    catalog = Project.load(BENCH).catalog
     a = np.column_stack([np.linspace(0, 0.1, 50), np.zeros(50), np.zeros(50)])
     b = a + [0.0, 0.0015, 0.0]
     wires = {"w1": SimpleNamespace(path=a, harness="h1"), "w2": SimpleNamespace(path=b, harness="h2")}

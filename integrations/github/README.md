@@ -4,7 +4,7 @@ GitHub is the source of truth for an R3 robot: the repository holds
 `robot.yaml`, sources and `r3.lock.yaml`; CI runs the pipeline and publishes
 `build/` as an artifact. Live simulation state is never committed.
 
-- `scaffold.create_project(target, template="rc-car")` writes a project
+- `scaffold.create_project(target, template="robot")` writes a project
   repository: `robot.yaml` (renamed, comments kept), `r3.lock.yaml` (platform
   revision pin), `cad/`, `pcb/<board>/`, `catalog/`, `backend/deploy.py` (BLITZ
   hooks generated from `software.modules`) and module stubs, `.gitignore`

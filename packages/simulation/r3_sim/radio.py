@@ -1,9 +1,9 @@
 """2.4 GHz ExpressLRS radio link: propagation, LoRa packet errors, receiver.
 
-Propagation (per packet), handset -> car antenna:
+Propagation (per packet), handset -> robot antenna:
 
 * **Sionna RT** ray tracing (``radio_sionna``) of the scene built from the spec
-  (``radio_scene``): ITU ground, obstacle boxes, dipole antennas, the car's own
+  (``radio_scene``): ITU ground, obstacle boxes, dipole antennas, the robot's own
   body. The coherent multipath sum at the ELRS FHSS hop frequency gives the
   channel gain *including* small-scale fading. This is the default.
 * **Analytic fallback** (``radio_analytic``): closed-form two-ray + knife edges,
@@ -117,7 +117,7 @@ def select_backend(renv: dict[str, Any]) -> str:
 
 
 class RadioLink:
-    """TX (pilot handset) -> RX (car receiver) uplink and telemetry downlink."""
+    """TX (pilot handset) -> RX (robot receiver) uplink and telemetry downlink."""
 
     def __init__(self, environment: Any, receiver_params: dict[str, Any], rng: np.random.Generator,
                  scene: RadioScene | None = None, scene_dir: Path | None = None, backend: str | None = None) -> None:
@@ -164,7 +164,7 @@ class RadioLink:
                 self.diagnostics.append(Diagnostic.warning(
                     "radio_propagation_fallback",
                     f"Sionna RT unavailable ({type(exc).__name__}: {exc}); using the analytic two-ray FALLBACK "
-                    "(no ray-traced multipath, obstacles as knife edges, no car body)",
+                    "(no ray-traced multipath, obstacles as knife edges, no robot body)",
                     subjects=["radio"], data={"sionna_available": 0.0}))
         else:
             self.diagnostics.append(Diagnostic.warning(
@@ -218,7 +218,7 @@ class RadioLink:
                           channel.gain_db - channel.mean_gain_db, f)
 
     def mean_rx_power_dbm(self, points: np.ndarray, model: Any | None = None) -> tuple[np.ndarray, np.ndarray]:
-        """Static-scene (no body, no shadowing) RX power at car-antenna ``points``: (coherent at carrier, local mean)."""
+        """Static-scene (no body, no shadowing) RX power at robot-antenna ``points``: (coherent at carrier, local mean)."""
         coherent, mean = (model or self.model).static_gain_db(points)
         return self.tx_power_dbm + coherent, self.tx_power_dbm + mean
 
@@ -284,7 +284,7 @@ class ElrsReceiver:
     def advance(self, t_end: float, rx_position: np.ndarray, channels_us: list[float], powered: bool,
                 rotation: np.ndarray | None = None) -> list[tuple[float, int]]:
         """Process packet slots up to ``t_end``; returns (arrival time, byte) pairs on the RX->Pi UART.
-        ``rotation`` (car body to world) poses the car body in the ray-traced scene."""
+        ``rotation`` (robot body to world) poses the robot body in the ray-traced scene."""
         out: list[tuple[float, int]] = []
         if not powered:
             self.powered_since = None

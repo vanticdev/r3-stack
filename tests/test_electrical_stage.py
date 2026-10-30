@@ -1,11 +1,11 @@
-"""Run the electrical stage on the reference RC car and print its diagnostics."""
+"""Run the electrical stage on the reference bench and print its diagnostics."""
 
 import json
 import shutil
 
 import pytest
 
-from conftest import copy_rc_car
+from conftest import copy_bench
 from r3_model.project import Project
 from r3_sim.electrical.stage import run
 from r3_sim.electrical.ngspice import find_library
@@ -40,14 +40,19 @@ def _run_and_check(root, routed: bool):
     return result
 
 
-def test_electrical_stage_on_rc_car(tmp_path):
-    """A fresh copy of the RC car (no build artifacts): wire lengths are estimated."""
-    _run_and_check(copy_rc_car(tmp_path / "rc-car"), routed=False)
+def test_electrical_stage_on_bench(tmp_path):
+    """A fresh copy of the bench (no build artifacts): wire lengths are estimated."""
+    _run_and_check(copy_bench(tmp_path / "bench"), routed=False)
 
 
-def test_electrical_stage_uses_routed_wire_lengths(rc_car_wiring, tmp_path):
+def test_electrical_stage_uses_routed_wire_lengths(tmp_path):
     """With the wiring stage's routes.json the lengths (and installed ampacity) come from routing."""
-    root = copy_rc_car(tmp_path / "rc-car")
+    root = copy_bench(tmp_path / "bench")
     (root / "build" / "wiring").mkdir(parents=True)
-    shutil.copy(rc_car_wiring.root / "build" / "wiring" / "routes.json", root / "build" / "wiring" / "routes.json")
+    project = Project.load(root)
+    # A synthetic measured route per conductor exercises the hand-off independently
+    # of router optimization and cable dynamics (which have their own fixtures).
+    routes = {"wires": {w.id: {"cut_length": .2, "installed_ampacity": project.catalog.wire(w.awg).ampacity}
+                         for h in project.spec.electrical.harnesses for w in h.wires}}
+    (root / "build/wiring/routes.json").write_text(json.dumps(routes))
     _run_and_check(root, routed=True)

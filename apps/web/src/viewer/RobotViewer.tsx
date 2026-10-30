@@ -391,10 +391,10 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
       mesh.geometry.dispose();
       mesh.geometry = playbackTubeGeometry(cable, interpolatePoints(a, b!, cursor.alpha));
     }
-    const chassis = root ? deltas[root] : null;
+    const base = root ? deltas[root] : null;
     const orbit = controls as unknown as { target: Vector3; update(): void } | null;
-    if (chassis && orbit) {
-      const p = new Vector3().setFromMatrixPosition(chassis);
+    if (base && orbit) {
+      const p = new Vector3().setFromMatrixPosition(base);
       if (follow && last.current) {
         const d = p.clone().sub(last.current);
         camera.position.add(d);
@@ -438,7 +438,7 @@ function PlaybackConnectors({ playback, data, register }: {
     if (!connectors) return [];
     const frames = playback.recording.frames!;
     const bodies = new Set(Object.keys(frames.bodies));
-    const root = frames.component_bodies.chassis ?? (frames.bodies.chassis ? "chassis" : Object.keys(frames.bodies)[0] ?? "");
+    const root = frames.component_bodies.base ?? (frames.bodies.base ? "base" : Object.keys(frames.bodies)[0] ?? "");
     const of = (id: string) => frames.component_bodies[id] ?? componentBody(data.tree, id, bodies, root) ?? root;
     const owner = (ref: string, seen = new Set<string>()): string => {
       const c = connectors.connectors[ref];

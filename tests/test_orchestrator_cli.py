@@ -26,20 +26,20 @@ def project(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def clean_project(tmp_path: Path) -> Path:
-    """RC car with the layout interferences moved apart, so the model stage passes."""
+    """bench with the layout interferences moved apart, so the model stage passes."""
     def fix(spec):
-        spec["components"]["standoff_rl"]["pose"]["xyz"] = ["30 mm", "45 mm", "28 mm"]
-        spec["components"]["standoff_rr"]["pose"]["xyz"] = ["25 mm", "-45 mm", "28 mm"]
-        spec["components"]["hat"]["pose"]["xyz"] = ["102.5 mm", 0, "98 mm"]
-        spec["components"]["knuckle_fl"]["pose"]["xyz"] = ["260 mm", "66 mm", "35 mm"]
-        spec["components"]["knuckle_fr"]["pose"]["xyz"] = ["260 mm", "-66 mm", "35 mm"]
+        spec["components"] = {"base": spec["components"]["base"]}
+        spec["mechanical"] = {}
+        spec["electrical"] = {}
+        spec["software"] = {}
+        spec["pcb"] = {}
     return make_project(tmp_path, fix, name="clean")
 
 
 def test_validate_model_json(capsys, project):
     code, payload = r3(capsys, "validate", "--stage", "model", "--project", str(project), "--json")
     assert code == cli.EXIT_ERRORS
-    assert payload["ok"] is False and payload["robot"] == "r3-rc-car"
+    assert payload["ok"] is False and payload["robot"] == "r3-bench"
     assert [s["stage"] for s in payload["stages"]] == ["model", "report"]
     assert payload["counts"]["error"] == len([d for d in payload["diagnostics"] if d["severity"] == "error"]) > 0
     first = payload["diagnostics"][0]
@@ -105,18 +105,18 @@ def test_unknown_stage_is_usage_error(capsys, project):
 def test_status_and_diagnose(capsys, project):
     r3(capsys, "validate", "--stage", "model", "-C", str(project), "--json")
     code, status = r3(capsys, "status", "-C", str(project), "--json")
-    assert status["summary"]["components"] == 23 and status["summary"]["bindings"] == 6
+    assert status["summary"]["components"] == 18 and status["summary"]["bindings"] == 7
     model = next(s for s in status["stages"] if s["stage"] == "model")
     assert model["status"] == "failed" and model["stale"] is False
     code, diagnosis = r3(capsys, "diagnose", "-C", str(project), "--json")
     assert code == cli.EXIT_ERRORS
     subjects = {g["subject"] for g in diagnosis["subjects"]}
-    assert "esc" in subjects
-    group = next(g for g in diagnosis["subjects"] if g["subject"] == "esc")
-    assert group["diagnostics"][0]["hint"] and group["diagnostics"][0]["also"] == ["standoff_rl"]
+    assert "block_a" in subjects
+    group = next(g for g in diagnosis["subjects"] if g["subject"] == "block_a")
+    assert group["diagnostics"][0]["hint"] and group["diagnostics"][0]["also"] == ["block_b"]
     # Human output is grouped by subject too.
     assert cli.main(["diagnose", "-C", str(project)]) == cli.EXIT_ERRORS
-    assert "esc: 1 errors" in capsys.readouterr().out
+    assert "block_a: 1 errors" in capsys.readouterr().out
 
 
 def test_status_marks_stale_results(capsys, project):

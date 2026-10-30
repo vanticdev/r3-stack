@@ -168,7 +168,7 @@ def test_mouser_keyword_and_part_number(tmp_path, monkeypatch):
 def test_agent_research_validates_and_marks_estimates(tmp_path, monkeypatch):
     provider = fake_research(tmp_path, monkeypatch)
     provider.check_available()
-    req = requirement(WHEEL_SOURCE, "front_wheels", ["wheel_fl", "wheel_fr"])
+    req = requirement(WHEEL_SOURCE, "sample_pair", ["sample_a", "sample_b"])
     found = {c.mpn: c for c in provider.search(req)}
     call = json.loads((tmp_path / "research-call.json").read_text())
     assert "--json-schema" in call["argv"] and "WebSearch,WebFetch" in call["argv"] and "12 mm hex" in call["stdin"]

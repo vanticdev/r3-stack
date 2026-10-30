@@ -62,7 +62,7 @@ class RobotDynamics:
         self.mujoco_threads = mujoco_threads()
         if self.mujoco_threads > 1:
             # MuJoCo's own thread pool parallelises collision inside a step; the results are bit-identical to the
-            # serial step (checked on the RC car with cables: max |dq| = 0 after 600 steps).
+            # serial step (checked on the robot with cables: max |dq| = 0 after 600 steps).
             mujoco.mju_threadpool(self.data, self.mujoco_threads)
         model = self.model
         env = project.spec.simulation.environment
@@ -181,7 +181,7 @@ class RobotDynamics:
         if vm.cables is not None:
             from r3_wiring.mujoco_cables import CableMonitor, settle
 
-            # The cables live in this world; let their slack settle with the car at rest before t = 0.
+            # The cables live in this world; let their slack settle with the robot at rest before t = 0.
             self.cables = CableMonitor(model, self.data, vm.cables, vm.root)
             # Pre-roll settles cables only. Robot parts start from the assembly,
             # so missing retainers cannot fall out before recording begins.

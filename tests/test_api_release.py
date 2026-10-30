@@ -3,17 +3,25 @@
 from __future__ import annotations
 
 import json
+import yaml
 
 import pytest
 
-from api_helpers import copy_rc_car, write_sim_scenario, write_stage_outputs
+from api_helpers import copy_bench, write_sim_scenario, write_stage_outputs
 from r3_model.diagnostics import StageResult
 from r3_orchestrator import api, cli, mcp_server, release
 
 
 @pytest.fixture
 def root(tmp_path):
-    return copy_rc_car(tmp_path)
+    root = copy_bench(tmp_path)
+    data = yaml.safe_load((root / "robot.yaml").read_text())
+    data["requirements"].update(top_speed="8 m/s", max_component_temperature_c=85)
+    data["simulation"]["scenarios"][1]["expect"]["min_top_speed_mps"] = 8
+    data["simulation"]["scenarios"][2]["expect"]["laps_completed"] = 1
+    data["components"]["overlap"] = dict(type="test-base", mount="base", pose={"xyz": [0, 0, .02]})
+    (root / "robot.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
+    return root
 
 
 def items(payload):
@@ -26,8 +34,8 @@ def test_nothing_run_is_not_ready(root):
     assert gate["counts"]["not_run"] == len(gate["items"]) and set(gate["blocking"]) == set(items(gate))
     kinds = {i["kind"] for i in gate["items"]}
     assert kinds == {"requirement", "scenario_expectation", "stage"}
-    assert "requirement.max_mass" in items(gate) and "scenario.steering_sweep.min_wire_clearance_m" in items(gate)
-    assert items(gate)["requirement.max_mass"]["target"] == pytest.approx(2.2)
+    assert "requirement.max_mass" in items(gate) and "scenario.full_throttle.min_top_speed_mps" in items(gate)
+    assert items(gate)["requirement.max_mass"]["target"] == pytest.approx(5)
 
 
 def test_status_precedence():
@@ -76,7 +84,7 @@ def test_evidence_from_results(root):
     assert gate["stage.model"]["status"] == "failed" and gate["stage.cad"]["status"] == "not_run"
     assert gate["stage.model"]["evidence"][0]["value"] > 0
     model_result = json.loads((root / "build/model/result.json").read_text())
-    assert any(d["code"] == "flat_cable_route_estimated" for d in model_result["diagnostics"])
+    assert any(d["code"] == "component_interference" for d in model_result["diagnostics"])
     temperature = gate["requirement.max_component_temperature_c"]
     assert temperature["status"] == "verified" and temperature["evidence"][0]["value"] == 60.0
     assert gate["requirement.min_runtime"]["status"] == "verified" and gate["requirement.min_runtime"]["evidence"][0]["value"] == 1800.0

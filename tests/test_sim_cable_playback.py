@@ -73,7 +73,7 @@ def test_recorded_wire_mapping_diameter_fanouts_and_motion(cable_world, tmp_path
     q0 = model.qpos0.copy()
     q1 = q0.copy()
     # A translation and yaw exercise world/robot-frame conversion. Geometry must
-    # move exactly with the car, including both pin-to-core fan-outs.
+    # move exactly with the robot, including both pin-to-core fan-outs.
     rotation=np.array([[np.cos(.4),-np.sin(.4),0],[np.sin(.4),np.cos(.4),0],[0,0,1]])
     yaw=np.array([np.cos(.2),0,0,np.sin(.2)])
     for j in range(model.njnt):

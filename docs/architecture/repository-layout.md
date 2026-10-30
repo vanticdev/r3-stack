@@ -84,7 +84,7 @@ identities, caches, and local environments must remain untracked.
 - Stable CAD/component identity and external revision reconciliation.
 - Physics engine, simulation clock, solver coupling, and determinism policy.
 - Supported hardware operations and how software connects to virtual devices.
-- Initial component catalog, reference robot, and validation acceptance criteria.
+- Component catalog coverage and validation acceptance criteria.
 - Job transport, persistence, artifact storage, and deployment infrastructure.
 
 Start with a small end-to-end robot workflow. Static cable routes and conservative

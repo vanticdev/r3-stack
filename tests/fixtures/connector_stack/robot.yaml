@@ -1,0 +1,12 @@
+robot: {name: connector-stack, mobility: stationary}
+components:
+  header: {type: synthetic-header}
+  socket: {type: synthetic-socket, mount: header, pose: {xyz: [0, 0, 0.0022]}}
+mechanical:
+  interfaces:
+    - id: contact
+      kind: connector_retention
+      parts: [header, socket]
+      axis_point: [0, 0, 0.0022]
+      axis_dir: [0, 0, 1]
+      params: {min_insertion: 0.005}

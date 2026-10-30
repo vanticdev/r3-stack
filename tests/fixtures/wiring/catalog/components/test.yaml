@@ -1,0 +1,153 @@
+components:
+- id: test-plate
+  kind: structure
+  mechanical:
+    mass: 0.3
+    shape: box
+    size:
+    - 320 mm
+    - 160 mm
+    - 3 mm
+  name: Test base plate
+- id: test-block
+  kind: sensor
+  mechanical:
+    mass: 0.1
+    shape: box
+    size:
+    - 40 mm
+    - 80 mm
+    - 50 mm
+  name: Obstacle block
+- id: test-arm
+  kind: structure
+  mechanical:
+    mass: 0.02
+    shape: box
+    size:
+    - 20 mm
+    - 20 mm
+    - 20 mm
+  name: Steered arm
+- connectors:
+    J1:
+      direction:
+      - 1
+      - 0
+      - 0
+      pins:
+        '1': S
+        '2': V
+        '3': G
+      position:
+      - 10 mm
+      - 0
+      - 10 mm
+      type: header-1x3-2.54
+  id: test-box
+  kind: sensor
+  mechanical:
+    mass: 0.02
+    shape: box
+    size:
+    - 20 mm
+    - 20 mm
+    - 20 mm
+  name: Box with a 3-pin header
+  pins:
+    G:
+      role: ground
+    S:
+      role: gpio
+    V:
+      role: power_in
+- connectors:
+    J1:
+      direction:
+      - -1
+      - 0
+      - 0
+      pins:
+        '1': S
+        '2': V
+        '3': G
+      position:
+      - -10 mm
+      - 0
+      - 10 mm
+      type: header-1x3-2.54
+  id: test-box-rev
+  kind: sensor
+  mechanical:
+    mass: 0.02
+    shape: box
+    size:
+    - 20 mm
+    - 20 mm
+    - 20 mm
+  name: Box with a 3-pin header facing -x
+  pins:
+    G:
+      role: ground
+    S:
+      role: gpio
+    V:
+      role: power_in
+- connectors:
+    J1:
+      direction:
+      - 1
+      - 0
+      - 0
+      pins:
+        '1': POS
+        '2': NEG
+      position:
+      - 30 mm
+      - 0
+      - 10 mm
+      type: integral
+  id: test-pack
+  kind: battery
+  mechanical:
+    mass: 0.1
+    shape: box
+    size:
+    - 60 mm
+    - 40 mm
+    - 20 mm
+  name: Pack with a two-wire pigtail
+  pins:
+    NEG:
+      role: ground
+    POS:
+      role: power_out
+- connectors:
+    J1:
+      direction:
+      - -1
+      - 0
+      - 0
+      pins:
+        '1': POS
+        '2': NEG
+      position:
+      - -10 mm
+      - 0
+      - 10 mm
+      type: xt30pw-male
+  id: test-sink
+  kind: sensor
+  mechanical:
+    mass: 0.02
+    shape: box
+    size:
+    - 20 mm
+    - 20 mm
+    - 20 mm
+  name: Load with an XT30 PCB socket facing -x
+  pins:
+    NEG:
+      role: ground
+    POS:
+      role: power_in

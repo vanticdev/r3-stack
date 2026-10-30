@@ -1,0 +1,155 @@
+schema: r3/robot@1
+robot:
+  name: wiring-bench
+  mobility: stationary
+components:
+  plate:
+    type: test-plate
+    pose:
+      xyz:
+      - 100 mm
+      - 0
+      - 0
+  pack:
+    type: test-pack
+    mount: plate
+    pose:
+      xyz:
+      - 0
+      - 0
+      - 3 mm
+  load_l:
+    type: test-sink
+    mount: plate
+    pose:
+      xyz:
+      - 210 mm
+      - 45 mm
+      - 3 mm
+  load_r:
+    type: test-sink
+    mount: plate
+    pose:
+      xyz:
+      - 210 mm
+      - -45 mm
+      - 3 mm
+  sensor:
+    type: test-arm
+    mount: plate
+    pose:
+      xyz:
+      - 0.3
+      - 0.1
+      - 0.05
+mechanical:
+  joints:
+  - id: pivot
+    type: revolute
+    parent: plate
+    child: load_r
+    origin:
+    - 0.21
+    - -0.045
+    - 0.003
+    axis:
+    - 0
+    - 0
+    - 1
+    limits:
+    - -0.4
+    - 0.4
+    damping: 0.01
+  - id: sensor_pivot
+    type: revolute
+    parent: plate
+    child: sensor
+    origin:
+    - 0.3
+    - 0.1
+    - 0.05
+    axis:
+    - 0
+    - 0
+    - 1
+    limits:
+    - -0.2
+    - 0.2
+    damping: 0.01
+electrical:
+  harnesses:
+  - id: pig
+    connectors:
+      A:
+        type: integral
+        mates: pack.J1
+      B:
+        type: xt60-female
+    wires:
+    - id: W_PIG_P
+      from: A.1
+      to: B.1
+      awg: 12
+      color: red
+    - id: W_PIG_N
+      from: A.2
+      to: B.2
+      awg: 12
+      color: black
+    route:
+      slack: 20 mm
+  - id: ysplit
+    connectors:
+      P1:
+        type: xt60-male
+        mates: pig.B
+      D1:
+        type: xt30-female
+        mates: load_l.J1
+      D2:
+        type: xt30-female
+        mates: load_r.J1
+    splices:
+      SP:
+        position:
+        - 165 mm
+        - 8 mm
+        - 15 mm
+      SN:
+        position:
+        - 165 mm
+        - -8 mm
+        - 15 mm
+    wires:
+    - id: W_Y_P
+      from: P1.1
+      to: SP
+      awg: 14
+      color: red
+    - id: W_Y_N
+      from: P1.2
+      to: SN
+      awg: 14
+      color: black
+    - id: W_L_P
+      from: SP
+      to: D1.1
+      awg: 20
+      color: red
+    - id: W_L_N
+      from: SN
+      to: D1.2
+      awg: 20
+      color: black
+    - id: W_R_P
+      from: SP
+      to: D2.1
+      awg: 20
+      color: red
+    - id: W_R_N
+      from: SN
+      to: D2.2
+      awg: 20
+      color: black
+    route:
+      slack: 20 mm

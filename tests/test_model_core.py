@@ -5,7 +5,7 @@ import pytest
 from r3_model.project import Project
 from r3_model.units import to_si
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
 
 
 def test_units():
@@ -15,13 +15,13 @@ def test_units():
     assert to_si(3) == 3.0
 
 
-def test_rc_car_graph_has_no_errors():
-    project = Project.load(RC_CAR)
+def test_bench_graph_has_no_errors():
+    project = Project.load(BENCH)
     assert project.graph.diagnostics == []
 
 
 def test_bindings_reach_devices():
-    project = Project.load(RC_CAR)
+    project = Project.load(BENCH)
     graph = project.graph
     for binding in project.spec.software.bindings.values():
         expects = binding.expects if len(binding.expects) == len(binding.pins) else binding.expects * len(binding.pins)
@@ -30,6 +30,6 @@ def test_bindings_reach_devices():
 
 
 def test_fuse_separates_hat_from_battery_net():
-    graph = Project.load(RC_CAR).graph
-    assert graph.connected("battery.POS", "hat.VBAT", through_internal=True)
-    assert not graph.connected("battery.POS", "hat.VBAT")
+    graph = Project.load(BENCH).graph
+    assert graph.connected("battery.POS", "controller.VBAT", through_internal=True)
+    assert not graph.connected("battery.POS", "controller.VBAT")

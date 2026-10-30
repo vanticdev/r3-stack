@@ -1,4 +1,4 @@
-"""Fixture helpers for orchestrator tests: copy the RC car and inject faults."""
+"""Fixture helpers for orchestrator tests: copy the bench and inject faults."""
 
 from __future__ import annotations
 
@@ -12,29 +12,34 @@ import yaml
 from r3_catalog import DATA_DIR
 
 ROOT = Path(__file__).resolve().parents[1]
-# Frozen copy of the first RC-car layout (with its known interferences) and of the
-# catalog entries it was authored against, so these tests do not change whenever
-# the example design or its catalog parts are improved.
-RC_CAR = ROOT / "tests" / "fixtures" / "rc_car_layout_v0"
+# Independent source fixture. Faults are injected explicitly so model-stage
+# checks do not depend on a project's incidental placement or catalog updates.
+BENCH = ROOT / "tests" / "fixtures" / "bench"
 
 
-def rc_car_spec() -> dict[str, Any]:
-    return yaml.safe_load((RC_CAR / "robot.yaml").read_text())
+def bench_spec() -> dict[str, Any]:
+    spec = yaml.safe_load((BENCH / "robot.yaml").read_text())
+    spec["components"]["block_a"] = {"type": "test-panel", "mount": "base", "pose": {"xyz": [0, 0, .3]}}
+    spec["components"]["block_b"] = {"type": "test-panel", "mount": "base", "pose": {"xyz": [0, 0, .3]}}
+    return spec
 
 
 def make_project(tmp_path: Path, mutate: Callable[[dict[str, Any]], None] | None = None,
-                 catalog_components: list[dict[str, Any]] | None = None, name: str = "car") -> Path:
-    """Write a copy of the RC car robot.yaml (optionally mutated) and a project-local catalog."""
+                 catalog_components: list[dict[str, Any]] | None = None, name: str = "bench") -> Path:
+    """Write a copy of the bench robot.yaml (optionally mutated) and a project-local catalog."""
     root = tmp_path / name
     root.mkdir(parents=True)
-    shutil.copytree(RC_CAR / "catalog", root / "catalog")  # the layout's frozen catalog envelopes
-    if mutate is None and catalog_components is None:
-        (root / "robot.yaml").write_text((RC_CAR / "robot.yaml").read_text())
-        return root
-    spec = rc_car_spec()
+    shutil.copytree(BENCH / "catalog", root / "catalog")  # independent fixture catalog
+    spec = bench_spec()
     if mutate:
         mutate(spec)
-    (root / "robot.yaml").write_text(yaml.safe_dump(spec, sort_keys=False))
+    from io import StringIO
+    from ruamel.yaml import YAML
+    editor = YAML()
+    editor.indent(mapping=2, sequence=4, offset=2)
+    buffer = StringIO()
+    editor.dump(spec, buffer)
+    (root / "robot.yaml").write_text("# Robot frame: synthetic stationary rig\n" + buffer.getvalue())
     if catalog_components:
         (root / "catalog" / "components").mkdir(parents=True, exist_ok=True)
         (root / "catalog" / "components" / "overrides.yaml").write_text(yaml.safe_dump({"components": catalog_components}))
@@ -43,8 +48,8 @@ def make_project(tmp_path: Path, mutate: Callable[[dict[str, Any]], None] | None
 
 def catalog_entry(type_id: str) -> dict[str, Any]:
     """A deep copy of the catalog component the fixture layout uses (frozen entry, else bundled), to override."""
-    for path in [*sorted((RC_CAR / "catalog" / "components").glob("*.yaml")), *sorted((DATA_DIR / "components").glob("*.yaml"))]:
-        for entry in yaml.safe_load(path.read_text())["components"]:
+    for path in [*sorted((BENCH / "catalog" / "components").glob("*.yaml")), *sorted((DATA_DIR / "components").glob("*.yaml"))]:
+        for entry in yaml.safe_load(path.read_text()).get("components", []):
             if entry["id"] == type_id:
                 return copy.deepcopy(entry)
     raise KeyError(type_id)

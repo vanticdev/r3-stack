@@ -21,7 +21,7 @@ def test_ina226_calibration_math() -> None:
 
 
 def test_ina226_driver_reads_voltage_and_current() -> None:
-    hal = fake.FakeCarHal(lambda t: {})
+    hal = fake.SensorHal()
     ina = Ina226(hal.i2c("/dev/i2c-1"), 0x40, 0.002, 10.0)
     ina.init()
     assert hal.i2c_devices[0x40].registers[0x05] == 5120
@@ -29,17 +29,17 @@ def test_ina226_driver_reads_voltage_and_current() -> None:
     reading = ina.read()
     expected_v = hal.battery_voltage()
     assert reading.bus_voltage_v == pytest.approx(expected_v, abs=1.25e-3)
-    assert reading.current_a == pytest.approx(hal.params.hat_current, abs=5e-4)
-    assert reading.shunt_voltage_v == pytest.approx(hal.params.hat_current * 0.002, abs=2.5e-6)
+    assert reading.current_a == pytest.approx(hal.params.monitor_current, abs=5e-4)
+    assert reading.shunt_voltage_v == pytest.approx(hal.params.monitor_current * 0.002, abs=2.5e-6)
 
 
 def test_mpu6050_init_and_burst_read_scale() -> None:
-    hal = fake.FakeCarHal(lambda t: {}, params=fake.CarParams(gyro_noise=0.0, gyro_bias=0.0))
+    hal = fake.SensorHal(params=fake.SensorParams(gyro_noise=0.0, gyro_bias=0.0))
     imu = Mpu6050(hal.i2c("/dev/i2c-1"))
     imu.init()
     registers = hal.i2c_devices[0x68].registers
     assert registers[0x6B] == 0x01 and registers[0x1B] == 1 << 3 and registers[0x1C] == 1 << 3
-    hal.car.yaw_rate = 1.0  # rad/s
+    hal.sensor.yaw_rate = 1.0  # rad/s
     sample = imu.read()
     assert sample.gyro_rps[2] == pytest.approx(1.0, abs=math.radians(1 / 65.5))
     assert sample.accel_mps2[2] == pytest.approx(9.80665, abs=0.01)
@@ -47,7 +47,7 @@ def test_mpu6050_init_and_burst_read_scale() -> None:
 
 
 def test_missing_device_reports_nack() -> None:
-    hal = fake.FakeCarHal(lambda t: {})
+    hal = fake.SensorHal()
     del hal.i2c_devices[0x68]
     with pytest.raises(HalError) as error:
         Mpu6050(hal.i2c("/dev/i2c-1")).init()
@@ -66,7 +66,7 @@ def test_gyro_bias_calibration_restarts_on_motion() -> None:
 
 
 def test_wheel_speed_from_edge_timestamps() -> None:
-    spacing = 2 * math.pi * 0.055 / 4
+    spacing = 2 * math.pi * 0.08 / 8
     wheel = WheelSpeedEstimator(spacing)
     speed, count, t = 3.0, 0, 0.0
     period = spacing / speed
@@ -99,11 +99,11 @@ def test_estimator_fuses_gps_and_wheel_speed() -> None:
     assert nmea_course_to_enu(90.0) == pytest.approx(0.0)  # due east
 
 
-def test_mpu_mount_rotation_transforms_specific_force_to_chassis():
-    hal = fake.FakeCarHal(lambda t: {}, params=fake.CarParams(gyro_noise=0.0, gyro_bias=0.0))
+def test_mpu_mount_rotation_transforms_specific_force_to_robot_frame():
+    hal = fake.SensorHal(params=fake.SensorParams(gyro_noise=0.0, gyro_bias=0.0))
     imu = Mpu6050(hal.i2c('/dev/i2c-1'), mounting_rpy_deg=(0, 90, 0))
     imu.init()
-    # Synthetic sensor gravity +z with a 90 degree pitch mounting becomes chassis +x.
+    # Synthetic sensor gravity +z with a 90 degree pitch mounting becomes robot_frame +x.
     sample = imu.read()
     assert sample.accel_mps2[0] == pytest.approx(9.80665, abs=.01)
     assert sample.accel_mps2[2] == pytest.approx(0, abs=.01)

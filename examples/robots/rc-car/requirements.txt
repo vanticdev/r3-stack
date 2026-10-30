@@ -1,2 +1,0 @@
-# Single BLITZ Python requirements file for the RC car project.
-# rc_car_controller uses only the standard library and the vendored r3_hal.

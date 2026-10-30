@@ -1,20 +1,17 @@
 """Shared, session-scoped fixtures: expensive stages run once into temporary projects.
 
-* ``rc_car_wiring``: the full wiring stage on a fresh copy of the reference RC car's
-  ``robot.yaml`` (catalog geometry; nothing read from ``examples/robots/rc-car/build``).
+* ``bench_wiring``: the full wiring stage on a fresh copy of the reference bench's
+  ``robot.yaml`` (catalog geometry; nothing read from ``tests/fixtures/bench/build``).
   Every test that uses it is marked ``slow`` automatically.
-* ``rc_car_fresh``: a copy of the RC car's sources without ``build/`` (module scope), so
+* ``bench_fresh``: a copy of the bench's sources without ``build/`` (module scope), so
   simulation tests never pick up stale CAD exports or ``routes.json`` from earlier runs.
 * ``small_wiring`` / ``branch_wiring``: :func:`r3_wiring.stage.route_and_check` on the
   synthetic projects of :mod:`test_wiring_support` (one connector pair; every
   termination kind), for fast router/planner tests.
 
-Tests never see ``examples/robots/*/build`` (design-fix-queue item 19: stale
-``routes.json`` and CAD exports caused false failures). ``Project.load`` of an
-example project returns a source-only copy, one per test module, so every
-artifact a test reads it (or its module) generated, and nothing is written into
-the example. ``R3_TESTS_USE_EXAMPLE_BUILD=1`` restores the old behaviour for
-manual debugging.
+Fixture projects are copied from sources before each module uses them. Every
+artifact read by a test is generated in its temporary project; local build
+folders never affect the suite.
 """
 
 from __future__ import annotations
@@ -27,8 +24,8 @@ from typing import Any
 
 import pytest
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
-EXAMPLES = RC_CAR.parent.resolve()
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
+EXAMPLES = BENCH.parent.resolve()
 _SOURCE_ONLY = shutil.ignore_patterns("build", "__pycache__", "_vendor")
 
 
@@ -42,7 +39,7 @@ class _ExampleCopies:
 
     def redirect(self, root: Path) -> Path:
         path = Path(root).resolve()
-        if path.parent != EXAMPLES or os.environ.get("R3_TESTS_USE_EXAMPLE_BUILD") == "1":
+        if path.parent != EXAMPLES:
             return path
         key = (self.module, path)
         if key not in self.copies:
@@ -58,6 +55,8 @@ def _examples_without_build(tmp_path_factory: pytest.TempPathFactory):
 
     copies = _ExampleCopies(tmp_path_factory.mktemp("example-sources"))
     original = Project.__dict__["load"]
+    old_templates = os.environ.get("R3_EXAMPLES_DIR")
+    os.environ["R3_EXAMPLES_DIR"] = str(EXAMPLES)
 
     def load(cls, root):
         return original.__func__(cls, copies.redirect(root))
@@ -65,6 +64,10 @@ def _examples_without_build(tmp_path_factory: pytest.TempPathFactory):
     Project.load = classmethod(load)
     yield copies
     Project.load = original
+    if old_templates is None:
+        os.environ.pop("R3_EXAMPLES_DIR", None)
+    else:
+        os.environ["R3_EXAMPLES_DIR"] = old_templates
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -83,31 +86,32 @@ class WiringRun:
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     for item in items:
-        if "rc_car_wiring" in getattr(item, "fixturenames", ()):
+        if "bench_wiring" in getattr(item, "fixturenames", ()):
             item.add_marker(pytest.mark.slow)
 
 
-def copy_rc_car(root: Path) -> Path:
-    """A fresh RC-car project: ``robot.yaml`` only (no build artifacts)."""
+def copy_bench(root: Path) -> Path:
+    """A fresh bench project: ``robot.yaml`` only (no build artifacts)."""
     root.mkdir(parents=True, exist_ok=True)
-    shutil.copy(RC_CAR / "robot.yaml", root / "robot.yaml")
+    shutil.copytree(BENCH, root, dirs_exist_ok=True, ignore=_SOURCE_ONLY)
     return root
 
 
 @pytest.fixture(scope="module")
-def rc_car_fresh(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    root = tmp_path_factory.mktemp("rc-car-fresh") / "rc-car"
-    shutil.copytree(RC_CAR, root, ignore=shutil.ignore_patterns("build", "__pycache__"))
+def bench_fresh(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    root = tmp_path_factory.mktemp("bench-fresh") / "bench"
+    shutil.copytree(BENCH, root, ignore=shutil.ignore_patterns("build", "__pycache__"))
     return root
 
 
 @pytest.fixture(scope="session")
-def rc_car_wiring(tmp_path_factory: pytest.TempPathFactory) -> WiringRun:
-    """The full RC-car wiring stage, once per session (artifacts under ``root/build/wiring``)."""
+def bench_wiring(tmp_path_factory: pytest.TempPathFactory) -> WiringRun:
+    """The full bench wiring stage, once per session (artifacts under ``root/build/wiring``)."""
     from r3_model.project import Project
     from r3_wiring.stage import format_diagnostics, run_stage
 
-    root = copy_rc_car(tmp_path_factory.mktemp("rc-car-wiring"))
+    root = tmp_path_factory.mktemp("bench-wiring")
+    shutil.copytree(EXAMPLES / "wiring", root, dirs_exist_ok=True, ignore=_SOURCE_ONLY)
     project = Project.load(root)
     result, bundle = run_stage(project)
     print("\n" + format_diagnostics(result))
@@ -136,3 +140,17 @@ def branch_wiring(tmp_path_factory: pytest.TempPathFactory) -> WiringRun:
     root = write_branch_project(tmp_path_factory.mktemp("branch-wiring"))
     project = Project.load(root)
     return WiringRun(root, project, route_and_check(project))
+
+
+@pytest.fixture(scope="session")
+def pcb_project(tmp_path_factory: pytest.TempPathFactory):
+    """Generate a passive coupon with KiCad in a temporary project, once per session."""
+    from r3_kicad.flow import Flow
+    from r3_kicad.library import find_install
+    from r3_model.project import Project
+    if find_install() is None:
+        pytest.skip("KiCad (kicad-cli + pcbnew) not installed")
+    root = tmp_path_factory.mktemp("pcb-coupon")
+    shutil.copytree(EXAMPLES / "pcb", root, dirs_exist_ok=True, ignore=_SOURCE_ONLY)
+    record = Flow(root / "pcb/test-board").run(watch_interval=.05)
+    return Project.load(root), record

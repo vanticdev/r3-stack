@@ -14,10 +14,10 @@ from r3_sim.vehicle import Vehicle, build_vehicle_model
 
 
 @pytest.fixture(scope="module")
-def routed(rc_car_wiring):
-    """The RC car with build/wiring/routes.json (catalog geometry, no CAD export; shared stage run)."""
-    assert (rc_car_wiring.root / "build" / "wiring" / "routes.json").exists()
-    return Project.load(rc_car_wiring.root), rc_car_wiring.bundle["routes"]
+def routed(bench_wiring):
+    """The bench with build/wiring/routes.json (catalog geometry, no CAD export; shared stage run)."""
+    assert (bench_wiring.root / "build" / "wiring" / "routes.json").exists()
+    return Project.load(bench_wiring.root), bench_wiring.bundle["routes"]
 
 
 @pytest.fixture(scope="module")
@@ -36,10 +36,15 @@ def wired_bench(tmp_path_factory):
     data=yaml.safe_load(catalog.read_text())
     arm=next(c for c in data["components"] if c["id"]=="test-arm")
     arm["mechanical"].update(size=[.02,.08,.02],envelope_offset=[0,.03,0])
+    data["components"].append(dict(id="test-guard", name="Clearance probe", kind="structure",
+        mechanical=dict(shape="box", size=[.01,.01,.01], mass=.01)))
     catalog.write_text(yaml.safe_dump(data))
     spec=yaml.safe_load((root/"robot.yaml").read_text())
     spec["robot"]["mobility"]="stationary"
     spec["components"]["dst"]["pose"]["xyz"][2]=.023
+    spec["components"]["guard"] = dict(type="test-guard", mount="plate", pose=dict(xyz=[.10,.065,.012]))
+    spec["mechanical"]["joints"].append(dict(id="probe", type="revolute", parent="plate", child="guard",
+        origin=[.10,.065,.012], axis=[0,0,1], limits=[-.1,.1], interface="probe_capture"))
     physics=lambda values:{key:dict(value=value,status="measured",source="Synthetic arm-bench mounting coupon rating") for key,value in values.items()}
     spec["mechanical"]["interfaces"]=[
         dict(id="bearing",kind="revolute_fit",parts=["plate","arm"],axis_point=[.2,-.06,.013],axis_dir=[0,0,1],
@@ -47,8 +52,12 @@ def wired_bench(tmp_path_factory):
         *[dict(id="pad_"+child,kind="adhesive",parts=[parent,child],axis_point=point,axis_dir=[0,0,1],
                params={"physics":physics(dict(area=.0004,shear_strength=1e7,peel_strength=1e7,radius=.01))})
           for parent,child,point in [("plate","src",[0,0,.003]),("arm","dst",[.2,0,.023]),("plate","block",[.1,0,.003])]]]
+    spec["mechanical"]["interfaces"].append(dict(id="probe_capture", kind="revolute_fit", parts=["plate","guard"],
+        axis_point=[.10,.065,.012], axis_dir=[0,0,1],
+        params={"physics":physics(dict(retention_force=1000,shear_force=1000,radius=.005))}))
     spec["mechanical"]["joints"][0]["interface"]="bearing"
-    spec["simulation"]={"scenarios":[dict(id="bench",duration=1)]}
+    spec["simulation"]={"environment":{"radio_environment":{"propagation_backend":"analytic"}},
+                        "scenarios":[dict(id="bench",duration=1)]}
     (root/"robot.yaml").write_text(yaml.safe_dump(spec))
     project=Project.load(root);routes=route_and_check(project)["routes"]
     (project.build_dir("wiring")/"routes.json").write_text(json.dumps(routes))

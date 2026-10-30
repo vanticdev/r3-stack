@@ -66,7 +66,7 @@ built the way an engineer organizes Onshape:
      top level, and `cad_model.json`. The document is pinned in `r3.lock.yaml` (`cad`,
      `cad_library`), and the superseded document is trashed.
 
-Negative tests: `python -m r3_onshape.negative_organized examples/robots/rc-car` runs a
+Negative tests: `python -m r3_onshape.negative_organized path/to/project` runs a
 misaligned hole pattern, a default-named feature, an unfoldered tab and an unconstrained
 sketch, and writes `build/cad/negative_tests.json`. The legacy single-Part-Studio builder
 (`direct.py`, `sync.py`, `plan.py`, `negative.py`) is kept for robot-frame specs without an
@@ -88,9 +88,9 @@ See [headless operation](../../docs/architecture/headless.md).
 Inspect the complete write plan without credentials, transport discovery or Onshape calls:
 
 ```sh
-python -m r3_onshape.organized rebuild examples/robots/rc-car --dry-run
-python -m r3_onshape.organized organize examples/robots/rc-car --dry-run
-python -m r3_onshape.negative_organized examples/robots/rc-car --dry-run
+python -m r3_onshape.organized rebuild path/to/project --dry-run
+python -m r3_onshape.organized organize path/to/project --dry-run
+python -m r3_onshape.negative_organized path/to/project --dry-run
 ```
 
 `R3_CAD_DRY_RUN=1` exposes the rebuild plan through the normal `cad` stage and saves

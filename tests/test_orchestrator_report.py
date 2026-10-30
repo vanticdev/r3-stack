@@ -59,5 +59,11 @@ def test_web_loader(built, source):
     assert out.returncode == 0, out.stdout + out.stderr
     if source == "generated":
         scene = json.loads(next(line for line in out.stdout.splitlines() if line.startswith('{"components"')))
-        assert scene["components"] == 23 and scene["wires"] == 30 and scene["routed"] is False
-        assert {"esc", "standoff_rl", "motor", "standoff_rr", "pi", "hat"} <= set(scene["flagged"])
+        graph = json.loads((built / "build/model/graph.json").read_text())
+        summary = json.loads((built / "build/report/summary.json").read_text())
+        assert scene["components"] == len(graph["components"])
+        assert scene["wires"] == sum(all(end is not None for end in w["ends"]) for w in graph["wires"].values())
+        assert scene["routed"] is False
+        expected = {subject for diagnostic in summary["diagnostics"] if diagnostic["severity"] == "error"
+                    for subject in diagnostic["subjects"] if subject in graph["components"]}
+        assert expected and set(scene["flagged"]) == expected

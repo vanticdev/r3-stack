@@ -16,7 +16,7 @@ import numpy as np
 
 from r3_model.units import to_si
 
-#: Speed below which the car counts as stopped (m/s).
+#: Speed below which the robot counts as stopped (m/s).
 STOP_SPEED = 0.05
 #: Waypoint capture radius for lap counting (m).
 CAPTURE_RADIUS = 2.0
@@ -72,7 +72,7 @@ def _project(xy: np.ndarray, segments: np.ndarray) -> tuple[np.ndarray, np.ndarr
 
 @dataclass
 class CourseProgress:
-    """Lap counting result. ``entered`` is when the car first moves onto the course past waypoint 1."""
+    """Lap counting result. ``entered`` is when the robot first moves onto the course past waypoint 1."""
 
     laps: int
     start: float | None  # first sample inside the capture radius of waypoint 1
@@ -81,8 +81,8 @@ class CourseProgress:
 
 
 def course_progress(xy: np.ndarray, t: np.ndarray, waypoints: list[list[float]], closed: bool) -> CourseProgress:
-    """Progress is the unwrapped arc length of the car's projection onto the course,
-    counted from the first approach to the first waypoint and only while the car is
+    """Progress is the unwrapped arc length of the robot's projection onto the course,
+    counted from the first approach to the first waypoint and only while the robot is
     within ``LAP_CORRIDOR`` of the course (shortcuts do not count). A lap completes
     when progress reaches the course length minus ``CAPTURE_RADIUS``."""
     if len(waypoints) < 2:
@@ -148,7 +148,7 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
                                 f"(progress along the course, start t={start}, end t={end})"))
         elif key == "max_cross_track_error_m":
             if start is None or course.entered is None:
-                checks.append(Check(key, expected, None, False, "car never reached the first path segment"))
+                checks.append(Check(key, expected, None, False, "robot never reached the first path segment"))
                 continue
             # The window opens on the first path segment (progress past waypoint 1), not at the capture circle,
             # where the distance to the course is up to CAPTURE_RADIUS by construction.
@@ -204,7 +204,7 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
             k0 = int(np.searchsorted(t, t0))
             k1 = _first_stop_after(t, speed, t0)
             if k1 is None:
-                checks.append(Check(key, expected, None, False, "car never stopped after link loss"))
+                checks.append(Check(key, expected, None, False, "robot never stopped after link loss"))
                 continue
             path = float(np.sum(np.hypot(np.diff(x[k0:k1 + 1]), np.diff(y[k0:k1 + 1])))) if k1 > k0 else 0.0
             checks.append(Check(key, expected, round(path, 3), path <= to_si(expected),
@@ -225,7 +225,7 @@ def evaluate(expect: dict[str, Any], rec: dict[str, np.ndarray], context: dict[s
                 k_end = len(t) - 1
                 path = float(np.sum(np.hypot(np.diff(x[k0:]), np.diff(y[k0:])))) if k_end > k0 else 0.0
                 checks.append(Check(key, expected, None, False,
-                                    f"car never stopped after the {fault['type']} fault at t={fault['t']:.2f}s "
+                                    f"robot never stopped after the {fault['type']} fault at t={fault['t']:.2f}s "
                                     f"({path:.1f} m travelled, {float(speed[-1]):.2f} m/s at the end)",
                                     {"speed_at_fault": float(speed[min(k0, len(speed) - 1)]), "distance_to_end": path,
                                      "final_speed": float(speed[-1])}))

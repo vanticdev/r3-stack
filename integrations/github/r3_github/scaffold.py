@@ -93,7 +93,7 @@ def render_deploy(project_name: str, spec: RobotSpec) -> str:
                                     "MODULES": "\n".join(declarations), "PLACEMENTS": "\n".join(placements)})
 
 
-def create_project(target: str | Path, name: str | None = None, template: str = "rc-car",
+def create_project(target: str | Path, name: str | None = None, template: str = "blank",
                    platform_url: str | None = None, platform_ref: str | None = None) -> list[str]:
     """Create a new project directory from ``template`` and return the files written (relative paths)."""
     target = Path(target)

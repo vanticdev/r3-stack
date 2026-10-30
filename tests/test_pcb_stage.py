@@ -1,4 +1,4 @@
-"""The ``pcb`` stage on the RC car: board.json hand-off, KiCad outputs, catalog consistency."""
+"""The ``pcb`` stage on the bench: board.json hand-off, KiCad outputs, catalog consistency."""
 
 from __future__ import annotations
 
@@ -17,59 +17,48 @@ from r3_kicad.netlist import read_netlist
 from r3_model.project import Project
 
 ROOT = Path(__file__).resolve().parents[1]
-CAR = ROOT / "examples/robots/rc-car"
-REQUEST = ROOT / ".r3-agents/requests/pcb.md"
+COUPON = ROOT / "tests/fixtures/pcb"
 pytestmark = pytest.mark.skipif(find_install() is None, reason="KiCad (kicad-cli + pcbnew) not installed")
 
 
 @pytest.fixture(scope="module")
-def stage_run():
-    import os
-
+def stage_run(pcb_project):
     from r3_kicad import stage
-
-    os.environ.setdefault("R3_KICAD_REGENERATE", "0")      # check the committed project; the flow has its own test
-    project = Project.load(CAR)
+    project, _ = pcb_project
     result = stage.run(project)
-    board = json.loads((project.root / "build/pcb/carrier-hat/board.json").read_text())
+    board = json.loads((project.root / "build/pcb/test-board/board.json").read_text())
     return project, result, board
 
 
 def test_board_json_contract(stage_run):
     project, result, board = stage_run
-    assert board["board"] == "carrier-hat" and board["component"] == "hat"
-    assert board["outline"]["width"] == pytest.approx(0.065) and board["outline"]["height"] == pytest.approx(0.070)
+    assert board["board"] == "test-board" and board["component"] == "filter"
+    assert board["outline"]["width"] == pytest.approx(.038) and board["outline"]["height"] == pytest.approx(.028)
     assert board["erc"]["errors"] == 0
     assert board["drc"]["errors"] == 0 and board["drc"]["unconnected"] == 0
-    assert set(board["connectors"]) == {"J_GPIO", "J_BATT", "J_ESC", "J_SERVO", "J_RX", "J_GPS", "J_ENC", "J_IMU"}
-    assert board["connectors"]["J_SERVO"]["2"] == "SERVO_6V"
-    assert board["connectors"]["J_ESC"] == {"1": "ESC_PWM", "2": "ESC_BEC", "3": "ESC_GND"}   # isolator's ESC side
-    assert board["connectors"]["J_GPIO"]["13"] == "HEARTBEAT"
-    assert "J_BATT.1" in board["nets"]["VBAT"]
-    traces = board["traces"]
-    assert traces and all(t["max_current"] > 0 and t["width"] > 0 for t in traces)
-    deliberate = [t for t in traces if t["origin"] == "deliberate"]
-    assert any(t["net"] == "VIN_HAT" and t["max_current"] >= 5.0 for t in deliberate)
+    assert set(board["connectors"]) == {"INPUT", "OUTPUT"}
+    assert board["connectors"]["OUTPUT"] == {"1": "SIGNAL_OUT", "2": "SUPPLY", "3": "GND"}
+    assert "INPUT.2" in board["nets"]["SUPPLY"]
+    assert board["regulators"] == {} and board["arbiter"] is None and "spice" not in board["files"]
+    assert board["traces"] and all(t["max_current"] > 0 and t["width"] > 0 for t in board["traces"])
     for key in ("kicad_pcb", "kicad_sch", "gerbers", "board_step", "step", "bom", "pos", "netlist"):
         assert (project.root / board["files"][key]).exists(), key
     for side in ("render_top", "render_bottom"):
         assert (project.root / board["renders"][side]).stat().st_size > 50_000
-    assert not [d for d in result.diagnostics if d.code in ("kicad_erc_errors", "kicad_drc_errors", "kicad_gui_opened",
-                                                            "pcb_netlist_mismatch", "pcb_flow_failed")]
+    assert not [d for d in result.diagnostics if d.code in ("kicad_erc_errors", "kicad_drc_errors", "kicad_gui_opened", "pcb_netlist_mismatch", "pcb_flow_failed")]
 
 
 def test_mounting_envelopes_handed_to_cad(stage_run):
     _, _, board = stage_run
     mounting = board["mounting"]
-    assert len(mounting["holes"]) == 4
-    assert {tuple(h["position"]) for h in mounting["holes"]} == {(-0.029, 0.02475), (0.029, 0.02475),
-                                                                 (-0.029, -0.02425), (0.029, -0.02425)}
-    assert mounting["printed_cap"]["inner_diameter"] == pytest.approx(mounting["head"]["diameter"] + 0.0006)
+    assert len(mounting["holes"]) == 2
+    assert {tuple(h["position"]) for h in mounting["holes"]} == {(-.015, -.01), (.015, -.01)}
+    assert mounting["printed_cap"]["inner_diameter"] == pytest.approx(mounting["head"]["diameter"] + .0006)
     assert mounting["keepouts"]["top_components_radius"] > mounting["head"]["diameter"] / 2
 
 
 def test_catalog_matches_the_board(stage_run):
-    """The requested catalog patch is applied: the KiCad netlist matches r3-carrier-hat exactly, the
+    """The requested catalog patch is applied: the KiCad netlist matches test-controller exactly, the
     connector positions are the measured ones and the TVS on the board is the catalog's."""
     _, result, board = stage_run
     assert not [d for d in result.diagnostics if d.code == "board_catalog_mismatch"], \
@@ -79,17 +68,14 @@ def test_catalog_matches_the_board(stage_run):
     assert not [d for d in result.diagnostics if d.code == "pcb_tvs_clamp_exceeds_abs_max"]
 
 
-def _requested_component() -> ComponentType:
-    text = REQUEST.read_text()
-    block = re.search(r"```yaml\n(  - id: r3-carrier-hat.*?)```", text, re.S).group(1)
-    return ComponentType.model_validate(yaml.safe_load(block)[0])
+def _declared_component():
+    return Project.load(COUPON).catalog.component("test-filter")
 
 
-def test_board_matches_catalog_with_requested_patch(stage_run):
+def test_board_matches_declared_catalog(stage_run):
     project, _, _ = stage_run
-    source = project.root / "pcb/carrier-hat"
+    source = project.root / "pcb/test-board"
     intent = load_intent_module(source).build()
-    netlist = read_netlist(project.root / "build/pcb/carrier-hat/carrier-hat.xml")
+    netlist = read_netlist(project.root / "build/pcb/test-board/test-board.xml")
     connectors = connectors_map(netlist, intent)
-    diags = catalog_check("hat", _requested_component(), connectors, netlist.nets, intent)
-    assert diags == [], [d.message for d in diags]
+    assert catalog_check("filter", _declared_component(), connectors, netlist.nets, intent) == []

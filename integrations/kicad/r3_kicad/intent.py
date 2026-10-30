@@ -12,6 +12,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from .regulators import BuckDesign, BuckBoostDesign
+
 Side = Literal["F", "B"]
 
 
@@ -169,6 +171,7 @@ class BoardIntent:
     origin: tuple[float, float] = (100.0, 60.0)      # board top-left corner on the KiCad page
     notes: list[str] = field(default_factory=list)
     mounting: Mounting = field(default_factory=Mounting)
+    regulators: dict[str, BuckDesign | BuckBoostDesign] = field(default_factory=dict)
 
     def part(self, ref: str) -> Part:
         for part in self.parts:

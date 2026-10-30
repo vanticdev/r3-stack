@@ -14,7 +14,6 @@ import { countsText, listLabels } from "../lib/status.ts";
 import { timeAgo } from "../lib/units.ts";
 
 const TEMPLATES: Record<string, { label: string; description: string }> = {
-  "rc-car": { label: "RC car", description: "The 1/10 reference car: Raspberry Pi 5, carrier HAT, brushed motor and ESC, steering servo, radio and GPS." },
   blank: { label: "Empty project", description: "A robot.yaml with the schema header and no components." },
 };
 
@@ -76,7 +75,7 @@ function CreateProjectDialog({ templates, onClose }: { templates: string[]; onCl
   const client = useQueryClient();
   const navigate = useNavigate();
   const [name, setName] = useState("");
-  const [template, setTemplate] = useState("rc-car");
+  const [template, setTemplate] = useState("blank");
   const [github, setGithub] = useState(false);
   const [isPrivate, setPrivate] = useState(true);
   const [confirming, setConfirming] = useState(false);
@@ -87,7 +86,7 @@ function CreateProjectDialog({ templates, onClose }: { templates: string[]; onCl
       navigate(`/p/${encodeURIComponent(result.id)}/overview`);
     },
   });
-  const options = [...new Set(["rc-car", "blank", ...templates])];
+  const options = [...new Set(["blank", ...templates])];
   const valid = /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name);
   const submit = () => { if (github && !confirming) setConfirming(true); else create.mutate(); };
   return (

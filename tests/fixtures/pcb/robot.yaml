@@ -1,0 +1,6 @@
+robot: {name: filter-coupon, mobility: stationary}
+components:
+  filter: {type: test-filter}
+pcb:
+  boards:
+    - {component: filter, tool: kicad, source: pcb/test-board, layers: 2, copper_oz: 1}

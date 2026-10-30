@@ -75,9 +75,9 @@ If the artifacts are missing, generate them from the repository root:
 
 ```bash
 export PYTHONPATH=packages/robot-model:packages/component-catalog:packages/simulation:packages/hardware-interface:packages/wiring:services/simulation-worker:integrations/onshape:integrations/kicad:services/orchestrator
-.venv/bin/python -m r3_orchestrator validate -C examples/robots/rc-car --stage model --stage wiring --stage electrical
-.venv/bin/python -m r3_sim_worker examples/robots/rc-car --scenario full_throttle
-.venv/bin/python -m r3_sim_worker examples/robots/rc-car --scenario steering_sweep   # cable slack playback
+.venv/bin/python -m r3_orchestrator validate -C path/to/project --stage model --stage wiring --stage electrical
+.venv/bin/python -m r3_sim_worker path/to/project --scenario observe
+.venv/bin/python -m r3_sim_worker path/to/project --scenario joint_sweep   # a project-defined cable motion scenario
 ```
 
 ## Pages

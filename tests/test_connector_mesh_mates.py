@@ -137,12 +137,12 @@ def test_solder_checks_only_occupied_pads(setup):
     ],
 )
 def test_each_mesh_error_blocks_release(tmp_path, code):
-    from api_helpers import copy_rc_car
+    from api_helpers import copy_bench
     from r3_model.diagnostics import Diagnostic, StageResult
     from r3_model.project import Project
     from r3_orchestrator.release import evaluate
 
-    root = copy_rc_car(tmp_path)
+    root = copy_bench(tmp_path)
     project = Project.load(root)
     result = StageResult(stage="connectors", inputs=project.fingerprint())
     result.add(Diagnostic.error(code, "Measured physical mating failure"))

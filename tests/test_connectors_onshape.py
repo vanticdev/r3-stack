@@ -13,7 +13,7 @@ from r3_model.project import Project
 from r3_onshape.client import Transport, multipart_body
 from r3_onshape.imports import import_models, plan_imports
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
 pytestmark = pytest.mark.skipif(not kicad_available(), reason="KiCad 3D library not installed")
 
 
@@ -47,8 +47,8 @@ class FakeOnshape(Transport):
 
 @pytest.fixture(scope="module")
 def project(tmp_path_factory):
-    root = tmp_path_factory.mktemp("rc-car")
-    shutil.copy(RC_CAR / "robot.yaml", root / "robot.yaml")
+    root = tmp_path_factory.mktemp("bench")
+    shutil.copytree(BENCH, root, dirs_exist_ok=True, ignore=shutil.ignore_patterns("build", "__pycache__", "_vendor"))
     project = Project.load(root)
     run(project, render=False)
     return project
@@ -61,7 +61,7 @@ def test_plan_places_models_with_rigid_transforms(project):
     # The Pi comes from its official STEP when downloadable; the HAT's board.step needs the KiCad stage
     # (not run in this copy); harness-to-harness XT60 halves need the router's pair placement (not run).
     assert "pi" in names or "pi" in skipped_names
-    assert "hat" in skipped_names
+    assert "controller.J_BATT" in skipped_names
     for item in items:
         r = item.transform[:3, :3]
         assert np.allclose(r.T @ r, np.eye(3), atol=1e-9) and np.linalg.det(r) == pytest.approx(1.0)

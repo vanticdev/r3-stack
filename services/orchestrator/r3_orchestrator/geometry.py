@@ -165,7 +165,7 @@ def _prism(solid_id: str, ring: np.ndarray, thickness: float, xyz: list[float], 
 
 def outline_solid(solid_id: str, outline: list[list[float]], thickness: float, xyz: list[float], rpy: list[float]) -> Solid:
     """Prism from a 2D outline (component frame, z from 0 to thickness). Concave
-    outlines (e.g. the RC-car plate taper) are decomposed into triangle prisms,
+    outlines (e.g. the robot plate taper) are decomposed into triangle prisms,
     so a convex hull never fills a notch."""
     ring = np.asarray(outline, dtype=float)
     pieces = tuple(_prism(f"{solid_id}#{i}", tri, thickness, xyz, rpy) for i, tri in enumerate(_triangulate(ring)))

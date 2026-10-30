@@ -88,7 +88,7 @@ existing discrepancy stays visible as `component_model_dimension_mismatch`.
 
 The vendor-family file has a strict `refinements` mapping applied before
 `extends`. This updates every Pi 5 RAM variant without editing the mechanically
-owned `rc_car.yaml`. GPIO identifiers used by bindings stay stable; their `net`
+owned `robot.yaml`. GPIO identifiers used by bindings stay stable; their `net`
 labels include the official alternate-function names (for example GPIO2/SDA1).
 
 All 16 physical interfaces are present: J8, four separate USB-A ports, Ethernet,

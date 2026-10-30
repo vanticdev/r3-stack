@@ -67,9 +67,9 @@ Robot frame, SI units; inertia about the part COM in robot-frame axes.
 ### `build/pcb/<board>/board.json`
 
 ```json
-{"board": "carrier-hat", "component": "hat", "outline": {"width": 0.065, "height": 0.0565},
- "nets": {"VBAT": ["J_BATT.1", "U1.VIN", "R1.1"]}, "connectors": {"J_BATT": {"1": "VBAT", "2": "GND"}},
- "traces": [{"net": "VBAT", "width": 0.002, "length": 0.03, "layer": "F.Cu", "max_current": 4.1}],
+{"board": "filter", "component": "controller", "outline": {"width": 0.038, "height": 0.028},
+ "nets": {"SIGNAL": ["J1.1", "R1.1"]}, "connectors": {"INPUT": {"1": "SIGNAL", "2": "SUPPLY", "3": "GND"}},
+ "traces": [{"net": "SIGNAL", "width": 0.00025, "length": 0.01, "layer": "F.Cu", "max_current": 0.01}],
  "erc": {"errors": 0, "warnings": 0}, "drc": {"errors": 0}, "files": {"kicad_pcb": "...", "gerbers": "..."}}
 ```
 
@@ -156,7 +156,7 @@ Execution may overlap without changing this order or any result: MuJoCo's
 solved (its inputs are final then). `R3_SIM_OVERLAP=0` runs strictly serially;
 both produce bit-identical recordings.
 
-Electrical interface, keyed by component id (generic, not RC-car specific):
+Electrical interface, keyed by component id (generic, not robot specific):
 
 ```python
 system = ElectricalSystem(project, routes=None)          # routes.json optional
@@ -177,10 +177,10 @@ monitor.update()            # after each mj_step: clearance from MuJoCo contact 
 monitor.wire_clearance()    # {wire_id: (signed surface distance, moving component)}
 monitor.exact_distances()   # the same from mj_geomDistance (cross-check)
 
-# Standalone shaker (wiring stage): chassis-only MuJoCo world plus cables.
+# Standalone shaker (wiring stage): base-only MuJoCo world plus cables.
 cables = CableSimulator(project, routes)
-report = cables.step(dt, chassis={"pos", "quat", "lin_acc", "ang_vel", "ang_acc"},
-                     moving={"knuckle_fl": {"pos", "quat"}, ...})  # or joints={"steer_fl": 0.2}
+report = cables.step(dt, base={"pos", "quat", "lin_acc", "ang_vel", "ang_acc"},
+                     moving={"pivot_left": {"pos", "quat"}, ...})  # or joints={"pivot": 0.2}
 report.min_clearance  # {wire_id: (distance, component)}
 ```
 

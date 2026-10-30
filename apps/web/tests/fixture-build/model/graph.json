@@ -1,161 +1,162 @@
 {
- "nets": {},
- "edges": [],
- "endpoints": {},
- "diagnostics": [],
- "components": {
-  "esc": {
-   "type": "esc-type",
-   "kind": "esc",
-   "name": "esc",
-   "mount": "world",
-   "shape": "box",
-   "size": [
-    0.0465,
-    0.034,
-    0.0355
-   ],
-   "axis": "z",
-   "xyz": [
-    0.065,
-    0.04,
-    0.028
-   ],
-   "rpy": [
-    0,
-    0,
-    0
-   ],
-   "color": "#1d1d1d",
-   "moving": false,
-   "mass": 0.05
+  "nets": {},
+  "edges": [],
+  "endpoints": {},
+  "diagnostics": [],
+  "components": {
+    "controller": {
+      "type": "pcb-type",
+      "kind": "pcb",
+      "name": "controller",
+      "mount": "world",
+      "shape": "box",
+      "size": [
+        0.04,
+        0.03,
+        0.002
+      ],
+      "axis": "z",
+      "xyz": [
+        0,
+        0,
+        0.02
+      ],
+      "rpy": [
+        0,
+        0,
+        0
+      ],
+      "color": "#334455",
+      "moving": false,
+      "mass": 0.05
+    },
+    "post": {
+      "type": "structure-type",
+      "kind": "structure",
+      "name": "post",
+      "mount": "world",
+      "shape": "cylinder",
+      "size": [
+        0.008,
+        0.04
+      ],
+      "axis": "z",
+      "xyz": [
+        0.015,
+        0.005,
+        0.02
+      ],
+      "rpy": [
+        0,
+        0,
+        0
+      ],
+      "color": "#888888",
+      "moving": false,
+      "mass": 0.05
+    },
+    "sensor": {
+      "type": "sensor-type",
+      "kind": "sensor",
+      "name": "sensor",
+      "mount": "world",
+      "shape": "box",
+      "size": [
+        0.02,
+        0.02,
+        0.02
+      ],
+      "axis": "z",
+      "xyz": [
+        0.06,
+        0,
+        0.06
+      ],
+      "rpy": [
+        0,
+        0,
+        0
+      ],
+      "color": "#222222",
+      "moving": true,
+      "mass": 0.05
+    }
   },
-  "standoff_rl": {
-   "type": "structure-type",
-   "kind": "structure",
-   "name": "structure",
-   "mount": "world",
-   "shape": "cylinder",
-   "size": [
-    0.0055,
-    0.047
-   ],
-   "axis": "z",
-   "xyz": [
-    0.045,
-    0.045,
-    0.028
-   ],
-   "rpy": [
-    0,
-    0,
-    0
-   ],
-   "color": "#888888",
-   "moving": false,
-   "mass": 0.05
+  "wires": {
+    "W_SIGNAL": {
+      "harness": "sensor_link",
+      "awg": 22,
+      "color": "white",
+      "signal": "DATA",
+      "from": "A.1",
+      "to": "B.1",
+      "ends": [
+        [
+          0,
+          0,
+          0.022
+        ],
+        [
+          0.06,
+          0,
+          0.06
+        ]
+      ]
+    },
+    "W_GND": {
+      "harness": "sensor_link",
+      "awg": 22,
+      "color": "black",
+      "signal": "GND",
+      "from": "A.2",
+      "to": "B.2",
+      "ends": [
+        [
+          0,
+          0,
+          0.022
+        ],
+        [
+          0.06,
+          0,
+          0.06
+        ]
+      ]
+    },
+    "W_LOOSE": {
+      "harness": "spare",
+      "awg": 22,
+      "color": "red",
+      "signal": "",
+      "from": "A.1",
+      "to": "B.1",
+      "ends": [
+        null,
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    }
   },
-  "wheel_rl": {
-   "type": "wheel-type",
-   "kind": "wheel",
-   "name": "wheel",
-   "mount": "world",
-   "shape": "cylinder",
-   "size": [
-    0.11,
-    0.045
-   ],
-   "axis": "y",
-   "xyz": [
-    0.0,
-    0.1,
-    0.055
-   ],
-   "rpy": [
-    0,
-    0,
-    0
-   ],
-   "color": "#222222",
-   "moving": true,
-   "mass": 0.05
-  }
- },
- "wires": {
-  "W_ESC_SIG": {
-   "harness": "esc_signal",
-   "awg": 22,
-   "color": "white",
-   "signal": "ESC_PWM",
-   "from": "A.1",
-   "to": "B.1",
-   "ends": [
-    [
-     0.042,
-     0.03,
-     0.048
-    ],
-    [
-     0.076,
-     -0.022,
-     0.1055
-    ]
-   ]
-  },
-  "W_ESC_GND": {
-   "harness": "esc_signal",
-   "awg": 22,
-   "color": "black",
-   "signal": "GND",
-   "from": "A.3",
-   "to": "B.3",
-   "ends": [
-    [
-     0.042,
-     0.03,
-     0.048
-    ],
-    [
-     0.076,
-     -0.022,
-     0.1055
-    ]
-   ]
-  },
-  "W_LOOSE": {
-   "harness": "spare",
-   "awg": 22,
-   "color": "red",
-   "signal": "",
-   "from": "A.1",
-   "to": "B.1",
-   "ends": [
-    null,
-    [
-     0,
-     0,
-     0
-    ]
-   ]
-  }
- },
- "interference": [
-  {
-   "a": "esc",
-   "b": "standoff_rl",
-   "volume": 8.41e-07,
-   "extent": [
-    0.0055,
-    0.0055,
-    0.0355
-   ],
-   "depth": 0.0055,
-   "center": [
-    0.045,
-    0.045,
-    0.0458
-   ],
-   "mount_related": false
-  }
- ]
+  "interference": [
+    {
+      "a": "controller",
+      "b": "post",
+      "volume": 1e-07,
+      "extent": [
+        0.004,
+        0.004,
+        0.002
+      ],
+      "depth": 0.002,
+      "center": [
+        0.015,
+        0.005,
+        0.021
+      ],
+      "mount_related": false
+    }
+  ]
 }

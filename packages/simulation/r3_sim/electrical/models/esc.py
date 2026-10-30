@@ -19,7 +19,7 @@ By default the switch is averaged: ngspice integrates period-averaged
 waveforms, no PWM ripple. With ``ElectricalSystem(esc_model="switched")`` the
 driven leg's duty source becomes the PWM gate itself (trapezoidal edges with
 the catalog switching time, every corner landed on exactly), so ngspice
-resolves the switching and the current ripple; measured on the RC car this
+resolves the switching and the current ripple; measured on the robot this
 runs at ~0.1x real time versus ~2x averaged, so it is opt-in.
 
 The current limit is an active set run by the firmware logic, like the ESC's

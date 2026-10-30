@@ -4,6 +4,7 @@ single/float/fixed solution, kernel wiring, firmware use of the fix quality, and
 from __future__ import annotations
 
 import math
+import yaml
 import shutil
 import sys
 from pathlib import Path
@@ -21,7 +22,7 @@ from r3_sim.radio_scene import scene_for_project
 from r3_sim.vehicle.mjcf import _behavior_params
 
 ROOT = Path(__file__).resolve().parents[1]
-FIRMWARE = ROOT / "examples" / "robots" / "rc-car" / "backend" / "python" / "rc_car_controller"
+FIRMWARE = ROOT / "tests" / "fixtures" / "bench" / "backend" / "python" / "bench_controller"
 ORIGIN = (37.4275, -122.1697, 30.0)
 
 
@@ -120,8 +121,8 @@ def test_fsk_ber_and_packet_error_at_sensitivity():
 
 @pytest.fixture(scope="module")
 def project(tmp_path_factory) -> Project:
-    root = tmp_path_factory.mktemp("rtk") / "rc-car"
-    shutil.copytree(ROOT / "examples" / "robots" / "rc-car", root, ignore=shutil.ignore_patterns("build", "__pycache__"))
+    root = tmp_path_factory.mktemp("rtk") / "bench"
+    shutil.copytree(ROOT / "tests" / "fixtures" / "bench", root, ignore=shutil.ignore_patterns("build", "__pycache__"))
     return Project.load(root)
 
 
@@ -154,11 +155,12 @@ def test_kernel_rover_is_fixed_at_start_and_reports_the_link(project, monkeypatc
 
 def test_kernel_without_the_correction_harness_reports_it(project, tmp_path, monkeypatch):
     monkeypatch.setenv("R3_RADIO_BACKEND", "analytic")
-    root = tmp_path / "rc-car"
+    root = tmp_path / "bench"
     shutil.copytree(project.root, root, ignore=shutil.ignore_patterns("build"))
-    text = (root / "robot.yaml").read_text()
-    text = text.replace("        - {id: W_RTK_RTCM, from: B.3, to: A.2, awg: 28, color: white, signal: RTCM}\n", "")
-    (root / "robot.yaml").write_text(text)
+    data = yaml.safe_load((root / "robot.yaml").read_text())
+    for harness in data["electrical"]["harnesses"]:
+        harness["wires"] = [wire for wire in harness["wires"] if wire["id"] != "W_RTK_RTCM"]
+    (root / "robot.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
     broken = Project.load(root)
     scenario = next(s for s in broken.spec.simulation.scenarios if s.id == "autonomous_course")
     kernel = CoSimKernel(broken, scenario)
@@ -197,7 +199,7 @@ def test_estimator_uses_the_fix_sigma(firmware):
 
 # ---------------------------------------------------------------- evaluator
 def test_cross_track_window_starts_on_the_first_segment():
-    """The car approaches waypoint 1 from 1.9 m to the side (inside the capture circle), then tracks within 0.3 m:
+    """The robot approaches waypoint 1 from 1.9 m to the side (inside the capture circle), then tracks within 0.3 m:
     the first path segment, not the capture circle, opens the window."""
     waypoints = [[5, 0], [35, 0], [35, 15], [5, 15]]
     t = np.arange(0.0, 40.0, 0.01)
@@ -213,7 +215,7 @@ def test_cross_track_window_starts_on_the_first_segment():
 
 def test_stop_distance_is_measured_from_a_software_failsafe_gap_without_receiver_loss():
     """At the edge of range a 0.65 s frame gap (above the 0.25 s software timeout, below the receiver's 1 s) stops the
-    car while the receiver keeps resyncing; the stop distance is measured from that gap."""
+    robot while the receiver keeps resyncing; the stop distance is measured from that gap."""
     t = np.arange(0.0, 20.0, 0.01)
     speed = np.clip(4.0 - 4.4 * (t - 10.3), 0.0, 4.0)  # 0.3 s detection, then a 4.4 m/s^2 brake: ~2.9 m
     x = np.cumsum(speed) * 0.01

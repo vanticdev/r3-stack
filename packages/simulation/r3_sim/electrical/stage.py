@@ -44,13 +44,10 @@ from .network import SILICONE_INSULATION_MAX_C, adiabatic_i2t_withstand
 from .system import ElectricalSystem
 
 STAGE = "electrical"
-DEFAULT_VEHICLE_MASS = 1.8  # kg, design estimate used when no CAD mass properties exist
-DEFAULT_CRUISE_SPEED = 4.0  # m/s
+DEFAULT_CRUISE_SPEED = 1.0  # m/s
 AIR_DENSITY = 1.204  # kg/m^3 at 20 C
-DRAG_COEFFICIENT = 0.6  # estimate for an open 1/10 car body
-FRONTAL_FILL = 0.6  # frontal area / bounding-box frontal area (estimate)
-DRIVEN_AXLE_LOAD_FRACTION = 0.55  # static ~50 % plus load transfer under acceleration (estimate)
-STEERING_HOLD = {"horn_torque": 0.2, "horn_speed": 0.5}  # N m, rad/s typical steering load (estimate)
+DRAG_COEFFICIENT = 1.0  # conservative generic bluff-body estimate
+FRONTAL_FILL = 1.0  # conservative projected bounding-envelope fill estimate
 SERVO_STALL_DEMAND = 1.2  # x stall torque demanded (servo held against its stop)
 CRUISE_ACTIVITY = 0.7
 BURST_DURATION = {"full_throttle": 2.0, "motor_stall": 2.0}  # s (assumptions)
@@ -113,7 +110,7 @@ def vehicle_model(project: Any, result: StageResult) -> dict[str, Any]:
         if missing:
             result.assume("vehicle", f"{len(missing)} components missing from cad_model.json use catalog mass: {', '.join(sorted(missing))}.")
     else:
-        mass, mass_source = DEFAULT_VEHICLE_MASS, "estimate"
+        mass, mass_source = catalog_mass, "catalog"
     lows, highs = [], []
     graph = project.graph
     boxes = [(np.asarray(p["bbox_min"], dtype=float), np.asarray(p["bbox_max"], dtype=float))
@@ -132,15 +129,24 @@ def vehicle_model(project: Any, result: StageResult) -> dict[str, Any]:
             center = position + np.array([0.0, 0.0, half[2]])
             lows.append(center - half)
             highs.append(center + half)
-    extent = np.max(highs, axis=0) - np.min(lows, axis=0)
-    frontal_area = FRONTAL_FILL * extent[1] * max(np.max(highs, axis=0)[2], 0.05)
+    extent = np.max(highs, axis=0) - np.min(lows, axis=0) if highs else np.zeros(3)
+    frontal_area = FRONTAL_FILL * extent[1] * extent[2]
+    wheels = {cid for cid, c in spec.components.items() if (ct := catalog.components.get(c.type)) and ct.kind == "wheel"}
+    driven = {j.child for j in spec.mechanical.joints if transmission and j.id in transmission.joints} & wheels
+    ground_drive = bool(driven)
+    if not ground_drive and motors:
+        result.assume("motor_load", "Non-wheeled operating points use component operating_speed and load_torque; unspecified values are estimated as zero.")
+    loads = [{**catalog.component(spec.components[cid].type).behavior.params, **spec.components[cid].params} for cid in motors]
     env = spec.simulation.environment
     return {"mass": mass, "mass_source": mass_source, "catalog_component_mass": catalog_mass, "wheel_radius": radius,
             "ratio": ratio, "drivetrain_efficiency": efficiency, "rolling_resistance": env.ground_rolling_resistance,
             "friction": env.ground_friction, "gravity": env.gravity, "frontal_area": frontal_area,
             "frontal_area_source": "cad" if boxes else "catalog",
             "drag_coefficient": DRAG_COEFFICIENT, "air_density": AIR_DENSITY,
-            "driven_axle_load_fraction": DRIVEN_AXLE_LOAD_FRACTION}
+            "driven_axle_load_fraction": len(driven) / len(wheels) if wheels else 0.0,
+            "ground_drive": ground_drive,
+            "motor_operating_speed": sum(to_si(p.get("operating_speed", 0)) for p in loads) / max(len(loads), 1),
+            "motor_load_torque": sum(to_si(p.get("load_torque", 0)) for p in loads) / max(len(loads), 1)}
 
 
 def road_load(vehicle: dict[str, Any], speed: float) -> float:
@@ -167,20 +173,29 @@ class OperatingPoints:
             for eid, esc in self.escs.items():
                 if graph.net_of(f"C:{eid}.{esc.m_a.name}") == graph.net_of(f"C:{mid}.{motor.pos.name}"):
                     self.esc_for_motor[mid] = eid
-        self.motor_omega_cruise = cruise_speed / vehicle["wheel_radius"] * vehicle["ratio"]
-        wheel_torque = road_load(vehicle, cruise_speed) * vehicle["wheel_radius"]
-        self.motor_torque_cruise = wheel_torque / (vehicle["ratio"] * vehicle["drivetrain_efficiency"]) / max(len(self.motors), 1)
-        traction = vehicle["friction"] * vehicle["driven_axle_load_fraction"] * vehicle["mass"] * vehicle["gravity"]
-        self.motor_torque_traction = traction * vehicle["wheel_radius"] / (vehicle["ratio"] * vehicle["drivetrain_efficiency"]) / max(len(self.motors), 1)
+        if vehicle["ground_drive"]:
+            self.motor_omega_cruise = cruise_speed / vehicle["wheel_radius"] * vehicle["ratio"]
+            wheel_torque = road_load(vehicle, cruise_speed) * vehicle["wheel_radius"]
+            self.motor_torque_cruise = wheel_torque / (vehicle["ratio"] * vehicle["drivetrain_efficiency"]) / max(len(self.motors), 1)
+            traction = vehicle["friction"] * vehicle["driven_axle_load_fraction"] * vehicle["mass"] * vehicle["gravity"]
+            self.motor_torque_traction = traction * vehicle["wheel_radius"] / (vehicle["ratio"] * vehicle["drivetrain_efficiency"]) / max(len(self.motors), 1)
+        else:
+            self.motor_omega_cruise = vehicle["motor_operating_speed"]
+            self.motor_torque_cruise = vehicle["motor_load_torque"]
+            self.motor_torque_traction = self.motor_torque_cruise
 
-    def inputs(self, throttle: float, omega: float, servo: dict[str, float], activity: float) -> dict[str, Any]:
+    def inputs(self, throttle: float, omega: float, servo: dict[str, float] | None, activity: float) -> dict[str, Any]:
         inputs: dict[str, Any] = {}
         for mid in self.motors:
             inputs[mid] = {"omega": omega}
             if mid in self.esc_for_motor:
                 inputs[self.esc_for_motor[mid]] = {"throttle": throttle}
         for sid in self.servos:
-            inputs[sid] = dict(servo)
+            params = {**self.system.project.catalog.component(self.system.project.spec.components[sid].type).behavior.params,
+                      **self.system.project.spec.components[sid].params}
+            inputs[sid] = dict(servo) if servo is not None else {
+                "horn_torque": to_si(params.get("load_torque", 0)),
+                "horn_speed": to_si(params.get("operating_speed", 0))}
         for cid in self.computers:
             inputs[cid] = {"activity": activity}
         return inputs
@@ -193,16 +208,18 @@ class OperatingPoints:
 
     def cruise_throttle(self, soc: float, activity: float = CRUISE_ACTIVITY) -> float:
         def residual(t: float) -> float:
-            out = self.solve(self.inputs(t, self.motor_omega_cruise, STEERING_HOLD, activity), soc, "ambient")
+            out = self.solve(self.inputs(t, self.motor_omega_cruise, None, activity), soc, "ambient")
             return self.motor_torque(out) - self.motor_torque_cruise
 
+        if residual(0.0) >= 0:
+            return 0.0
         if residual(1.0) < 0:
             return 1.0
         return float(brentq(residual, 0.0, 1.0, xtol=1e-5))
 
     def traction_omega(self, soc: float) -> float:
         def residual(w: float) -> float:
-            out = self.solve(self.inputs(1.0, w, STEERING_HOLD, 1.0), soc, "ambient")
+            out = self.solve(self.inputs(1.0, w, None, 1.0), soc, "ambient")
             return self.motor_torque(out) - self.motor_torque_traction
 
         if residual(0.0) <= 0:
@@ -222,9 +239,9 @@ class OperatingPoints:
         stall_torque = max((s.stall_torque * SERVO_STALL_DEMAND for s in self.servos.values()), default=0.0)
         return {
             "idle": (self.inputs(0.0, 0.0, {"horn_torque": 0.0, "horn_speed": 0.0}, 0.0), "steady"),
-            "cruise": (self.inputs(t_cruise, self.motor_omega_cruise, STEERING_HOLD, CRUISE_ACTIVITY), "steady"),
-            "full_throttle": (self.inputs(1.0, w_full, STEERING_HOLD, 1.0), "ambient"),
-            "motor_stall": (self.inputs(1.0, 0.0, STEERING_HOLD, 1.0), "ambient"),
+            "cruise": (self.inputs(t_cruise, self.motor_omega_cruise, None, CRUISE_ACTIVITY), "steady"),
+            "full_throttle": (self.inputs(1.0, w_full, None, 1.0), "ambient"),
+            "motor_stall": (self.inputs(1.0, 0.0, None, 1.0), "ambient"),
             "servo_stall_compute": (self.inputs(t_cruise, self.motor_omega_cruise,
                                                 {"horn_torque": stall_torque, "horn_speed": 0.0}, 1.0), "steady"),
         }
@@ -593,7 +610,7 @@ def _cores(model: Any) -> dict[str | None, Any]:
 def check_tvs(system: ElectricalSystem, result: StageResult) -> dict[str, Any]:
     """Input TVS clamp against the converters' input absolute maximum.
 
-    Expected surge: with a 2S pack nothing in the car drives the bus above the pack voltage for long (the
+    Expected surge: with a 2S pack nothing in the robot drives the bus above the pack voltage for long (the
     brushed ESC does not boost); surges are inductive kicks when the pack is unplugged or a fuse opens under
     load, and the TVS current is at most the current interrupted in the board's supply branch. That branch is
     fused, so the expected surge current is 2 x the fuse rating (a blade fuse carries 200 % for at least
@@ -849,7 +866,7 @@ def full_throttle_transient(project: Any, routes: Any, ops: OperatingPoints, dur
     computer = next(iter(ops.computers), None)
     for k in range(int(round(duration / dt))):
         omega = w_end * (k + 1) * dt / duration
-        inputs = ops.inputs(1.0, omega, STEERING_HOLD, 1.0)
+        inputs = ops.inputs(1.0, omega, None, 1.0)
         inputs[esc] = {"pulse_us": 2000.0} if esc else {}
         out = system.step(dt, inputs)
         trace["time"].append(system.time)
@@ -962,7 +979,7 @@ def _assumptions(result: StageResult, vehicle: dict[str, Any], ops: OperatingPoi
     a("electrical", "ESC H-bridge is a state-space averaged switch inside ngspice (no PWM ripple); its cycle-by-cycle current limit "
                     "acts with one co-simulation step (one 1 kHz PWM period) of latency. The PWM-switched bridge "
                     "(ElectricalSystem(esc_model='switched'), gate edges resolved by ngspice) runs at ~0.1x real time versus "
-                    "~2x averaged on the RC car; its step-mean motor torque was ~4 % below the averaged model at 1 kHz PWM, "
+                    "~2x averaged on the robot; its step-mean motor torque was ~4 % below the averaged model at 1 kHz PWM, "
                     "50 % throttle, where the current ripple is large (L/R ~ T/2).")
     a("electrical", "Wire resistance from the AWG table with copper tempco 0.00393/K; contact resistance per mated pin from the catalog; PCB trace resistance not modeled.")
     if not routed:
@@ -978,10 +995,10 @@ def _assumptions(result: StageResult, vehicle: dict[str, Any], ops: OperatingPoi
     a("connectors", "Burst rating = 2 x continuous unless the catalog provides current_rating_burst (XT60/XT30 datasheet ratio).")
     a("vehicle", f"Mass {vehicle['mass']:.2f} kg ({vehicle['mass_source']}), C_rr {vehicle['rolling_resistance']}, C_d {DRAG_COEFFICIENT}, "
                  f"frontal area {vehicle['frontal_area']:.4f} m^2 ({vehicle['frontal_area_source']} bounding box x {FRONTAL_FILL}), "
-                 f"driven-axle load {DRIVEN_AXLE_LOAD_FRACTION}.")
+                 f"driven-wheel load fraction {vehicle['driven_axle_load_fraction']} (equal wheel-load estimate).")
     a("vehicle", f"Cruise {ops.cruise_speed} m/s -> motor {ops.motor_torque_cruise * 1e3:.2f} mN m at {ops.motor_omega_cruise:.0f} rad/s; "
                  f"traction-limited acceleration torque {ops.motor_torque_traction * 1e3:.1f} mN m.")
-    a("loads", f"Steering hold load {STEERING_HOLD}; servo stall = {SERVO_STALL_DEMAND} x stall torque demand at zero speed; computer activity {CRUISE_ACTIVITY} at cruise, 1.0 at peaks.")
+    a("loads", f"Servo loads use declared load_torque and operating_speed (zero when unspecified); servo stall = {SERVO_STALL_DEMAND} x stall torque demand at zero speed; computer activity {CRUISE_ACTIVITY} at cruise, 1.0 at peaks.")
     a("regulators", "Buck UVLO falling threshold = catalog v_in_min unless uvlo_falling is given; ESC linear BEC dropout 1.0 V and 1.5 x current-limit foldback (estimates).")
     a("fuses", "Fuse melting integral with tau set by a 1.25 x rating minimum melting current; contacts and fuse resistance temperature-independent.")
     a("thermal", "Operating points: power-net conductors at their electrothermal steady state (continuous points) or ambient (burst "

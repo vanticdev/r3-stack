@@ -9,18 +9,18 @@ it, for example ``cuda_ad_mono_polarized`` on a GPU worker.
 Link channel (per packet):
 
 * ``PathSolver`` traces specular reflection (depth 3), refraction and UTD wedge
-  diffraction from the handset (Sionna transmitter) to the car antenna
+  diffraction from the handset (Sionna transmitter) to the robot antenna
   (Sionna receiver).
-* The car body is part of the scene and is posed at every trace. Every
+* The robot body is part of the scene and is posed at every trace. Every
   candidate path is tested for visibility against it, so body **blockage** is
   exact. Near-field scattering by the body is *not* modelled. The antenna sits
   about 0.65 lambda above the Pi/HAT stack, where ray optics and UTD do not
-  apply. Tracing reciprocally from the car antenna does sample those edges,
+  apply. Tracing reciprocally from the robot antenna does sample those edges,
   but the diffracted sum moved by +-8 dB at 300 m between 0.4M, 1M and 2M rays
   per source (non-convergent). An installed-antenna pattern from a full-wave
   solver would be the right input for that (see the README).
 * Traces are cached on a position grid (``rt_grid_m``, default 0.25 m, i.e. 20
-  traces/s at 5 m/s) and a heading bucket (15 deg) for the body pose. The car
+  traces/s at 5 m/s) and a heading bucket (15 deg) for the body pose. The robot
   body is moved to the bucket pose before each trace.
 * Between traces each path is extrapolated from the cached cell center o to
   the actual antenna position p. The first path segment is recomputed exactly
@@ -127,7 +127,7 @@ def _material_xml(mat_id: str, material: str, thickness: float, frequency: float
 
 
 def write_scene(scene: RadioScene, directory: Path) -> Path:
-    """Mitsuba XML + PLY meshes for ``scene`` (ground, obstacles, car body in the robot frame at the origin)."""
+    """Mitsuba XML + PLY meshes for ``scene`` (ground, obstacles, robot body in the robot frame at the origin)."""
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "meshes").mkdir(exist_ok=True)
     shapes: list[str] = []
@@ -161,7 +161,7 @@ def write_scene(scene: RadioScene, directory: Path) -> Path:
         shapes.append(f'<shape type="ply" id="mesh-{name}"><string name="filename" value="meshes/{name}.ply"/>'
                       f'<boolean name="face_normals" value="true"/><ref id="{mat}" name="bsdf"/></shape>')
     for body in scene.body:
-        name = f"car-{body.material}"
+        name = f"robot-{body.material}"
         _write_ply(directory / "meshes" / f"{name}.ply", body.vertices + _PARK, body.faces)
         mat = material_id(body.material, 0.003)
         shapes.append(f'<shape type="ply" id="mesh-{name}"><string name="filename" value="meshes/{name}.ply"/>'
@@ -174,12 +174,12 @@ def write_scene(scene: RadioScene, directory: Path) -> Path:
 
 @dataclass
 class PathSet:
-    """Paths traced from one car-antenna position ``origin`` to the handset."""
+    """Paths traced from one robot-antenna position ``origin`` to the handset."""
 
     origin: np.ndarray
     a: np.ndarray  # complex passband coefficients, no propagation phase
     length: np.ndarray  # float64 total path length (m)
-    first: np.ndarray  # (n, 3) interaction point adjacent to the car antenna (handset for LoS)
+    first: np.ndarray  # (n, 3) interaction point adjacent to the robot antenna (handset for LoS)
     los: bool
     diffracted: int
     refracted: int
@@ -197,7 +197,7 @@ def _rz(yaw: float) -> np.ndarray:
 
 
 class SionnaPropagation:
-    """Ray-traced handset <-> car-antenna channel (see module docstring)."""
+    """Ray-traced handset <-> robot-antenna channel (see module docstring)."""
 
     name = "sionna_rt"
     label = "Sionna RT"
@@ -218,18 +218,18 @@ class SionnaPropagation:
         self.refraction = bool(refraction)
         self.directory = Path(directory)
         self.xml_path = write_scene(scene, self.directory)
-        self.scene = rt.load_scene(str(self.xml_path), merge_shapes=True, merge_shapes_exclude_regex="car-.*")
+        self.scene = rt.load_scene(str(self.xml_path), merge_shapes=True, merge_shapes_exclude_regex="robot-.*")
         self.scene.frequency = self.frequency
         self.scene.tx_array = rt.PlanarArray(num_rows=1, num_cols=1, pattern=scene.tx_pattern, polarization=scene.polarization)
         self.scene.rx_array = rt.PlanarArray(num_rows=1, num_cols=1, pattern=scene.rx_pattern, polarization=scene.polarization)
         self.handset = rt.Transmitter("handset", position=mi.Point3f(*map(float, self.tx_position)), power_dbm=float(scene.tx_power_dbm))
-        self.car = rt.Receiver("car_antenna", position=mi.Point3f(*map(float, self.tx_position + [1.0, 0.0, 0.0])))
+        self.robot = rt.Receiver("robot_antenna", position=mi.Point3f(*map(float, self.tx_position + [1.0, 0.0, 0.0])))
         self.scene.add(self.handset)
-        self.scene.add(self.car)
+        self.scene.add(self.robot)
         self.solver = rt.PathSolver(deterministic=True)
         self._body: list[tuple[str, np.ndarray]] = []
         for body in scene.body:
-            obj = self.scene.get(f"car-{body.material}")
+            obj = self.scene.get(f"robot-{body.material}")
             if obj is not None:
                 self._body.append((obj.mi_mesh.id() + ".vertex_positions", np.asarray(body.vertices, dtype=float)))
         self._body_pose: tuple[float, ...] | None = None
@@ -339,15 +339,15 @@ class SionnaPropagation:
 
     # ------------------------------------------------------------------ tracing
     def _solve(self, points: np.ndarray, grid: bool = False) -> list[PathSet]:
-        """One PathSolver call from the handset to car-antenna ``points`` (one Sionna receiver each); one PathSet per point.
+        """One PathSolver call from the handset to robot-antenna ``points`` (one Sionna receiver each); one PathSet per point.
         ``grid`` only selects the statistics bucket (static-scene evaluation vs link traces)."""
         mi, rt = self.mi, self.rt
         points = np.atleast_2d(np.asarray(points, dtype=float))
         added: list[str] = []
         if len(points) == 1:
-            self.car.position = mi.Point3f(*map(float, points[0]))
+            self.robot.position = mi.Point3f(*map(float, points[0]))
         else:
-            self.scene.remove("car_antenna")
+            self.scene.remove("robot_antenna")
             for i, p in enumerate(points):
                 self.scene.add(rt.Receiver(f"grid_rx{i}", position=mi.Point3f(*map(float, p))))
                 added.append(f"grid_rx{i}")
@@ -366,7 +366,7 @@ class SionnaPropagation:
             if added:
                 for name in added:
                     self.scene.remove(name)
-                self.scene.add(self.car)
+                self.scene.add(self.robot)
         elapsed = time.perf_counter() - t0
         if grid:
             self.grid_points += len(points)
@@ -403,7 +403,7 @@ class SionnaPropagation:
                 if abs(length - SPEED_OF_LIGHT * tau[s, i]) > 0.05:  # vertex order/precision guard
                     length = SPEED_OF_LIGHT * tau[s, i]
                 lengths.append(length)
-                lasts.append(ordered[-2])  # interaction (or handset) adjacent to the car antenna
+                lasts.append(ordered[-2])  # interaction (or handset) adjacent to the robot antenna
                 los |= kinds == 0
                 n_diff += bool(kinds & 8)
                 n_ref += bool(kinds & 4)
@@ -426,7 +426,7 @@ class SionnaPropagation:
         return paths
 
     def _trace_key(self, key: tuple[int, int, int, int]) -> PathSet:
-        """Trace one cache cell: the cell centre, with the car body posed at the cell's heading bucket."""
+        """Trace one cache cell: the cell centre, with the robot body posed at the cell's heading bucket."""
         center = np.array([key[0] * self.grid, key[1] * self.grid, key[2] * self.grid_z])
         if self._body:
             yaw_b = key[3] * self.heading_bucket
@@ -456,7 +456,7 @@ class SionnaPropagation:
         return ChannelSample(gain, mean, 0.0, len(paths.a), paths.los)
 
     def static_gain_db(self, points: np.ndarray, frequency: float | None = None, batch: int = 256) -> tuple[np.ndarray, np.ndarray]:
-        """Coherent and incoherent gain (antennas included) at car-antenna ``points`` with no car body in the scene."""
+        """Coherent and incoherent gain (antennas included) at robot-antenna ``points`` with no robot body in the scene."""
         self._park_body()
         points = np.atleast_2d(np.asarray(points, dtype=float))
         f = self.frequency if frequency is None else frequency
@@ -474,7 +474,7 @@ class SionnaPropagation:
         """Sionna ``RadioMapSolver`` coverage (handset as transmitter, isotropic receiver, cell-averaged path gain)."""
         mi, rt = self.mi, self.rt
         self._park_body()
-        self.scene.remove("car_antenna")
+        self.scene.remove("robot_antenna")
         try:
             t0 = time.perf_counter()
             rmap = rt.RadioMapSolver()(self.scene, center=mi.Point3f(float(center[0]), float(center[1]), float(height)),
@@ -484,14 +484,14 @@ class SionnaPropagation:
             gain = np.asarray(rmap.path_gain)[0]
             elapsed = time.perf_counter() - t0
         finally:
-            self.scene.add(self.car)
+            self.scene.add(self.robot)
             self._body_pose = None
         # Sionna planar maps are indexed [y, x]; cell centers:
         ny, nx = gain.shape
         xs = center[0] - size[0] / 2.0 + cell * (np.arange(nx) + 0.5)
         ys = center[1] - size[1] / 2.0 + cell * (np.arange(ny) + 0.5)
         with np.errstate(divide="ignore"):
-            # Isotropic map receiver -> add the catalog car-antenna peak gain; scale the handset pattern to its catalog gain.
+            # Isotropic map receiver -> add the catalog robot-antenna peak gain; scale the handset pattern to its catalog gain.
             gain_db = (10.0 * np.log10(gain) + self.scene_spec.rx_gain_dbi
                        + (self.scene_spec.tx_gain_dbi - _PATTERN_PEAK_DBI.get(self.scene_spec.tx_pattern, 0.0)))
         return {"x": xs, "y": ys, "gain_db": gain_db, "seconds": elapsed, "cell": cell, "height": height}
@@ -519,11 +519,11 @@ class SionnaPropagation:
             f"{self.max_depth}, refraction {self.refraction}, UTD wedge diffraction {self.diffraction}, {self.samples} rays/source, "
             "no diffuse scattering (ground roughness not modelled).",
             f"Scene: {ground} ground plane ({2 * s.ground_half_extent:.0f} m square), obstacles [{obstacles or 'none'}], "
-            f"car body by material [{body}] (material classes are estimates). Antennas: {s.tx_pattern}/{s.rx_pattern}, "
+            f"robot body by material [{body}] (material classes are estimates). Antennas: {s.tx_pattern}/{s.rx_pattern}, "
             f"{s.polarization}-polarized, peak gains scaled to the catalog values ({self.gain_correction_db:+.2f} dB total). "
-            f"Car antenna offset {np.round(s.antenna_offset, 3).tolist()} m ({s.antenna_offset_source}).",
-            f"Traced handset -> car antenna on a {self.grid} m grid x {math.degrees(self.heading_bucket):.0f} deg heading "
-            "buckets with the car body posed per trace (exact blockage; near-field body scattering not modelled); first-segment exact extrapolation between traces; coherent sum at the "
+            f"robot antenna offset {np.round(s.antenna_offset, 3).tolist()} m ({s.antenna_offset_source}).",
+            f"Traced handset -> robot antenna on a {self.grid} m grid x {math.degrees(self.heading_bucket):.0f} deg heading "
+            "buckets with the robot body posed per trace (exact blockage; near-field body scattering not modelled); first-segment exact extrapolation between traces; coherent sum at the "
             "FHSS hop frequency gives small-scale fading (no statistical fading model).",
         ] + list(s.notes)
 

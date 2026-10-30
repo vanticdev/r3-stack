@@ -9,7 +9,7 @@ server, simulation worker) call it first; importing :mod:`r3_sim` calls it too.
 Backend choice: EGL when a GPU device node exists (``/dev/dri/renderD*`` or
 ``/dev/nvidia0``), so the vendor driver renders. Without a GPU both EGL and
 OSMesa fall back to Mesa's CPU rasterizer, and OSMesa is preferred: through
-EGL, llvmpipe produced shadow-map acne across the floor in the RC-car renders,
+EGL, llvmpipe produced shadow-map acne across the floor in the robot renders,
 OSMesa did not (R3 worker image, arm64: EGL Mesa 25.2.8, OSMesa 25.1.7).
 """
 

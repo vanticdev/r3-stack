@@ -40,27 +40,18 @@ Y = ±24.5 mm. No consumer should derive their location from the enlarged box.
 Envelope consumers in assembly/model checks, wiring obstacles, radio geometry,
 simulation fallback geometry/mass centres, native feature-envelope plans and
 fabrication fallback geometry now preserve that offset. The source placement and
-RC-car assembly joins remain in the board frame. The RC-car needs no change to
-its authored join offsets or deck-hole pattern.
+robot assembly joins remain in the board frame. The robot needs no change to
+its authored join offsets or panel-hole pattern.
 
 ## Fit evidence and limits
 
-`r3 validate -C examples/robots/rc-car --stage assembly,model,cad --json` passes
-assembly and model checks with **zero interferences** (132 plan solids, 83
-objects, 105 joins). A separate FCL triangle-surface collision check placed the
-**entire downloaded Pi tessellation**, including its open shells, at the compiled
-Pi pose and compared it with every other existing RC-car part plan: **zero
-collisions**. Thus the corrected protrusions do not reveal an interference against
-those current counterpart plans.
+Assembly clearance must be evaluated against each new project’s actual counterparts. The purchased-board measurements do not certify an installed layout.
 
 The STEP includes open surfaces as well as 2,689 native solids. A volume-only
 mesh boolean initially rejected some shells, so it was not used as proof of full
-clearance. FCL's surface check includes them. Generated evidence is under
-`build/modelbank/pi-surface-fit-evidence.json`, `pi-fit-evidence.json` and
-`pi5-dimensions.png` (build artifacts, not committed).
+clearance. Surface-distance checks must include those shells when evaluating a project.
 
-This is not a live Onshape import/assembly proof. No API-key transport was
-configured. Nor does the envelope review certify every mounting face: the
+Nor does the envelope review certify every mounting face: the
 catalog's existing **nominal 1.6 mm mounting stack** differs from the STEP's
 0.030..1.306 mm PCB faces. That discrepancy is explicitly recorded in
 `key_specs.pcb_faces_z` / `pcb_thickness`; it needs a physical-board/seat review

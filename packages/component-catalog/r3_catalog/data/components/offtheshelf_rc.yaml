@@ -1,9 +1,4 @@
-# Off-the-shelf parts for a 1/10 RC car with a 3D-printed frame and a BOUGHT drivetrain (no custom gears):
-# the Traxxas Slash 2WD rear driveline, Traxxas SCT wheels, a Savox servo, a Hobbywing brushed ESC with BEC,
-# a Pololu 5 V / 5.5 A buck for the Raspberry Pi 5 (no custom PCB), a SparkFun u-blox M10 GNSS breakout,
-# a Gens Ace 2S LiPo with XT60 and a GY-521 MPU-6050 breakout.
-# Research notes with every source URL: .r3-runs/lane-d-research/drivetrain-parts.md
-#
+# Off-the-shelf components, with supplier data and explicitly labelled geometry estimates.
 # Geometry honesty: Traxxas publishes no drawings or CAD for the Magnum 272 transmission, the driveshafts or
 # the wheel hubs. Those envelopes and interface positions are ESTIMATES laid out for the Slash 2WD geometry
 # (296 mm track, 335 mm wheelbase, 2.2/3.0 in SCT wheels) and are labelled `estimated`; measure the bought
@@ -431,7 +426,7 @@ components:
     part_number: GPS-18037
     description: >
       38.1 x 30.5 mm board, 4 holes on a 33.0 x 25.4 mm rectangle, 3.3 V only. Needs an external active L1 antenna on
-      the SMA (e.g. SparkFun GPS-14986 molex/u.FL or a puck): place the antenna with a clear sky view on top of the car.
+      the SMA (e.g. SparkFun GPS-14986 molex/u.FL or a puck): place the antenna with a clear sky view on the robot.
     mechanical:
       shape: box
       size: [38.1 mm, 30.5 mm, 4 mm]

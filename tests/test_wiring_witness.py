@@ -69,8 +69,7 @@ def test_transformed_mesh_matches_transformed_analytic_box():
 
 
 def test_legacy_nearest_normal_sign_flips_at_edges_and_corners():
-    """The pre-85f2fb6 rule reports far-away points as deep penetrations: the review
-    packet's -236.7 mm (esc_motor vs knuckle_fl) came from this, not from the geometry."""
+    """Nearest-normal signing can report distant points as deep penetrations."""
     v, f = box_mesh()
     mesh = MeshShape(v, f)
     # 180 mm in front of the end faces, a fraction of a sample step below an edge: the nearest
@@ -133,7 +132,7 @@ def test_mujoco_distance_agrees_with_exact_for_meshes_and_primitives():
 def test_measure_returns_witness_pair_and_agreement():
     v, f = box_mesh(center=(0.0, 0.0, 0.0))
     mesh = MeshShape(v, f)
-    obstacle = Obstacle("block", "structure", mesh, mesh, 0.0, False, "chassis", True, source="cad_mesh")
+    obstacle = Obstacle("block", "structure", mesh, mesh, 0.0, False, "base", True, source="cad_mesh")
     line = np.column_stack([np.linspace(-0.05, 0.05, 101), np.full(101, 0.02), np.zeros(101)])
     m = measure(obstacle, line, 0.001, swept=False)
     assert m.exact == pytest.approx(0.01 - 0.001, abs=1e-9)

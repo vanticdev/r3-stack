@@ -16,10 +16,10 @@ const item = (over: Partial<ReleaseItem>): ReleaseItem => ({ id: "requirement.x"
 
 describe("labels", () => {
   it("names parts, harnesses and operating points for people", () => {
-    expect(partLabel("knuckle_fr")).toBe("front-right knuckle");
-    expect(partLabel("battery_lead")).toBe("battery lead");
-    expect(partLabel("power_y")).toBe("power Y");
-    expect(partLabel("esc_motor")).toBe("ESC motor");
+    expect(partLabel("pivot_right")).toBe("pivot right");
+    expect(partLabel("supply")).toBe("supply");
+    expect(partLabel("distribution")).toBe("distribution");
+    expect(partLabel("actuator_power")).toBe("actuator power");
     expect(partLabel("pi")).toBe("Pi");
     expect(partLabel("W_BAT_P")).toBe("W_BAT_P");
     expect(partLabel("esc.BEC")).toBe("esc.BEC");
@@ -35,14 +35,14 @@ describe("labels", () => {
 
   it("turns diagnostics into headlines and measured facts", () => {
     const d = {
-      code: "cable_sags_into_moving_part", stage: "wiring", subjects: ["servo_lead", "W_SRV_SIG"],
-      message: "servo_lead cable enters the knuckle_fr envelope by 2.3 mm during the slack simulation (t = 1.597 s)",
-      data: { min_distance: -0.00234, required: 0.008, component: "knuckle_fr", time: 1.597 },
+      code: "cable_sags_into_moving_part", stage: "wiring", subjects: ["actuator_signal", "W_SRV_SIG"],
+      message: "actuator_signal cable enters the pivot_right envelope by 2.3 mm during the slack simulation (t = 1.597 s)",
+      data: { min_distance: -0.00234, required: 0.008, component: "pivot_right", time: 1.597 },
     };
     expect(diagnosticType(d.code)).toBe("Cable sags into moving part");
-    expect(diagnosticHeadline(d)).toBe("Servo lead cable enters the front-right knuckle envelope by 2.3 mm during the slack simulation (t = 1.597 s)");
+    expect(diagnosticHeadline(d)).toBe("Actuator signal cable enters the pivot right envelope by 2.3 mm during the slack simulation (t = 1.597 s)");
     const facts = diagnosticFacts(d);
-    expect(facts).toMatchObject({ cable: "servo lead", part: "front-right knuckle", amount: "2.34 mm inside", limit: "needs ≥ 8 mm", time: 1.597 });
+    expect(facts).toMatchObject({ cable: "actuator signal", part: "pivot right", amount: "2.34 mm inside", limit: "needs ≥ 8 mm", time: 1.597 });
     expect(diagnosticHeadline({ message: "esc BEC supplies 2.38 A at servo_stall_compute@full > 2.0 A rating", subjects: ["esc", "op:servo_stall_compute@full"] }))
       .toBe("ESC BEC supplies 2.38 A at servo stall compute · full charge > 2.0 A rating");
     expect(diagnosticType("some_new_code")).toBe("Some new code");

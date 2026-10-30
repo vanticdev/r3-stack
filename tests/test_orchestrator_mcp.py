@@ -34,8 +34,8 @@ def test_validate_and_diagnostics(project):
     errors = m.r3_get_diagnostics(project=project, severity="error")
     assert errors["counts"]["error"] == len(errors["diagnostics"]) > 0
     assert all(d["code"] == "component_interference" for d in errors["diagnostics"])
-    esc = m.r3_get_diagnostics(project=project, subject="esc")
-    assert [d["subjects"] for d in esc["diagnostics"]] == [["esc", "standoff_rl"]]
+    esc = m.r3_get_diagnostics(project=project, subject="block_a")
+    assert [d["subjects"] for d in esc["diagnostics"]] == [["block_a", "block_b"]]
     status = m.r3_status(project=project)
     assert next(s for s in status["stages"] if s["stage"] == "model")["status"] == "failed"
     assert m.r3_diagnose(project=project)["errors"] > 0
@@ -43,13 +43,13 @@ def test_validate_and_diagnostics(project):
 
 def test_run_stage_returns_assumptions(project):
     result = m.r3_run_stage("model", project=project)
-    assert result["assumptions"] and result["stages"][0]["metrics"]["components"] == 23
+    assert result["assumptions"] and result["stages"][0]["metrics"]["components"] == 18
     assert m.r3_run_stage("bogus", project=project)["code"] == "usage_error"
 
 
 def test_spec_patch_concurrency(project):
     read = m.r3_get_spec(project=project)
-    first = m.r3_patch_spec({"components": {"standoff_rl": {"pose": {"xyz": ["30 mm", "45 mm", "28 mm"]}}}}, read["sha256"], project=project)
+    first = m.r3_patch_spec({"components": {"panel": {"pose": {"xyz": ["30 mm", "45 mm", "28 mm"]}}}}, read["sha256"], project=project)
     assert first["ok"] and first["previous_sha256"] == read["sha256"] and first["sha256"] != read["sha256"]
     # A second agent still holding the old revision must conflict, not overwrite.
     second = m.r3_patch_spec({"robot": {"version": "9.9.9"}}, read["sha256"], project=project)
@@ -59,7 +59,7 @@ def test_spec_patch_concurrency(project):
     # The applied edit fixed one interference.
     result = m.r3_validate(project=project, stages=["model"])
     pairs = {frozenset(d["subjects"]) for d in result["diagnostics"] if d["code"] == "component_interference"}
-    assert frozenset({"esc", "standoff_rl"}) not in pairs
+    assert frozenset({"esc", "panel"}) not in pairs
 
 
 def test_spec_patch_schema_validation_and_dry_run(project):
@@ -83,7 +83,7 @@ def test_spec_patch_preserves_comments_and_layout(project):
     assert result["ok"] and result["preserves_comments"] and result["graph_diagnostics"] == []
     after = path.read_text().splitlines()
     changed = [(a, b) for a, b in zip(before, after) if a != b]
-    assert len(before) == len(after) and changed == [("  max_mass: 2.2 kg", "  max_mass: 2.1 kg")]
+    assert len(before) == len(after) and changed == [("  max_mass: 5 kg", "  max_mass: 2.1 kg")]
 
 
 def test_spec_patch_reports_dangling_connectors(project):
@@ -150,4 +150,4 @@ def test_stdio_round_trip(project):
 
     names, spec = asyncio.run(asyncio.wait_for(session_calls(), timeout=60))
     assert EXPECTED_TOOLS <= names
-    assert spec["ok"] and spec["spec"]["name"] == "r3-rc-car" and len(spec["sha256"]) == 64
+    assert spec["ok"] and spec["spec"]["name"] == "r3-bench" and len(spec["sha256"]) == 64

@@ -10,7 +10,7 @@ import { expect, request, test, type Page } from "@playwright/test";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const shots = path.resolve(here, "..", process.env.R3_E2E_SCREENSHOTS ?? "test-results/screenshots");
 mkdirSync(shots, { recursive: true });
-const pid = process.env.R3_E2E_PROJECT ?? "rc-car";
+const pid = process.env.R3_E2E_PROJECT ?? "robot";
 
 // Against the mock layer every response carries X-R3-Mock: 1. Against a real `r3 serve`, the tests that
 // start pipeline runs or agent sessions are skipped: they would execute stages and spend the user's
@@ -138,8 +138,8 @@ test.describe("interactions", () => {
     await page.goto("/#/");
     await page.getByRole("button", { name: "New project" }).click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("radio", { name: /RC car/ })).toBeChecked();
-    await dialog.getByLabel("Project name").fill("my-rover");
+    await expect(dialog.getByRole("radio", { name: "Empty project" })).toBeChecked();
+    await dialog.getByLabel("Project name").fill("my-instrument");
     await dialog.getByText("Also create a GitHub repository").click();
     await expect(dialog).toContainText("Owner");
     await shot(page, `32-projects-create-${backend()}`);

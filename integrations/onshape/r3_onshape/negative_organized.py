@@ -1,18 +1,4 @@
-"""Phase B negative tests: deliberately broken designs and documents must produce
-their diagnostics.
-
-* ``misaligned_hole_pattern``: one gearbox mounting hole in the chassis moved by
-  0.5 mm (catalog override in a temporary project) -> ``hole_pattern_mismatch``
-  from the assembly compiler;
-* ``default_feature_name``, ``unfoldered_tab``, ``unconstrained_sketch``: a
-  scratch Onshape document with one organized Part Studio (built by the same
-  builder), then a feature renamed to ``Extrude 1``, a second tab left outside
-  the tab folders and a sketch with a free line; the organization check must
-  report ``cad_default_feature_name``, ``cad_tab_not_in_folder`` and
-  ``cad_unconstrained_sketch``. The scratch document is deleted.
-
-    python -m r3_onshape.negative_organized examples/robots/rc-car
-"""
+"""Negative assembly and document-organization probes derived from the current project."""
 
 from __future__ import annotations
 
@@ -31,21 +17,36 @@ import yaml
 from r3_model.diagnostics import StageResult
 from r3_model.project import Project
 
-CATALOG = Path(__file__).resolve().parents[3] / "packages" / "component-catalog" / "r3_catalog" / "data" / "components" / "rc_car.yaml"
-
-
 def misaligned_hole_pattern(root: Path) -> dict[str, Any]:
+    """Move a hole on one side of an actual declared multi-hole join."""
+    project = Project.load(root)
+    selected = None
+    if project.spec.assembly:
+        for join in project.spec.assembly.joins:
+            cid, _, iface = join.a.partition(".")
+            component = project.spec.components[cid]
+            entry = project.catalog.component(component.type)
+            interface = entry.interfaces.get(iface)
+            if interface and interface.kind == "hole_pattern" and len(interface.params.get("holes", [])) > 1:
+                selected = (entry, iface)
+                break
+    if selected is None:
+        return {"id": "misaligned_hole_pattern", "skipped": "no declared multi-hole join", "passed": True}
+    entry, iface = selected
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
         shutil.copy(root / "robot.yaml", work / "robot.yaml")
-        (work / "catalog" / "components").mkdir(parents=True)
-        data = yaml.safe_load(CATALOG.read_text())
-        plate = copy.deepcopy(next(c for c in data["components"] if c["id"] == "chassis-plate-al6061"))
-        plate["interfaces"]["gearbox"]["params"]["holes"][0][0] = "18.5 mm"
-        (work / "catalog" / "components" / "override.yaml").write_text(yaml.safe_dump({"components": [plate]}))
+        if (root / "catalog").is_dir():
+            shutil.copytree(root / "catalog", work / "catalog")
+        directory = work / "catalog/components"
+        directory.mkdir(parents=True, exist_ok=True)
+        data = entry.model_dump(mode="json")
+        from r3_model.units import to_si
+        data["interfaces"][iface]["params"]["holes"][0][0] = to_si(interface.params["holes"][0][0]) + .0005
+        (directory / "zz_negative_override.yaml").write_text(yaml.safe_dump({"components": [data]}))
         diagnostics = Project.load(work).assembly.diagnostics
     hits = [d for d in diagnostics if d.code == "hole_pattern_mismatch"]
-    return {"id": "misaligned_hole_pattern", "mutation": "chassis.gearbox hole 1 moved +0.5 mm in x",
+    return {"id": "misaligned_hole_pattern", "mutation": f"{entry.id}.{iface} hole shifted +0.5 mm",
             "expected": ["hole_pattern_mismatch"], "found": sorted({d.code for d in diagnostics if d.severity.value == "error"}),
             "passed": bool(hits), "detail": hits[0].message if hits else ""}
 
@@ -126,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("project", nargs="?", default="examples/robots/rc-car")
+    parser.add_argument("project", nargs="?", default=".")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     root = Path(args.project).resolve()

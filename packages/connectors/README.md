@@ -20,5 +20,5 @@ mated-pair checks and renders.
 
 ```
 python -m r3_connectors.derive --write        # regenerate the catalog geometry (needs KiCad)
-python -m r3_connectors examples/robots/rc-car  # models, connectors.json, renders
+python -m r3_connectors path/to/project  # models, connectors.json, renders
 ```

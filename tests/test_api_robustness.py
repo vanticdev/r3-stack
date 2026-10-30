@@ -1,5 +1,5 @@
 """Server robustness: readable project_invalid errors, stale-code detection, the project cache and
-``r3 serve --reload``. Uses a temporary rc-car copy (no build/ artifacts)."""
+``r3 serve --reload``. Uses a temporary bench copy (no build/ artifacts)."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ pytest.importorskip("fastapi")
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from api_helpers import copy_rc_car  # noqa: E402
+from api_helpers import copy_bench  # noqa: E402
 from r3_model.project import Project  # noqa: E402
 from r3_orchestrator import cli  # noqa: E402
 from r3_orchestrator.api import freshness, server  # noqa: E402
@@ -20,14 +20,14 @@ from r3_orchestrator.api.agents import AgentManager  # noqa: E402
 from r3_orchestrator.api.errors import MAX_LISTED_ERRORS  # noqa: E402
 from r3_orchestrator.api.server import create_app  # noqa: E402
 
-PID = "rc-car"
+PID = "bench"
 
 
 @pytest.fixture
 def projects(tmp_path):
     parent = tmp_path / "projects"
     parent.mkdir()
-    copy_rc_car(parent, PID)
+    copy_bench(parent, PID)
     freshness.PROJECTS.clear()
     yield parent
     freshness.PROJECTS.clear()
@@ -93,10 +93,10 @@ def test_many_errors_list_the_first_few_and_count_all(client, projects):
 
 
 def test_project_list_carries_the_structured_error_and_other_projects_load(client, projects):
-    copy_rc_car(projects, "good-car")
+    copy_bench(projects, "good-project")
     edit_spec(projects / PID, bad_types("gps"))
     rows = {row["id"]: row for row in client.get("/api/projects").json()["projects"]}
-    bad, good = rows[PID], rows["good-car"]
+    bad, good = rows[PID], rows["good-project"]
     assert bad["error"] == bad["error_detail"]["message"] and "components.gps.type" in bad["error"]
     assert bad["error_detail"]["code"] == "project_invalid"
     assert bad["error_detail"]["data"]["errors"][0]["path"] == "components.gps.type"

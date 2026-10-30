@@ -9,18 +9,18 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
-from api_helpers import copy_rc_car, parse_sse, sse  # noqa: E402
+from api_helpers import copy_bench, parse_sse, sse  # noqa: E402
 from r3_orchestrator.api.runs import RunManager  # noqa: E402
 from r3_orchestrator.api.server import create_app  # noqa: E402
 
-PID = "rc-car"
+PID = "bench"
 
 
 @pytest.fixture
 def projects(tmp_path):
     parent = tmp_path / "projects"
     parent.mkdir()
-    copy_rc_car(parent)
+    copy_bench(parent)
     return parent
 
 
@@ -39,7 +39,7 @@ def test_run_streams_stage_events(projects, monkeypatch):
         assert types[:3] == ["run_queued", "run_started", "stage_started"] and types[-1] == "run_finished"
         assert [e["stage"] for e in events if e["type"] == "stage_started"] == ["model", "report"]
         logs = [e for e in events if e["type"] == "log"]
-        assert any(e["line"] == "fake stage: checking r3-rc-car" and e["stream"] == "stdout" and e["stage"] == "model" for e in logs)
+        assert any(e["line"] == "fake stage: checking r3-bench" and e["stream"] == "stdout" and e["stage"] == "model" for e in logs)
         assert any("fake stage logging works" in e["line"] and e["stream"] == "logging" for e in logs)
         assert [e["message"] for e in events if e["type"] == "progress"] == ["halfway"]
         (diagnostic,) = [e for e in events if e["type"] == "diagnostic"]

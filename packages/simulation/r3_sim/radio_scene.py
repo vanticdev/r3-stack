@@ -7,13 +7,13 @@ Pure geometry and materials, independent of the solver, built from the spec:
   pair only when *both* ``ground_permittivity`` and ``ground_conductivity`` are
   given explicitly;
 * static obstacles: ``environment.obstacles`` boxes (center, size, material);
-* the car body: every component of the robot except the receiver and the
+* the robot body: every component of the robot except the receiver and the
   antenna (its own radiator cannot shadow itself), as its CAD
   mesh (``build/cad/meshes``) when available, otherwise its catalog box /
   cylinder / plate outline, in the robot frame. Parts are merged per radio
-  material so the solver can move the body with the car at each trace;
+  material so the solver can move the body with the robot at each trace;
 * the antennas: transmitter (pilot handset) position, power, pattern and
-  polarization; the car antenna offset in the robot frame.
+  polarization; the robot antenna offset in the robot frame.
 
 Material classes for the body are estimates: metals and PCB-dense parts
 (computer, HAT, ESC, battery pouch foils, motor/servo cans) are perfect
@@ -74,7 +74,7 @@ class Box:
 
 @dataclass
 class BodyMesh:
-    """Car body triangles of one radio material, robot frame (m)."""
+    """robot body triangles of one radio material, robot frame (m)."""
 
     material: str
     vertices: np.ndarray
@@ -118,7 +118,7 @@ def _polarization(value: Any) -> str:
 
 
 def scene_from_environment(environment: Any, receiver_params: dict[str, Any]) -> RadioScene:
-    """Static scene (ground, obstacles, antennas) from ``simulation.environment``; no car body."""
+    """Static scene (ground, obstacles, antennas) from ``simulation.environment``; no robot body."""
     tx = environment.radio_transmitter
     renv = dict(environment.radio_environment or {})
     position = np.asarray(tx.position, dtype=float) if tx else np.array([0.0, 0.0, 1.2])
@@ -186,8 +186,8 @@ def _part_mesh(project: Any, cid: str, cad_parts: dict[str, Any]) -> tuple[np.nd
     return vertices, np.asarray(mesh.faces, dtype=np.int64)
 
 
-def car_body(project: Any, exclude: tuple[str, ...] = ()) -> list[BodyMesh]:
-    """Car body grouped by radio material (robot frame)."""
+def robot_body(project: Any, exclude: tuple[str, ...] = ()) -> list[BodyMesh]:
+    """robot body grouped by radio material (robot frame)."""
     cad_parts = (project.read_build_json("cad/cad_model.json") or {}).get("parts") or {}
     groups: dict[str, BodyMesh] = {}
     for cid in sorted(project.spec.components):
@@ -210,7 +210,7 @@ def car_body(project: Any, exclude: tuple[str, ...] = ()) -> list[BodyMesh]:
 
 
 def antenna_component(project: Any) -> str | None:
-    """The car's receive antenna: CAD ``rf.antenna_component``, else the first ``antenna`` catalog kind."""
+    """The robot's receive antenna: CAD ``rf.antenna_component``, else the first ``antenna`` catalog kind."""
     rf = (project.read_build_json("cad/cad_model.json") or {}).get("rf") or {}
     if rf.get("antenna_component") in project.spec.components:
         return str(rf["antenna_component"])
@@ -233,7 +233,7 @@ def _catalog_feed_point(project: Any, antenna_id: str) -> np.ndarray | None:
 
 
 def antenna_offset(project: Any, receiver_id: str | None, height_above_mount: float) -> tuple[np.ndarray, str]:
-    """Car antenna position in the robot frame: CAD ``rf.antenna_position`` when exposed, else the catalog dipole
+    """robot antenna position in the robot frame: CAD ``rf.antenna_position`` when exposed, else the catalog dipole
     center of the antenna component, else receiver pose + height."""
     cad = project.read_build_json("cad/cad_model.json") or {}
     rf = cad.get("rf") or {}
@@ -255,5 +255,5 @@ def scene_for_project(project: Any, receiver_id: str | None, receiver_params: di
         project, receiver_id, to_si(receiver_params.get("antenna_height_above_mount", 0.1)))
     if include_body:
         antenna = antenna_component(project)
-        scene.body = car_body(project, exclude=tuple(c for c in (receiver_id, antenna) if c))
+        scene.body = robot_body(project, exclude=tuple(c for c in (receiver_id, antenna) if c))
     return scene

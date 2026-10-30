@@ -9,7 +9,7 @@ kinematics (``mj_kinematics``) on the scenario's ``vehicle.xml``. ``frames.rest`
 each body's pose at ``qpos0``, the frame the robot-frame CAD meshes are authored in.
 
 Usage (shared venv, repository root on PYTHONPATH as for the r3 CLI):
-    python apps/web/scripts/convert_recording.py examples/robots/rc-car full_throttle --hz 30 [--out file.json]
+    python apps/web/scripts/convert_recording.py path/to/project full_throttle --hz 30 [--out file.json]
 """
 
 from __future__ import annotations

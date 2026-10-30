@@ -1,13 +1,4 @@
-"""Synchronous buck designs for the carrier HAT regulators.
-
-* ``U2`` TI TPS568230 (SLVSEY5C, D-CAP3, 8 A): VBAT -> 5.1 V / 5 A for the Pi.
-* ``U3`` TI TPS56528 (SLVSBV3B, D-CAP2, 5 A): VBAT -> 6.0 V servo rail, the
-  cycle-by-cycle valley current limit (5.5-7.8 A) is the servo stall limit.
-
-Equation numbers refer to the respective datasheet. Values tagged ``datasheet``
-come from the cited tables; capacitor DC-bias retention, switching transition
-time and the 2-layer board thermal resistance are engineering estimates.
-"""
+"""Converter sizing and verification from explicit requirements and vendor data."""
 
 from __future__ import annotations
 
@@ -118,11 +109,11 @@ class BuckRequirements:
     name: str
     v_out: float
     i_out: float                  # continuous design current
-    v_in_min: float = 6.0
-    v_in_nom: float = 7.4
-    v_in_max: float = 17.0
+    v_in_min: float
+    v_in_nom: float
+    v_in_max: float
     v_in_ripple: float = 0.2      # V p-p at nominal input
-    i_peak: float = 0.0           # required peak output (servo stall); 0 = same as i_out
+    i_peak: float = 0.0           # required peak output; 0 = same as i_out
 
 
 @dataclass
@@ -254,24 +245,8 @@ C_OUT_22U_16V = ("GRM31CR61C226KE15L", 22e-6, 16.0, 0.55, "Capacitor_SMD:C_1206_
 BULK_220U = ("EEH-ZA1E221P", 220e-6, 25.0, 1.0, "Capacitor_SMD:CP_Elec_8x10")
 
 
-def pi_rail() -> BuckDesign:
-    """5.1 V / 5 A for the Pi 5. TPS568230 Table 3 (5 V, 600 kHz): Rlower 30 k, L 2.2 uH,
-    Cout 66-500 uF, Cff 47-330 pF. VIN UVLO 4.2 V typ / 4.4 V max rising, 3.8 V falling."""
-    req = BuckRequirements("5V", v_out=5.1, i_out=5.0)
-    c_out = CapacitorBank(*C_OUT_22U_16V[:4], count=4, footprint=C_OUT_22U_16V[4])
-    # TI recommends 40 uF of X5R/X7R on VIN (sec. 8.2.2.1.4): 3 x 22 uF 25 V keeps ~43 uF at 7.4 V.
-    c_in = CapacitorBank(*C_IN_22U_25V[:4], count=3, footprint=C_IN_22U_25V[4])
-    return design_buck(TPS568230, XAL7030_222, c_out, c_in, req, r_fb_lower=30.1e3, c_ff=100e-12, bulk_out=220e-6)
 
 
-def servo_rail() -> BuckDesign:
-    """6.0 V servo rail. TPS56528 Table 2 (6.5 V row): R2 49.9 k, L 2.2-4.7 uH (3.3 typ), Cout 20-68 uF.
-    The DS3218 servo stalls at 2.5 A (catalog); the rail must deliver >= 5 A peak and the 5.5 A minimum
-    valley limit bounds a shorted or stalled servo."""
-    req = BuckRequirements("SERVO_6V", v_out=6.0, i_out=2.5, i_peak=5.0)
-    c_out = CapacitorBank("GRM31CR61C226KE15L", 22e-6, 16.0, 0.45, count=3, footprint="Capacitor_SMD:C_1206_3216Metric")
-    c_in = CapacitorBank(*C_IN_22U_25V[:4], count=2, footprint=C_IN_22U_25V[4])
-    return design_buck(TPS56528, XAL7030_332, c_out, c_in, req, r_fb_lower=49.9e3, c_ff=0.0, theta_ja_board=55.0)
 
 
 def hold_up_time(c_eff: float, v_start: float, v_end: float, power: float) -> float:
@@ -410,11 +385,11 @@ class BuckBoostRequirements:
     name: str
     v_out: float
     i_out: float                  # continuous design current
-    i_peak: float                 # short-term peak (servo stall with margin)
-    v_in_min: float = 4.4         # HAT input UVLO region (2S pack collapsing under a motor stall)
-    v_in_nom: float = 7.4
-    v_in_max: float = 8.4         # 2S full; 17 V TVS clamp is the absolute transient
-    v_in_transient: float = 17.0
+    i_peak: float                 # short-term peak
+    v_in_min: float
+    v_in_nom: float
+    v_in_max: float
+    v_in_transient: float
     f_sw: float = 400e3
     uvlo_on: float = 4.5
 
@@ -605,17 +580,6 @@ def design_buck_boost(ic: BuckBoostIC, fet: Mosfet, inductor: Inductor, c_out: C
     return design
 
 
-def servo_rail() -> BuckBoostDesign:
-    """6.0 V servo rail: TI LM5175 4-switch buck-boost, 3 A continuous / 4 A peak from 4.4-8.4 V (17 V transient).
-
-    It replaces the TPS56528 buck, which was in dropout below ~7.8 V input (4.80 V at the servo at minimum
-    charge). Four CSD17577Q3A NexFETs, Coilcraft XAL7030-332 (3.3 uH), 12 mOhm sense resistor, 400 kHz, CCM
-    with hiccup current limit; the servo sees 6.0 V from a full pack down to the 4.2 V UVLO."""
-    req = BuckBoostRequirements("SERVO_6V", v_out=6.0, i_out=3.0, i_peak=4.0)
-    c_out = CapacitorBank("GRM31CR61C226KE15L", 22e-6, 16.0, 0.45, count=4, footprint="Capacitor_SMD:C_1206_3216Metric")
-    c_in = CapacitorBank(*C_IN_22U_25V[:4], count=2, footprint=C_IN_22U_25V[4])
-    return design_buck_boost(LM5175, CSD17577Q3A, XAL7030_332, c_out, c_in, req, r_fb_lower=20.0e3, r_sense=12e-3,
-                             c_slope=47e-12, r_uv_upper=100e3, t_ss=10e-3, f_bw=8e3)
 
 
 def buck_boost_efficiency_curve(design: BuckBoostDesign, v_in: float,

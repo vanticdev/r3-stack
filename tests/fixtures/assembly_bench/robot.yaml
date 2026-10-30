@@ -26,7 +26,7 @@ components:
   hat_so_2: {type: standoff-m2.5-11}
   hat_so_3: {type: standoff-m2.5-11}
   hat_so_4: {type: standoff-m2.5-11}
-  hat: {type: hat-bench}
+  controller: {type: controller-bench}
 
 assembly:
   root: plate
@@ -56,12 +56,12 @@ assembly:
     - {a: pi_so_3.top, b: pi.b3}
     - {a: pi_so_4.top, b: pi.b4}
     # HAT on the GPIO header (clock inferred from pin 1) plus 4 standoffs.
-    - {a: pi.gpio, b: hat.socket}
+    - {a: pi.gpio, b: controller.socket}
     - {a: pi.t1, b: hat_so_1.bottom}
     - {a: pi.t2, b: hat_so_2.bottom}
     - {a: pi.t3, b: hat_so_3.bottom}
     - {a: pi.t4, b: hat_so_4.bottom}
-    - {a: hat_so_1.top, b: hat.h1, fasteners: {type: M2.5x5}}
-    - {a: hat_so_2.top, b: hat.h2, fasteners: {type: M2.5x5}}
-    - {a: hat_so_3.top, b: hat.h3, fasteners: {type: M2.5x5}}
-    - {a: hat_so_4.top, b: hat.h4, fasteners: {type: M2.5x5}}
+    - {a: hat_so_1.top, b: controller.h1, fasteners: {type: M2.5x5}}
+    - {a: hat_so_2.top, b: controller.h2, fasteners: {type: M2.5x5}}
+    - {a: hat_so_3.top, b: controller.h3, fasteners: {type: M2.5x5}}
+    - {a: hat_so_4.top, b: controller.h4, fasteners: {type: M2.5x5}}

@@ -1,4 +1,4 @@
-"""Minimal RC-car controller used to exercise the twin before the real firmware exists.
+"""Minimal bench controller used to exercise the twin before the real firmware exists.
 
 Uses only ``r3_hal``: CRSF over UART (arm/sticks/failsafe), NMEA GPS, INA226
 battery voltage, MPU-6050 yaw rate, Hall encoder speed, ESC/servo PWM. Modes

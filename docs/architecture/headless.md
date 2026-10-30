@@ -36,7 +36,7 @@ runs first in the `r3` CLI, the MCP server and the simulation worker, and on any
 * `egl` when a GPU device node exists (`/dev/dri/renderD*`, `/dev/nvidia0`), so
   the vendor driver renders;
 * otherwise `osmesa`. Both backends then run on Mesa's CPU rasterizer. Through
-  EGL, llvmpipe showed shadow-map acne across the floor in the RC-car renders;
+  EGL, llvmpipe showed shadow-map acne across the floor in the robot renders;
   OSMesa did not (worker image on arm64: EGL Mesa 25.2.8, OSMesa 25.1.7).
 
 It also sets `MPLBACKEND=Agg`. Explicit settings always win. `r3 doctor` renders
@@ -106,7 +106,7 @@ r3-kicad-headless -- python -c "from kipy import KiCad; print(KiCad().get_versio
 
 ## Onshape document organization (phase B)
 
-The organized RC-car document (`r3_onshape.organized`) is built over REST with the
+The organized robot document (`r3_onshape.organized`) is built over REST with the
 headless session or API keys. Everything that defines the CAD, places it and verifies it is
 headless. Organizational edits that Onshape exposes only in its editor protocol are not.
 

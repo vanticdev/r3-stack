@@ -1,0 +1,13 @@
+components:
+  - id: test-filter
+    name: Synthetic passive filter
+    kind: pcb
+    mechanical: {shape: box, size: [0.038, 0.028, 0.0016], mass: 0.004}
+    pins:
+      SIGNAL_IN: {role: passive}
+      SIGNAL_OUT: {role: passive}
+      SUPPLY: {role: passive}
+      GND: {role: ground}
+    connectors:
+      INPUT: {type: header-1x3-2.54, position: [-0.011, 0.00346, 0.00414], direction: [0, 0, 1], x: [0, -1, 0], pins: {'1': SIGNAL_IN, '2': SUPPLY, '3': GND}, source: 'kicad:J1'}
+      OUTPUT: {type: header-1x3-2.54, position: [0.011, 0.00346, 0.00414], direction: [0, 0, 1], x: [0, -1, 0], pins: {'1': SIGNAL_OUT, '2': SUPPLY, '3': GND}, source: 'kicad:J2'}

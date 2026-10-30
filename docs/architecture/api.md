@@ -98,7 +98,7 @@ r3 serve [--host 127.0.0.1] [--port 8321] [--projects-root DIR ...] [--web-dist 
 | GET | `/api/doctor` | `?refresh=true` | The `r3 doctor` payload (`environment`, `tools`, `stages`), plus `checked_at` and `agents` (CLI detection, see below). Cached until refreshed, because the probes take seconds. |
 | GET | `/api/agent/providers` | `?refresh=true` | `[{provider, available, path, version, detail}]` for `claude` and `codex` |
 | GET | `/api/projects` | | `{projects: [ProjectSummary], roots, templates}` |
-| POST | `/api/projects` | `{name, template="rc-car", github?: {private=true, description}, confirm=false}` | 201 `{ok, id, path, files[], github?}`. `github` without `confirm: true` returns 428. |
+| POST | `/api/projects` | `{name, template="robot", github?: {private=true, description}, confirm=false}` | 201 `{ok, id, path, files[], github?}`. `github` without `confirm: true` returns 428. |
 | GET | `/api/projects/{pid}` | | `ProjectDetail` |
 | GET | `/api/projects/{pid}/release` | | `Release` (the gate alone) |
 | GET | `/api/projects/{pid}/spec` | | `{yaml, sha256, spec, path}` |
@@ -296,15 +296,15 @@ artifact URLs, `status`, `stale`).
               "motor_current": [...], "steer": [...], "soc": [...], "rail_5v": [...], "wire_clearance": [...], "...": []},
    "firmware_logs": [...], "events": [...],
    "frames": {"t": [...], "format": "x y z qw qx qy qz (world frame)",
-              "bodies": {"chassis": [[x, y, z, qw, qx, qy, qz], ...], "knuckle_fl": [...], "wheel_fl": [...]},
-              "component_bodies": {"battery": "chassis", "wheel_fl": "wheel_fl", "...": "..."},
+              "bodies": {"base": [[x, y, z, qw, qx, qy, qz], ...], "pivot_left": [...], "sensor": [...]},
+              "component_bodies": {"battery": "base", "sensor": "sensor", "...": "..."},
               "cables": {"cable00s0": {"rgba": [r, g, b, a], "points": [[[x, y, z], ...per cable body], ...per frame]}}}}
   ```
   - `series` resamples every 1-D channel of the 100 Hz recording to `hz`.
   - `frames` comes from forward kinematics of `vehicle.xml` at the recorded 30 Hz
     `snapshot_qpos`, at most `hz`.
   - To place a component, compose its body pose with its pose relative to that body. For
-    the chassis body that relative pose is the robot-frame pose from **model**; for a
+    the base body that relative pose is the robot-frame pose from **model**; for a
     moving body, use the body's rest pose.
   - `cables=false` drops the cable polylines, which are the bulk of the payload.
 
@@ -417,7 +417,7 @@ session then returns 503 `agent_cli_missing`.
 .venv/bin/python -m pytest tests/test_api_server.py tests/test_api_runs.py tests/test_api_agents.py tests/test_api_release.py
 ```
 
-- The tests use FastAPI's TestClient against a temporary copy of `examples/robots/rc-car`,
+- The tests use FastAPI's TestClient against a temporary copy of `path/to/project`,
   with real assembly and model results plus stage hand-off files in the documented
   formats.
 - Runs use fake stages (`tests/api_fake_stage.py`) in real worker processes.

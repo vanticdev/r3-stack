@@ -1,10 +1,10 @@
 """Radio coverage map PNG: Sionna RT radio map around the course plus coherent path-solver RSSI along the route.
 
 Left panel: ``RadioMapSolver`` (handset transmitting, cell-averaged path gain,
-isotropic map receiver scaled to the catalog car-antenna gain) over the area
-the car drove near the transmitter. Right panel: ``PathSolver`` coherent RSSI
+isotropic map receiver scaled to the catalog robot-antenna gain) over the area
+the robot drove near the transmitter. Right panel: ``PathSolver`` coherent RSSI
 at the carrier on a grid over the full route, which shows the two-ray fringes.
-Both use the static scene: ground, obstacles and antennas, without the car
+Both use the static scene: ground, obstacles and antennas, without the robot
 body or shadowing. The white contour is the link threshold (noise +
 interference + required SNR at 10 % PER). With the analytic fallback both
 panels show the fallback model and are labeled so.
@@ -98,7 +98,7 @@ def plot_coverage(radio: Any, rec: dict[str, np.ndarray], context: dict[str, Any
         mesh = ax.pcolormesh(grid["x"], grid["y"], rss, shading="nearest", cmap="viridis", vmin=vmin, vmax=vmax, rasterized=True)
         if np.isfinite(grid["rss"]).any() and np.nanmin(grid["rss"]) < threshold < np.nanmax(grid["rss"]):
             ax.contour(grid["x"], grid["y"], np.nan_to_num(grid["rss"], nan=vmin - 50), levels=[threshold], colors="white", linewidths=0.9)
-        ax.plot(rec["x"], rec["y"], color=SERIES[1], linewidth=1.0, label="car path")
+        ax.plot(rec["x"], rec["y"], color=SERIES[1], linewidth=1.0, label="robot path")
         ax.scatter([tx[0]], [tx[1]], marker="*", s=120, color="white", edgecolor=INK, zorder=5, label="pilot TX")
         for obstacle in obstacles:
             ax.scatter([obstacle["center"][0]], [obstacle["center"][1]], marker="s", s=25, color=SERIES[3], edgecolor=INK, zorder=5)
