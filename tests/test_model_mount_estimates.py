@@ -12,9 +12,8 @@ def test_owned_sensor_mount_estimate_is_reported_until_measured(tmp_path):
     (directory / "sensor.yaml").write_text(yaml.safe_dump({"components": [{
         "id": "spectrometer", "kind": "sensor", "name": "Owned spectrometer",
         "mechanical": {"shape": "box", "size": [.03, .02, .004], "mass": .01,
-                       "features": [{"id": "mount", "kind": "clearance_hole", "position": [.01, 0, .002],
-                                     "diameter": .0022, "depth": .002,
-                                     "provenance": {"status": "estimated", "source": "Unconfirmed supplier drawing"}}]}
+                       "mount_holes": [[.01, 0, .002]],
+                       "provenance": {"status": "estimated", "source": "Unconfirmed supplier drawing"}}
     }]}))
     (tmp_path / "robot.yaml").write_text(yaml.safe_dump({
         "schema": "r3/robot@1", "robot": {"name": "spectrometer fixture"},
@@ -26,8 +25,8 @@ def test_owned_sensor_mount_estimate_is_reported_until_measured(tmp_path):
     assert len(result.diagnostics) == 1
     warning = result.diagnostics[0]
     assert warning.code == "mount_geometry_estimated"  # release stage evidence recognizes this suffix
-    assert warning.subjects == ["sensor"] and warning.data["holes"][0]["diameter"] == .0022
-    project.catalog.component("spectrometer").mechanical.features[0].provenance.status = "measured"
+    assert warning.subjects == ["sensor"] and warning.data["holes"][0] == [.01, 0, .002]
+    project.catalog.component("spectrometer").mechanical.provenance.status = "measured"
     measured = StageResult(stage="model")
     ModelChecker(project, measured).check_mount_estimates()
     assert not measured.diagnostics

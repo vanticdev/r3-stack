@@ -780,9 +780,8 @@ class RobotSpec(_Model):
         if shared:
             raise ValueError(f"fastener and interface ids must differ (transmission paths reference both): {shared}")
         parts = self.part_ids()
-        collisions = sorted(ids & {p for p in parts if ":" in p})
-        if collisions:
-            raise ValueError(f"part names collide with component ids: {collisions}")
+        # Native hardware is an explicitly declared part, including fastener:S
+        # and nut:S. These names no longer collide with generated local solids.
         for fastener in mech.fasteners:
             refs = [*fastener.clamps, *([fastener.thread_into] if fastener.thread_into else [])]
             for ref in refs:

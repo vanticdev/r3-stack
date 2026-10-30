@@ -9,8 +9,7 @@ Pure geometry and materials, independent of the solver, built from the spec:
 * static obstacles: ``environment.obstacles`` boxes (center, size, material);
 * the robot body: every component of the robot except the receiver and the
   antenna (its own radiator cannot shadow itself), as its CAD
-  mesh (``build/cad/meshes``) when available, otherwise its catalog box /
-  cylinder / plate outline, in the robot frame. Parts are merged per radio
+  verified pulled STL mesh in the robot frame. Parts are merged per radio
   material so the solver can move the body with the robot at each trace;
 * the antennas: transmitter (pilot handset) position, power, pattern and
   polarization; the robot antenna offset in the robot frame.
@@ -208,6 +207,10 @@ def antenna_offset(project: Any, receiver_id: str | None, height_above_mount: fl
 
 def scene_for_project(project: Any, receiver_id: str | None, receiver_params: dict[str, Any], include_body: bool = True) -> RadioScene:
     scene = scene_from_environment(project.spec.simulation.environment, receiver_params)
+    if receiver_id is None and antenna_component(project) is None:
+        scene.antenna_offset = np.zeros(3)
+        scene.antenna_offset_source = "not_applicable"
+        return scene
     scene.antenna_offset, scene.antenna_offset_source = antenna_offset(
         project, receiver_id, to_si(receiver_params.get("antenna_height_above_mount", 0.1)))
     if include_body:

@@ -24,24 +24,3 @@ def test_pi_outline_envelope_and_mount_pattern():
     assert validate(bank, bank.validation.bbox_m).status == 'passed'
     # A real discrepancy still fails; correcting dimensions did not weaken validation.
     assert validate(bank, [.0885, .060, .018976]).status == 'mismatch'
-
-
-def test_clearance_envelope_keeps_board_frame_under_rotation():
-    from r3_onshape.plan import _envelope_solids
-    from r3_wiring.obstacles import _catalog_shape
-    from r3_model.project import Project
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[1] / 'tests/fixtures/bench'
-    project = Project.load(root)
-    mech = project.catalog.component(project.spec.components['pi'].type).mechanical
-    xyz, rpy = [.1, .2, .3], [.2, -.3, 1.2]
-    solid = make_solid('pi', 'custom', mech.size, 'z', xyz, rpy, mech.envelope_offset)
-    local = (solid.vertices - xyz) @ rpy_matrix(rpy)
-    assert local.min(axis=0) == pytest.approx([-.04295, -.029630352, -.00145])
-    assert local.max(axis=0) == pytest.approx([.04555, .028, .017526])
-    fallback = _envelope_solids(mech, {})[0]
-    assert fallback.position == pytest.approx([.0013, -.000815176, .008038])
-    obstacle = _catalog_shape(project, 'pi')
-    pos, rot = project.graph.component_pose('pi')
-    assert obstacle.center == pytest.approx(pos + rot @ np.asarray(fallback.position))

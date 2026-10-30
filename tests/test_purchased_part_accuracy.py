@@ -61,15 +61,9 @@ def test_j8_every_post_and_pin_one(parts):
             holes.append([poly.centroid.x, poly.centroid.y])
     assert len(holes) == 4
     np.testing.assert_allclose(np.ptp(holes, axis=0), [58, 49], atol=0.00001)
-    mount = [
-        feature.position[:2]
-        for feature in part.mechanical.features
-        if feature.id.startswith("hole_")
-    ]
-    assert [
-        max(Decimal(str(p[i])) for p in mount) - min(Decimal(str(p[i])) for p in mount)
-        for i in (0, 1)
-    ] == [Decimal("0.058"), Decimal("0.049")]
+    mount = part.mechanical.mount_holes
+    assert [max(Decimal(str(p[i])) for p in mount) - min(Decimal(str(p[i])) for p in mount)
+            for i in (0, 1)] == [Decimal("0.058"), Decimal("0.049")]
 
 
 # Surface identifiers in the immutable RP-010083-CA-1 model. Each envelope
@@ -128,14 +122,14 @@ def test_gy521_eight_measured_pads(parts):
         "AD0",
         "INT",
     ]
-    assert not part.mechanical.solids
+    assert "solids" not in part.mechanical.model_fields
     geometry = catalog.connector(inst.type).geometry
     physical = detect(bodies, instance_frame(inst), geometry)
     assert len(physical.contacts) == 8 and all(p.opening for p in physical.contacts)
     expected = np.array([p.position[:2] for p in geometry.pins.values()])
     found = np.array([p.centre[:2] for p in physical.contacts])
     assert cdist(expected, found).min(axis=1).max() <= 0.00005
-    assert part.mechanical.features[0].provenance.status == "estimated"
+    assert "features" not in part.mechanical.model_fields
 
 
 @pytest.mark.parametrize("name", ["CAM0", "CAM1", "PCIE", "FAN", "UART", "BAT", "POE"])

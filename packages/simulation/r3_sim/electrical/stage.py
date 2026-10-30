@@ -826,10 +826,10 @@ def estimate_runtime(system: ElectricalSystem, ops: OperatingPoints, duty: dict[
 
 
 def full_throttle_transient(project: Any, routes: Any, ops: OperatingPoints, duration: float = 2.0, dt: float = 1e-3) -> dict[str, list[float]]:
-    """Full throttle from rest with a constant motor-speed ramp to the
-    traction-limited speed reached after ``duration`` (no vehicle dynamics)."""
+    """Full-throttle electrical ramp: road-drive speed or the declared stationary operating speed."""
     system = ElectricalSystem(project, routes, initial={"battery_soc": 1.0})
-    w_end = ops.cruise_speed * 2.0 / ops.vehicle["wheel_radius"] * ops.vehicle["ratio"]
+    w_end = (ops.cruise_speed * 2.0 / ops.vehicle["wheel_radius"] * ops.vehicle["ratio"]
+             if ops.vehicle["ground_drive"] else ops.vehicle["motor_operating_speed"])
     trace: dict[str, list[float]] = {"time": [], "omega": [], "motor_current": [], "torque": [], "battery_voltage": [], "pi_voltage": []}
     motor = next(iter(ops.motors))
     esc = ops.esc_for_motor.get(motor)

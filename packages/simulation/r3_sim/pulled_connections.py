@@ -12,12 +12,20 @@ def pulled_connections(project) -> ConnectionModel:
     # and contact evidence are taken from the pulled geometry projection.
     authored = compile_connections(project)
     model = ConnectionModel(diagnostics=list(authored.diagnostics), estimated=authored.estimated)
+    # Resting is deliberately not a CAD mate: contact alone supplies no
+    # retention. Keep its monitor so an unfastened body can detach/fall.
+    model.connections.extend(c for c in authored.connections
+                             if c.kind == "resting" and c.a in pulled.parts and c.b in pulled.parts)
+    seen = {c.id for c in model.connections}
     for mate in pulled.mates:
         a, b = mate.a[0], mate.b[0]
         frame = pulled.poses[a] @ pulled.parts[a].mate_connectors[mate.a[1]]
         candidates = [c for c in authored.connections if {c.a, c.b} == {a, b}]
         if candidates:
             for c in candidates:
+                if c.id in seen:
+                    continue
+                seen.add(c.id)
                 c.point = frame[:3, 3].tolist()
                 c.axis = frame[:3, 2].tolist()
                 model.connections.append(c)

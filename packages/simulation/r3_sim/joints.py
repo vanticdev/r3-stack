@@ -653,8 +653,8 @@ class JointMonitor:
             self._point = np.asarray(
                 [np.asarray(c.point) - self._origin(a) for c, a in zip(self._connections, self._a)]
             )
-            self._caps = np.asarray([[c.axial, c.shear, c.torque, c.bending] for c in self._connections])
-            self._slip = np.asarray([c.slip for c in self._connections])
+            self._caps = np.asarray([[c.axial, c.shear, c.torque, c.bending] for c in self._connections], dtype=float)
+            self._slip = np.asarray([c.slip for c in self._connections], dtype=float)
             self._decay = np.asarray([c.loosening_distance for c in self._connections])
             self._locked = np.asarray([c.locked for c in self._connections])
             self._ball = np.asarray([c.kind == "ball_joint" for c in self._connections])
