@@ -81,10 +81,14 @@ class WiringRun:
     result: Any = None  # r3_model.diagnostics.StageResult of a full stage run
 
 
+@pytest.hookimpl(tryfirst=True)
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     for item in items:
         if "rc_car_wiring" in getattr(item, "fixturenames", ()):
             item.add_marker(pytest.mark.slow)
+            # Keep the one expensive session fixture on one worker; unrelated
+            # tests run concurrently instead of rebuilding this stage per worker.
+            item.add_marker(pytest.mark.xdist_group(name="full_wiring"))
 
 
 def copy_rc_car(root: Path) -> Path:
