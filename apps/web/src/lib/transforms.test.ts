@@ -10,16 +10,16 @@ import {
 const apply = (m: ReturnType<typeof poseMatrix>, p: Vec3) => new Vector3(...p).applyMatrix4(m).toArray();
 const close = (a: number[], b: number[], digits = 9) => a.forEach((v, i) => expect(v).toBeCloseTo(b[i]!, digits));
 
-// robot-like tree: base <- arm <- knuckle <- wheel; servo <- tie_rod.
+// Instrument tree: base <- support <- pivot <- sensor, with a separate actuator.
 const components = {
-  base: { mount: "world", xyz: [0.13, 0, 0.025] as Vec3 },
-  support: { mount: "base", xyz: [0.26, 0.0475, 0.025] as Vec3 },
-  pivot_left: { mount: "support", xyz: [0.26, 0.0675, 0.035] as Vec3 },
-  sensor: { mount: "pivot_left", xyz: [0.26, 0.1, 0.055] as Vec3 },
-  servo: { mount: "base", xyz: [0.25, 0, 0.028] as Vec3 },
+  base: { mount: "world", xyz: [0.02, 0, 0.01] as Vec3 },
+  support: { mount: "base", xyz: [0.04, 0.01, 0.01] as Vec3 },
+  pivot_left: { mount: "support", xyz: [0.04, 0.03, 0.05] as Vec3 },
+  sensor: { mount: "pivot_left", xyz: [0.04, 0.08, 0.09] as Vec3 },
+  servo: { mount: "base", xyz: [0.06, 0, 0.01] as Vec3 },
 };
-const steer: SpecJoint = { id: "pivot", type: "revolute", parent: "base", child: "pivot_left", origin: [0.26, 0.0675, 0.055], axis: [0, 0, 1], limits: [-0.45, 0.45] };
-const spin: SpecJoint = { id: "roll", type: "continuous", parent: "pivot_left", child: "sensor", origin: [0.26, 0.1, 0.055], axis: [0, 1, 0] };
+const steer: SpecJoint = { id: "pivot", type: "revolute", parent: "base", child: "pivot_left", origin: [0.04, 0.03, 0.09], axis: [0, 0, 1], limits: [-0.6, 0.6] };
+const spin: SpecJoint = { id: "roll", type: "continuous", parent: "pivot_left", child: "sensor", origin: [0.04, 0.08, 0.09], axis: [0, 1, 0] };
 
 describe("robot.yaml poses", () => {
   it("rpy is R = Rz(yaw)·Ry(pitch)·Rx(roll)", () => {
@@ -33,12 +33,12 @@ describe("robot.yaml poses", () => {
 
 describe("playback body poses", () => {
   it("bodyDelta carries nominal-frame geometry to the recorded world pose", () => {
-    const nominal: Pose7 = [0.26, 0.1, 0.0555, 1, 0, 0, 0];
+    const nominal: Pose7 = [0.1, 0.1, 0.12, 1, 0, 0, 0];
     const s = Math.SQRT1_2;
-    const current: Pose7 = [5.26, 1.1, 0.0555, s, 0, 0, s]; // translated + yawed 90° about the wheel centre
+    const current: Pose7 = [5.1, 1.1, 0.12, s, 0, 0, s]; // translated + yawed 90° about the sensor centre
     const delta = bodyDelta(nominal, current);
-    close(apply(delta, [0.26, 0.1, 0.0555]), [5.26, 1.1, 0.0555]); // body origin lands on the recorded position
-    close(apply(delta, [0.36, 0.1, 0.0555]), [5.26, 1.2, 0.0555]); // +x of the body now points +y
+    close(apply(delta, [0.1, 0.1, 0.12]), [5.1, 1.1, 0.12]); // body origin lands on the recorded position
+    close(apply(delta, [0.2, 0.1, 0.12]), [5.1, 1.2, 0.12]); // +x of the body now points +y
   });
 
   it("identity when the body is at its nominal pose", () => {
@@ -52,15 +52,15 @@ describe("playback body poses", () => {
     const frames = {
       bodies: {
         base: [[5, 1, 0, s, 0, 0, s], [6, 1, 0, s, 0, 0, s]] as Pose7[],
-        wheel: [[4.9, 1, 0.055, s, 0, 0, s]] as Pose7[],
+        probe: [[4.9, 1, 0.12, s, 0, 0, s]] as Pose7[],
       },
     };
     const rest = restPoses(frames, "base");
     expect(rest.base).toEqual([0, 0, 0, 1, 0, 0, 0]);
-    close(rest.wheel!.slice(0, 3), [0, 0.1, 0.055], 9);
-    close(rest.wheel!.slice(3), [1, 0, 0, 0], 9);
-    // Placing the wheel mesh (authored at rest) with bodyDelta lands it on the recorded pose.
-    close(apply(bodyDelta(rest.wheel!, frames.bodies.wheel[0]!), [0, 0.1, 0.055]), [4.9, 1, 0.055]);
+    close(rest.probe!.slice(0, 3), [0, 0.1, 0.12], 9);
+    close(rest.probe!.slice(3), [1, 0, 0, 0], 9);
+    // Placing the sensor mesh (authored at rest) with bodyDelta lands it on the recorded pose.
+    close(apply(bodyDelta(rest.probe!, frames.bodies.probe[0]!), [0, 0.1, 0.12]), [4.9, 1, 0.12]);
     const given = { ...frames, rest: { base: [0, 0, 0.0005, 1, 0, 0, 0] as Pose7 } };
     expect(restPoses(given, "base")).toBe(given.rest);
   });
@@ -110,17 +110,17 @@ describe("mount tree and joints", () => {
   it("revolute joint rotates about its axis through its origin", () => {
     const m = jointMatrix(steer, Math.PI / 2);
     close(apply(m, steer.origin), steer.origin); // the axis point stays fixed
-    // The wheel centre is 32.5 mm left of the kingpin; steering 90° left swings it to the rear.
-    close(apply(m, [0.26, 0.1, 0.055]), [0.26 - 0.0325, 0.0675, 0.055]);
+    // A sensor 50 mm along +y swings toward -x under a 90° pivot.
+    close(apply(m, [0.04, 0.08, 0.09]), [-0.01, 0.03, 0.09]);
   });
 
-  it("chains compose root-first: wheel spin happens in the steered frame", () => {
+  it("chains compose root-first: sensor rotation happens in the steered frame", () => {
     const chains = jointChains(tree, [steer, spin]);
     const q = { pivot: Math.PI / 2, roll: Math.PI / 2 };
     const m = chainMatrix(chains.sensor!, q);
-    // A point on the tyre's front (+x of the wheel centre) spins down (−z), then steering rotates the wheel centre.
-    const point = apply(m, [0.26 + 0.055, 0.1, 0.055]);
-    close(point, [0.26 - 0.0325, 0.0675, 0.055 - 0.055]);
+    // The probe's +x offset rotates down, then the parent pivot rotates its centre.
+    const point = apply(m, [0.08, 0.08, 0.09]);
+    close(point, [-0.01, 0.03, 0.05]);
   });
 
   it("prismatic joints translate and limits clamp", () => {
@@ -140,7 +140,7 @@ describe("mount tree and joints", () => {
 
 describe("Ackermann steering", () => {
   it("inner wheel steers more and satisfies cot δo − cot δi = track / wheelbase", () => {
-    const wheelbase = 0.26, track = 0.135;
+    const wheelbase = 0.4, track = 0.16;
     const { left, right } = ackermann(0.3, wheelbase, track);
     expect(left).toBeGreaterThan(right); // left turn: left wheel is inner
     expect(1 / Math.tan(right) - 1 / Math.tan(left)).toBeCloseTo(track / wheelbase, 9);
@@ -155,8 +155,8 @@ describe("exploded view", () => {
   it("offsets accumulate along the joins from the root", () => {
     const offsets = explodeOffsets(components, 1);
     expect(offsets.base).toEqual([0, 0, 0]);
-    close(offsets.support!, [0.13, 0.0475, 0]);
-    close(offsets.pivot_left!, [0.13, 0.0675, 0.01]);
+    close(offsets.support!, [0.02, 0.01, 0]);
+    close(offsets.pivot_left!, [0.02, 0.03, 0.04]);
     expect(explodeOffsets(components, 0).sensor).toEqual([0, 0, 0]);
   });
 

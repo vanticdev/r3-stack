@@ -138,8 +138,8 @@ test.describe("interactions", () => {
     await page.goto("/#/");
     await page.getByRole("button", { name: "New project" }).click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByRole("radio", { name: /robot/ })).toBeChecked();
-    await dialog.getByLabel("Project name").fill("my-rover");
+    await expect(dialog.getByRole("radio", { name: "Empty project" })).toBeChecked();
+    await dialog.getByLabel("Project name").fill("my-instrument");
     await dialog.getByText("Also create a GitHub repository").click();
     await expect(dialog).toContainText("Owner");
     await shot(page, `32-projects-create-${backend()}`);

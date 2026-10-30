@@ -9,7 +9,7 @@ const transcript = [
   "| Part | Check | Result | Next step |\n|---|---|---|---|\n| Battery lead | Clearance | **8 mm** | Run wiring |\n| Motor lead | Bend radius | Passed | Keep route |",
   "- [x] Inspect the route\n- [ ] Run simulation",
   "> Keep the lead clear of moving parts.",
-  '```python\nprint("Ready for simulation")\nvalidate_route(harness="supply", min_clearance_mm=8, moving_parts=["front_wheel", "rear_wheel"], allow_estimates=False)\n```',
+  '```python\nprint("Ready for simulation")\nvalidate_route(harness="supply", min_clearance_mm=8, moving_parts=["rotating_sensor", "pivot"], allow_estimates=False)\n```',
   "[Review guide](https://example.com/guide)",
 ].join("\n\n");
 
