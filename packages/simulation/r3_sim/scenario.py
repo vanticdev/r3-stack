@@ -471,7 +471,7 @@ def _finish(
             return str(Path(path).resolve())
 
     mjcf_path = write_mjcf(kernel.vm, out_dir / "vehicle.xml")
-    artifacts.append((rel(mjcf_path), "mjcf", "generated MuJoCo vehicle model"))
+    artifacts.append((rel(mjcf_path), "mjcf", "generated MuJoCo robot assembly"))
     from .cable_playback import part_pose_recording
 
     part_ids, part_poses, part_rest = part_pose_recording(kernel.vehicle, kernel.recorder.snapshots_qpos)

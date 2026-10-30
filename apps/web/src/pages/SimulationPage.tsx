@@ -76,7 +76,7 @@ const METRIC_GROUPS: { title: string; keys: string[] }[] = [
   { title: "Run", keys: ["sim_time_s", "wall_time_s", "realtime_factor", "radio_backend"] },
 ];
 const METRIC_LABEL: Record<string, string> = {
-  top_speed_mps: "Top speed", distance_m: "Distance", vehicle_mass_kg: "Vehicle mass", min_battery_voltage_v: "Lowest battery voltage",
+  top_speed_mps: "Top speed", distance_m: "Distance", vehicle_mass_kg: "Robot mass", min_battery_voltage_v: "Lowest battery voltage",
   final_soc: "Charge at the end", energy_wh: "Energy used", peak_battery_current_a: "Peak battery current", peak_motor_current_a: "Peak motor current",
   min_rail_5v: "Lowest 5 V rail", brownouts: "Brownouts", max_tx_distance_m: "Farthest from transmitter", min_rssi_dbm: "Weakest signal",
   link_lost: "Link lost at", link_margin_at_range_requirement_db: "Link margin at required range", packets_ok: "Packets received", packets_lost: "Packets lost",
@@ -213,7 +213,7 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
       <div className="grid side" style={{ alignItems: "start" }}>
         <div className="stack" style={{ gap: 16 }}>
           {has3d ? (
-            <Card flush title="Playback" actions={<label className="check small"><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />Follow vehicle</label>}>
+            <Card flush title="Playback" actions={<label className="check small"><input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} />Follow robot</label>}>
               {last?.stale && (
                 // Playback draws today's CAD at the recorded body poses, but the wires are the recorded cable
                 // simulation, so an old run shows old routes and slack over the current layout.
