@@ -6,7 +6,12 @@ chord/angle tolerances; no catalog geometry or native service is consulted.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 import numpy as np
+
+if TYPE_CHECKING:
+    from r3_model.project import Project
+    from r3_model.diagnostics import StageResult
 
 from r3_model.pulled import PulledModel, PullError, load_pulled
 from .model import (ANGLE_TOLERANCE, CHORD_TOLERANCE, Face, GeometryModel,
@@ -98,7 +103,10 @@ def part_from_step(name: str, path: Path, pose: np.ndarray | None = None) -> Par
     part = PartGeometry(name, name, faces, vertices, triangles)
     _orient_faces_from_mesh(part)
     # A failed boolean must never become a zero-interference result.
-    part.manifold()
+    try:
+        part.manifold()
+    except ValueError as error:
+        raise PullError("cad_pull_invalid", str(error)) from error
     return part
 
 
@@ -136,3 +144,35 @@ def _cached_geometry(name: str, path: str, modified: int, placement: str) -> Par
 def read_step(name: str, path: Path, placement: Frame) -> PartGeometry:
     """Compatibility API for externally supplied, part-local STEP solids."""
     return part_from_step(name, path, placement.matrix())
+
+
+def verify_pulled(project: Project, result: StageResult, pulled: PulledModel | None = None) -> dict[str, Any]:
+    """CAD-stage hook: ``payload = verify_pulled(project, result, pulled)``.
+
+    Reads only pinned local inputs, appends closure/fit/motion diagnostics to
+    the caller's StageResult, and returns the world-mesh presentation payload
+    with fit and motion evidence. Missing/invalid inputs yield one PullError
+    diagnostic and an empty payload. No native transport is used.
+    """
+    from r3_model.diagnostics import Diagnostic
+    from r3_model.pulled_view import apply_pulled, cad_view
+    from .fit import FitChecker
+    from .motion import run_motion
+
+    try:
+        pulled = pulled or load_pulled(project.root)
+        assembly = apply_pulled(project, pulled)
+        result.extend(assembly.diagnostics)
+        model = geometry_from_pulled(pulled)
+        materials = {name: part.material or "" for name, part in pulled.parts.items()}
+        fit = FitChecker(project, model, materials, result).run()
+        motion = run_motion(project, model, fit, result) if not assembly.errors else {}
+        payload = cad_view(project)
+        payload.update(fit=fit.summary(), motion=motion, assembly=assembly.to_json())
+        result.metrics.update(pulled_parts=len(pulled.parts), pulled_mates=len(pulled.mates),
+                              verified_fasteners=len(fit.verified_fasteners),
+                              verified_interfaces=len(fit.verified_interfaces))
+        return payload
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error)))
+        return {}
