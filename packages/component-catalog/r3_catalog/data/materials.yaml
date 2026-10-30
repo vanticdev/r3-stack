@@ -14,6 +14,9 @@
 # upper bounds for real parts with infill below 100 %.
 materials:
   - id: petg
+    joint_physics:
+      shear_strength: {source: 'von Mises estimate from weakest XY/Z TDS tensile ultimate; isotropic approximation, printed layer direction unknown', status: estimated, value: 13279056.191361394}
+      friction: {source: R3 dry printed-part surface friction estimate; qualify actual surface pair, status: estimated, value: 0.2}
     name: PETG (Bambu Lab PETG HF)
     process: fdm
     keywords: [petg]
@@ -37,6 +40,9 @@ materials:
         Estimated: poisson_ratio. Cross-check: Prusament PETG TDS v1.1 gives a horizontal tensile yield of 47 MPa
         and an interlayer adhesion of 18 +/- 4 MPa (https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2023/10/9f8d2165-tds_prusament-petg_n_en.pdf).
   - id: pla-plus
+    joint_physics:
+      shear_strength: {source: 'von Mises estimate from weakest XY/Z TDS tensile ultimate; isotropic approximation, printed layer direction unknown', status: estimated, value: 20992455.787734795}
+      friction: {source: R3 dry printed-part surface friction estimate; qualify actual surface pair, status: estimated, value: 0.2}
     name: PLA+ (eSUN PLA+)
     process: fdm
     keywords: [pla+, pla plus, pla-plus]
@@ -60,6 +66,9 @@ materials:
         Estimated: youngs_modulus (eSUN publishes no tensile modulus; the X-Y flexural modulus 3259 MPa stands in for
         it, an approximation for unfilled PLA) and poisson_ratio.
   - id: pla
+    joint_physics:
+      shear_strength: {source: 'von Mises estimate from weakest XY/Z TDS tensile ultimate; isotropic approximation, printed layer direction unknown', status: estimated, value: 17897858.344878398}
+      friction: {source: R3 dry printed-part surface friction estimate; qualify actual surface pair, status: estimated, value: 0.2}
     name: PLA (Bambu Lab PLA Basic)
     process: fdm
     keywords: [pla, pla basic]
@@ -81,6 +90,9 @@ materials:
       source: "Bambu Lab PLA Basic TDS V3.0 https://store.bblcdn.com/s1/default/58b85d0f3db94878854a28fdb8a0006e/Bambu_PLA_Basic_Technical_Data_Sheet.pdf"
       notes: "Estimated: poisson_ratio."
   - id: asa
+    joint_physics:
+      shear_strength: {source: 'von Mises estimate from weakest XY/Z TDS tensile ultimate; isotropic approximation, printed layer direction unknown', status: estimated, value: 17897858.344878398}
+      friction: {source: R3 dry printed-part surface friction estimate; qualify actual surface pair, status: estimated, value: 0.2}
     name: ASA (Bambu Lab ASA)
     process: fdm
     keywords: [asa]
@@ -104,6 +116,9 @@ materials:
         Estimated: poisson_ratio. Cross-check: Prusament ASA TDS v1.1 gives a horizontal yield of 42 MPa and an
         interlayer adhesion of 11 +/- 1 MPa (https://storage.googleapis.com/prusa3d-content-prod-14e8-wordpress-prusament-prod/2024/05/bc8551ef-tds_prusament-asa_2024_en.pdf).
   - id: pa6-cf
+    joint_physics:
+      shear_strength: {source: 'von Mises estimate from weakest XY/Z TDS tensile ultimate; isotropic approximation, printed layer direction unknown', status: estimated, value: 27712812.92110204}
+      friction: {source: R3 dry printed-part surface friction estimate; qualify actual surface pair, status: estimated, value: 0.2}
     name: PA6-CF (Bambu Lab PA6-CF)
     process: fdm
     keywords: [pa6-cf, pa-cf, pa6 cf, nylon-cf, cf nylon]
@@ -127,6 +142,9 @@ materials:
       source: "Bambu Lab PA6-CF TDS V3.0 https://store.bblcdn.com/b2abc59ac250492b979a52f1ce3e61b3.pdf"
       notes: "Estimated: poisson_ratio (an isotropic E/nu model is itself an approximation for this anisotropic composite)."
   - id: paht-cf
+    joint_physics:
+      shear_strength: {source: 'von Mises estimate from weakest XY/Z TDS tensile ultimate; isotropic approximation, printed layer direction unknown', status: estimated, value: 27135462.651912414}
+      friction: {source: R3 dry printed-part surface friction estimate; qualify actual surface pair, status: estimated, value: 0.2}
     name: PAHT-CF (Bambu Lab PAHT-CF, PA12-based)
     process: fdm
     keywords: [paht-cf, pa12-cf, paht cf, pa12 cf]
@@ -147,3 +165,123 @@ materials:
       status: datasheet
       source: "Bambu Lab PAHT-CF TDS V3.0 https://store.bblcdn.com/7166b20bc68f4c87b32c972b856eeb4b.pdf"
       notes: "Estimated: poisson_ratio."
+  - id: al6061
+    name: Aluminum 6061-T6
+    process: machined
+    keywords:
+    - '6061'
+    density: 2700
+    tensile_strength: 310000000.0
+    tensile_strength_z: 310000000.0
+    youngs_modulus: 69000000000.0
+    poisson_ratio: 0.33
+    joint_physics:
+      shear_strength:
+        value: 178978583.448784
+        status: estimated
+        source: Kaiser Aluminum 6061 technical data, typical T6 values; von Mises ultimate
+          shear approximation
+      friction:
+        value: 0.2
+        status: estimated
+        source: R3 dry surface friction estimate
+    provenance:
+      status: estimated
+      source: Kaiser Aluminum 6061 technical data, typical T6 values; typical values,
+        no certified material lot
+  - id: al7075
+    name: Aluminum 7075-T6
+    process: machined
+    keywords:
+    - '7075'
+    density: 2700
+    tensile_strength: 572000000.0
+    tensile_strength_z: 572000000.0
+    youngs_modulus: 71700000000.0
+    poisson_ratio: 0.33
+    joint_physics:
+      shear_strength:
+        value: 330244353.97646594
+        status: estimated
+        source: Kaiser Aluminum 7075 technical data, typical T6 values; von Mises ultimate
+          shear approximation
+      friction:
+        value: 0.2
+        status: estimated
+        source: R3 dry surface friction estimate
+    provenance:
+      status: estimated
+      source: Kaiser Aluminum 7075 technical data, typical T6 values; typical values,
+        no certified material lot
+  - id: steel
+    name: Unspecified steel
+    process: machined
+    keywords:
+    - steel
+    density: 7850
+    tensile_strength: 400000000.0
+    tensile_strength_z: 400000000.0
+    youngs_modulus: 200000000000.0
+    poisson_ratio: 0.3
+    joint_physics:
+      shear_strength:
+        value: 230940107.67585033
+        status: estimated
+        source: R3 conservative unspecified steel estimate; alloy/temper not qualified;
+          von Mises ultimate shear approximation
+      friction:
+        value: 0.2
+        status: estimated
+        source: R3 dry surface friction estimate
+    provenance:
+      status: estimated
+      source: R3 conservative unspecified steel estimate; alloy/temper not qualified;
+        typical values, no certified material lot
+  - id: brass
+    name: Brass CW614N
+    process: machined
+    keywords:
+    - brass
+    density: 8500
+    tensile_strength: 350000000.0
+    tensile_strength_z: 350000000.0
+    youngs_modulus: 100000000000.0
+    poisson_ratio: 0.34
+    joint_physics:
+      shear_strength:
+        value: 202072594.21636903
+        status: estimated
+        source: R3 CW614N temper-unspecified estimate; von Mises ultimate shear approximation
+      friction:
+        value: 0.2
+        status: estimated
+        source: R3 dry surface friction estimate
+    provenance:
+      status: estimated
+      source: R3 CW614N temper-unspecified estimate; typical values, no certified material
+        lot
+  - id: pa12
+    name: Nylon PA12
+    process: machined
+    keywords:
+    - pa12
+    - nylon
+    density: 1050
+    tensile_strength: 45000000.0
+    tensile_strength_z: 45000000.0
+    youngs_modulus: 1500000000.0
+    poisson_ratio: 0.35
+    joint_physics:
+      shear_strength:
+        value: 25980762.11353316
+        status: estimated
+        source: R3 unqualified PA12/nylon estimate; molding and moisture unspecified;
+          von Mises ultimate shear approximation
+      friction:
+        value: 0.2
+        status: estimated
+        source: R3 dry surface friction estimate
+    provenance:
+      status: estimated
+      source: R3 unqualified PA12/nylon estimate; molding and moisture unspecified; typical
+        values, no certified material lot

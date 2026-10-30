@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-sim = ["mujoco>=3.1", "scipy>=1.11", "matplotlib>=3.8", "pillow>=10"]
+sim = ["mujoco>=3.17", "scipy>=1.11", "matplotlib>=3.8", "pillow>=10"]
 mcp = ["mcp>=1.2"]
 models = ["cascadio>=0.1.1", "trimesh>=4", "rarfile>=4.2"]
 # `r3 serve`: HTTP API (services/orchestrator/r3_orchestrator/api) and web app host.

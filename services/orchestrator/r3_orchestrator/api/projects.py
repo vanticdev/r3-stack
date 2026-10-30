@@ -18,6 +18,8 @@ import json
 import math
 import re
 import threading
+from r3_sim.load_cases import all_scenarios
+
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -439,7 +441,7 @@ def _scenario_summary(ref: ProjectRef, scenario_id: str, fingerprint: dict[str, 
 def sim_list(ref: ProjectRef) -> dict[str, Any]:
     project = load(ref)
     fingerprint = project.fingerprint()
-    scenarios = [{**s.model_dump(mode="json"), "last": _scenario_summary(ref, s.id, fingerprint)} for s in project.spec.simulation.scenarios]
+    scenarios = [{**s.model_dump(mode="json"), "last": _scenario_summary(ref, s.id, fingerprint)} for s in all_scenarios(project)]
     return _finite({"scenarios": scenarios, "result": _stage_block(project, ref.id, "sim", fingerprint),
                     "overview_url": artifact_url(ref.id, "sim/overview.png") if (ref.root / "build/sim/overview.png").exists() else None})
 
@@ -449,11 +451,11 @@ _RECORDING_LOCK = threading.Lock()
 
 def sim_detail(ref: ProjectRef, scenario_id: str, hz: float = 30.0, cables: bool = True) -> dict[str, Any]:
     project = load(ref)
-    scenario = next((s for s in project.spec.simulation.scenarios if s.id == scenario_id), None)
+    scenario = next((s for s in all_scenarios(project) if s.id == scenario_id), None)
     folder = ref.root / "build" / "sim" / scenario_id
     if scenario is None and not folder.is_dir():
         raise ApiError("scenario_not_found", f"no scenario {scenario_id!r} in robot.yaml or build/sim",
-                       {"scenarios": [s.id for s in project.spec.simulation.scenarios]})
+                       {"scenarios": [s.id for s in all_scenarios(project)]})
     last = _scenario_summary(ref, scenario_id, project.fingerprint())
     payload: dict[str, Any] = {"scenario": scenario.model_dump(mode="json") if scenario else {"id": scenario_id}, "last": last,
                                "summary": _read_json(folder / "summary.json"), "recording": None}
@@ -491,11 +493,19 @@ def decode_recording(npz_path: str, mtime_ns: int, hz: float, cables: bool) -> d
     logs = [json.loads(x) for x in data["firmware_logs"] if x] if "firmware_logs" in data.files else []
     events = [json.loads(x) for x in data["events"] if x] if "events" in data.files else []
     out: dict[str, Any] = {"hz": hz, "duration": duration, "channels": sorted(k for k in series if k != "t"), "series": series,
-                           "firmware_logs": logs[:2000], "events": events[:2000], "frames": None}
+                           "firmware_logs": logs[:2000], "events": [event for i, event in enumerate(events) if i < 2000 or event.get("event") in ("joint_failed", "part_detached")], "frames": None}
     xml = Path(npz_path).with_name("vehicle.xml")
     if "snapshot_qpos" in data.files and xml.exists():
         metadata = json.loads(str(data["cable_metadata"])) if "cable_metadata" in data.files else None
         out["frames"] = _body_frames(xml, data["snapshot_t"], data["snapshot_qpos"], hz, cables, metadata)
+    if {"part_ids", "part_poses", "part_rest", "snapshot_t"} <= set(data.files):
+        from r3_sim.cable_playback import recorded_part_frames
+
+        parts = recorded_part_frames(data["snapshot_t"], data["part_ids"], data["part_poses"], data["part_rest"], hz,
+                                     str(data["part_root"]) if "part_root" in data.files else None)
+        if out.get("frames") and not out["frames"].get("error"):
+            parts["cables"] = out["frames"].get("cables")
+        out["frames"] = parts
     return out
 
 
@@ -543,7 +553,11 @@ def _body_frames(xml: Path, snapshot_t: Any, snapshot_qpos: Any, hz: float, cabl
     mujoco.mj_kinematics(model, data)
     # CAD and connector paths are authored in the robot frame. qpos0 can put
     # the vehicle above ground; remove that root transform from nominal poses.
-    root_name = (metadata or {}).get("root_body", "chassis")
+    root_name = (metadata or {}).get("root_body")
+    if not root_name:
+        text=mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_TEXT,"r3_root")
+        root_name=(model.text_data[model.text_adr[text]:model.text_adr[text]+model.text_size[text]].rstrip(b"\0").decode()
+                   if text>=0 else names[rigid[0]])
     root = names.index(root_name) if root_name in names else rigid[0]
     rotation = data.xmat[root].reshape(3, 3)
     origin = data.xpos[root].copy()
@@ -577,7 +591,7 @@ def _body_frames(xml: Path, snapshot_t: Any, snapshot_qpos: Any, hz: float, cabl
             for cable, path in display.items():
                 cable_frames[cable].append(np.round(path, 6).tolist())
     details = metadata["wires"] if reconstruction else {}
-    return {"t": times, "format": "x y z qw qx qy qz (world frame)", "bodies": poses, "component_bodies": components,
+    return {"root_body": root_name, "t": times, "format": "x y z qw qx qy qz (world frame)", "bodies": poses, "component_bodies": components,
             "rest": rest,
             "cables": {c: {"rgba": cable_colors.get(c), "points": frames,
                             **({k: details[c][k] for k in ("wire_id", "bundle", "harness", "od", "color")}

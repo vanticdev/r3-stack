@@ -136,6 +136,38 @@ function ClipPlayer({ url, playback, duration }: { url: string; playback: Playba
   return <video ref={video} src={url} muted playsInline preload="metadata" controls={false} style={{ width: "100%", borderRadius: 6, background: "#000" }} />;
 }
 
+export interface JointFailureEvent {
+  t: number;
+  event: "joint_failed" | "part_detached";
+  joint: string;
+  message: string;
+  load: number;
+  capacity: number;
+}
+
+export function jointFailures(events: unknown[] | undefined): JointFailureEvent[] {
+  return (events ?? []).filter((e): e is JointFailureEvent => {
+    if (!e || typeof e !== "object") return false;
+    const v = e as Record<string, unknown>;
+    return (v.event === "joint_failed" || v.event === "part_detached") && typeof v.t === "number" && typeof v.joint === "string" &&
+      typeof v.message === "string" && typeof v.load === "number" && typeof v.capacity === "number";
+  });
+}
+
+export function JointFailures({ events, t, seek }: { events: unknown[] | undefined; t: number; seek: (t: number) => void }) {
+  const failures = jointFailures(events);
+  if (!failures.length) return null;
+  return <Card title="Joint failures" subtitle="Release blocked · select a failure to replay the part coming loose">
+    <div className="check-list" data-testid="joint-failures">
+      {failures.map((e, i) => <CheckRow key={`${e.joint}-${i}`} outcome="failed" title={e.joint}
+        result={e.t <= t ? "Released" : "Upcoming"}
+        action={<button className="small ghost" onClick={() => seek(e.t)}>t = {e.t.toFixed(3)} s</button>}>
+        <p>{e.message}</p>
+      </CheckRow>)}
+    </div>
+  </Card>;
+}
+
 function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; response: ScenarioResponse; item: ScenarioListItem; onRun: () => void; busy: boolean }) {
   const { data } = useRobotScene(pid);
   const recording = response.recording;
@@ -157,12 +189,13 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
   const passed = checks.filter((c) => c.pass).length;
   const failed = checks.length - passed;
   const name = partLabel(item.id);
+  const released = jointFailures(recording?.events).length;
 
   return (
     <div className="stack" style={{ gap: 16 }}>
       <div className="readiness">
         <div className="summary-line">
-          <span className="lead">{last?.stale ? "Previous run: " : ""}{failed ? `${plural(failed, "check")} failed` : `${plural(passed, "check")} passed`}{failed && passed ? `, ${passed} passed` : ""}</span>
+          <span className="lead">{last?.stale ? "Previous run: " : ""}{released ? `${plural(released, "connection failure")}` : failed ? `${plural(failed, "check")} failed` : `${plural(passed, "check")} passed`}{failed && passed ? `, ${passed} passed` : ""}</span>
           {last?.stale && <span className="tag outdated"><Icon name="clock" size={11} />Inputs changed since this run</span>}
           <Markdown inline className="secondary">{item.description}</Markdown>
           <span className="spacer" style={{ flex: 1 }} />
@@ -212,6 +245,7 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
           )}
         </div>
         <div className="stack" style={{ gap: 16 }}>
+          <JointFailures events={recording?.events} t={playback.t} seek={seek} />
           <Card title="Checks">
             <div className="check-list" data-testid="sim-checks">
               {checks.map((c) => {

@@ -80,7 +80,7 @@ def _fasteners_for_join(spec: RobotSpec, catalog: "Catalog", result: "AssemblyRe
             out.append(Fastener(id="", type=_screw_type(catalog, join, nominal), length=length,
                                 position=_point(wc, hc.x, hc.y, -hc.depth), axis=wc[:3, 2].tolist(),
                                 clamps=[ic.obj, *extra], thread_into=it.obj, preloaded=spec_f.preloaded, join=join.join_id))
-        elif kinds == {"clearance"} and spec_f is not None and spec_f.nut:
+        elif kinds == {"clearance"} and spec_f is not None:
             head, other = ("a", "b") if spec_f.head == "a" else ("b", "a")
             (hh, ih, wh), (ho, io, _) = sides[head], sides[other]
             parsed = parse_fastener(spec_f.type)
@@ -107,6 +107,10 @@ def _fasteners_for_join(spec: RobotSpec, catalog: "Catalog", result: "AssemblyRe
                                     preloaded=preloaded, join=join.join_id))
     for n, fastener in enumerate(out):
         fastener.id = join.join_id if len(out) == 1 else f"{join.join_id}_{n + 1}"
+    for fastener in out:
+        if spec_f:
+            fastener.torque = spec_f.torque
+            fastener.locking = spec_f.locking
     return out
 
 
@@ -168,7 +172,9 @@ def _interface_for_join(join: Join, a: "ResolvedInterface", b: "ResolvedInterfac
                          join=join.join_id)
     if "adhesive_pad" in kinds and kinds <= PLANAR:
         params.setdefault("min_fraction", 0.8)
-        return Interface(id=join.join_id, kind="adhesive", parts=[b.obj, a.obj], params=params, join=join.join_id)
+        wb = _world(result, b)
+        return Interface(id=join.join_id, kind="adhesive", parts=[b.obj, a.obj], params=params, join=join.join_id,
+                         axis_point=wb[:3, 3].tolist(), axis_dir=wb[:3, 2].tolist())
     return None
 
 

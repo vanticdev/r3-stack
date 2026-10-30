@@ -370,6 +370,14 @@ class WireGauge(_Model):
 FastenerKind = Literal["socket_head_screw", "button_head_screw", "ball_stud", "nut", "standoff_mf", "heat_set_insert"]
 
 
+class JointCoefficient(_Model):
+    """SI joint input with independently reviewable provenance."""
+
+    value: float = Field(ge=0)
+    status: Literal["datasheet", "standard", "estimated", "measured"]
+    source: str = Field(min_length=1)
+
+
 class FastenerType(_Model):
     """Purchased fastener dimensions (ISO metric coarse threads).
 
@@ -386,6 +394,8 @@ class FastenerType(_Model):
 
     id: str
     kind: FastenerKind
+    locking: Literal["nyloc", "threadlocker", "lock_washer", "locking_cap"] | None = None
+    joint_physics: dict[str, JointCoefficient] = Field(default_factory=dict)
     name: str
     standard: str = ""
     thread: str = Field(description="e.g. M3")
@@ -444,6 +454,7 @@ class Material(_Model):
 
     id: str
     name: str
+    joint_physics: dict[str, JointCoefficient] = Field(default_factory=dict)
     process: Literal["fdm", "sls", "machined"] = "fdm"
     keywords: list[str] = Field(default_factory=list, description="Lower-case words that identify the material in a catalog "
                                                                   "`mechanical.material` string (e.g. petg).")
@@ -487,6 +498,7 @@ class Printer(_Model):
 
 
 class Catalog(_Model):
+    joint_defaults: dict[str, JointCoefficient] = Field(default_factory=dict)
     components: dict[str, ComponentType] = Field(default_factory=dict)
     connectors: dict[str, ConnectorType] = Field(default_factory=dict)
     wires: dict[int, WireGauge] = Field(default_factory=dict)

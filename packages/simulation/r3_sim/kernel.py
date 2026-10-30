@@ -42,7 +42,8 @@ from .pilot import Pilot
 from .radio import ElrsReceiver, RadioLink
 from .radio_scene import scene_for_project
 from .signals import BindingMap, map_bindings, uart_paths
-from .vehicle import Vehicle, build_vehicle_model
+from .dynamics import RobotDynamics
+from .assembly import build_assembly_model
 from .vehicle.mjcf import _behavior_params
 
 CABLE_PERIOD = 0.005
@@ -170,22 +171,33 @@ class CoSimKernel:
         mission = scenario.mission or {}
         waypoints = mission.get("waypoints") or []
         routes = project.read_build_json("wiring/routes.json")
-        self.vm = build_vehicle_model(project, self.initial_pose, spec.simulation.environment.obstacles, waypoints,
-                                      routes=routes)
+        has_wheels = any(project.catalog.component(c.type).kind == "wheel" for c in spec.components.values())
+        if has_wheels:
+            from .vehicle import build_vehicle_model
+            self.vm = build_vehicle_model(project, self.initial_pose, spec.simulation.environment.obstacles, waypoints, routes=routes)
+        else:
+            self.vm = build_assembly_model(project, self.initial_pose, spec.simulation.environment.obstacles, routes=routes, course=waypoints)
+        self.wheels = getattr(self.vm, "wheels", {})
+        self.steering = getattr(self.vm, "steering", [])
         self.diagnostics.extend(self.vm.diagnostics)
         self.assumptions.extend(self.vm.assumptions)
-        self.vehicle = Vehicle(project, self.vm)
+        from .load_cases import configure_model, LoadCase
+
+        configure_model(self.vm, scenario, project)
+        self.vehicle = RobotDynamics(project, self.vm)
+        self.diagnostics.extend(self.vehicle.diagnostics)
+        self.vehicle.load_case = LoadCase(self.vehicle, scenario, project, self.seed)
         self.assumptions.append(("mechanical", f"Aerodynamic drag CdA = {self.vehicle.drag_area} m^2 (estimate), air density "
                                                f"{self.vehicle.rho:.3f} kg/m^3; rolling resistance C_rr = "
-                                               f"{next(iter(self.vm.wheels.values())).rolling_resistance if self.vm.wheels else 0} "
-                                               "applied as N*C_rr*r moment per wheel; rigid chassis (no suspension)."))
+                                               f"{next(iter(self.wheels.values())).rolling_resistance if self.wheels else 0} "
+                                               "applied only for declared tire adapters; per-part rigid bodies with native joints."))
 
         # --- identities
         self.computer = spec.software.modules[0].runs_on if spec.software.modules else next(
             iter(_find_kind(project, "load.computer")), "pi")
         drive = self.vm.drives[0] if self.vm.drives else None
         self.motor_id = drive.actuator_component if drive else "motor"
-        self.servo_id = self.vm.steering[0].actuator_component if self.vm.steering else "servo"
+        self.servo_id = self.steering[0].actuator_component if self.steering else "servo"
         self.esc_id = next(iter(_find_kind(project, "esc")), "esc")
         self.battery_id = next(iter(_find_kind(project, "battery")), "battery")
         self.board_id = next(iter(_find_kind(project, "board")), None)
@@ -371,6 +383,7 @@ class CoSimKernel:
             from .cable_playback import cable_metadata
 
             self.recorder.cable_metadata = cable_metadata(self.vehicle.cables)
+        self.recorder.events = self.vehicle.joints.events
         self.recorder.snapshots_t.append(0.0)
         self.recorder.snapshots_qpos.append(self.vehicle.data.qpos.copy())
         self._next_record = 0.0
@@ -742,7 +755,7 @@ class CoSimKernel:
                                      ("_nets", "BEC_6V")], 6.0))
         if self.vm.drives:
             vehicle.set_motor_torque(0, torque, motor_omega)
-        if self.vm.steering:
+        if self.steering:
             vehicle.step_servo(0, self.dt, servo_pulse, servo_v)
 
     def step(self) -> None:
@@ -769,6 +782,14 @@ class CoSimKernel:
         Every quantity is read at the same point of the step sequence as in :meth:`step`,
         so the results are identical. Stops early after a brownout."""
         vehicle = self.vehicle
+        if vehicle.substeps > 1:
+            # Native substeps need current controls and checks before preparing
+            # the next electrical solve. The first half still overlaps it.
+            for _ in range(steps):
+                self.step()
+                if not self.pi_powered:
+                    break
+            return
         # Split the electrical step only if it is the system's own (a wrapped instance ``step``,
         # e.g. fault injection, must run as a whole).
         split = (hasattr(self.electrical, "solve_step") and hasattr(self.electrical, "finish_step")
@@ -919,8 +940,8 @@ class CoSimKernel:
         self.recorder.add(
             t=self.t, x=position[0], y=position[1], z=position[2], yaw=state.yaw(), speed=state.forward_speed(),
             vx=v[0], vy=v[1],
-            steer=state.steer_angle(0) if self.vm.steering else 0.0,
-            steer_target=0.5 * sum(vehicle.steer_targets[0]) if self.vm.steering else 0.0,
+            steer=state.steer_angle(0) if self.steering else 0.0,
+            steer_target=0.5 * sum(vehicle.steer_targets[0]) if self.steering else 0.0,
             horn=vehicle.servos[0].theta if vehicle.servos else 0.0,
             motor_omega=state.motor_omega(0) if self.vm.drives else 0.0,
             motor_torque=vehicle.motor_torque[0] if self.vm.drives else 0.0,

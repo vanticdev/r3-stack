@@ -82,3 +82,37 @@ class ConductorPlayback:
                 world[region] = local_end @ data.xmat[body].reshape(3, 3).T + data.xpos[body]
             result[wire] = world
         return result
+
+
+def part_pose_recording(vehicle: Any, qpos: list[np.ndarray]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """World-frame part poses at recorded snapshots, using MuJoCo kinematics.
+
+    Stored independently of meshes/XML so a later CAD rebuild cannot erase the
+    motion of detached parts. Nominal frames are aligned with robot axes.
+    """
+    import mujoco
+
+    model = vehicle.model
+    names = [vehicle.vm.root, *(name for name in vehicle.vm.bodies if name != vehicle.vm.root)]
+    ids = np.asarray([model.body(name).id for name in names])
+    data = mujoco.MjData(model)
+    poses = []
+    for snapshot in qpos:
+        data.qpos[:] = snapshot
+        mujoco.mj_kinematics(model, data)
+        poses.append(np.column_stack([data.xpos[ids], data.xquat[ids]]))
+    rest = np.asarray([np.r_[vehicle.vm.body_origin[name], [1, 0, 0, 0]] for name in names])
+    return np.asarray(names), np.asarray(poses, dtype=np.float64), rest
+
+
+def recorded_part_frames(times: Any, names: Any, poses: Any, rest: Any, hz: float, root: str | None = None) -> dict[str, Any]:
+    """The web playback frame contract, with no MuJoCo or asset dependency."""
+    step = max(1, int(round(len(times) / max(float(times[-1] - times[0]), 1e-9) / hz))) if len(times) > 1 else 1
+    indices = np.arange(0, len(times), step)
+    return {
+        "root_body": root or str(names[0]),
+        "t": np.round(times[indices], 4).tolist(), "format": "x y z qw qx qy qz (world frame)",
+        "bodies": {str(name): np.round(poses[indices, i], 7).tolist() for i, name in enumerate(names)},
+        "component_bodies": {str(name): str(name) for name in names},
+        "rest": {str(name): rest[i].tolist() for i, name in enumerate(names)}, "cables": None,
+    }

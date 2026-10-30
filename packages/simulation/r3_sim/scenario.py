@@ -37,7 +37,7 @@ from r3_model.project import Project
 from .evaluation import evaluate, rc_gaps
 from .hal_server import TwinHalServer
 from .kernel import CoSimKernel
-from .vehicle.mjcf import write_mjcf
+from .assembly import write_mjcf
 
 WATCHDOG_RESTART_DELAY = 2.0
 MAX_RESTARTS = 3
@@ -167,11 +167,20 @@ class _Software:
         self.kernel.software_running = False
 
 
-def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | None = None, *,
-                 out_dir: Path | None = None, render: bool = True, seed: int | None = None,
-                 progress: Callable[[str], None] | None = None) -> ScenarioOutcome:
+def run_scenario(
+    project: Project,
+    scenario_id: str,
+    software_cmd: list[str] | None = None,
+    *,
+    out_dir: Path | None = None,
+    render: bool = True,
+    seed: int | None = None,
+    progress: Callable[[str], None] | None = None,
+) -> ScenarioOutcome:
     """Run one scenario of ``project`` and write ``build/sim/<scenario>/``."""
-    scenario = next((s for s in project.spec.simulation.scenarios if s.id == scenario_id), None)
+    from .load_cases import all_scenarios
+
+    scenario = next((s for s in all_scenarios(project) if s.id == scenario_id), None)
     if scenario is None:
         raise KeyError(f"scenario {scenario_id!r} not in robot.yaml")
     out_dir = out_dir or project.build_dir(f"sim/{scenario_id}")
@@ -185,7 +194,15 @@ def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | N
     setup = time.monotonic() - wall_start
     diagnostics = list(kernel.diagnostics)
     server = TwinHalServer(kernel)
-    cmd = software_cmd if software_cmd is not None else default_software_command(project)
+    cmd = (
+        software_cmd
+        if software_cmd is not None
+        else (
+            None
+            if scenario.initial.get("joint_load")
+            else default_software_command(project)
+        )
+    )
     if cmd is None:
         diagnostics.append(Diagnostic.warning(
             "software_missing", "no runnable robot software; the twin runs with no software outputs",
@@ -196,55 +213,96 @@ def run_scenario(project: Project, scenario_id: str, software_cmd: list[str] | N
     duration = kernel.duration
     last_report = 0.0
     hung = False
-    while kernel.t < duration - 1e-9 and not server.ended:
-        if progress and kernel.t - last_report >= 10.0:
-            last_report = kernel.t
-            progress(f"{scenario_id}: t={kernel.t:.1f}s / {duration:.0f}s")
-        if server.connected and not software.frozen:
-            status = server.serve_one()
-            if status == "ok":
+    from .dynamics import SimulationInstability
+
+    try:
+        while kernel.t < duration - 1e-9 and not server.ended:
+            if progress and kernel.t - last_report >= min(10.0, max(0.1, duration / 10)):
+                last_report = kernel.t
+                progress(f"{scenario_id}: t={kernel.t:.1f}s / {duration:.0f}s")
+            if server.connected and not software.frozen:
+                status = server.serve_one()
+                if status == "ok":
+                    continue
+                if status == "end":
+                    break
+                if status == "freeze":
+                    software.freeze()
+                    kernel.software_frozen, kernel.frozen_at = True, kernel.t
+                    kernel.recorder.events.append(
+                        {
+                            "t": kernel.t,
+                            "event": "software_freeze",
+                            "method": "SIGSTOP",
+                            "pid": software.proc.pid if software.proc else None,
+                        }
+                    )
+                    continue
+                if status == "brownout":
+                    software.kill("brownout")
+                    continue
+                if status == "timeout":
+                    hung = True
+                    software.kill("hung")
+                    software.gave_up = True
+                    continue
+                # closed: the program exited.
+                exit_code = software.proc.wait() if software.proc else None
+                software.kill("exited")
+                if software.launches:
+                    software.launches[-1]["exit_code"] = exit_code
+                kernel.recorder.events.append(
+                    {"t": kernel.t, "event": "software_exit", "exit_code": exit_code}
+                )
+                if software.restarts < MAX_RESTARTS and kernel.pi_powered:
+                    software.restarts += 1
+                    software.restart_at = kernel.t + WATCHDOG_RESTART_DELAY
+                else:
+                    software.gave_up = True
                 continue
-            if status == "end":
-                break
-            if status == "freeze":
-                software.freeze()
-                kernel.software_frozen, kernel.frozen_at = True, kernel.t
-                kernel.recorder.events.append({"t": kernel.t, "event": "software_freeze", "method": "SIGSTOP",
-                                               "pid": software.proc.pid if software.proc else None})
+            # No software connected (or frozen): decide whether to (re)launch, otherwise free-run one step.
+            due = (
+                kernel.pi_powered
+                and not software.gave_up
+                and kernel.boot_ready_t is not None
+                and kernel.t + 1e-9 >= kernel.boot_ready_t
+                and (
+                    software.restart_at is None
+                    or kernel.t + 1e-9 >= software.restart_at
+                )
+            )
+            if due:
+                kernel.boot_ready_t = (
+                    kernel.t
+                )  # booted; stays set until the next power loss
+                software.restart_at = None
+                if not software.launch():
+                    diagnostics.append(
+                        Diagnostic.error(
+                            "software_not_connected",
+                            f"robot software did not connect to the twin within {CONNECT_TIMEOUT:.0f} s",
+                            subjects=[scenario_id],
+                            data={
+                                "t": kernel.t,
+                                "exit_code": software.launches[-1].get("exit_code")
+                                or 0,
+                            },
+                        )
+                    )
+                    software.gave_up = True
                 continue
-            if status == "brownout":
-                software.kill("brownout")
-                continue
-            if status == "timeout":
-                hung = True
-                software.kill("hung")
-                software.gave_up = True
-                continue
-            # closed: the program exited.
-            exit_code = software.proc.wait() if software.proc else None
-            software.kill("exited")
-            if software.launches:
-                software.launches[-1]["exit_code"] = exit_code
-            kernel.recorder.events.append({"t": kernel.t, "event": "software_exit", "exit_code": exit_code})
-            if software.restarts < MAX_RESTARTS and kernel.pi_powered:
-                software.restarts += 1
-                software.restart_at = kernel.t + WATCHDOG_RESTART_DELAY
-            else:
-                software.gave_up = True
-            continue
-        # No software connected (or frozen): decide whether to (re)launch, otherwise free-run one step.
-        due = (kernel.pi_powered and not software.gave_up and kernel.boot_ready_t is not None and kernel.t + 1e-9 >= kernel.boot_ready_t
-               and (software.restart_at is None or kernel.t + 1e-9 >= software.restart_at))
-        if due:
-            kernel.boot_ready_t = kernel.t  # booted; stays set until the next power loss
-            software.restart_at = None
-            if not software.launch():
-                diagnostics.append(Diagnostic.error(
-                    "software_not_connected", f"robot software did not connect to the twin within {CONNECT_TIMEOUT:.0f} s",
-                    subjects=[scenario_id], data={"t": kernel.t, "exit_code": software.launches[-1].get("exit_code") or 0}))
-                software.gave_up = True
-            continue
-        kernel.step()
+            kernel.step()
+    except SimulationInstability as error:
+        diagnostics.append(
+            Diagnostic.error(
+                "joint_simulation_unstable",
+                str(error),
+                subjects=[scenario_id],
+                data={"t": kernel.t},
+            )
+        )
+        if not kernel.recorder.channels:
+            kernel._record(kernel.last_outputs, kernel.vehicle.position())
     software.kill("scenario_end")
     server.close()
     wall = time.monotonic() - wall_start
@@ -268,9 +326,19 @@ def _interp_position(rec: dict[str, np.ndarray], t: float) -> tuple[float, float
     return float(np.interp(t, rec["t"], rec["x"])), float(np.interp(t, rec["t"], rec["y"]))
 
 
-def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHalServer, software: _Software,
-            diagnostics: list[Diagnostic], out_dir: Path, render: bool, wall: float, hung: bool,
-            setup: float = 0.0) -> ScenarioOutcome:
+def _finish(
+    project: Project,
+    scenario: Any,
+    kernel: CoSimKernel,
+    server: TwinHalServer,
+    software: _Software,
+    diagnostics: list[Diagnostic],
+    out_dir: Path,
+    render: bool,
+    wall: float,
+    hung: bool,
+    setup: float = 0.0,
+) -> ScenarioOutcome:
     for arbiter in set(kernel.arbiters.values()):
         kernel.recorder.events.extend(arbiter.events)
     kernel.recorder.events.sort(key=lambda e: e.get("t", 0.0))
@@ -367,6 +435,7 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         "packets_ok": kernel.receiver.packets_ok, "packets_lost": kernel.receiver.packets_lost,
         "min_wire_clearance_m": (round(kernel.min_wire_clearance[0], 5) if math.isfinite(kernel.min_wire_clearance[0]) else None),
         "min_wire_clearance_wire": kernel.min_wire_clearance[1], "min_wire_clearance_component": kernel.min_wire_clearance[2],
+        "physics_timestep_s": float(kernel.vehicle.model.opt.timestep), "physics_substeps": kernel.vehicle.substeps,
         "vehicle_mass_kg": round(kernel.vm.total_mass, 4), "sim_time_s": round(kernel.t, 3), "wall_time_s": round(wall, 2),
         "realtime_factor": round(kernel.t / wall, 2) if wall > 0 else None,
         # Setup (model build, cable layout and settling) is a fixed cost; the loop factor is what
@@ -380,10 +449,13 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
     metrics.update(_loss_breakdown(project, kernel, rec))
     metrics.update(_gnss_metrics(kernel, rec))
     diagnostics.extend(_sensor_capability(project, kernel, scenario))
-    passed = all(c.passed for c in checks) and not any(d.severity.value == "error" and d.code in ("software_not_connected", "software_hung")
-                                                       for d in diagnostics)
+    diagnostics.extend(kernel.vehicle.joints.final_diagnostics())
+    passed = all(c.passed for c in checks) and not any(
+        d.severity.value == "error" for d in diagnostics
+    )
 
     artifacts: list[tuple[str, str, str]] = []
+
     def rel(path: Path) -> str:
         try:
             return str(Path(path).resolve().relative_to((project.root / "build").resolve()))
@@ -392,13 +464,23 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
 
     mjcf_path = write_mjcf(kernel.vm, out_dir / "vehicle.xml")
     artifacts.append((rel(mjcf_path), "mjcf", "generated MuJoCo vehicle model"))
+    from .cable_playback import part_pose_recording
+
+    part_ids, part_poses, part_rest = part_pose_recording(kernel.vehicle, kernel.recorder.snapshots_qpos)
     npz = out_dir / "recording.npz"
     np.savez_compressed(
-        npz, **rec, snapshot_t=np.asarray(kernel.recorder.snapshots_t), snapshot_qpos=np.asarray(kernel.recorder.snapshots_qpos),
+        npz,
+        part_ids=part_ids, part_poses=part_poses, part_rest=part_rest, part_root=np.asarray(kernel.vm.root),
+        **rec,
+        snapshot_t=np.asarray(kernel.recorder.snapshots_t),
+        snapshot_qpos=np.asarray(kernel.recorder.snapshots_qpos),
         cable_metadata=np.asarray(json.dumps(kernel.recorder.cable_metadata)),
         rc_frame_times=np.asarray(kernel.receiver.rc_frame_times),
-        firmware_logs=np.asarray([json.dumps(log) for log in kernel.recorder.logs] or [""]),
-        events=np.asarray([json.dumps(e) for e in kernel.recorder.events] or [""]))
+        firmware_logs=np.asarray(
+            [json.dumps(log) for log in kernel.recorder.logs] or [""]
+        ),
+        events=np.asarray([json.dumps(e) for e in kernel.recorder.events] or [""]),
+    )
     artifacts.append((rel(npz), "recording", "100 Hz time series, 30 Hz qpos snapshots, firmware logs, events"))
     from .plots import plot_all
     from .radio_plots import plot_coverage
@@ -437,17 +519,33 @@ def _finish(project: Project, scenario: Any, kernel: CoSimKernel, server: TwinHa
         artifacts.append((rel(log_path), "log", "robot software stdout/stderr"))
 
     summary = {
-        "scenario": scenario.id, "description": scenario.description, "passed": passed, "seed": kernel.seed,
-        "timestep": kernel.dt, "duration": kernel.duration, "checks": [c.as_dict() for c in checks], "metrics": metrics,
-        "software": {"command": software.cmd, "launches": software.launches, "module": server.module,
-                     "firmware_log_count": len(kernel.recorder.logs)},
-        "fallbacks": {"electrical": bool(getattr(kernel.electrical, "is_fallback", False)),
-                      "cables": bool(getattr(kernel.cables, "is_fallback", False))},
-        "events": kernel.recorder.events[:200],
+        "scenario": scenario.id,
+        "description": scenario.description,
+        "passed": passed,
+        "seed": kernel.seed,
+        "timestep": kernel.dt,
+        "duration": kernel.duration,
+        "checks": [c.as_dict() for c in checks],
+        "metrics": metrics,
+        "software": {
+            "command": software.cmd,
+            "launches": software.launches,
+            "module": server.module,
+            "firmware_log_count": len(kernel.recorder.logs),
+        },
+        "fallbacks": {
+            "electrical": bool(getattr(kernel.electrical, "is_fallback", False)),
+            "cables": bool(getattr(kernel.cables, "is_fallback", False)),
+        },
+        "events": kernel.recorder.events,
+        "connections": kernel.vehicle.joints.report(),
+        "estimated_joint_inputs": kernel.vm.connections.estimated,
         "firmware_logs": kernel.recorder.logs[:200],
         "diagnostics": [d.model_dump(mode="json") for d in diagnostics],
         "assumptions": [{"domain": d, "statement": s} for d, s in kernel.assumptions],
-        "artifacts": [{"path": p, "kind": k, "description": d} for p, k, d in artifacts],
+        "artifacts": [
+            {"path": p, "kind": k, "description": d} for p, k, d in artifacts
+        ],
         "renders": renders,
         "inputs": project.fingerprint(),
     }
@@ -513,7 +611,7 @@ def _loss_breakdown(project: Project, kernel: CoSimKernel, rec: dict[str, np.nda
     v = float(rec["speed"][k])
     vehicle = kernel.vehicle
     aero = 0.5 * vehicle.rho * vehicle.drag_area * v ** 3
-    wheels = list(kernel.vm.wheels.values())
+    wheels = list(getattr(kernel.vm,"wheels",{}).values())
     crr = wheels[0].rolling_resistance if wheels else 0.0
     rolling = crr * kernel.vm.total_mass * project.spec.simulation.environment.gravity * v
     damping = sum(j.damping * (v / w.radius) ** 2 for w in wheels for j in project.spec.mechanical.joints if j.id == w.joint)

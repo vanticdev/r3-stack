@@ -3,8 +3,7 @@
 Conventions
 -----------
 * Units: SI floats, or strings with explicit units (see :mod:`r3_model.units`).
-* Robot frame: +x forward, +y left, +z up. Origin at ground level directly below
-  the rear axle center. Rotations are roll/pitch/yaw (rad) applied as R = Rz·Ry·Rx.
+* Robot frame: +x forward, +y left, +z up. The origin is the project-defined design datum. Rotations are roll/pitch/yaw (rad) applied as R = Rz·Ry·Rx.
 * Identities: component ids, connector ids, harness ids and wire ids are stable
   strings. Pin references are ``<component>.<connector>.<pin>`` for component
   connectors and ``<harness>.<connector>.<pin>`` for cable-side connectors.
@@ -18,7 +17,7 @@ from typing import Any, Literal
 
 from pydantic_core import PydanticCustomError
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .units import Quantity, Vector
 
@@ -35,14 +34,44 @@ class Pose(_Model):
 
 
 class RobotInfo(_Model):
+    mobility: Literal["mobile", "stationary"] | None = Field(default=None, description="Base mobility; inferred from a positive top_speed when omitted.")
     name: str
     description: str = ""
     version: str = "0.1.0"
 
 
+class VibrationProfile(_Model):
+    """Tailored MIL-STD-810H 514.8 Annex C wheeled-vehicle random profile.
+
+    R3's small-vehicle default is an estimate, not a qualification spectrum.
+    PSD breakpoints are Hz and (m/s²)²/Hz; three axes run consecutively.
+    """
+
+    duration: Quantity = 60.0
+    psd: list[list[float]] = Field(default_factory=lambda: [[5.0, 0.05], [20.0, 0.2], [80.0, 0.2], [200.0, 0.02]])
+    ramp: Quantity = Field(default=1.0, gt=0, description="Smooth vibration start/stop envelope (s).")
+    motor_frequency: Quantity = 120.0
+    motor_acceleration: Quantity = 1.0
+    source: str = "MIL-STD-810H Method 514.8 Annex C; R3 estimated small-vehicle tailoring"
+    estimated: bool = True
+
+    @model_validator(mode="after")
+    def _valid_spectrum(self) -> "VibrationProfile":
+        if self.duration <= 0 or self.motor_frequency <= 0 or self.motor_acceleration < 0:
+            raise ValueError("vibration duration/frequency must be positive and acceleration nonnegative")
+        if len(self.psd) < 2 or any(len(p) != 2 or p[0] <= 0 or p[1] < 0 for p in self.psd):
+            raise ValueError("vibration PSD needs at least two positive-frequency, nonnegative-density points")
+        if any(a[0] >= b[0] for a, b in zip(self.psd, self.psd[1:])):
+            raise ValueError("vibration PSD frequencies must increase")
+        return self
+
+
 class Requirements(_Model):
     """Acceptance criteria checked by validation and simulation scenarios."""
 
+    drop_height: Quantity = Field(default=1.0, ge=0, description="Drop clearance above ground, each face and corner (m).")
+    impact_speed: Quantity | None = Field(default=None, ge=0, description="Wall impact speed (m/s); default requirements.top_speed.")
+    vibration: VibrationProfile = Field(default_factory=VibrationProfile)
     max_mass: Quantity | None = None
     top_speed: Quantity | None = None
     min_runtime: Quantity | None = Field(default=None, description="Mission runtime at the scenario duty cycle.")
@@ -160,6 +189,8 @@ class Fastener(_Model):
     thread_into: str | None = Field(default=None, description="Part with the tapped hole (or male thread for nuts).")
     nut: str | None = Field(default=None, description="Catalog nut id when the fastener ends in a nut.")
     grip: Quantity | None = Field(default=None, description="Clamp length from the head seat to the nut seat (through bolts).")
+    torque: Quantity | None = Field(default=None, ge=0, description="Assembly torque in N m; catalog estimate when omitted.")
+    locking: str | None = Field(default=None, description="nyloc, threadlocker, lock_washer, or locking_cap; explicit locking feature.")
     preloaded: bool = True
     body: str | None = Field(default=None, description="Component that is this fastener (a kingpin screw, ball stud, stacking "
                                                        "standoff or nut modeled as an assembly object); default: its own part.")
@@ -175,7 +206,7 @@ class Fastener(_Model):
 
 
 InterfaceKind = Literal["revolute_fit", "press_fit", "drive_flat", "ball_joint", "spline", "adhesive", "strap",
-                        "magnetic_target", "connector_retention"]
+                        "magnetic_target", "connector_retention", "snap_fit", "resting"]
 
 
 class Interface(_Model):
@@ -365,7 +396,26 @@ class Scenario(_Model):
 
 
 class Simulation(_Model):
+    base_mount: Literal["auto", "free", "fixed"] = Field(default="auto", description="auto fixes a stationary base to the world; drop cases release the test fixture.")
     timestep: Quantity = 0.001
+    physics_max_timestep: Quantity = Field(default=0.00025, description="Maximum native MuJoCo step; master steps are subdivided without changing software/electrical timing.")
+
+    @field_validator("timestep", "physics_max_timestep")
+    @classmethod
+    def positive_timestep(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("simulation timesteps must be positive")
+        return value
+
+    @property
+    def physics_substeps(self) -> int:
+        import math
+        return max(1, math.ceil(float(self.timestep) / float(self.physics_max_timestep)))
+
+    @property
+    def physics_timestep(self) -> float:
+        return float(self.timestep) / self.physics_substeps
+
     seed: int = 1
     environment: Environment = Field(default_factory=Environment)
     scenarios: list[Scenario] = Field(default_factory=list)
@@ -389,6 +439,8 @@ class Fasteners(_Model):
     nut: str | None = Field(default=None, description="Catalog nut id for a through bolt (both holes clearance).")
     head: Literal["a", "b"] = Field(default="a", description="Head side of a through bolt.")
     clamps: list[str] = Field(default_factory=list, description="Further clamped components, in stack order.")
+    torque: Quantity | None = Field(default=None, ge=0, description="Assembly torque in N m; catalog estimate when omitted.")
+    locking: str | None = Field(default=None, description="nyloc, threadlocker, lock_washer, or locking_cap; explicit locking feature.")
     preloaded: bool = True
 
 
@@ -584,8 +636,7 @@ class RobotSpec(_Model):
                 raise ValueError(f"fastener {fastener.id!r} lists a part twice")
             if not refs:
                 raise ValueError(f"fastener {fastener.id!r} neither clamps nor threads into anything")
-            if fastener.thread_into is None and fastener.nut is None:
-                raise ValueError(f"fastener {fastener.id!r} needs thread_into or a nut")
+            # Missing retainers are diagnosed by joint_capacity_zero and replayed as loose pins.
             if fastener.thread_into is not None and fastener.nut is not None:
                 raise ValueError(f"fastener {fastener.id!r} cannot both thread into a part and end in a nut")
             if fastener.nut is not None and fastener.grip is None:

@@ -1,13 +1,10 @@
 """Generate a MuJoCo MJCF vehicle model from the robot spec.
 
-Body tree: every ``mechanical.joints`` child becomes its own body under the
-joint parent's body; every other component is *lumped* into the body of the
-nearest mount ancestor that is a body (fixed mounts carry no relative motion,
-so their mass/inertia is merged with the parallel-axis theorem). Stub axles
-ride with their knuckle, axles and encoder rings with their wheel. CAD parts
-that are not spec components (fasteners, nuts) are lumped into the body of
-their CAD ``owner``. The root (the world-mounted component, e.g. the chassis)
-gets a free joint.
+Every component and load-bearing fastener/nut has its own massive body.
+Nominal mounts define placement only; real compiled connections supply
+breakable equality constraints. Moving joints retain their actuator coordinates
+inside free mount carriers, so releasing their mount frees the part. Collision
+uses CAD convex pieces or catalog primitives, including after release.
 
 Steering: when the cad stage solved the linkage (``kinematics.steering.table``:
 kingpin angle per servo horn angle from the real tie-rod geometry), the knuckle
@@ -15,8 +12,7 @@ targets interpolate that table; otherwise the bicycle angle is
 ``ratio * theta_horn`` split by ideal Ackermann geometry.
 
 All body frames are aligned with the robot frame (+x forward, +y left, +z up);
-a body's origin is its joint origin (root: the robot origin, which is the
-ground point below the rear axle). Mass properties come from
+a body's origin is its joint origin (root: the project-defined robot design datum). Mass properties come from
 ``build/cad/cad_model.json`` when present (CAD mass, COM, inertia about the COM
 in robot axes) and otherwise from catalog mass with solid box/cylinder inertia.
 
@@ -35,7 +31,6 @@ from __future__ import annotations
 
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -45,9 +40,10 @@ from r3_model.graph import rpy_matrix
 from r3_model.project import Project
 from r3_model.units import to_si
 
-from ..geometry import MassProperties, axis_rotation, box_inertia, combine, cylinder_inertia, rotation_to_quat
+from ..geometry import MassProperties, axis_rotation, combine, rotation_to_quat
 from .scene_visual import add_cameras, add_scene
 from .servo import ackermann_angles
+from ..assembly import (AssemblyModel, TransmissionInfo, write_mjcf, mass_report, _add_cables, _behavior_params, _component_shape, _find_root, _fmt, _hex_rgba, _local_center, _si, cad_mass_properties, catalog_mass_properties)
 
 #: Contact bitmasks: robot geoms (1) collide only with the environment (2).
 ROBOT_CONTYPE, ROBOT_CONAFFINITY = 1, 0
@@ -67,19 +63,8 @@ class WheelInfo:
     body: str = ""  # MuJoCo body carrying the tire: the wheel, or the axle the wheel is fixed to
 
 
-@dataclass
-class DriveInfo:
-    """A differential (or direct) transmission from a motor to wheel joints."""
-
-    id: str
-    actuator_component: str
-    joints: list[str]
-    ratio: float
-    efficiency: float
-    tendon: str
-    rotor_inertia: float
-    output_inertia: float
-    backlash: float
+# Compatibility name for the shared, locomotion-independent transmission.
+DriveInfo = TransmissionInfo
 
 
 @dataclass
@@ -110,61 +95,12 @@ class SteeringInfo:
 
 
 @dataclass
-class VehicleModel:
-    xml: str
-    root: str
-    bodies: dict[str, list[str]]  # body component -> lumped component ids
-    body_origin: dict[str, np.ndarray]
-    mass_properties: dict[str, MassProperties]
-    total_mass: float
-    wheels: dict[str, WheelInfo]
-    drives: list[DriveInfo]
-    steering: list[SteeringInfo]
-    imu_site: str | None
-    imu_component: str | None
-    diagnostics: list[Diagnostic] = field(default_factory=list)
-    assumptions: list[tuple[str, str]] = field(default_factory=list)
-    mass_source: dict[str, str] = field(default_factory=dict)
-    geometry: dict[str, dict[str, Any]] = field(default_factory=dict)  # body -> primitive shape (for clearance)
-    cables: Any = None  # r3_wiring.mujoco_cables.CablePlan when routes were given
-    cad_extras: dict[str, list[str]] = field(default_factory=dict)  # body -> CAD-only parts (fasteners, nuts) lumped in
+class VehicleModel(AssemblyModel):
+    """Assembly physics plus metadata for declared tires and steering."""
 
-
-def _fmt(values: Any) -> str:
-    return " ".join(f"{float(v):.9g}" for v in np.ravel(values))
-
-
-def _component_shape(project: Project, cid: str) -> tuple[str, list[float], str]:
-    mech = project.catalog.component(project.spec.components[cid].type).mechanical
-    shape = "cylinder" if mech.shape == "cylinder" else "box"
-    return shape, [float(v) for v in mech.size], mech.axis
-
-
-def _local_center(shape: str, size: list[float]) -> np.ndarray:
-    """Catalog convention: box frames sit at the center of the bottom face;
-    cylinder frames sit at the cylinder center."""
-    if shape == "box":
-        return np.array([0.0, 0.0, size[2] / 2.0])
-    return np.zeros(3)
-
-
-def catalog_mass_properties(project: Project, cid: str) -> MassProperties:
-    mech = project.catalog.component(project.spec.components[cid].type).mechanical
-    mass = float(project.spec.components[cid].params.get("mass", mech.mass))
-    shape, size, axis = _component_shape(project, cid)
-    if shape == "cylinder":
-        local = cylinder_inertia(mass, size[0], size[1], axis)
-    else:
-        local = box_inertia(mass, size)
-    position, rotation = project.graph.component_pose(cid)
-    com = position + rotation @ (_local_center(shape, size) + np.asarray(mech.envelope_offset))
-    return MassProperties(mass, com, rotation @ local @ rotation.T, "catalog")
-
-
-def cad_mass_properties(part: dict[str, Any]) -> MassProperties:
-    ixx, iyy, izz, ixy, ixz, iyz = (float(v) for v in part["inertia"])
-    inertia = np.array([[ixx, ixy, ixz], [ixy, iyy, iyz], [ixz, iyz, izz]])
-    return MassProperties(float(part["mass"]), np.asarray(part["com"], dtype=float), inertia, "cad")
+    wheels: dict[str, WheelInfo] = field(default_factory=dict)
+    steering: list[SteeringInfo] = field(default_factory=list)
+    default_drag_area: float = 0.04  # vehicle adapter estimate
 
 
 def _joint_children(project: Project) -> dict[str, Any]:
@@ -273,41 +209,6 @@ def _steering_table(cad: dict[str, Any], trans_id: str, joints: list[str]) -> tu
     return [float(row["servo_rad"]) for row in rows], {j: [float(row[j]) for row in rows] for j in joints}
 
 
-def _find_root(project: Project, joint_children: dict[str, Any]) -> str:
-    roots = [cid for cid, comp in project.spec.components.items() if comp.mount == "world" and cid not in joint_children]
-    if not roots:
-        raise ValueError("no world-mounted root component for the vehicle body")
-    # Prefer a structural component as the free-floating base.
-    for cid in roots:
-        if project.catalog.component(project.spec.components[cid].type).kind == "structure":
-            return cid
-    return roots[0]
-
-
-def _behavior_params(project: Project, cid: str) -> dict[str, Any]:
-    ctype = project.catalog.component(project.spec.components[cid].type)
-    params = dict(ctype.behavior.params) if ctype.behavior else {}
-    params.update(project.spec.components[cid].params)
-    return params
-
-
-def _si(value: Any, default: float) -> float:
-    if value is None:
-        return default
-    try:
-        return to_si(value)
-    except ValueError:
-        return default
-
-
-def _hex_rgba(color: str, alpha: float = 1.0) -> str:
-    color = color.lstrip("#")
-    if len(color) != 6:
-        return f"0.55 0.55 0.55 {alpha}"
-    r, g, b = (int(color[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
-    return f"{r:.3f} {g:.3f} {b:.3f} {alpha}"
-
-
 def build_vehicle_model(project: Project, initial_pose: tuple[float, float, float] = (0.0, 0.0, 0.0),
                         obstacles: list[dict[str, Any]] | None = None,
                         course: list[list[float]] | None = None, routes: dict[str, Any] | None = None) -> VehicleModel:
@@ -362,14 +263,14 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
                   "estimated_mass": round(sum(part_props[c].mass for c in estimated), 6)},
             hint="Run the cad stage to replace estimates with Onshape mass properties."))
         assumptions.append(("mechanical", "Components without CAD mass properties are solid homogeneous boxes/cylinders "
-                                          "with catalog mass; fixed-mounted parts are lumped into their parent body."))
+                                          "with catalog mass; every component retains its own body."))
 
     for members in cad_extras.values():
         for name in members:
             part_props[name] = cad_mass_properties(cad_parts[name])
     if any(cad_extras.values()):
         count = sum(len(m) for m in cad_extras.values())
-        assumptions.append(("mechanical", f"{count} CAD fasteners/nuts are lumped into the body of their owner component "
+        assumptions.append(("mechanical", f"{count} CAD fasteners/nuts are separate bodies, using "
                                           "with their Onshape mass properties."))
     body_props = {body: combine([part_props[c] for c in members + cad_extras[body]]) for body, members in bodies.items()}
     body_origin: dict[str, np.ndarray] = {root: np.zeros(3)}
@@ -451,7 +352,7 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     # --- XML
     mj = ET.Element("mujoco", model=spec.robot.name)
     ET.SubElement(mj, "compiler", angle="radian", autolimits="true", meshdir=str(mesh_dir))
-    ET.SubElement(mj, "option", timestep=f"{spec.simulation.timestep:.9g}", integrator="implicitfast", cone="elliptic",
+    ET.SubElement(mj, "option", timestep=f"{spec.simulation.physics_timestep:.9g}", integrator="implicitfast", cone="pyramidal",
                   impratio="10", gravity=f"0 0 {-env.gravity:.9g}")
     visual = ET.SubElement(mj, "visual")
     ET.SubElement(visual, "global", offwidth="1280", offheight="960", azimuth="135", elevation="-25")
@@ -633,8 +534,27 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
         assumptions.append(("mechanical", "Open differential splits carrier torque equally (fixed tendon, coef 1/n); motor "
                                           "rotor inertia is reflected through ratio^2 onto the carrier; gear backlash is not modeled."))
 
+    from ..joints import separate_parts
+
+    connections, joint_bindings = separate_parts(project, mj, root, bodies, body_origin, body_props, cad_extras,
+                                                 elements, joint_children, cad_parts, part_props, initial_pose,
+                                                 contact_proxies={cid:f"tire_{cid}" for cid in wheels})
+    diagnostics.extend(connections.diagnostics)
+    total_mass = sum(p.mass for p in body_props.values())
+    assumptions.append(("mechanical", "Each part is a separate MuJoCo body. Catalog or CAD convex-piece collisions, "
+                        "breakable constraints from real connections; mounts alone provide no retention."))
     cable_plan = _add_cables(project, mj, routes, root, elements, body_origin, diagnostics, assumptions) if routes else None
 
+    # Sleeping is safe for passive detached islands. Plugin-backed cable trees
+    # remain awake: the cable plugin applies its own passive forces.
+    import mujoco
+    if hasattr(mujoco.mjtEnableBit, "mjENBL_SLEEP"):
+        flags = mj.find("option/flag")
+        flags.set("sleep", "enable")
+        if cable_plan is not None:
+            for el in mj.findall("worldbody/body"):
+                if el.find(".//composite") is not None:
+                    el.set("sleep", "never")
     sensor = ET.SubElement(mj, "sensor")
     if imu_site:
         ET.SubElement(sensor, "accelerometer", name="imu_acc", site=imu_site)
@@ -644,46 +564,18 @@ def build_vehicle_model(project: Project, initial_pose: tuple[float, float, floa
     xml = ET.tostring(mj, encoding="unicode")
     if cable_plan is not None:
         total_mass += cable_plan.total_mass  # wire mass rides on the vehicle through its anchors
-    return VehicleModel(xml=xml, root=root, bodies=bodies, body_origin=body_origin, mass_properties=body_props,
+    model = VehicleModel(xml=xml, root=root, bodies=bodies, body_origin=body_origin, mass_properties=body_props,
                         total_mass=total_mass, wheels=wheels, drives=drives, steering=steering, imu_site=imu_site,
                         imu_component=imu_component, diagnostics=diagnostics, assumptions=assumptions,
-                        mass_source=mass_source, geometry=geometry, cables=cable_plan, cad_extras=cad_extras)
+                        mass_source=mass_source, geometry=geometry, cables=cable_plan, cad_extras=cad_extras,
+                        connections=connections, joint_bindings=joint_bindings,
+                        moving_joints={k:v for k,v in joint_children.items() if v.type != "fixed"})
 
 
-def _add_cables(project: Project, mj: ET.Element, routes: dict[str, Any], root: str, elements: dict[str, ET.Element],
-                body_origin: dict[str, np.ndarray], diagnostics: list[Diagnostic],
-                assumptions: list[tuple[str, str]]) -> Any:
-    """Routed harnesses as MuJoCo cables in this world (None if they cannot be built)."""
-    try:
-        from r3_wiring.bodies import ROOT
-        from r3_wiring.mujoco_cables import emit_mjcf, plan_cables
-
-        plan = plan_cables(project, routes, timestep=float(project.spec.simulation.timestep))
-        body = lambda kin_body: root if kin_body == ROOT else kin_body  # noqa: E731
-        emit_mjcf(mj, plan, lambda b: elements[body(b)], lambda b: body_origin[body(b)], body)
-    except Exception as error:  # noqa: BLE001 - any failure leaves the vehicle without cables
-        diagnostics.append(Diagnostic.warning(
-            "cable_model_fallback", f"MuJoCo cables could not be built from routes.json ({type(error).__name__}: {error})",
-            subjects=["wiring/routes.json"], data={"fallback": 1}))
-        return None
-    diagnostics.extend(plan.diagnostics)
-    assumptions.extend(plan.assumptions)
-    return plan
-
-
-def write_mjcf(model: VehicleModel, path: Path) -> Path:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    import xml.dom.minidom
-
-    path.write_text(xml.dom.minidom.parseString(model.xml).toprettyxml(indent="  "))
-    return path
-
-
-def mass_report(model: VehicleModel) -> dict[str, Any]:
-    return {body: {"mass": round(p.mass, 6), "com": [round(v, 6) for v in p.com], "source": p.source,
-                   "members": model.bodies[body], "cad_parts": model.cad_extras.get(body, [])}
-            for body, p in model.mass_properties.items()} | {
-        "_total_mass": round(model.total_mass, 6)}
+    from ..load_cases import configure_model
+    from r3_model.spec import Scenario
+    configure_model(model, Scenario(id="assembly_initial", duration=0), project)
+    return model
 
 
 __all__ = ["VehicleModel", "WheelInfo", "DriveInfo", "SteeringInfo", "build_vehicle_model", "write_mjcf",

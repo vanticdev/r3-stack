@@ -38,6 +38,21 @@ def run_client(root: Path, client: Callable[[VirtualHal], Any], visual: dict[str
                duration: float = 3.0) -> tuple[Any, CoSimKernel, TwinHalServer]:
     """Serve one twin session in this thread while ``client`` runs against it in another."""
     project = Project.load(root)
+    project.spec.simulation.base_mount = "fixed"  # the optics bench is fixed to its stand
+    # Mounts on this bench are qualified adhesive clamps. The template's
+    # unqualified screws are a separate model-stage fixture, not bench parts.
+    project.spec.mechanical.fasteners = []
+    # This optics bench has qualified external clamps; the original printbot
+    # mounting screws themselves are intentionally unqualified by joint checks.
+    from r3_model.spec import Interface
+    for cid in project.spec.components:
+        if cid == "frame":
+            continue
+        project.spec.mechanical.interfaces.append(Interface.model_validate(dict(
+            id=f"optics_clamp_{cid}", kind="adhesive", parts=["frame", cid],
+            axis_point=project.graph.component_pose(cid)[0].tolist(), axis_dir=[0, 0, 1],
+            params={"physics": {key:dict(value=value,status="measured",source="Synthetic optics bench clamp qualification")
+                                for key,value in {"area":.01,"shear_strength":1e8,"peel_strength":1e8,"radius":.05}.items()}})))
     if visual is not None:
         project.spec.simulation.environment.visual = visual
     kernel = CoSimKernel(project, Scenario(id="camera", duration=duration))
@@ -83,7 +98,13 @@ def test_frames_are_paced_timestamped_and_rendered(printbot: Path) -> None:
     assert intrinsics["vfov_deg"] == pytest.approx(33.0)
     assert intrinsics["fy"] == pytest.approx(120 / np.tan(np.radians(16.5)), rel=1e-6)
     sky, lane = image[:60].reshape(-1, 3).mean(axis=0), image[-60:, :60].reshape(-1, 3).mean(axis=0)
-    centre = image[-40:, 140:180].reshape(-1, 3).mean(axis=0)
+    # Per-part contacts include the battery below the frame, changing resting
+    # camera height. The centre line must remain visible in the lower central
+    # field, rather than occupying the old lumped-body bottom crop.
+    centre_pixels = image[120:, 140:180].reshape(-1, 3)
+    yellow = (centre_pixels[:,0] > 150) & (centre_pixels[:,1] > 120) & (centre_pixels[:,2] < 90)
+    assert yellow.sum() > 100
+    centre = centre_pixels[yellow].mean(axis=0)
     assert sky[2] > sky[0] + 20                                  # blue sky above the horizon
     assert abs(lane[0] - lane[2]) < 15 and lane.mean() < 110     # grey asphalt beside the centre line
     assert centre[0] > 150 and centre[1] > 120 and centre[2] < 90  # the yellow dashed centre line straight ahead

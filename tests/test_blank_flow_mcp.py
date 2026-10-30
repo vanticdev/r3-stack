@@ -92,7 +92,7 @@ def test_grow_a_printed_frame_robot(project: str) -> None:
     assert stage(project, "assembly")["status"] == "ok"
     model = stage(project, "model")
     # An unpowered Pi is a real error; its spare header inputs are not.
-    assert {d["code"] for d in model["diagnostics"] if d["severity"] == "error"} == {"input_without_driver"}
+    assert {d["code"] for d in model["diagnostics"] if d["severity"] == "error"} == {"input_without_driver", "joint_capacity_zero"}
     assert any(d["code"] == "computer_inputs_unused" for d in model["diagnostics"])
     assert stage(project, "electrical")["status"] == "not_configured"
 
@@ -102,7 +102,10 @@ def test_grow_a_printed_frame_robot(project: str) -> None:
                     "assembly": spec["assembly"], "electrical": spec["electrical"], "software": spec["software"]})
     for name in ("assembly", "model", "electrical"):
         result = stage(project, name)
-        assert result["status"] == "ok", (name, [d for d in result["diagnostics"] if d["severity"] == "error"])
+        if name == "model":
+            assert {d["code"] for d in result["diagnostics"] if d["severity"] == "error"} == {"joint_capacity_zero"}
+        else:
+            assert result["status"] == "ok", (name, result["diagnostics"])
     assert not [d for d in stage(project, "fabrication")["diagnostics"] if d["code"] == "stage_unavailable"]
 
     # Step 3: a mistake the checks must catch: the camera binding on the empty CAM1 port.
@@ -110,11 +113,11 @@ def test_grow_a_printed_frame_robot(project: str) -> None:
     wrong = {**bindings["front_camera"], "pins": ["pi.CAM1.21", "pi.CAM1.20"], "device": "cam1"}
     patch(project, {"software": {"bindings": {"front_camera": wrong}}})
     errors = [d for d in stage(project, "model")["diagnostics"] if d["severity"] == "error"]
-    assert {d["code"] for d in errors} == {"binding_not_connected"}
+    assert {d["code"] for d in errors} == {"binding_not_connected", "joint_capacity_zero"}
     diagnosis = m.r3_diagnose(project=project)
     assert diagnosis["errors"] >= 1 and any(g["subject"] == "front_camera" for g in diagnosis["subjects"])
     patch(project, {"software": {"bindings": {"front_camera": bindings["front_camera"]}}})
-    assert stage(project, "model")["status"] == "ok"
+    assert {d["code"] for d in stage(project, "model")["diagnostics"] if d["severity"] == "error"} == {"joint_capacity_zero"}
 
     # A cable too short for where the computer sits is reported with numbers.
     short = {**m.r3_get_catalog_component("arducam-fpc-22-22-150mm", project=project)["component"]}
@@ -152,4 +155,8 @@ def test_source_a_catalog_part_by_requirements(tmp_path: Path) -> None:
     assert chosen["ok"] and chosen["pinned"]["catalog_id"] == "arducam-b0445-imx296" and chosen["catalog_file"] == ""
     assert not list((root / "catalog" / "components").glob("sourced_*.yaml"))
     for name in ("assembly", "model"):
-        assert stage(project, name)["status"] == "ok"
+        result = stage(project, name)
+        if name == "model":
+            assert {d["code"] for d in result["diagnostics"] if d["severity"] == "error"} == {"joint_capacity_zero"}
+        else:
+            assert result["status"] == "ok"

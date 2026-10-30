@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from .schema import Catalog, ComponentType, ConnectorGeometry, ConnectorType, FastenerType, Material, Printer, PrintFit, WireGauge
+from .schema import Catalog, ComponentType, ConnectorGeometry, ConnectorType, FastenerType, JointCoefficient, Material, Printer, PrintFit, WireGauge
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -70,6 +70,7 @@ def load_catalog(*extra_dirs: Path) -> Catalog:
                 catalog.wires[gauge.awg] = gauge
         fasteners = root / "fasteners.yaml"
         if fasteners.exists():
+            catalog.joint_defaults.update({k: JointCoefficient.model_validate(v) for k, v in (yaml.safe_load(fasteners.read_text()).get("joint_defaults") or {}).items()})
             for entry in yaml.safe_load(fasteners.read_text())["fasteners"]:
                 fastener = FastenerType.model_validate(entry)
                 catalog.fasteners[fastener.id] = fastener

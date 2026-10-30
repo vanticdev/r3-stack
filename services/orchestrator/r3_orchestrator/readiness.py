@@ -96,18 +96,8 @@ def _connectors(project: Project) -> tuple[str, str, str] | None:
 def _sim(project: Project) -> tuple[str, str, str] | None:
     if (found := _components(project)) is not None:
         return found
-    if not project.spec.simulation.scenarios:
-        return ("not_configured", "robot.yaml defines no simulation scenarios",
-                "Add simulation.scenarios (id, duration, mission/pilot, expect) to drive the robot software in the twin.")
-    models = _behavior_models(project)
-    if not any(model.startswith("tire") for model in models):
-        return ("not_configured", "the twin drives a vehicle: no component has a tire behaviour model (wheels)",
-                "Add wheels, a drive motor and a steering servo joined in `assembly:` with revolute joins and "
-                "mechanical.transmissions (differential, ackermann_steering).")
-    if not project.spec.mechanical.transmissions:
-        return ("not_configured", "no drive or steering transmission (mechanical.transmissions)",
-                "Add mechanical.transmissions: a `differential` from the motor to the driven wheel joints and an "
-                "`ackermann_steering` from the servo to the steered joints.")
+    # Mechanical load cases apply to every robot, including passive assemblies
+    # with no motor, wheels, software or authored driving mission.
     return None
 
 
