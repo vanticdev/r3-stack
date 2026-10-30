@@ -28,7 +28,19 @@ def _component_entries(paths: list[Path], raw_by_id: dict[str, dict[str, Any]]) 
     """Component entries of one catalog folder with ``extends: <id>`` resolved (a variant such as
     another RAM size repeats only what differs from its base). Bases may be in any file of this
     folder or of a folder loaded earlier."""
-    pending = [(path, entry) for path in paths for entry in yaml.safe_load(path.read_text())["components"]]
+    documents = [(path, yaml.safe_load(path.read_text())) for path in paths]
+    pending = [(path, entry) for path, document in documents for entry in document["components"]]
+    # Physical refinements live with the vendor family, independently of legacy
+    # example catalogs. Apply before extends so every RAM variant inherits them.
+    # The final merged entry still passes the strict ComponentType schema below.
+    for path, document in documents:
+        for identifier, refinement in document.get("refinements", {}).items():
+            matches = [i for i, (_, entry) in enumerate(pending) if entry["id"] == identifier]
+            if len(matches) != 1 or "id" in refinement or "extends" in refinement:
+                raise ValueError(f"{path}: invalid component refinement {identifier!r}")
+            i = matches[0]
+            original_path, entry = pending[i]
+            pending[i] = (original_path, _merge(entry, refinement))
     local = {entry["id"]: entry for _, entry in pending if "extends" not in entry}
     resolved: dict[str, dict[str, Any]] = {}
 

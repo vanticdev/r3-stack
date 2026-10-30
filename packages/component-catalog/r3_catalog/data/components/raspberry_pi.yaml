@@ -19,3 +19,1230 @@ components:
     extends: raspberry-pi-5-8gb
     name: Raspberry Pi 5 (16 GB)
     provenance: {status: datasheet, source: "https://www.raspberrypi.com/products/raspberry-pi-5/ (16 GB variant)"}
+
+refinements:
+  raspberry-pi-5-8gb:
+    connectors:
+      J8:
+        type: header-2x20-2.54
+        position:
+        - -0.01
+        - 0.0245
+        - 0.003876
+        direction:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: measured
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Forty separate 0.64 mm STEP post solids, 2.54 mm grid; insulator top Z=3.876, tips Z=9.876 mm.
+        pins:
+          '1': 3V3
+          '2': 5V
+          '3': GPIO2
+          '4': 5V
+          '5': GPIO3
+          '6': GND
+          '7': GPIO4
+          '8': GPIO14
+          '9': GND
+          '10': GPIO15
+          '11': GPIO17
+          '12': GPIO18
+          '13': GPIO27
+          '14': GND
+          '15': GPIO22
+          '16': GPIO23
+          '17': 3V3
+          '18': GPIO24
+          '19': GPIO10
+          '20': GND
+          '21': GPIO9
+          '22': GPIO25
+          '23': GPIO11
+          '24': GPIO8
+          '25': GND
+          '26': GPIO7
+          '27': GPIO0
+          '28': GPIO1
+          '29': GPIO5
+          '30': GND
+          '31': GPIO6
+          '32': GPIO12
+          '33': GPIO13
+          '34': GND
+          '35': GPIO19
+          '36': GPIO16
+          '37': GPIO26
+          '38': GPIO20
+          '39': GND
+          '40': GPIO21
+      CAM0:
+        type: rpi5-fpc-22p-0.5mm-vertical
+        position:
+        - 0.01319746046
+        - -0.0195
+        - 0.005286
+        direction:
+        - 0
+        - 0
+        - 1
+        x:
+        - 0
+        - -1
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: measured
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: 22 spring apex centres; vertical cable exit. Pin 1 inward (Y=13.75); CAM0=J3 nearest Ethernet, CAM1=J4
+            nearest HDMI.
+        pins:
+          '1': GND
+          '2': CAM0_D0_N
+          '3': CAM0_D0_P
+          '4': GND
+          '5': CAM0_D1_N
+          '6': CAM0_D1_P
+          '7': GND
+          '8': CAM0_CK_N
+          '9': CAM0_CK_P
+          '10': GND
+          '11': CAM0_D2_N
+          '12': CAM0_D2_P
+          '13': GND
+          '14': CAM0_D3_N
+          '15': CAM0_D3_P
+          '16': GND
+          '17': CAM0_IO0
+          '18': CAM0_IO1
+          '19': GND
+          '20': CAM0_SCL
+          '21': CAM0_SDA
+          '22': 3V3
+      CAM1:
+        type: rpi5-fpc-22p-0.5mm-vertical
+        position:
+        - 0.00699746046
+        - -0.0195
+        - 0.005286
+        direction:
+        - 0
+        - 0
+        - 1
+        x:
+        - 0
+        - -1
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: measured
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: 22 spring apex centres; vertical cable exit. Pin 1 inward (Y=13.75); CAM0=J3 nearest Ethernet, CAM1=J4
+            nearest HDMI.
+        pins:
+          '1': GND
+          '2': CAM1_D0_N
+          '3': CAM1_D0_P
+          '4': GND
+          '5': CAM1_D1_N
+          '6': CAM1_D1_P
+          '7': GND
+          '8': CAM1_CK_N
+          '9': CAM1_CK_P
+          '10': GND
+          '11': CAM1_D2_N
+          '12': CAM1_D2_P
+          '13': GND
+          '14': CAM1_D3_N
+          '15': CAM1_D3_P
+          '16': GND
+          '17': CAM1_IO0
+          '18': CAM1_IO1
+          '19': GND
+          '20': CAM1_SCL
+          '21': CAM1_SDA
+          '22': 3V3
+      PCIE:
+        type: rpi5-fpc-16p-0.5mm-vertical
+        position:
+        - -0.03900253954
+        - 0.002
+        - 0.005286
+        direction:
+        - 0
+        - 0
+        - 1
+        x:
+        - 0
+        - 1
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: measured
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: 'Amphenol 62674-161120ALF; Raspberry Pi PCIe connector standard figures 1/2: pin 1 at Y=26.25; contacts
+            on RHS.'
+        pins:
+          '1': 5V
+          '2': 5V
+          '3': GND
+          '4': PCIE_CLK_P
+          '5': PCIE_CLK_N
+          '6': GND
+          '7': PCIE_RX_P
+          '8': PCIE_RX_N
+          '9': GND
+          '10': PCIE_TX_P
+          '11': PCIE_TX_N
+          '12': GND
+          '13': PCIE_PWR_EN
+          '14': PCIE_DET_WAKE
+          '15': PCIE_CLKREQ_N
+          '16': PCIE_RST_B
+      FAN:
+        type: jst-sh-4-header
+        position:
+        - 0.02384611179
+        - 0.024
+        - 0.005636
+        direction:
+        - 0
+        - 0
+        - 1
+        x:
+        - 0
+        - -1
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: measured
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: 'JST BMxxB-SRSS-TB top-entry housing measured in Pi STEP; 1 mm contact pitch. Pin signals: Raspberry
+            Pi hardware docs / RP-003139-SP. Spring-tip axis is projected onto housing top.'
+        pins:
+          '1': FAN_5V
+          '2': FAN_PWM
+          '3': GND
+          '4': FAN_TACH
+      UART:
+        type: jst-sh-3-header
+        position:
+        - -0.01
+        - -0.02445388821
+        - 0.005636
+        direction:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: measured
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: 'JST BMxxB-SRSS-TB top-entry housing measured in Pi STEP; 1 mm contact pitch. Pin signals: Raspberry
+            Pi hardware docs / RP-003139-SP. Spring-tip axis is projected onto housing top.'
+        pins:
+          '1': DEBUG_RX
+          '2': GND
+          '3': DEBUG_TX
+      BAT:
+        type: jst-sh-2-header
+        position:
+        - -0.0235
+        - -0.02365388821
+        - 0.005636
+        direction:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: measured
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: 'JST BMxxB-SRSS-TB top-entry housing measured in Pi STEP; 1 mm contact pitch. Pin signals: Raspberry
+            Pi hardware docs / RP-003139-SP. Spring-tip axis is projected onto housing top.'
+        pins:
+          '1': VBAT
+          '2': GND
+      POE:
+        type: header-2x2-2.54
+        position:
+        - 0.019
+        - -0.0185
+        - 0.003876
+        direction:
+        - 0
+        - 0
+        - 1
+        x:
+        - 1
+        - 0
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: estimated
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Four separate STEP posts and insulator. CT numbering/net association requires board schematic; no PoE
+            voltage is assumed.
+        pins:
+          '1': POE_CT1
+          '2': POE_CT2
+          '3': POE_CT3
+          '4': POE_CT4
+      USB2_0:
+        type: rpi5-usb2-a-receptacle-0
+        position:
+        - 0.04528
+        - 0.01899967636
+        - 0.005695243832
+        direction:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - -1
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: estimated
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those
+            ends to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector
+            vendor drawing; estimated until independently confirmed.
+        pins:
+          '1': USB2_0_VBUS
+          '2': USB2_0_D_N
+          '3': USB2_0_D_P
+          '4': USB2_0_GND
+      USB2_1:
+        type: rpi5-usb2-a-receptacle-1
+        position:
+        - 0.04528
+        - 0.01899967636
+        - 0.014275243971
+        direction:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - -1
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: estimated
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those
+            ends to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector
+            vendor drawing; estimated until independently confirmed.
+        pins:
+          '1': USB2_1_VBUS
+          '2': USB2_1_D_N
+          '3': USB2_1_D_P
+          '4': USB2_1_GND
+      USB3_0:
+        type: rpi5-usb3-a-receptacle-0
+        position:
+        - 0.0455
+        - 0.00100010383
+        - 0.005835999618
+        direction:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - -1
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: estimated
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those
+            ends to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector
+            vendor drawing; estimated until independently confirmed.
+        pins:
+          '1': USB3_0_VBUS
+          '2': USB3_0_D_N
+          '3': USB3_0_D_P
+          '4': USB3_0_GND
+          '5': USB3_0_SSRX_N
+          '6': USB3_0_SSRX_P
+          '7': USB3_0_GND_DRAIN
+          '8': USB3_0_SSTX_N
+          '9': USB3_0_SSTX_P
+      USB3_1:
+        type: rpi5-usb3-a-receptacle-1
+        position:
+        - 0.0455
+        - 0.00100010383
+        - 0.014335999615
+        direction:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - -1
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: estimated
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those
+            ends to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector
+            vendor drawing; estimated until independently confirmed.
+        pins:
+          '1': USB3_1_VBUS
+          '2': USB3_1_D_N
+          '3': USB3_1_D_P
+          '4': USB3_1_GND
+          '5': USB3_1_SSRX_N
+          '6': USB3_1_SSRX_P
+          '7': USB3_1_GND_DRAIN
+          '8': USB3_1_SSTX_N
+          '9': USB3_1_SSTX_P
+      ETH:
+        type: rpi5-rj45-receptacle
+        position:
+        - 0.04555
+        - -0.01775
+        - 0.011935999733
+        direction:
+        - 1
+        - 0
+        - 0
+        x:
+        - 0
+        - -1
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: estimated
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those
+            ends to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector
+            vendor drawing; estimated until independently confirmed.
+        pins:
+          '1': ETH_DA_P
+          '2': ETH_DA_N
+          '3': ETH_DB_P
+          '4': ETH_DC_P
+          '5': ETH_DC_N
+          '6': ETH_DB_N
+          '7': ETH_DD_P
+          '8': ETH_DD_N
+      HDMI0:
+        type: rpi5-micro-hdmi-receptacle
+        position:
+        - -0.0167
+        - -0.0296303501
+        - 0.00287325
+        direction:
+        - 0
+        - -1
+        - 0
+        x:
+        - 1
+        - 0
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: estimated
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Molex 46765 drawing and 19 spring contact lanes in STEP; shell front flare at Y=-1.6303501. Contact-side
+            numbering must be confirmed against fitted connector revision.
+        pins:
+          '1': HDMI0_HPD
+          '2': HDMI0_UTILITY
+          '3': HDMI0_D2_P
+          '4': HDMI0_D2_SHIELD
+          '5': HDMI0_D2_N
+          '6': HDMI0_D1_P
+          '7': HDMI0_D1_SHIELD
+          '8': HDMI0_D1_N
+          '9': HDMI0_D0_P
+          '10': HDMI0_D0_SHIELD
+          '11': HDMI0_D0_N
+          '12': HDMI0_CLK_P
+          '13': HDMI0_CLK_SHIELD
+          '14': HDMI0_CLK_N
+          '15': HDMI0_CEC
+          '16': HDMI0_DDC_GND
+          '17': HDMI0_SCL
+          '18': HDMI0_SDA
+          '19': HDMI0_5V
+      HDMI1:
+        type: rpi5-micro-hdmi-receptacle
+        position:
+        - -0.0033
+        - -0.0296303501
+        - 0.00287325
+        direction:
+        - 0
+        - -1
+        - 0
+        x:
+        - 1
+        - 0
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: estimated
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Molex 46765 drawing and 19 spring contact lanes in STEP; shell front flare at Y=-1.6303501. Contact-side
+            numbering must be confirmed against fitted connector revision.
+        pins:
+          '1': HDMI1_HPD
+          '2': HDMI1_UTILITY
+          '3': HDMI1_D2_P
+          '4': HDMI1_D2_SHIELD
+          '5': HDMI1_D2_N
+          '6': HDMI1_D1_P
+          '7': HDMI1_D1_SHIELD
+          '8': HDMI1_D1_N
+          '9': HDMI1_D0_P
+          '10': HDMI1_D0_SHIELD
+          '11': HDMI1_D0_N
+          '12': HDMI1_CLK_P
+          '13': HDMI1_CLK_SHIELD
+          '14': HDMI1_CLK_N
+          '15': HDMI1_CEC
+          '16': HDMI1_DDC_GND
+          '17': HDMI1_SCL
+          '18': HDMI1_SDA
+          '19': HDMI1_5V
+      USB_C:
+        type: rpi5-usb-c-16-receptacle
+        position:
+        - -0.0313
+        - -0.0292
+        - 0.003016
+        direction:
+        - 0
+        - -1
+        - 0
+        x:
+        - 1
+        - 0
+        - 0
+        embedded: true
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+        provenance:
+          status: estimated
+          source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+            docs/guide/part-accuracy.md
+          notes: Shell and tongue verified in STEP. The STEP has 16 solder tails but no mating contact solids. Standard
+            USB-C USB2 contact layout is ESTIMATED until vendor connector drawing or physical measurement confirms it.
+        pins:
+          '1': USBC_A1
+          '2': USBC_A4
+          '3': USBC_A5
+          '4': USBC_A6
+          '5': USBC_A7
+          '6': USBC_A8
+          '7': USBC_A9
+          '8': USBC_A12
+          '9': USBC_B1
+          '10': USBC_B4
+          '11': USBC_B5
+          '12': USBC_B6
+          '13': USBC_B7
+          '14': USBC_B8
+          '15': USBC_B9
+          '16': USBC_B12
+    pins:
+      GPIO2:
+        role: i2c_sda
+        logic_level: 3.3
+        functions:
+        - i2c1_sda
+        current_max: 0.016
+        net: GPIO2/SDA1
+      GPIO19:
+        role: pwm_out
+        logic_level: 3.3
+        functions:
+        - pwm0_ch3
+        current_max: 0.016
+        net: GPIO19/PCM_FS
+      GPIO22:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+      GPIO27:
+        role: gpio
+        logic_level: 3.3
+        functions:
+        - gpio
+        current_max: 0.016
+      GPIO9:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO9/SPI0_MISO
+      GPIO0:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO0/ID_SD
+      GPIO8:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO8/SPI0_CE0_N
+      GPIO25:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+      GPIO4:
+        role: uart_tx
+        logic_level: 3.3
+        functions:
+        - uart2_tx
+        current_max: 0.016
+        net: GPIO4/GPCLK0
+      GPIO1:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO1/ID_SC
+      GPIO11:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO11/SPI0_SCLK
+      GPIO24:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+      GPIO26:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+      GPIO5:
+        role: uart_rx
+        logic_level: 3.3
+        functions:
+        - uart2_rx
+        current_max: 0.016
+      GPIO3:
+        role: i2c_scl
+        logic_level: 3.3
+        functions:
+        - i2c1_scl
+        current_max: 0.016
+        net: GPIO3/SCL1
+      GPIO13:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO13/PWM1
+      GPIO16:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+      GPIO23:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+      GPIO21:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO21/PCM_DOUT
+      GPIO18:
+        role: pwm_out
+        logic_level: 3.3
+        functions:
+        - pwm0_ch2
+        current_max: 0.016
+        net: GPIO18/PCM_CLK
+      GPIO17:
+        role: gpio
+        logic_level: 3.3
+        functions:
+        - gpio
+        current_max: 0.016
+      GPIO12:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO12/PWM0
+      GPIO20:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO20/PCM_DIN
+      GPIO14:
+        role: uart_tx
+        logic_level: 3.3
+        functions:
+        - uart0_tx
+        current_max: 0.016
+        net: GPIO14/TXD0
+      GPIO10:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO10/SPI0_MOSI
+      GPIO15:
+        role: uart_rx
+        logic_level: 3.3
+        functions:
+        - uart0_rx
+        current_max: 0.016
+        net: GPIO15/RXD0
+      GPIO7:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+        net: GPIO7/SPI0_CE1_N
+      GPIO6:
+        role: gpio
+        logic_level: 3.3
+        current_max: 0.016
+        functions:
+        - gpio
+      5V:
+        role: power_in
+        voltage_nominal: 5.1
+        voltage_min: 4.75
+        voltage_max: 5.5
+        current_max: 5.0
+      3V3:
+        role: power_out
+        voltage_nominal: 3.3
+        current_max: 0.5
+      GND:
+        role: ground
+      CAM0_D0_N:
+        role: passive
+        net: CAM0_D0_N
+      CAM0_D0_P:
+        role: passive
+        net: CAM0_D0_P
+      CAM0_D1_N:
+        role: passive
+        net: CAM0_D1_N
+      CAM0_D1_P:
+        role: passive
+        net: CAM0_D1_P
+      CAM0_CK_N:
+        role: passive
+        net: CAM0_CK_N
+      CAM0_CK_P:
+        role: passive
+        net: CAM0_CK_P
+      CAM0_D2_N:
+        role: passive
+        net: CAM0_D2_N
+      CAM0_D2_P:
+        role: passive
+        net: CAM0_D2_P
+      CAM0_D3_N:
+        role: passive
+        net: CAM0_D3_N
+      CAM0_D3_P:
+        role: passive
+        net: CAM0_D3_P
+      CAM0_IO0:
+        role: gpio
+        logic_level: 3.3
+        functions:
+        - gpio
+        current_max: 0.016
+      CAM0_IO1:
+        role: gpio
+        logic_level: 3.3
+        functions:
+        - gpio
+        current_max: 0.016
+      CAM0_SDA:
+        role: i2c_sda
+        logic_level: 3.3
+        functions:
+        - i2c_cam0_sda
+      CAM0_SCL:
+        role: i2c_scl
+        logic_level: 3.3
+        functions:
+        - i2c_cam0_scl
+      CAM1_D0_N:
+        role: passive
+        net: CAM1_D0_N
+      CAM1_D0_P:
+        role: passive
+        net: CAM1_D0_P
+      CAM1_D1_N:
+        role: passive
+        net: CAM1_D1_N
+      CAM1_D1_P:
+        role: passive
+        net: CAM1_D1_P
+      CAM1_CK_N:
+        role: passive
+        net: CAM1_CK_N
+      CAM1_CK_P:
+        role: passive
+        net: CAM1_CK_P
+      CAM1_D2_N:
+        role: passive
+        net: CAM1_D2_N
+      CAM1_D2_P:
+        role: passive
+        net: CAM1_D2_P
+      CAM1_D3_N:
+        role: passive
+        net: CAM1_D3_N
+      CAM1_D3_P:
+        role: passive
+        net: CAM1_D3_P
+      CAM1_IO0:
+        role: gpio
+        logic_level: 3.3
+        functions:
+        - gpio
+        current_max: 0.016
+      CAM1_IO1:
+        role: gpio
+        logic_level: 3.3
+        functions:
+        - gpio
+        current_max: 0.016
+      CAM1_SDA:
+        role: i2c_sda
+        logic_level: 3.3
+        functions:
+        - i2c_cam1_sda
+      CAM1_SCL:
+        role: i2c_scl
+        logic_level: 3.3
+        functions:
+        - i2c_cam1_scl
+      PCIE_CLK_P:
+        role: passive
+        net: PCIE_CLK_P
+      PCIE_CLK_N:
+        role: passive
+        net: PCIE_CLK_N
+      PCIE_RX_P:
+        role: passive
+        net: PCIE_RX_P
+      PCIE_RX_N:
+        role: passive
+        net: PCIE_RX_N
+      PCIE_TX_P:
+        role: passive
+        net: PCIE_TX_P
+      PCIE_TX_N:
+        role: passive
+        net: PCIE_TX_N
+      PCIE_PWR_EN:
+        role: passive
+        net: PCIE_PWR_EN
+      PCIE_DET_WAKE:
+        role: passive
+        net: PCIE_DET_WAKE
+      PCIE_CLKREQ_N:
+        role: passive
+        net: PCIE_CLKREQ_N
+      PCIE_RST_B:
+        role: passive
+        net: PCIE_RST_B
+      FAN_5V:
+        role: passive
+        net: FAN_5V
+      FAN_PWM:
+        role: passive
+        net: FAN_PWM
+      FAN_TACH:
+        role: passive
+        net: FAN_TACH
+      DEBUG_RX:
+        role: passive
+        net: DEBUG_RX
+      DEBUG_TX:
+        role: passive
+        net: DEBUG_TX
+      VBAT:
+        role: passive
+        net: VBAT
+      POE_CT1:
+        role: passive
+        net: POE_CT1
+      POE_CT2:
+        role: passive
+        net: POE_CT2
+      POE_CT3:
+        role: passive
+        net: POE_CT3
+      POE_CT4:
+        role: passive
+        net: POE_CT4
+      USB2_0_VBUS:
+        role: passive
+        net: USB2_0_VBUS
+      USB2_0_D_N:
+        role: passive
+        net: USB2_0_D_N
+      USB2_0_D_P:
+        role: passive
+        net: USB2_0_D_P
+      USB2_0_GND:
+        role: passive
+        net: USB2_0_GND
+      USB2_1_VBUS:
+        role: passive
+        net: USB2_1_VBUS
+      USB2_1_D_N:
+        role: passive
+        net: USB2_1_D_N
+      USB2_1_D_P:
+        role: passive
+        net: USB2_1_D_P
+      USB2_1_GND:
+        role: passive
+        net: USB2_1_GND
+      USB3_0_VBUS:
+        role: passive
+        net: USB3_0_VBUS
+      USB3_0_D_N:
+        role: passive
+        net: USB3_0_D_N
+      USB3_0_D_P:
+        role: passive
+        net: USB3_0_D_P
+      USB3_0_GND:
+        role: passive
+        net: USB3_0_GND
+      USB3_0_SSRX_N:
+        role: passive
+        net: USB3_0_SSRX_N
+      USB3_0_SSRX_P:
+        role: passive
+        net: USB3_0_SSRX_P
+      USB3_0_GND_DRAIN:
+        role: passive
+        net: USB3_0_GND_DRAIN
+      USB3_0_SSTX_N:
+        role: passive
+        net: USB3_0_SSTX_N
+      USB3_0_SSTX_P:
+        role: passive
+        net: USB3_0_SSTX_P
+      USB3_1_VBUS:
+        role: passive
+        net: USB3_1_VBUS
+      USB3_1_D_N:
+        role: passive
+        net: USB3_1_D_N
+      USB3_1_D_P:
+        role: passive
+        net: USB3_1_D_P
+      USB3_1_GND:
+        role: passive
+        net: USB3_1_GND
+      USB3_1_SSRX_N:
+        role: passive
+        net: USB3_1_SSRX_N
+      USB3_1_SSRX_P:
+        role: passive
+        net: USB3_1_SSRX_P
+      USB3_1_GND_DRAIN:
+        role: passive
+        net: USB3_1_GND_DRAIN
+      USB3_1_SSTX_N:
+        role: passive
+        net: USB3_1_SSTX_N
+      USB3_1_SSTX_P:
+        role: passive
+        net: USB3_1_SSTX_P
+      ETH_DA_P:
+        role: passive
+        net: ETH_DA_P
+      ETH_DA_N:
+        role: passive
+        net: ETH_DA_N
+      ETH_DB_P:
+        role: passive
+        net: ETH_DB_P
+      ETH_DC_P:
+        role: passive
+        net: ETH_DC_P
+      ETH_DC_N:
+        role: passive
+        net: ETH_DC_N
+      ETH_DB_N:
+        role: passive
+        net: ETH_DB_N
+      ETH_DD_P:
+        role: passive
+        net: ETH_DD_P
+      ETH_DD_N:
+        role: passive
+        net: ETH_DD_N
+      HDMI0_HPD:
+        role: passive
+        net: HDMI0_HPD
+      HDMI0_UTILITY:
+        role: passive
+        net: HDMI0_UTILITY
+      HDMI0_D2_P:
+        role: passive
+        net: HDMI0_D2_P
+      HDMI0_D2_SHIELD:
+        role: passive
+        net: HDMI0_D2_SHIELD
+      HDMI0_D2_N:
+        role: passive
+        net: HDMI0_D2_N
+      HDMI0_D1_P:
+        role: passive
+        net: HDMI0_D1_P
+      HDMI0_D1_SHIELD:
+        role: passive
+        net: HDMI0_D1_SHIELD
+      HDMI0_D1_N:
+        role: passive
+        net: HDMI0_D1_N
+      HDMI0_D0_P:
+        role: passive
+        net: HDMI0_D0_P
+      HDMI0_D0_SHIELD:
+        role: passive
+        net: HDMI0_D0_SHIELD
+      HDMI0_D0_N:
+        role: passive
+        net: HDMI0_D0_N
+      HDMI0_CLK_P:
+        role: passive
+        net: HDMI0_CLK_P
+      HDMI0_CLK_SHIELD:
+        role: passive
+        net: HDMI0_CLK_SHIELD
+      HDMI0_CLK_N:
+        role: passive
+        net: HDMI0_CLK_N
+      HDMI0_CEC:
+        role: passive
+        net: HDMI0_CEC
+      HDMI0_DDC_GND:
+        role: passive
+        net: HDMI0_DDC_GND
+      HDMI0_SCL:
+        role: passive
+        net: HDMI0_SCL
+      HDMI0_SDA:
+        role: passive
+        net: HDMI0_SDA
+      HDMI0_5V:
+        role: passive
+        net: HDMI0_5V
+      HDMI1_HPD:
+        role: passive
+        net: HDMI1_HPD
+      HDMI1_UTILITY:
+        role: passive
+        net: HDMI1_UTILITY
+      HDMI1_D2_P:
+        role: passive
+        net: HDMI1_D2_P
+      HDMI1_D2_SHIELD:
+        role: passive
+        net: HDMI1_D2_SHIELD
+      HDMI1_D2_N:
+        role: passive
+        net: HDMI1_D2_N
+      HDMI1_D1_P:
+        role: passive
+        net: HDMI1_D1_P
+      HDMI1_D1_SHIELD:
+        role: passive
+        net: HDMI1_D1_SHIELD
+      HDMI1_D1_N:
+        role: passive
+        net: HDMI1_D1_N
+      HDMI1_D0_P:
+        role: passive
+        net: HDMI1_D0_P
+      HDMI1_D0_SHIELD:
+        role: passive
+        net: HDMI1_D0_SHIELD
+      HDMI1_D0_N:
+        role: passive
+        net: HDMI1_D0_N
+      HDMI1_CLK_P:
+        role: passive
+        net: HDMI1_CLK_P
+      HDMI1_CLK_SHIELD:
+        role: passive
+        net: HDMI1_CLK_SHIELD
+      HDMI1_CLK_N:
+        role: passive
+        net: HDMI1_CLK_N
+      HDMI1_CEC:
+        role: passive
+        net: HDMI1_CEC
+      HDMI1_DDC_GND:
+        role: passive
+        net: HDMI1_DDC_GND
+      HDMI1_SCL:
+        role: passive
+        net: HDMI1_SCL
+      HDMI1_SDA:
+        role: passive
+        net: HDMI1_SDA
+      HDMI1_5V:
+        role: passive
+        net: HDMI1_5V
+      USBC_A1:
+        role: passive
+        net: USBC_A1
+      USBC_A4:
+        role: passive
+        net: USBC_A4
+      USBC_A5:
+        role: passive
+        net: USBC_A5
+      USBC_A6:
+        role: passive
+        net: USBC_A6
+      USBC_A7:
+        role: passive
+        net: USBC_A7
+      USBC_A8:
+        role: passive
+        net: USBC_A8
+      USBC_A9:
+        role: passive
+        net: USBC_A9
+      USBC_A12:
+        role: passive
+        net: USBC_A12
+      USBC_B1:
+        role: passive
+        net: USBC_B1
+      USBC_B4:
+        role: passive
+        net: USBC_B4
+      USBC_B5:
+        role: passive
+        net: USBC_B5
+      USBC_B6:
+        role: passive
+        net: USBC_B6
+      USBC_B7:
+        role: passive
+        net: USBC_B7
+      USBC_B8:
+        role: passive
+        net: USBC_B8
+      USBC_B9:
+        role: passive
+        net: USBC_B9
+      USBC_B12:
+        role: passive
+        net: USBC_B12
+    interfaces:
+      J8:
+        origin:
+        - -0.01
+        - 0.0245
+        - 0.003876
+        description: Measured top of official STEP header insulator; HAT follows through its join.

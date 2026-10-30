@@ -65,7 +65,7 @@ class ConnectorInstance(_Model):
     pins: dict[str, str] = Field(description="connector pin number -> component pin name.")
     embedded: bool = Field(default=False, description="The connector body is part of the component's own 3D model.")
     source: str = Field(default="", description="Where the pose comes from, e.g. 'kicad:J5' or 'step:J8 pin 1'.")
-    provenance: Provenance | None = None
+    provenance: Provenance = Field(default_factory=lambda: Provenance(status="estimated"))
 
 
 FeatureKind = Literal["bore", "d_bore", "shaft", "d_shaft", "tapped_hole", "clearance_hole", "spline", "face", "slot",
@@ -332,7 +332,7 @@ class ConnectorGeometry(_Model):
     footprint: str = ""
     footprint_placement: Placement | None = None
     pins: dict[str, ConnectorPin]
-    pin_shape: Literal["square_post", "socket", "blade", "crimp", "bullet", "solder_cup", "coax"] = "square_post"
+    pin_shape: Literal["square_post", "socket", "blade", "crimp", "bullet", "solder_cup", "coax", "pad"] = "square_post"
     pin_size: Quantity = 0.00064
     envelope: Vector | None = None
     depth: Quantity = 0.0

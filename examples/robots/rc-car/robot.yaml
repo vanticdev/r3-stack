@@ -591,7 +591,7 @@ electrical:
       description: Keyed HAT I2C lead to owned GY-521 solder pads; AD0 stays low (0x68), no added pull-ups.
       connectors:
         A: {type: jst-gh-4-housing, mates: hat.J_IMU}
-        B: {type: integral, mates: imu.J1}
+        B: {type: solder-wire-1x8-2.54, mates: imu.J1}
       wires:
         - {id: W_IMU_VCC, from: A.1, to: B.1, awg: 28, color: red, signal: 3V3}
         - {id: W_IMU_GND, from: A.2, to: B.2, awg: 28, color: black, signal: GND}

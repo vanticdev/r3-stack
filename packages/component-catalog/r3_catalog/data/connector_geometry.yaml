@@ -2033,3 +2033,1619 @@ geometry:
     pins:
       "1": {position: [-5.5 mm, 0, 0], tip: 0.0 mm, wire_entry: [-5.5 mm, 0, -30.7 mm], wire_axis: [0.0, 0.0, -1.0]}
       "2": {position: [5.5 mm, 0, 0], tip: 0.0 mm, wire_entry: [5.5 mm, 0, -30.7 mm], wire_axis: [0.0, 0.0, -1.0]}
+  # Purchased-board connector measurements (part-accuracy).
+  rpi5-fpc-22p-0.5mm-vertical:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - 0.0085
+        - -0.05569746046
+        - -0.005286
+        x:
+        - 0
+        - 1
+        - 0
+        z:
+        - 0
+        - 0
+        - 1
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.05329746046
+          - 0.0
+          - 0.00131
+        - - 0.05699746046
+          - 0.017
+          - 0.0053
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.00525
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '2':
+        position:
+        - -0.00475
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '3':
+        position:
+        - -0.00425
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '4':
+        position:
+        - -0.00375
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '5':
+        position:
+        - -0.00325
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '6':
+        position:
+        - -0.00275
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '7':
+        position:
+        - -0.00225
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '8':
+        position:
+        - -0.00175
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '9':
+        position:
+        - -0.00125
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '10':
+        position:
+        - -0.00075
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '11':
+        position:
+        - -0.00025
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '12':
+        position:
+        - 0.00025
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '13':
+        position:
+        - 0.00075
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '14':
+        position:
+        - 0.00125
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '15':
+        position:
+        - 0.00175
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '16':
+        position:
+        - 0.00225
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '17':
+        position:
+        - 0.00275
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '18':
+        position:
+        - 0.00325
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '19':
+        position:
+        - 0.00375
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '20':
+        position:
+        - 0.00425
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '21':
+        position:
+        - 0.00475
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '22':
+        position:
+        - 0.00525
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+    pin_shape: blade
+    pin_size: 0.0002
+    envelope:
+    - 0.0167
+    - 0.0038
+    - 0.00395
+    depth: 0.00395
+    reach: 0.0
+    provenance:
+      status: measured
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: 22 spring apex centres; vertical cable exit. Pin 1 inward (Y=13.75); CAM0=J3 nearest Ethernet, CAM1=J4 nearest
+        HDMI.
+  rpi5-fpc-16p-0.5mm-vertical:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - -0.03
+        - 0.00349746046
+        - -0.005286
+        x:
+        - 0
+        - -1
+        - 0
+        z:
+        - 0
+        - 0
+        - 1
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.001
+          - 0.023
+          - 0.00131
+        - - 0.0048
+          - 0.037
+          - 0.0053
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.00375
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '2':
+        position:
+        - -0.00325
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '3':
+        position:
+        - -0.00275
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '4':
+        position:
+        - -0.00225
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '5':
+        position:
+        - -0.00175
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '6':
+        position:
+        - -0.00125
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '7':
+        position:
+        - -0.00075
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '8':
+        position:
+        - -0.00025
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '9':
+        position:
+        - 0.00025
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '10':
+        position:
+        - 0.00075
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '11':
+        position:
+        - 0.00125
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '12':
+        position:
+        - 0.00175
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '13':
+        position:
+        - 0.00225
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '14':
+        position:
+        - 0.00275
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '15':
+        position:
+        - 0.00325
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+      '16':
+        position:
+        - 0.00375
+        - 0.0
+        - 0.0
+        tip: -0.000653887
+    pin_shape: blade
+    pin_size: 0.0002
+    envelope:
+    - 0.0137
+    - 0.0038
+    - 0.00395
+    depth: 0.00395
+    reach: 0.0
+    provenance:
+      status: measured
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: 'Amphenol 62674-161120ALF; Raspberry Pi PCIe connector standard figures 1/2: pin 1 at Y=26.25; contacts
+        on RHS.'
+  jst-sh-4-header:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - 0.052
+        - -0.06634611179
+        - -0.005636
+        x:
+        - 0
+        - 1
+        - 0
+        z:
+        - 0
+        - 0
+        - 1
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.0652
+          - 0.0489
+          - 0.00131
+        - - 0.0692
+          - 0.0551
+          - 0.0057
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.0015
+        - 0.0
+        - 0.0
+        tip: -0.001300492
+      '2':
+        position:
+        - -0.0005
+        - 0.0
+        - 0.0
+        tip: -0.001300492
+      '3':
+        position:
+        - 0.0005
+        - 0.0
+        - 0.0
+        tip: -0.001300492
+      '4':
+        position:
+        - 0.0015
+        - 0.0
+        - 0.0
+        tip: -0.001300492
+    pin_shape: square_post
+    pin_size: 0.0002
+    envelope:
+    - 0.006
+    - 0.004
+    - 0.0043
+    depth: 0.0043
+    reach: 0.0
+    provenance:
+      status: measured
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: 'JST BMxxB-SRSS-TB top-entry housing measured in Pi STEP; 1 mm contact pitch. Pin signals: Raspberry Pi
+        hardware docs / RP-003139-SP. Spring-tip axis is projected onto housing top.'
+  jst-sh-3-header:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - -0.0325
+        - -0.00354611179
+        - -0.005636
+        x:
+        - 1
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - 1
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.0299
+          - 0.0024
+          - 0.00131
+        - - 0.0351
+          - 0.0064
+          - 0.0057
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.001
+        - 0.0
+        - 0.0
+        tip: -0.001300492
+      '2':
+        position:
+        - 0.0
+        - 0.0
+        - 0.0
+        tip: -0.001300492
+      '3':
+        position:
+        - 0.001
+        - 0.0
+        - 0.0
+        tip: -0.001300492
+    pin_shape: square_post
+    pin_size: 0.0002
+    envelope:
+    - 0.005
+    - 0.004
+    - 0.0043
+    depth: 0.0043
+    reach: 0.0
+    provenance:
+      status: measured
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: 'JST BMxxB-SRSS-TB top-entry housing measured in Pi STEP; 1 mm contact pitch. Pin signals: Raspberry Pi
+        hardware docs / RP-003139-SP. Spring-tip axis is projected onto housing top.'
+  jst-sh-2-header:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - -0.019
+        - -0.00434611179
+        - -0.005636
+        x:
+        - 1
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - 1
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.0169
+          - 0.0032
+          - 0.00131
+        - - 0.0211
+          - 0.0072
+          - 0.0057
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.0005
+        - 0.0
+        - 0.0
+        tip: -0.001300492
+      '2':
+        position:
+        - 0.0005
+        - 0.0
+        - 0.0
+        tip: -0.001300492
+    pin_shape: square_post
+    pin_size: 0.0002
+    envelope:
+    - 0.004
+    - 0.004
+    - 0.0043
+    depth: 0.0043
+    reach: 0.0
+    provenance:
+      status: measured
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: 'JST BMxxB-SRSS-TB top-entry housing measured in Pi STEP; 1 mm contact pitch. Pin signals: Raspberry Pi
+        hardware docs / RP-003139-SP. Spring-tip axis is projected onto housing top.'
+  header-2x2-2.54:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - -0.0615
+        - -0.0095
+        - -0.003876
+        x:
+        - 1
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - 1
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.0589
+          - 0.0069
+          - -0.0006
+        - - 0.0641
+          - 0.0121
+          - 0.0099
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.00127
+        - -0.00127
+        - 0.0
+        tip: 0.006
+      '2':
+        position:
+        - -0.00127
+        - 0.00127
+        - 0.0
+        tip: 0.006
+      '3':
+        position:
+        - 0.00127
+        - -0.00127
+        - 0.0
+        tip: 0.006
+      '4':
+        position:
+        - 0.00127
+        - 0.00127
+        - 0.0
+        tip: 0.006
+    pin_shape: square_post
+    pin_size: 0.00064
+    envelope:
+    - 0.00508
+    - 0.00508
+    - 0.01044
+    depth: 0.00444
+    reach: 0.006
+    provenance:
+      status: estimated
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: Four separate STEP posts and insulator. CT numbering/net association requires board schematic; no PoE voltage
+        is assumed.
+  rpi5-usb2-a-receptacle-0:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - 0.04699967636
+        - 0.005695243832
+        - -0.08778
+        x:
+        - 0
+        - 0
+        - 1
+        z:
+        - 0
+        - -1
+        - 0
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.07
+          - 0.03969967636
+          - 0.0018
+        - - 0.0881
+          - 0.05429967636
+          - 0.0103
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.003508843216
+        - 1.484994e-06
+        - 0
+        tip: -0.002493867474
+      '2':
+        position:
+        - -0.001008843221
+        - -4.94998e-07
+        - 0
+        tip: -0.002493867474
+      '3':
+        position:
+        - 0.000991156823
+        - -4.94998e-07
+        - 0
+        tip: -0.002493867474
+      '4':
+        position:
+        - 0.003491156767
+        - -4.94998e-07
+        - 0
+        tip: -0.002493867474
+    pin_shape: blade
+    pin_size: 0.0005
+    envelope:
+    - 0.0146
+    - 0.0086
+    - 0.018
+    depth: 0.018000000000000002
+    reach: 0.0
+    provenance:
+      status: estimated
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those ends
+        to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector vendor
+        drawing; estimated until independently confirmed.
+  rpi5-usb2-a-receptacle-1:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - 0.04699967636
+        - 0.014275243971
+        - -0.08778
+        x:
+        - 0
+        - 0
+        - 1
+        z:
+        - 0
+        - -1
+        - 0
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.07
+          - 0.03969967636
+          - 0.0104
+        - - 0.0881
+          - 0.05429967636
+          - 0.0176
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.003508843216
+        - 1.484994e-06
+        - 0
+        tip: -0.002493867474
+      '2':
+        position:
+        - -0.001008843221
+        - -4.94998e-07
+        - 0
+        tip: -0.002493867474
+      '3':
+        position:
+        - 0.000991156823
+        - -4.94998e-07
+        - 0
+        tip: -0.002493867474
+      '4':
+        position:
+        - 0.003491156767
+        - -4.94998e-07
+        - 0
+        tip: -0.002493867474
+    pin_shape: blade
+    pin_size: 0.0005
+    envelope:
+    - 0.0146
+    - 0.0086
+    - 0.018
+    depth: 0.018000000000000002
+    reach: 0.0
+    provenance:
+      status: estimated
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those ends
+        to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector vendor
+        drawing; estimated until independently confirmed.
+  rpi5-usb3-a-receptacle-0:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - 0.02900010383
+        - 0.005835999618
+        - -0.088
+        x:
+        - 0
+        - 0
+        - 1
+        z:
+        - 0
+        - -1
+        - 0
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.07
+          - 0.02170010383
+          - 0.0018
+        - - 0.0881
+          - 0.03630010383
+          - 0.0103
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.003250000286
+        - 0.0
+        - 0
+        tip: -0.003580001078
+      '2':
+        position:
+        - -0.001000000325
+        - 0.0
+        - 0
+        tip: -0.003580001078
+      '3':
+        position:
+        - 0.000999999654
+        - 0.0
+        - 0
+        tip: -0.003580001078
+      '4':
+        position:
+        - 0.003249999615
+        - -0.0
+        - 0
+        tip: -0.003580001078
+      '5':
+        position:
+        - 0.003999999622
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+      '6':
+        position:
+        - 0.001999999701
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+      '7':
+        position:
+        - -3.36e-10
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+      '8':
+        position:
+        - -0.002000000372
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+      '9':
+        position:
+        - -0.004000000293
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+    pin_shape: blade
+    pin_size: 0.0005
+    envelope:
+    - 0.0146
+    - 0.0086
+    - 0.018
+    depth: 0.018000000000000002
+    reach: 0.0
+    provenance:
+      status: estimated
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those ends
+        to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector vendor
+        drawing; estimated until independently confirmed.
+  rpi5-usb3-a-receptacle-1:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - 0.02900010383
+        - 0.014335999615
+        - -0.088
+        x:
+        - 0
+        - 0
+        - 1
+        z:
+        - 0
+        - -1
+        - 0
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.07
+          - 0.02170010383
+          - 0.0104
+        - - 0.0881
+          - 0.03630010383
+          - 0.0176
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.003250000286
+        - 0.0
+        - 0
+        tip: -0.003580001078
+      '2':
+        position:
+        - -0.001000000325
+        - 0.0
+        - 0
+        tip: -0.003580001078
+      '3':
+        position:
+        - 0.000999999654
+        - 0.0
+        - 0
+        tip: -0.003580001078
+      '4':
+        position:
+        - 0.003249999615
+        - 0.0
+        - 0
+        tip: -0.003580001078
+      '5':
+        position:
+        - 0.003999999622
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+      '6':
+        position:
+        - 0.001999999701
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+      '7':
+        position:
+        - -3.36e-10
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+      '8':
+        position:
+        - -0.002000000372
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+      '9':
+        position:
+        - -0.004000000293
+        - 7.0000067e-05
+        - 0
+        tip: -0.000690001423
+    pin_shape: blade
+    pin_size: 0.0005
+    envelope:
+    - 0.0146
+    - 0.0086
+    - 0.018
+    depth: 0.018000000000000002
+    reach: 0.0
+    provenance:
+      status: estimated
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those ends
+        to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector vendor
+        drawing; estimated until independently confirmed.
+  rpi5-rj45-receptacle:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - 0.01025
+        - 0.011935999733
+        - -0.08805
+        x:
+        - 0
+        - 0
+        - 1
+        z:
+        - 0
+        - -1
+        - 0
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.0664
+          - 0.0022
+          - 0.0013
+        - - 0.0881
+          - 0.0183
+          - 0.0147
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.003570000226
+        - 0.0
+        - 0
+        tip: -0.002500003766
+      '2':
+        position:
+        - -0.002550000259
+        - 0.0
+        - 0
+        tip: -0.002500003766
+      '3':
+        position:
+        - -0.001530000292
+        - 0.0
+        - 0
+        tip: -0.002500003766
+      '4':
+        position:
+        - -0.000510000296
+        - 0.0
+        - 0
+        tip: -0.002500003766
+      '5':
+        position:
+        - 0.000509999729
+        - 0.0
+        - 0
+        tip: -0.002500003766
+      '6':
+        position:
+        - 0.001529999726
+        - 0.0
+        - 0
+        tip: -0.002500003766
+      '7':
+        position:
+        - 0.002549999692
+        - 0.0
+        - 0
+        tip: -0.002500003766
+      '8':
+        position:
+        - 0.003569999659
+        - 0.0
+        - 0
+        tip: -0.002500003766
+    pin_shape: blade
+    pin_size: 0.0005
+    envelope:
+    - 0.016
+    - 0.0134
+    - 0.02165
+    depth: 0.02165
+    reach: 0.0
+    provenance:
+      status: estimated
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: Shell lip and frontmost gold spring ends measured from official STEP vertices; pin axes project those ends
+        to the mating plane. Electrical numbering and the loaded spring contact datum require a fitted-connector vendor
+        drawing; estimated until independently confirmed.
+  rpi5-micro-hdmi-receptacle:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - -0.0258
+        - -0.00287325
+        - -0.0016303501
+        x:
+        - 1
+        - 0
+        - 0
+        z:
+        - 0
+        - 1
+        - 0
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.0221
+          - -0.0017
+          - 0.0002
+        - - 0.0295
+          - 0.007
+          - 0.0047
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.0018
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+      '2':
+        position:
+        - -0.0016
+        - -0.00023275
+        - 0.0
+        tip: -0.00235
+      '3':
+        position:
+        - -0.0014
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+      '4':
+        position:
+        - -0.0012
+        - -0.00023275
+        - 0.0
+        tip: -0.00235
+      '5':
+        position:
+        - -0.001
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+      '6':
+        position:
+        - -0.0008
+        - -0.00023275
+        - 0.0
+        tip: -0.00235
+      '7':
+        position:
+        - -0.0006
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+      '8':
+        position:
+        - -0.0004
+        - -0.00023275
+        - 0.0
+        tip: -0.00235
+      '9':
+        position:
+        - -0.0002
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+      '10':
+        position:
+        - 0.0
+        - -0.00023275
+        - 0.0
+        tip: -0.00235
+      '11':
+        position:
+        - 0.0002
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+      '12':
+        position:
+        - 0.0004
+        - -0.00023275
+        - 0.0
+        tip: -0.00235
+      '13':
+        position:
+        - 0.0006
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+      '14':
+        position:
+        - 0.0008
+        - -0.00023275
+        - 0.0
+        tip: -0.00235
+      '15':
+        position:
+        - 0.001
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+      '16':
+        position:
+        - 0.0012
+        - -0.00023275
+        - 0.0
+        tip: -0.00235
+      '17':
+        position:
+        - 0.0014
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+      '18':
+        position:
+        - 0.0016
+        - -0.00023275
+        - 0.0
+        tip: -0.00235
+      '19':
+        position:
+        - 0.0018
+        - 0.00023275
+        - 0.0
+        tip: -0.00235
+    pin_shape: blade
+    pin_size: 0.0002
+    envelope:
+    - 0.0074
+    - 0.0045
+    - 0.0087
+    depth: 0.0087
+    reach: 0.0
+    provenance:
+      status: estimated
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: Molex 46765 drawing and 19 spring contact lanes in STEP; shell front flare at Y=-1.6303501. Contact-side
+        numbering must be confirmed against fitted connector revision.
+  rpi5-usb-c-16-receptacle:
+    model:
+      source: vendor
+      url: https://pip-assets.raspberrypi.com/categories/892-raspberry-pi-5/documents/RP-010083-CA-1-rpi-5%203D%20STEP%20-%20No%20Graphics%20small%20file.zip
+      path: rpi-5b_no_graphics.step
+      sha256: 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f
+      license: MIT (Copyright (c) 2026 Raspberry Pi Ltd; LICENSE.txt in the archive). Provided for guidance only, without
+        guarantee of accuracy.
+      units: mm
+      placement:
+        origin:
+        - -0.0112
+        - -0.003016
+        - -0.0012
+        x:
+        - 1
+        - 0
+        - 0
+        z:
+        - 0
+        - 1
+        - 0
+      params:
+        bank_id: raspberry-pi-5-4gb
+        extract_bounds:
+        - - 0.0067
+          - -0.0013
+          - 0.0003
+        - - 0.0157
+          - 0.0066
+          - 0.0047
+      provenance:
+        status: measured
+        source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+          docs/guide/part-accuracy.md
+    pins:
+      '1':
+        position:
+        - -0.00275
+        - 0.00035
+        - 0.0
+        tip: 0.0
+      '2':
+        position:
+        - -0.00125
+        - 0.00035
+        - 0.0
+        tip: 0.0
+      '3':
+        position:
+        - -0.00075
+        - 0.00035
+        - 0.0
+        tip: 0.0
+      '4':
+        position:
+        - -0.00025
+        - 0.00035
+        - 0.0
+        tip: 0.0
+      '5':
+        position:
+        - 0.00025
+        - 0.00035
+        - 0.0
+        tip: 0.0
+      '6':
+        position:
+        - 0.00075
+        - 0.00035
+        - 0.0
+        tip: 0.0
+      '7':
+        position:
+        - 0.00125
+        - 0.00035
+        - 0.0
+        tip: 0.0
+      '8':
+        position:
+        - 0.00275
+        - 0.00035
+        - 0.0
+        tip: 0.0
+      '9':
+        position:
+        - 0.00275
+        - -0.00035
+        - 0.0
+        tip: 0.0
+      '10':
+        position:
+        - 0.00125
+        - -0.00035
+        - 0.0
+        tip: 0.0
+      '11':
+        position:
+        - 0.00075
+        - -0.00035
+        - 0.0
+        tip: 0.0
+      '12':
+        position:
+        - 0.00025
+        - -0.00035
+        - 0.0
+        tip: 0.0
+      '13':
+        position:
+        - -0.00025
+        - -0.00035
+        - 0.0
+        tip: 0.0
+      '14':
+        position:
+        - -0.00075
+        - -0.00035
+        - 0.0
+        tip: 0.0
+      '15':
+        position:
+        - -0.00125
+        - -0.00035
+        - 0.0
+        tip: 0.0
+      '16':
+        position:
+        - -0.00275
+        - -0.00035
+        - 0.0
+        tip: 0.0
+    pin_shape: blade
+    pin_size: 0.0002
+    envelope:
+    - 0.009
+    - 0.0044
+    - 0.0078
+    depth: 0.0078
+    reach: 0.0
+    provenance:
+      status: estimated
+      source: Official Raspberry Pi RP-010083-CA-1 STEP (SHA-256 6841637b4cfa97637bf34b529bfe896f24d9634b2c40b57a156781f55d88f06f);
+        docs/guide/part-accuracy.md
+      notes: Shell and tongue verified in STEP. The STEP has 16 solder tails but no mating contact solids. Standard USB-C
+        USB2 contact layout is ESTIMATED until vendor connector drawing or physical measurement confirms it.
+  solder-pads-1x8-2.54:
+    model:
+      source: vendor
+      url: https://raw.githubusercontent.com/adam-kabbara/RSX-CANSAT-2026/6e7b39f8cbd07e0290e0925f2fbab3cb3e0e376f/electrical/DO_NOT_EDIT__KICAD_LIBRARIES/Custom_3D_Models.3dshapes/GY-521_%28MPU-6050%29.step
+      path: model.step
+      sha256: 48a9f5f0294d9de8831c6169dd60676bb402c2b59301da10a7a2e7dbeb3633cd
+      license: Public CAD in adam-kabbara/RSX-CANSAT-2026; third-party model rights unspecified, no redistribution permission
+        assumed.
+      units: mm
+      placement:
+        origin:
+        - -0.010175
+        - 0.01438
+        - -0.001
+        x:
+        - 1
+        - 0
+        - 0
+        z:
+        - 0
+        - 0
+        - 1
+      params:
+        bank_id: gy-521-mpu6050
+        extract_bounds:
+        - - 0
+          - -0.01565
+          - 0
+        - - 0.02035
+          - -0.0131
+          - 0.00101
+      provenance:
+        status: measured
+        source: https://raw.githubusercontent.com/adam-kabbara/RSX-CANSAT-2026/6e7b39f8cbd07e0290e0925f2fbab3cb3e0e376f/electrical/DO_NOT_EDIT__KICAD_LIBRARIES/Custom_3D_Models.3dshapes/GY-521_%28MPU-6050%29.step
+    pins:
+      '1':
+        position: &id001
+        - -0.00889
+        - 0
+        - 0
+        tip: 0
+        pad: *id001
+      '2':
+        position: &id002
+        - -0.006350000000000001
+        - 0
+        - 0
+        tip: 0
+        pad: *id002
+      '3':
+        position: &id003
+        - -0.00381
+        - 0
+        - 0
+        tip: 0
+        pad: *id003
+      '4':
+        position: &id004
+        - -0.00127
+        - 0
+        - 0
+        tip: 0
+        pad: *id004
+      '5':
+        position: &id005
+        - 0.00127
+        - 0
+        - 0
+        tip: 0
+        pad: *id005
+      '6':
+        position: &id006
+        - 0.00381
+        - 0
+        - 0
+        tip: 0
+        pad: *id006
+      '7':
+        position: &id007
+        - 0.006350000000000001
+        - 0
+        - 0
+        tip: 0
+        pad: *id007
+      '8':
+        position: &id008
+        - 0.00889
+        - 0
+        - 0
+        tip: 0
+        pad: *id008
+    pin_shape: pad
+    pin_size: 0.001
+    envelope:
+    - 0.02035
+    - 0.00254
+    - 0.001
+    depth: 0.001
+    reach: 0
+    provenance:
+      status: measured
+      source: https://raw.githubusercontent.com/adam-kabbara/RSX-CANSAT-2026/6e7b39f8cbd07e0290e0925f2fbab3cb3e0e376f/electrical/DO_NOT_EDIT__KICAD_LIBRARIES/Custom_3D_Models.3dshapes/GY-521_%28MPU-6050%29.step
+  solder-wire-1x8-2.54:
+    model:
+      source: proxy
+      units: mm
+      params:
+        builder: solder_wire_row
+        count: 8
+        pitch: 2.54
+        diameter: 0.32
+        length: 1
+      provenance:
+        status: estimated
+        source: Generated bare 28 AWG wire ends for routing (proxy); build verification uses the actual routed conductor
+          ends.
+    pins:
+      '1':
+        position:
+        - -0.00889
+        - 0
+        - 0
+        tip: 0
+        wire_entry:
+        - -0.00889
+        - 0
+        - -0.0005
+        wire_axis:
+        - 0
+        - 0
+        - -1
+      '2':
+        position:
+        - -0.006350000000000001
+        - 0
+        - 0
+        tip: 0
+        wire_entry:
+        - -0.006350000000000001
+        - 0
+        - -0.0005
+        wire_axis:
+        - 0
+        - 0
+        - -1
+      '3':
+        position:
+        - -0.00381
+        - 0
+        - 0
+        tip: 0
+        wire_entry:
+        - -0.00381
+        - 0
+        - -0.0005
+        wire_axis:
+        - 0
+        - 0
+        - -1
+      '4':
+        position:
+        - -0.00127
+        - 0
+        - 0
+        tip: 0
+        wire_entry:
+        - -0.00127
+        - 0
+        - -0.0005
+        wire_axis:
+        - 0
+        - 0
+        - -1
+      '5':
+        position:
+        - 0.00127
+        - 0
+        - 0
+        tip: 0
+        wire_entry:
+        - 0.00127
+        - 0
+        - -0.0005
+        wire_axis:
+        - 0
+        - 0
+        - -1
+      '6':
+        position:
+        - 0.00381
+        - 0
+        - 0
+        tip: 0
+        wire_entry:
+        - 0.00381
+        - 0
+        - -0.0005
+        wire_axis:
+        - 0
+        - 0
+        - -1
+      '7':
+        position:
+        - 0.006350000000000001
+        - 0
+        - 0
+        tip: 0
+        wire_entry:
+        - 0.006350000000000001
+        - 0
+        - -0.0005
+        wire_axis:
+        - 0
+        - 0
+        - -1
+      '8':
+        position:
+        - 0.00889
+        - 0
+        - 0
+        tip: 0
+        wire_entry:
+        - 0.00889
+        - 0
+        - -0.0005
+        wire_axis:
+        - 0
+        - 0
+        - -1
+    pin_shape: bullet
+    pin_size: 0.00032
+    envelope:
+    - 0.02035
+    - 0.00254
+    - 0.001
+    depth: 0.001
+    reach: 0
+    provenance:
+      status: measured
+      source: https://raw.githubusercontent.com/adam-kabbara/RSX-CANSAT-2026/6e7b39f8cbd07e0290e0925f2fbab3cb3e0e376f/electrical/DO_NOT_EDIT__KICAD_LIBRARIES/Custom_3D_Models.3dshapes/GY-521_%28MPU-6050%29.step

@@ -54,7 +54,7 @@ connectors:
   - id: fpc-22p-0.5mm-cable
     family: FPC/FFC ZIF 0.5 mm pitch, 22 positions
     gender: none
-    mates_with: [fpc-22p-0.5mm-socket]
+    mates_with: [fpc-22p-0.5mm-socket, rpi5-fpc-22p-0.5mm-vertical]
     pin_count: 22
     current_rating_per_pin: 0.5
     voltage_rating: 50
