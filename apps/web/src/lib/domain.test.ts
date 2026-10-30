@@ -110,11 +110,11 @@ describe("wiring", () => {
     const rows = wireRows({
       routes: { wires: { W: { harness: "h", awg: 14, routed_length: 0.2, cut_length: 0.25 } } },
       detail: { wires: { W: { harness: "h", color: "blue", bends: [{ radius: 0.01, required: 0.02 }, { radius: 0.004, required: 0.026 }] } },
-                wire_min_clearance: { W: { distance: -0.002, component: "wheel_rr" } } },
+                wire_min_clearance: { W: { distance: -0.002, component: "sensor" } } },
       currents: [{ id: "W", continuous_current: -12, ampacity: 25 }],
       slack: { wires: { W: { min_distance: 0.025, component: "" } } },
     });
-    expect(rows[0]).toMatchObject({ id: "W", bendRadius: 0.004, bendRequired: 0.026, clearance: -0.002, clearanceComponent: "wheel_rr",
+    expect(rows[0]).toMatchObject({ id: "W", bendRadius: 0.004, bendRequired: 0.026, clearance: -0.002, clearanceComponent: "sensor",
                                     current: 12, ampacity: 25, slackClearance: null });
   });
 
