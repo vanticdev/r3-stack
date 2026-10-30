@@ -1,0 +1,125 @@
+schema: r3/robot@1
+robot:
+  name: recorded-front-left-corner
+components:
+  chassis:
+    type: chassis-plate-al6061
+    pose:
+      xyz:
+      - 130 mm
+      - 0
+      - 25 mm
+    params:
+      outline:
+      - - -170 mm
+        - -65 mm
+      - - -86 mm
+        - -65 mm
+      - - -86 mm
+        - -70 mm
+      - - -70 mm
+        - -70 mm
+      - - -70 mm
+        - -65 mm
+      - - 40 mm
+        - -65 mm
+      - - 70 mm
+        - -40 mm
+      - - 170 mm
+        - -40 mm
+      - - 170 mm
+        - 40 mm
+      - - 70 mm
+        - 40 mm
+      - - 40 mm
+        - 65 mm
+      - - -170 mm
+        - 65 mm
+  arm_fl:
+    type: suspension-arm-pa12
+  kp_fl:
+    type: kingpin-screw-m3x20
+  knuckle_fl:
+    type: steering-knuckle
+  stub_fl:
+    type: stub-axle-6mm
+  wheel_fl:
+    type: wheel-110x45
+    source:
+      group: front_wheels
+      requires:
+        kind: wheel
+        diameter:
+        - 100 mm
+        - 115 mm
+        width:
+        - 40 mm
+        - 50 mm
+        hub: 6 mm bore
+  nut_fl:
+    type: wheel-nut-m6-nyloc
+  bs_kl:
+    type: ball-stud-m3-5.8x8
+assembly:
+  root: chassis
+  joins:
+  - id: arm_fl_mount
+    a: chassis.arm_fl
+    b: arm_fl.base
+    clock: 0 deg
+    fasteners:
+      type: M3x10
+  - id: kingpin_thread_fl
+    a: arm_fl.kingpin
+    b: kp_fl.thread
+  - id: kingpin_fl
+    a: kp_fl.shank
+    b: knuckle_fl.kingpin
+    kind: revolute
+    joint: steer_fl
+    limits:
+    - -0.45
+    - 0.45
+    damping: 0.02
+    verify:
+      clearance:
+      - 0.05 mm
+      - 0.15 mm
+      min_engagement: 10 mm
+      retainers:
+      - kp_fl
+      thrust:
+      - arm_fl
+  - id: stub_press_fl
+    a: knuckle_fl.stub
+    b: stub_fl.press
+    fit: interference
+    verify:
+      interference:
+      - 0.01 mm
+      - 0.06 mm
+      min_engagement: 8 mm
+  - id: hub_fl
+    a: stub_fl.journal
+    b: wheel_fl.hub
+    kind: revolute
+    joint: spin_fl
+    damping: 0.0005
+    verify:
+      clearance:
+      - 0.01 mm
+      - 0.05 mm
+      min_engagement: 15 mm
+      retainers:
+      - nut_fl
+      thrust:
+      - stub_fl
+  - id: wheel_nut_fl
+    a: stub_fl.nut_thread
+    b: nut_fl.seat
+    fasteners:
+      type: M6x7
+      preloaded: false
+  - id: bs_kl
+    a: knuckle_fl.ball_stud
+    b: bs_kl.thread
