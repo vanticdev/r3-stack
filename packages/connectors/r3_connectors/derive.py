@@ -229,6 +229,76 @@ PROXIES: dict[str, ProxySpec] = {
 # Same housing geometry with heavier crimp terminals; retain it when regenerating.
 PROXIES["servo-3-female-hd"] = PROXIES["servo-3-female"]
 
+# Crimp housing dimensions are used for occupancy, independently of display CAD.
+# Harwin's downloadable CAD requires TraceParts registration. Use the existing
+# KiCad socket as an explicitly labelled contact-grid reference, never sculpt a
+# purchased housing. Width/depth come from the vendor drawings, not that model.
+HOUSING_SOURCE = "https://www.harwin.com/products/M20-1060300"
+HOUSING_DRAWING = "https://content.harwin.com/asset/b9496f9a-d89f-420f-aea9-abb4534be02f/DRG-00376-Technical-Drawing-Datasheet-M20-106-pdf.pdf"
+DOUBLE_HOUSING_SOURCE = "https://www.harwin.com/products/M20-1070300"
+
+
+def housing_specs() -> dict[str, KicadSpec]:
+    """All 1xN/2xN crimp contact arrays, derived through official KiCad pads."""
+    out = {}
+    for rows in (1, 2):
+        for length in range(1, 21):
+            name = f"PinSocket_{rows}x{length:02d}_P2.54mm_Vertical"
+            out[f"dupont-{rows}x{length}"] = KicadSpec(
+                f"Connector_PinSocket_2.54mm:{name}", f"Connector_PinSocket_2.54mm.3dshapes/{name}.step",
+                (0.0 if rows == 1 else -1.27, -1.27 * (length - 1), 8.5),
+                (0, -1, 0), (0, 0, 1), rows == 1, -1.1, "socket", 1.0,
+                "KiCad PCB socket is a contact-grid reference only, NOT crimp housing CAD. "
+                "Crimp occupancy uses vendor envelope; vendor CAD requires TraceParts registration.")
+    return out
+
+
+def derive_housings(footprints: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    out = {}
+    for identifier, spec in housing_specs().items():
+        g = derive_kicad(identifier, spec, footprints[spec.footprint])
+        rows, length = map(int, identifier.removeprefix("dupont-").split("x"))
+        # M20-106: 2.54*N + 0.20 wide, 2.50 thick, 14.00 deep.
+        # M20-107: 2.54*N wide, 5.10 thick, 14.00 deep.
+        g["envelope"] = np.array([2.54 * length + (0.2 if rows == 1 else 0.),
+                                  2.5 if rows == 1 else 5.1, 14.])
+        g["depth"], g["reach"] = 14., 0.
+        g["provenance"] = {
+            "status": "derived" if length <= 12 else "estimated",
+            "source": f"{HOUSING_DRAWING}; {DOUBLE_HOUSING_SOURCE}; KiCad pads: {spec.footprint}",
+            "notes": "Harwin M20-106/107 nominal envelopes; N>12 extrapolates the drawing formula, "
+                     "availability must be checked. Wire-entry depth approximated by the 14 mm body length. "
+                     "Display CAD is a KiCad socket contact-grid reference, not the purchased crimp housing."}
+        for pin in g["pins"].values():
+            pin["wire_entry"] = np.array([*pin["position"][:2], -14.])
+            pin["wire_axis"] = np.array([0., 0., -1.])
+        out[identifier] = g
+    return out
+
+
+def write_housing_types() -> None:
+    """Append generated type metadata without rewriting existing catalog entries."""
+    path = DATA_DIR / "connectors.yaml"
+    text = path.read_text().split("# BEGIN GENERATED CRIMP HOUSINGS")[0].rstrip() + "\n"
+    lines = ["# BEGIN GENERATED CRIMP HOUSINGS (r3_connectors.derive --write)"]
+    for rows in (1, 2):
+        for length in range(1, 21):
+            width = 2.54 * length + (0.2 if rows == 1 else 0.)
+            source = HOUSING_SOURCE if rows == 1 else DOUBLE_HOUSING_SOURCE
+            lines.extend([
+                f"  - id: dupont-{rows}x{length}",
+                "    family: 2.54 mm crimp housing (Dupont-style)",
+                "    gender: female", "    mates_with: []", f"    pin_count: {rows * length}",
+                "    header_pitch: 2.54 mm", "    current_rating_per_pin: 3", "    voltage_rating: 250",
+                "    contact_resistance: 20 mohm", "    awg_min: 22", "    awg_max: 30",
+                f"    body_size: [{width:.2f} mm, {2.5 if rows == 1 else 5.1} mm, 14 mm]",
+                "    provenance: {status: estimated, source: " + json.dumps(source) +
+                ', notes: "M20 crimp-contact ratings; generic Dupont-style equivalent, verify chosen terminal. '
+                'N>12 uses extrapolated envelope dimensions, not a stocked Harwin part number."}',
+            ])
+    path.write_text(text + "\n".join(lines) + "\n")
+
+
 def _round(v: float, nd: int = 4) -> float:
     r = round(float(v), nd)
     return 0.0 if r == 0 else r
@@ -391,13 +461,14 @@ def to_yaml(geometry: dict[str, dict[str, Any]]) -> str:
 
 
 def derive_all() -> dict[str, dict[str, Any]]:
-    names = [s.footprint for s in KICAD.values()] + [s.footprint for s in PROXIES.values() if s.footprint]
+    names = [s.footprint for s in [*KICAD.values(), *housing_specs().values()]] + [s.footprint for s in PROXIES.values() if s.footprint]
     footprints = library_footprints(names)
     out: dict[str, dict[str, Any]] = {}
     for type_id, spec in KICAD.items():
         out[type_id] = derive_kicad(type_id, spec, footprints[spec.footprint])
     for type_id, spec in PROXIES.items():
         out[type_id] = derive_proxy(type_id, spec, footprints.get(spec.footprint) if spec.footprint else None)
+    out.update(derive_housings(footprints))
     return dict(sorted(out.items()))
 
 
@@ -408,6 +479,7 @@ def main(argv: list[str] | None = None) -> int:
     text = to_yaml(derive_all())
     if args.write:
         OUT.write_text(text)
+        write_housing_types()
         print(f"wrote {OUT}")
     else:
         print(text)

@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from .schema import Catalog, ComponentType, ConnectorGeometry, ConnectorType, FastenerType, Material, Printer, PrintFit, WireGauge
+from .schema import Catalog, ComponentType, ConnectionSite, ConnectorGeometry, ConnectorType, FastenerType, Material, Printer, PrintFit, WireGauge
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -122,4 +122,4 @@ def default_catalog() -> Catalog:
     return load_catalog()
 
 
-__all__ = ["Catalog", "ComponentType", "ConnectorGeometry", "ConnectorType", "FastenerType", "Material", "Printer", "PrintFit", "WireGauge", "default_catalog", "load_catalog"]
+__all__ = ["Catalog", "ComponentType", "ConnectionSite", "ConnectorGeometry", "ConnectorType", "FastenerType", "Material", "Printer", "PrintFit", "WireGauge", "default_catalog", "load_catalog"]

@@ -104,6 +104,16 @@ def r3_run_stage(stage: str, project: str = "", scenarios: list[str] | None = No
 
 
 @_tool(_READ)
+def r3_connection_points(project: str = "", component: str = "", free_only: bool = False,
+                         fits_type: str = "") -> dict[str, Any]:
+    """All wireable mating sites, including unused placements. Robot-frame origins, cable exit directions,
+    pin/signal/net maps, occupancy and blocking, compatible housing types, and conservative free-access reach.
+    Filters combine: component id, unoccupied/unblocked sites only, and a compatible connector type.
+    Recomputed from current inputs; does not build or write the project."""
+    return _guard(lambda: api.connection_points(project or None, component, free_only, fits_type))
+
+
+@_tool(_READ)
 def r3_get_diagnostics(project: str = "", stage: str = "", severity: str = "", subject: str = "") -> dict[str, Any]:
     """Stored diagnostics from the last run, filtered by stage, severity (error|warning|info) and/or subject id."""
     return _guard(lambda: api.stored_diagnostics(project or None, stage or None, severity or None, subject or None))
