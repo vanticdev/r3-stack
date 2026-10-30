@@ -16,16 +16,14 @@ def box(size, centre):
 
 
 @pytest.fixture
-def setup():
+def setup(tmp_path):
     catalog = load_catalog()
     geometry = catalog.connector("header-1x3-2.54").geometry
     socket = geometry.model_copy(deep=True)
-    pins = [box([0.64, 0.64, 6], [x, 0, 3]) for x in (-2.54, 0, 2.54)]
-    housing = box([10, 3, 7], [0, 0, -3.5])
-    for x in (-2.54, 0, 2.54):
-        housing = trimesh.boolean.difference(
-            [housing, box([0.9, 0.9, 8], [x, 0, -3])], engine="manifold"
-        )
+    from connector_native_fixture import posts, socket as socket_solid, pull
+    native = pull(tmp_path / "contacts", {"posts": posts(), "socket": socket_solid()})
+    pins = list(trimesh.load_mesh(native.parts["posts"].stl).split())
+    housing = trimesh.load_mesh(native.parts["socket"].stl)
     # Search envelope must cover both the physical pins and socket depth.
     geometry.depth = socket.depth = 0.007
     geometry.reach = socket.reach = 0.006
@@ -177,7 +175,7 @@ def test_post_must_fit_physical_socket_opening(setup):
 
 
 @pytest.mark.parametrize("supplier", ["sourced", "proxy", "simplified", "empty"])
-def test_nonembedded_connector_searches_placed_model(setup, supplier):
+def test_nonembedded_connector_searches_native_owner(setup, supplier, tmp_path):
     from types import SimpleNamespace
     from r3_connectors.stage import ConnectorStage
     from r3_model.diagnostics import StageResult
@@ -199,12 +197,18 @@ def test_nonembedded_connector_searches_placed_model(setup, supplier):
     # Exercise placement, not just coincident identity frames.
     origin = np.array([0.04, 0.03, 0.02])
     stage.graph = SimpleNamespace(component_pose=lambda _: (origin, np.eye(3)))
-    stage.component_scenes = {"board": trimesh.Scene(box([12, 8, 1.6], [0, 0, -0.8]))}
-    own = [box([10, 3, 6], [0, 0, 3])] if supplier in {"proxy", "simplified"} else pins
+    from connector_native_fixture import box as solid_box, compound, posts, socket as socket_solid, pull
+    own = solid_box((10,3,6), (0,0,3)) if supplier in {"proxy", "simplified"} else posts()
     if supplier == "empty":
-        own = [box([10, 3, 6], [100, 0, 3])]
-        stage.component_scenes = {"board": trimesh.Scene(box([12, 8, 1.6], [100, 0, -0.8]))}
-    stage.scenes = {"header": trimesh.Scene(own), "socket": trimesh.Scene(socket)}
+        own = solid_box((10,3,6), (100,0,3))
+    board = solid_box((12,8,1.6), (100 if supplier == "empty" else 0,0,-.8))
+    fa = Frame(np.eye(3), origin)
+    fb = fa.mated()
+    stage.pulled = pull(tmp_path, {"part": compound([board,own]), "lead.A": socket_solid()},
+                        poses={"part": fa.matrix(), "lead.A": fb.matrix()})
+    # Catalog model labels never replace physical native contact evidence.
+    stage.component_scenes = {}
+    stage.scenes = {}
     stage._mesh_bodies = {}
     stage.routes = None
     stage.data = {"checks": {}, "connectors": {
@@ -247,7 +251,7 @@ def test_nested_housings_do_not_count_as_interference():
     assert volume == 0
 
 
-def test_embedded_posts_do_not_require_computer_kind_or_numeric_pin_names(setup):
+def test_embedded_posts_do_not_require_computer_kind_or_numeric_pin_names(setup, tmp_path):
     from types import SimpleNamespace
     from r3_connectors.stage import ConnectorStage
     from r3_model.diagnostics import StageResult
@@ -256,12 +260,13 @@ def test_embedded_posts_do_not_require_computer_kind_or_numeric_pin_names(setup)
     g.pins = {f"contact_{i}": pin for i, pin in enumerate(g.pins.values())}
     instance = SimpleNamespace(type="arbitrary-contact-array", embedded=True,
                                position=[0, 0, 0], direction=[0, 0, 1], x=[1, 0, 0])
-    component = SimpleNamespace(kind="actuator", connectors={"service": instance},
-                                mechanical=SimpleNamespace(solids=[]))
+    component = SimpleNamespace(kind="actuator", connectors={"service": instance})
     stage = ConnectorStage.__new__(ConnectorStage)
     stage.spec = SimpleNamespace(components={"axis_module": SimpleNamespace(type="custom-actuator")})
     stage.catalog = SimpleNamespace(component=lambda _: component, connector=lambda _: SimpleNamespace(geometry=g))
-    stage.component_scenes = {"custom-actuator": trimesh.Scene(pins)}
+    from connector_native_fixture import posts, pull
+    stage.pulled = pull(tmp_path, {"axis_module": posts()})
+    stage.component_scenes = {"axis_module": trimesh.load(stage.pulled.parts["axis_module"].stl, force="scene")}
     stage.data = {"checks": {}}
     stage.result = StageResult(stage="connectors")
     stage.verify_embedded_posts()
@@ -269,7 +274,7 @@ def test_embedded_posts_do_not_require_computer_kind_or_numeric_pin_names(setup)
     assert stage.data["checks"]["axis_module.service_model"]["posts_found"] == 3
 
 
-def test_solder_mate_dispatch_does_not_depend_on_connector_type_name(setup):
+def test_solder_mate_dispatch_does_not_depend_on_connector_type_name(setup, tmp_path):
     from types import SimpleNamespace
     from r3_connectors.stage import ConnectorStage
     from r3_model.diagnostics import StageResult
@@ -277,11 +282,6 @@ def test_solder_mate_dispatch_does_not_depend_on_connector_type_name(setup):
     g, _, _, _ = setup
     g.pin_shape = "pad"
     g.depth = 0.001
-    board = box([10, 3, 1], [0, 0, -0.5])
-    for x in (-2.54, 0, 2.54):
-        drill = trimesh.creation.cylinder(radius=0.0005, height=0.003, sections=64)
-        drill.apply_translation([x * 0.001, 0, -0.0005])
-        board = trimesh.boolean.difference([board, drill], engine="manifold")
     stage = ConnectorStage.__new__(ConnectorStage)
     stage.result = StageResult(stage="connectors")
     stage.spec = SimpleNamespace(components={"instrument": SimpleNamespace(type="custom-sensor")}, assembly=None)
@@ -291,7 +291,9 @@ def test_solder_mate_dispatch_does_not_depend_on_connector_type_name(setup):
         component=lambda _: SimpleNamespace(id="custom-sensor", model=None),
     )
     stage.graph = SimpleNamespace(component_pose=lambda _: (np.zeros(3), np.eye(3)))
-    stage.component_scenes = {"custom-sensor": trimesh.Scene(board)}
+    from connector_native_fixture import solder_board, pull
+    stage.pulled = pull(tmp_path, {"instrument": solder_board()})
+    stage.component_scenes = {}
     stage.scenes = {}
     stage._mesh_bodies = {}
     frame = {"origin": [0, 0, 0], "x": [1, 0, 0], "z": [0, 0, 1]}
