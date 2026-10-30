@@ -48,3 +48,17 @@ def test_subcell_obstacle_keeps_its_cad_surface(tmp_path) -> None:
     assert len(shape.faces) == len(box.faces)
     assert unbalanced_edge_count(shape.faces) == 0
     assert shape.sdf(np.array([[0.0004, 0.0004, 0.0004]]))[0] < 0
+
+
+def test_coincident_faces_keep_oriented_multiplicity() -> None:
+    # Distinct closed tetrahedra acquire the same base after clustering. Their
+    # tips stay distinct, so deleting one equally wound base opens three edges.
+    first = np.array([[.1, .1, .1], [2.1, .1, .1], [.1, 2.1, .1], [.1, .1, 2.1]])
+    second = first + [.2, .2, .2]
+    second[3, 2] = 4.1
+    tetra = np.array([[0, 2, 1], [0, 1, 3], [1, 2, 3], [2, 0, 3]])
+    vertices, faces = np.vstack([first, second]), np.vstack([tetra, tetra + 4])
+    assert unbalanced_edge_count(faces) == 0
+    _, clustered = cluster_decimate(vertices, faces, cell=1.)
+    assert len(clustered) == 8
+    assert unbalanced_edge_count(clustered) == 0
