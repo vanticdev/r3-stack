@@ -19,7 +19,7 @@ from r3_connectors.pins import component_connector_frame, geometry_of, instance_
 from r3_model.project import Project
 
 ROOT = Path(__file__).resolve().parents[1]
-RC_CAR = ROOT / "examples" / "robots" / "rc-car"
+BENCH = ROOT / "tests" / "fixtures" / "bench"
 needs_kicad = pytest.mark.skipif(not kicad_available(), reason="KiCad (pcbnew) not installed")
 
 
@@ -106,19 +106,19 @@ def test_catalog_mated_pairs_align(catalog):
 
 @pytest.fixture(scope="module")
 def project():
-    return Project.load(RC_CAR)
+    return Project.load(BENCH)
 
 
 def test_component_connectors_mate_in_place(project):
     """The shimmed stack preserves its declared socket seating gap and pin grid."""
     j8 = component_connector_frame(project, "pi.J8")
-    socket = component_connector_frame(project, "hat.J_GPIO")
+    socket = component_connector_frame(project, "controller.J_GPIO")
     catalog = project.catalog
     header, sock = catalog.connector("header-2x20-2.54").geometry, catalog.connector("socket-2x20-2.54").geometry
     d = socket.origin - j8.origin
     assert np.linalg.norm(d - (d @ j8.z) * j8.z) < 1e-6
-    join = next(j for j in project.spec.assembly.joins if j.join_id == "gpio_header")
-    assert float(d @ j8.z) == pytest.approx(float(join.offset), abs=1e-15)
+    gap = project.spec.components["controller"].params["seating_gap"]
+    assert float(d @ j8.z) == pytest.approx(gap, abs=1e-15)
     assert np.dot(j8.z, socket.z) < -0.9999 and np.dot(j8.x, socket.x) > 0.9999
     for number in header.pins:
         delta = socket.point(sock.pins[number].position) - j8.point(header.pins[number].position)
@@ -129,9 +129,9 @@ def test_component_connectors_mate_in_place(project):
 def test_hat_connector_poses_match_kicad_board(project):
     from r3_connectors.board import board_connectors
 
-    ctype = project.catalog.component("r3-carrier-hat")
+    ctype = project.catalog.component("test-controller")
     refs = {n: i.source.split()[0].split(":")[1] for n, i in ctype.connectors.items() if i.source.startswith("kicad:")}
-    placed = board_connectors(RC_CAR / "pcb" / "carrier-hat" / "carrier-hat.kicad_pcb", ctype, project.catalog, refs)
+    placed = board_connectors(BENCH / "pcb" / "carrier-controller" / "carrier-controller.kicad_pcb", ctype, project.catalog, refs)
     assert set(placed) == set(ctype.connectors)
     for name, b in placed.items():
         frame = instance_frame(ctype.connectors[name])
@@ -196,14 +196,14 @@ def assert_routes_record_pin_ends(routes) -> None:
 
 
 @pytest.fixture(scope="module")
-def routed(rc_car_wiring):
-    """The RC car routed, planned and supported (shared full wiring-stage run, see conftest.py)."""
-    return rc_car_wiring.bundle
+def routed(bench_wiring):
+    """The bench routed, planned and supported (shared full wiring-stage run, see conftest.py)."""
+    return bench_wiring.bundle
 
 
-def test_every_wire_ends_on_its_pins(rc_car_wiring, routed):
-    checked = assert_wires_end_on_pins(rc_car_wiring.project, routed["routing"], routed["routes"])
-    assert checked >= 25  # 30 wires, both ends: crimp/cup ends here, pigtails and splices above
+def test_every_wire_ends_on_its_pins(bench_wiring, routed):
+    checked = assert_wires_end_on_pins(bench_wiring.project, routed["routing"], routed["routes"])
+    assert checked == 8  # Every crimp end in the independent branched fixture.
 
 
 def test_branch_project_wires_end_on_their_pins(branch_wiring):

@@ -150,7 +150,7 @@ class Propagation:
 
 @dataclass
 class ChannelSample:
-    """Channel between the pilot handset and the car antenna, antenna gains included (dB)."""
+    """Channel between the pilot handset and the robot antenna, antenna gains included (dB)."""
 
     gain_db: float  # coherent (narrowband, at the hop frequency): P_rx = P_tx + gain_db
     mean_gain_db: float  # local mean: incoherent power sum over paths (no small-scale fading)
@@ -189,4 +189,4 @@ class AnalyticPropagation:
         p = self.propagation
         return [f"FALLBACK analytic propagation (Sionna RT unavailable): two-ray ground reflection with complex Fresnel "
                 f"coefficient (eps_r {p.permittivity}, sigma {p.conductivity} S/m, roughness {p.roughness} m: estimates), "
-                "isotropic elevation pattern, static obstacles as single knife edges, no car body, no multipath beyond the two rays."]
+                "isotropic elevation pattern, static obstacles as single knife edges, no robot body, no multipath beyond the two rays."]

@@ -60,4 +60,4 @@ def test_web_loader(built, source):
     if source == "generated":
         scene = json.loads(next(line for line in out.stdout.splitlines() if line.startswith('{"components"')))
         assert scene["components"] == 23 and scene["wires"] == 30 and scene["routed"] is False
-        assert {"esc", "standoff_rl", "motor", "standoff_rr", "pi", "hat"} <= set(scene["flagged"])
+        assert {"esc", "standoff_rl", "motor", "standoff_rr", "pi", "controller"} <= set(scene["flagged"])

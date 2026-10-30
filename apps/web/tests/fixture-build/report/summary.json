@@ -2,7 +2,7 @@
  "schema": "r3/report-summary@1",
  "generated_at": 1793000000.0,
  "robot": {
-  "name": "fixture-car",
+  "name": "fixture-robot",
   "description": "Web dashboard loader fixture",
   "version": "0.1.0"
  },

@@ -25,7 +25,7 @@ non-root device user               ``USER blitz`` (uid 1000)
 The BLITZ build Dockerfile uses ``FROM --platform=linux/arm64 debian:12`` for the
 same target profile (``LinuxDistro.DEBIAN_12``); this runtime image uses the slim
 variant of the same release. The bundle can be the real BLITZ bundle (see
-``examples/robots/rc-car/backend/sim_image.py``) or be composed directly from a
+``examples/robots/robot/backend/sim_image.py``) or be composed directly from a
 module folder with :func:`spec_from_module`.
 
 CLI::

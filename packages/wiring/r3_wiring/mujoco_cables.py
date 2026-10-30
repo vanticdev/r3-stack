@@ -96,7 +96,7 @@ PART_CONTYPE, PART_CONAFFINITY = 8, 0
 SEGMENT_LENGTH = 0.010  # m, target; the cantilever converges as 1 - 2 l / L (tests/test_wiring_sim.py)
 BEND_STABILITY = 4.0  # safety factor on the implicit-damping floor of spans shorter than the bound
 MIN_SEGMENTS = 3  # MuJoCo's cable composite needs at least three bodies
-CLEARANCE_MARGIN = 0.025  # m (3x the RC car requirement); larger clearances are reported as this value
+CLEARANCE_MARGIN = 0.025  # m (3x the robot requirement); larger clearances are reported as this value
 POISSON_RATIO = 0.45  # silicone-insulated stranded copper (estimate)
 RETARDATION_TIME = 0.002  # s, Kelvin-Voigt tau of the insulation (estimate)
 TWIST_STABILITY = 40.0  # damping floor factor k in b >= k I_x / dt
@@ -107,7 +107,7 @@ CONTACT_SOLREF = "0.002 1"
 # For stiff 12 AWG on 1 g segments the default gives ~2 mm at a clamp; this gives ~0.1 mm.
 ANCHOR_SOLIMP = CONTACT_SOLIMP = "0.99 0.999 0.001 0.5 2"
 # Static supports (plates, boxes) keep MuJoCo's default impedance with the 2 dt time constant:
-# measured on the RC car the deepest support penetration is the same (0.55 vs 0.52 mm) and the
+# measured on the robot the deepest support penetration is the same (0.55 vs 0.52 mm) and the
 # clearances identical, at ~30 % less constraint-solver time.
 SUPPORT_SOLIMP = "0.9 0.95 0.001 0.5 2"
 CABLE_FRICTION = "0.5 0.005 0.0001"  # silicone on plastic/aluminium (estimate)

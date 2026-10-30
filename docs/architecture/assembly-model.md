@@ -59,12 +59,12 @@ the interface.
 components:
   plate: {type: bench-plate, pose: {xyz: [0, 0, 0]}}   # only the root has a pose
   s_fl:  {type: standoff-m3-30}
-  deck:  {type: bench-deck}
+  panel:  {type: bench-panel}
 assembly:
   root: plate
   joins:
     - {a: plate.so_fl, b: s_fl.bottom, fasteners: {type: M3x8}}
-    - {a: s_fl.top, b: deck.h_fl, fasteners: {type: M3x8}}
+    - {a: s_fl.top, b: panel.h_fl, fasteners: {type: M3x8}}
     - {a: plate.bracket_seat, b: bracket.foot, clock: 0 deg, fasteners: {type: M3x10, count: 2}}
     - {a: axle.shaft, b: wheel.hub, kind: revolute, joint: wheel_spin}
 ```
@@ -113,7 +113,7 @@ gives the same placement as `a → b`.
   lists the joint explicitly, the two must agree, or you get `joint_conflict`.
 
 **Loops.** The graph is traversed breadth-first from the root, in join order.
-Every join outside the tree, such as the other three standoffs under a deck,
+Every join outside the tree, such as the other three standoffs under a panel,
 must close within tolerance:
 
 - Spin about the axis is ignored for clock-free seats and revolute joins.

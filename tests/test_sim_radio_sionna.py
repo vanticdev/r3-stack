@@ -1,5 +1,5 @@
 """Sionna RT propagation: validation against the closed-form two-ray model, the labeled fallback,
-car-body blockage, path extrapolation, FHSS and the scene builder."""
+rig-body blockage, path extrapolation, FHSS and the scene builder."""
 
 import json
 import math
@@ -15,7 +15,7 @@ from r3_sim.radio import ELRS_FHSS_CHANNELS, RadioLink
 from r3_sim.radio_analytic import itu_ground_permittivity, two_ray_dipole_gain_db
 from r3_sim.radio_scene import BodyMesh, RadioScene, material_for, scene_for_project
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
 SIONNA_OK, SIONNA_WHY = radio_sionna.sionna_status()
 needs_sionna = pytest.mark.skipif(not SIONNA_OK, reason=f"Sionna RT unavailable: {SIONNA_WHY}")
 F = 2.44e9
@@ -64,8 +64,8 @@ def test_link_channel_extrapolates_between_traces(flat):
 
 @needs_sionna
 def test_car_body_blocks_paths(tmp_path):
-    """A 0.3 m metal box on the car between the antenna (low, at its front face) and the handset blocks the LoS and
-    the ground reflection when the car faces away from the handset, not when it faces it."""
+    """A 0.3 m metal box on the rig between the antenna (low, at its front face) and the handset blocks the LoS and
+    the ground reflection when the rig faces away from the handset, not when it faces it."""
     import trimesh
 
     box = trimesh.creation.box(extents=[0.3, 0.3, 0.3])
@@ -73,21 +73,21 @@ def test_car_body_blocks_paths(tmp_path):
     scene = flat_scene(body=[BodyMesh("metal", np.asarray(box.vertices), np.asarray(box.faces), ["block"])],
                        antenna_offset=np.array([0.0, 0.0, 0.12]))
     model = radio_sionna.SionnaPropagation(scene, tmp_path / "scene")
-    car = np.array([TX[0] + 30.0, 0.0, 0.0])
+    rig = np.array([TX[0] + 30.0, 0.0, 0.0])
 
     def gain(yaw: float) -> float:
         c, s = math.cos(yaw), math.sin(yaw)
         rotation = np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
-        return model.channel(car + rotation @ scene.antenna_offset, rotation).gain_db
+        return model.channel(rig + rotation @ scene.antenna_offset, rotation).gain_db
 
     facing_tx, facing_away = gain(math.pi), gain(0.0)  # box behind the antenna vs between antenna and handset
     assert facing_tx - facing_away > 10.0
-    assert facing_tx == pytest.approx(model.static_gain_db((car + scene.antenna_offset)[None, :])[0][0], abs=1.0)
+    assert facing_tx == pytest.approx(model.static_gain_db((rig + scene.antenna_offset)[None, :])[0][0], abs=1.0)
 
 
 @needs_sionna
 def test_fhss_hops_change_the_coherent_channel():
-    project = Project.load(RC_CAR)
+    project = Project.load(BENCH)
     params = dict(project.catalog.component("elrs-receiver-2g4").behavior.params)
     link = RadioLink(project.spec.simulation.environment, params, np.random.default_rng(1))
     hops = [link.hop_frequency(i) for i in range(0, 4 * ELRS_FHSS_CHANNELS, link.hop_interval)]
@@ -98,7 +98,7 @@ def test_fhss_hops_change_the_coherent_channel():
 
 
 def test_analytic_fallback_is_labeled(monkeypatch):
-    project = Project.load(RC_CAR)
+    project = Project.load(BENCH)
     params = dict(project.catalog.component("elrs-receiver-2g4").behavior.params)
 
     def unavailable() -> None:
@@ -115,18 +115,18 @@ def test_analytic_fallback_is_labeled(monkeypatch):
     assert forced.backend == "analytic_two_ray" and forced.diagnostics[0].code == "radio_propagation_fallback"
 
 
-def test_scene_from_rc_car_spec(tmp_path):
-    root = tmp_path / "rc-car"
-    shutil.copytree(RC_CAR, root, ignore=shutil.ignore_patterns("build", "__pycache__"))
+def test_scene_from_bench_spec(tmp_path):
+    root = tmp_path / "bench"
+    shutil.copytree(BENCH, root, ignore=shutil.ignore_patterns("build", "__pycache__"))
     project = Project.load(root)
     params = dict(project.catalog.component("elrs-receiver-2g4").behavior.params)
     scene = scene_for_project(project, "receiver", params)
     assert scene.ground_material == "medium_dry_ground" and scene.ground_custom is None
-    assert [b.name for b in scene.obstacles] == ["cone_a"]
+    assert [b.name for b in scene.obstacles] == ["screen"]
     # Authored material in robot.yaml is used verbatim; only missing materials are estimates.
     assert scene.obstacles[0].material == "plastic" and not scene.obstacles[0].material_estimated
     materials = {m.material: m for m in scene.body}
-    assert "chassis" in materials["metal"].parts and "pi" in materials["metal"].parts and "deck" in materials["plastic"].parts
+    assert "base" in materials["metal"].parts and "pi" in materials["metal"].parts and "rotor" not in materials["metal"].parts
     body_parts = sum((m.parts for m in scene.body), [])
     assert "receiver" not in body_parts and "rx_antenna" not in body_parts  # the radiator does not shadow itself
     # Without CAD the feed point is the middle of the antenna's catalog dipole, placed by its pose.
@@ -136,7 +136,7 @@ def test_scene_from_rc_car_spec(tmp_path):
     expected = position + rotation @ (np.asarray(dipole.position, dtype=float)
                                       + np.asarray(dipole.axis, dtype=float) * dipole.length / 2.0)
     assert np.allclose(scene.antenna_offset, expected) and scene.antenna_offset_source == "catalog"
-    built = Project.load(RC_CAR).read_build_json("cad/cad_model.json") or {}
+    built = Project.load(BENCH).read_build_json("cad/cad_model.json") or {}
     if (built.get("rf") or {}).get("antenna_position"):  # the CAD-derived feed point agrees with the catalog geometry
         assert np.allclose(scene.antenna_offset, built["rf"]["antenna_position"], atol=1e-4)
     # The antenna must sit outside (above) every body part.

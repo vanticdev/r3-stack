@@ -9,13 +9,13 @@ and the pipeline then runs unchanged.
 components:
   pi:
     type: raspberry-pi-5-8gb          # optional: used until a sourced part is pinned
-    mount: deck
+    mount: panel
     source:
       requires: {kind: computer, family: raspberry-pi-5, ram: ">= 4 GB"}
   receiver:
     source:                           # no type: the model stage reports component_unsourced until pinned
       requires: {kind: radio, protocol: crsf, band: 2.4 GHz, supply: [4.5 V, 5.5 V]}
-  wheel_fl:
+  sensor:
     type: wheel-110x45
     source: &wheel
       group: front_wheels             # one choice and one lock entry for both wheels

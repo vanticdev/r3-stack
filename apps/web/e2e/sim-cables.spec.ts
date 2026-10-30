@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const shots = path.resolve("test-results/screenshots");
 mkdirSync(shots, { recursive: true });
-const pid = process.env.R3_E2E_PROJECT ?? "rc-car";
+const pid = process.env.R3_E2E_PROJECT ?? "robot";
 
 async function ready(page: Page) {
   const viewer = page.getByTestId("robot-viewer");

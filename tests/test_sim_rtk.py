@@ -4,6 +4,7 @@ single/float/fixed solution, kernel wiring, firmware use of the fix quality, and
 from __future__ import annotations
 
 import math
+import yaml
 import shutil
 import sys
 from pathlib import Path
@@ -21,7 +22,7 @@ from r3_sim.radio_scene import scene_for_project
 from r3_sim.vehicle.mjcf import _behavior_params
 
 ROOT = Path(__file__).resolve().parents[1]
-FIRMWARE = ROOT / "examples" / "robots" / "rc-car" / "backend" / "python" / "rc_car_controller"
+FIRMWARE = ROOT / "tests" / "fixtures" / "bench" / "backend" / "python" / "bench_controller"
 ORIGIN = (37.4275, -122.1697, 30.0)
 
 
@@ -120,8 +121,8 @@ def test_fsk_ber_and_packet_error_at_sensitivity():
 
 @pytest.fixture(scope="module")
 def project(tmp_path_factory) -> Project:
-    root = tmp_path_factory.mktemp("rtk") / "rc-car"
-    shutil.copytree(ROOT / "examples" / "robots" / "rc-car", root, ignore=shutil.ignore_patterns("build", "__pycache__"))
+    root = tmp_path_factory.mktemp("rtk") / "bench"
+    shutil.copytree(ROOT / "tests" / "fixtures" / "bench", root, ignore=shutil.ignore_patterns("build", "__pycache__"))
     return Project.load(root)
 
 
@@ -154,11 +155,12 @@ def test_kernel_rover_is_fixed_at_start_and_reports_the_link(project, monkeypatc
 
 def test_kernel_without_the_correction_harness_reports_it(project, tmp_path, monkeypatch):
     monkeypatch.setenv("R3_RADIO_BACKEND", "analytic")
-    root = tmp_path / "rc-car"
+    root = tmp_path / "bench"
     shutil.copytree(project.root, root, ignore=shutil.ignore_patterns("build"))
-    text = (root / "robot.yaml").read_text()
-    text = text.replace("        - {id: W_RTK_RTCM, from: B.3, to: A.2, awg: 28, color: white, signal: RTCM}\n", "")
-    (root / "robot.yaml").write_text(text)
+    data = yaml.safe_load((root / "robot.yaml").read_text())
+    for harness in data["electrical"]["harnesses"]:
+        harness["wires"] = [wire for wire in harness["wires"] if wire["id"] != "W_RTK_RTCM"]
+    (root / "robot.yaml").write_text(yaml.safe_dump(data, sort_keys=False))
     broken = Project.load(root)
     scenario = next(s for s in broken.spec.simulation.scenarios if s.id == "autonomous_course")
     kernel = CoSimKernel(broken, scenario)

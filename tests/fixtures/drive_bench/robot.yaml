@@ -1,0 +1,335 @@
+components:
+  base:
+    pose:
+      xyz:
+      - 0
+      - 0
+      - 0.08
+    type: bench-base
+  battery:
+    mount: base
+    pose:
+      xyz:
+      - -0.05
+      - 0
+      - 0.09
+    type: lipo-2s-5000-25c
+  controller:
+    mount: base
+    pose:
+      xyz:
+      - 0
+      - 0
+      - 0.2
+    type: bench-controller
+  esc:
+    mount: base
+    pose:
+      xyz:
+      - 0.06
+      - 0
+      - 0.09
+    type: esc-brushed-60a
+  motor:
+    mount: base
+    pose:
+      xyz:
+      - 0.05
+      - 0
+      - 0.14
+    type: motor-540-brushed
+  roller_left:
+    type: test-roller
+    mount: base
+    pose:
+      xyz: &id001
+      - -0.06
+      - 0.13
+      - 0.07
+  roller_right:
+    type: test-roller
+    mount: base
+    pose:
+      xyz: &id003
+      - -0.06
+      - -0.13
+      - 0.07
+  roller_idler:
+    type: test-roller
+    mount: base
+    pose:
+      xyz: &id005
+      - 0.12
+      - 0
+      - 0.07
+electrical:
+  harnesses:
+  - connectors:
+      A:
+        mates: battery.J1
+        type: integral
+      B:
+        mates: esc.J_PWR
+        type: integral
+    id: power
+    wires:
+    - awg: 12
+      from: A.1
+      id: P
+      to: B.1
+    - awg: 12
+      from: A.2
+      id: G
+      to: B.2
+  - connectors:
+      A:
+        mates: esc.J_MOT
+        type: integral
+      N:
+        mates: motor.J_NEG
+        type: integral
+      P:
+        mates: motor.J_POS
+        type: integral
+    id: motor_lead
+    wires:
+    - awg: 14
+      from: A.1
+      id: MP
+      to: P.1
+    - awg: 14
+      from: A.2
+      id: MN
+      to: N.1
+  - connectors:
+      A:
+        mates: esc.J_SIG
+        type: integral
+      B:
+        mates: controller.J1
+        type: servo-3-female
+    id: signal
+    wires:
+    - awg: 22
+      from: A.1
+      id: S
+      to: B.1
+    - awg: 22
+      from: A.2
+      id: V
+      to: B.2
+    - awg: 22
+      from: A.3
+      id: SG
+      to: B.3
+mechanical:
+  interfaces:
+  - axis_dir:
+    - 0
+    - 0
+    - 1
+    id: mount_battery
+    kind: adhesive
+    params:
+      physics:
+        area:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 0.001
+        peel_strength:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000000.0
+        radius:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 0.03
+        shear_strength:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000000.0
+    parts:
+    - base
+    - battery
+  - axis_dir:
+    - 0
+    - 0
+    - 1
+    id: mount_motor
+    kind: adhesive
+    params:
+      physics:
+        area:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 0.001
+        peel_strength:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000000.0
+        radius:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 0.03
+        shear_strength:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000000.0
+    parts:
+    - base
+    - motor
+  - axis_dir:
+    - 0
+    - 0
+    - 1
+    id: mount_esc
+    kind: adhesive
+    params:
+      physics:
+        area:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 0.001
+        peel_strength:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000000.0
+        radius:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 0.03
+        shear_strength:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000000.0
+    parts:
+    - base
+    - esc
+  - axis_dir:
+    - 0
+    - 0
+    - 1
+    id: mount_controller
+    kind: adhesive
+    params:
+      physics:
+        area:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 0.001
+        peel_strength:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000000.0
+        radius:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 0.03
+        shear_strength:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000000.0
+    parts:
+    - base
+    - controller
+  - axis_dir: &id002
+    - 0
+    - 1
+    - 0
+    axis_point: *id001
+    id: capture_left
+    kind: revolute_fit
+    params: &id004
+      physics:
+        radius:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 0.006
+        retention_force:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000
+        shear_force:
+          source: Synthetic rated captive-bearing/structural-bond fixture
+          status: datasheet
+          value: 10000
+    parts:
+    - base
+    - roller_left
+  - axis_dir: *id002
+    axis_point: *id003
+    id: capture_right
+    kind: revolute_fit
+    params: *id004
+    parts:
+    - base
+    - roller_right
+  - axis_dir: *id002
+    axis_point: *id005
+    id: capture_idler
+    kind: revolute_fit
+    params: *id004
+    parts:
+    - base
+    - roller_idler
+  joints:
+  - axis: &id006
+    - 0
+    - 1
+    - 0
+    child: roller_left
+    damping: 2.0e-05
+    id: spin_left
+    interface: capture_left
+    origin: *id001
+    parent: base
+    type: continuous
+  - axis: *id006
+    child: roller_right
+    damping: 2.0e-05
+    id: spin_right
+    interface: capture_right
+    origin: *id003
+    parent: base
+    type: continuous
+  - axis: *id006
+    child: roller_idler
+    damping: 2.0e-05
+    id: spin_idler
+    interface: capture_idler
+    origin: *id005
+    parent: base
+    type: continuous
+  transmissions:
+  - actuator: motor
+    efficiency: 0.9
+    id: drive
+    joints:
+    - spin_left
+    - spin_right
+    ratio: 12.0
+    type: differential
+robot:
+  mobility: mobile
+  name: Triangular drive bench
+simulation:
+  scenarios:
+  - duration: 10
+    expect:
+      brownouts: 0
+      min_top_speed_mps: 8
+    id: full_throttle
+    initial:
+      battery_soc: 1
+      mode: manual
+software:
+  bindings:
+    esc_pwm:
+      channel: 2
+      computer: controller
+      device: pwmchip0
+      expects:
+      - esc.J_SIG.1
+      interface: pwm
+      pins:
+      - controller.J1.1

@@ -14,10 +14,10 @@ from r3_sim.vehicle import Vehicle, build_vehicle_model
 
 
 @pytest.fixture(scope="module")
-def routed(rc_car_wiring):
-    """The RC car with build/wiring/routes.json (catalog geometry, no CAD export; shared stage run)."""
-    assert (rc_car_wiring.root / "build" / "wiring" / "routes.json").exists()
-    return Project.load(rc_car_wiring.root), rc_car_wiring.bundle["routes"]
+def routed(bench_wiring):
+    """The bench with build/wiring/routes.json (catalog geometry, no CAD export; shared stage run)."""
+    assert (bench_wiring.root / "build" / "wiring" / "routes.json").exists()
+    return Project.load(bench_wiring.root), bench_wiring.bundle["routes"]
 
 
 @pytest.fixture(scope="module")

@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 import math
 import os
 import shutil
@@ -36,7 +37,7 @@ from .headless import GuiWatch
 from .intent import BoardIntent
 from .netlist import compare, read_netlist
 from .notes import design_notes
-from .regulators import hold_up_time, pi_rail, servo_rail
+from .regulators import BuckDesign, BuckBoostDesign
 from .spice import power_subcircuit
 
 STAGE = "pcb"
@@ -52,8 +53,6 @@ def run(project) -> StageResult:  # project: r3_model.project.Project
                          "kicad-cli for ERC/DRC/exports. R3 only reads KiCad's outputs back for board.json and the checks.")
     result.assume("pcb", "Trace ratings use the IPC-2152 external-conductor fit (Brooks 2015) at 10 C rise for signals and "
                          "20 C for hand-laid power copper, without the plane modifier (the opposite GND pour lowers the rise).")
-    result.assume("pcb", "Regulator data are TI datasheet values (TPS568230 SLVSEY5C, TPS56528 SLVSBV3B); capacitor DC-bias "
-                         "retention, switching transition time and the 2-layer thermal resistance are estimates.")
     cli = KicadCli.find()
     if cli is None:
         result.add(Diagnostic.error("kicad_cli_unavailable", "KiCad (kicad-cli + pcbnew) is not installed",
@@ -161,9 +160,8 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
     _power_checks(intent, board_file, power, result, name)
     _segment_checks(intent, result, name)
     pour_report = _pour_checks(intent, board_file, result, name)
-    pi, servo = pi_rail(), servo_rail()
-    _regulator_checks(pi, servo, result, name)
-    _tvs_check(intent, ctype, pi, servo, result, name)
+    _regulator_checks(intent.regulators, result, name)
+    _tvs_check(intent, ctype, intent.regulators, result, name)
     geometry = connector_geometry(board_file, intent, ctype, project.catalog)
     for cid, entry in geometry.items():
         if entry.get("deviation_xy", 0.0) > 0.002:
@@ -173,12 +171,14 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
                                           data={"board": entry["pad_centroid"], "catalog": entry.get("catalog_position"),
                                                 "deviation": entry["deviation_xy"], "limit": 0.002},
                                           hint="update the catalog connector position from board.json connector_geometry"))
-    spice = out / f"{name}_power.cir"
-    tvs_part = next((p.value for p in intent.parts if p.lib_id.startswith("Diode:SMAJ")), "SMAJ10A")
-    spice.write_text(power_subcircuit(pi, servo, tvs=tvs_part))
-    files["spice"] = _rel(project, spice)
-    arbiter = arbiter_params(ctype.behavior.params.get("failsafe") if ctype and ctype.behavior else None)
-    notes = design_notes(intent, pi, servo, power, erc, drc, pour_report, arbiter)
+    if intent.regulators:
+        spice = out / f"{name}_power.cir"
+        spice.write_text(power_subcircuit(intent.regulators))
+        files["spice"] = _rel(project, spice)
+    params = ctype.behavior.params if ctype and ctype.behavior else {}
+    failsafe = params.get("failsafe")
+    arbiter = arbiter_params(failsafe) if isinstance(failsafe, dict) else None
+    notes = design_notes(intent, power, erc, drc, pour_report)
     (out / "design-notes.md").write_text(notes)
     (source / "design-notes.md").write_text(notes)
     files["design_notes"] = _rel(project, source / "design-notes.md")
@@ -199,22 +199,15 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
         "zones": [{"net": z.net, "layer": z.layer, "name": z.name, "area": round(z.area * 1e-6, 9)} for z in board_file.zones],
         "power": power,
         "pours": pour_report,
-        "regulators": {
-            "pi_5v": _regulator_json(pi), "servo_6v": _regulator_json(servo),
-            "hold_up_5v_s": round(hold_up_time(pi.values["c_out_effective"], pi.values["v_out_nominal"], 4.63, 6.5), 6),
-        },
+        "regulators": {key: _regulator_json(design) for key, design in intent.regulators.items()},
         "mounting": _mounting_json(intent, ctype),
-        "arbiter": {"part": arbiter.part, "timeout": arbiter.timeout, "neutral_us": arbiter.neutral_us,
-                    "frame": arbiter.frame, "rearm_edges": arbiter.rearm_edges, "rearm_band_us": arbiter.rearm_band_us,
-                    "heartbeat_pin": arbiter.heartbeat_pin, "input_pin": arbiter.input_pin, "output": "J_ESC.1",
-                    "supply": arbiter.supply, "brake_us": arbiter.brake_us, "brake_hold": arbiter.brake_hold,
-                    "brake_pattern_us": list(arbiter.brake_pattern_us)},
+        "arbiter": asdict(arbiter) if arbiter else None,
         "erc": erc,
         "drc": drc,
         "files": files,
         "renders": renders,
         "units": "SI (m, A, ohm); trace coordinates board-local (origin top-left corner, y down); "
-                 "connector_geometry in the component frame (origin board centre, y toward the GPIO edge)",
+                 "connector_geometry in the component frame (origin and axes declared by the board intent)",
     }
     (out / "board.json").write_text(json.dumps(board_json, indent=2))
     result.artifact(_rel(project, out / "board.json"), "json", "board hand-off for wiring/electrical stages")
@@ -419,29 +412,22 @@ def _power_checks(intent: BoardIntent, board, power: dict[str, Any], result: Sta
                                           subjects=[name, net], data=entry))
 
 
-def _regulator_checks(pi, servo, result: StageResult, name: str) -> None:
-    for ref, design in (("U2", pi), ("U3", servo)):
+def _regulator_checks(designs: dict[str, BuckDesign | BuckBoostDesign], result: StageResult, name: str) -> None:
+    for key, design in designs.items():
         for check, ok, detail in design.checks:
             if not ok:
-                result.add(Diagnostic.warning("buck_design_margin", f"{ref} {design.ic.part}: {check}: {detail}",
-                                              subjects=[name, ref], hint=check))
-    v = servo.values
-    if "v_in_dropout" in v and v["v_in_dropout"] > 7.4:
-        result.add(Diagnostic.info("servo_rail_dropout", f"servo rail is in dropout below {v['v_in_dropout']:.2f} V input at "
-                                   f"{servo.req.i_out:g} A (TPS56528 Dmax {servo.ic.max_duty:.2f}); a nominal 2S pack gives "
-                                   "~5.8-5.9 V at the servo", subjects=[name, "U3"],
-                                   data={"v_in_dropout": round(v["v_in_dropout"], 3), "v_nominal_in": 7.4,
-                                         "max_duty": round(servo.ic.max_duty, 4)}))
+                result.add(Diagnostic.warning("buck_design_margin", f"{key} {design.ic.part}: {check}: {detail}",
+                                              subjects=[name, key], hint=check))
 
 
-def _tvs_check(intent: BoardIntent, catalog_component, pi, servo, result: StageResult, name: str) -> None:
+def _tvs_check(intent: BoardIntent, catalog_component, designs: dict[str, BuckDesign | BuckBoostDesign], result: StageResult, name: str) -> None:
     """The input TVS on the board against the catalog's TVS data and the regulators' VIN absolute maximum.
     V_C(I_PP) is the datasheet clamp at the part's rated peak pulse current, the worst case it is specified for
     (the electrical twin also checks it at the expected surge current)."""
     tvs_parts = [p for p in intent.parts if p.lib_id.startswith("Diode:SMAJ")]
     params = (catalog_component.behavior.params if catalog_component and catalog_component.behavior else {}) or {}
     tvs = params.get("tvs") if isinstance(params.get("tvs"), dict) else None
-    if not tvs_parts or tvs is None:
+    if not tvs_parts or tvs is None or not designs:
         return
     part = tvs_parts[0]
     if str(tvs.get("part")) != part.value:
@@ -449,12 +435,12 @@ def _tvs_check(intent: BoardIntent, catalog_component, pi, servo, result: StageR
                                     subjects=[name, part.ref], data={"kind": "tvs_part"}))
         return
     clamp, i_pp = float(tvs["v_clamp"]), float(tvs["i_pp"])
-    abs_max = min(pi.ic.v_in_abs_max, servo.ic.v_in_abs_max)
+    abs_max = min(design.ic.v_in_abs_max for design in designs.values())
     data = {"clamp_voltage": clamp, "abs_max": abs_max, "surge_current": i_pp}
     if clamp > abs_max:
         result.add(Diagnostic.warning("pcb_tvs_clamp_exceeds_abs_max", f"{part.value} clamps at {clamp:g} V at its {i_pp:g} A "
                                       f"peak pulse current, above the regulators' {abs_max:g} V VIN absolute maximum",
-                                      subjects=[name, part.ref, "U2", "U3"], data=data,
+                                      subjects=[name, part.ref, *designs], data=data,
                                       hint="choose a TVS whose clamp at I_PP is below the absolute maximum"))
     else:
         result.add(Diagnostic.info("pcb_tvs_clamp_ok", f"{part.value} clamps at {clamp:g} V at its {i_pp:g} A peak pulse current, "

@@ -112,7 +112,7 @@ components:
         origin: [-10 mm, 24.5 mm, 4.1 mm]
         params: {pitch: 2.54 mm, rows: 2, cols: 20, pin1: [-24.13 mm, -1.27 mm]}
 
-  - id: hat-bench
+  - id: controller-bench
     kind: pcb
     name: HAT 65 x 56.5 x 1.6 mm with 2x20 stacking socket
     mechanical: {shape: box, size: [65 mm, 56.5 mm, 1.6 mm], mass: 0.025}

@@ -158,4 +158,4 @@ Healthy designs still run the full requested duration. Set this field to `null`,
 or pass `--full-duration` to `r3_sim_worker`, to continue a failed assembly for the
 entire case. An explicit replay cutoff is not qualification evidence or a substitute for the
 sustained vibration requirement. Qualification requires full requested durations;
-historical truncated rc-car recordings are explicitly labeled in the run report.
+historical truncated robot recordings are explicitly labeled in the run report.

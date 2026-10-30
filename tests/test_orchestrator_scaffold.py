@@ -26,29 +26,29 @@ def no_gh(monkeypatch):
 
 def test_scaffold_tree(tmp_path):
     target = tmp_path / "trail-bot"
-    files = scaffold.create_project(target, template="rc-car", platform_url="git+https://example.com/r3.git", platform_ref="abc123")
+    files = scaffold.create_project(target, template="bench", platform_url="git+https://example.com/r3.git", platform_ref="abc123")
     for expected in ("robot.yaml", "r3.lock.yaml", "README.md", "AGENTS.md", "CLAUDE.md", ".gitignore", ".mcp.json",
-                     ".github/workflows/r3.yml", "cad/README.md", "pcb/carrier-hat/README.md", "catalog/README.md",
-                     "backend/deploy.py", "backend/python/rc_car_controller/main.py"):
+                     ".github/workflows/r3.yml", "cad/README.md", "pcb/test-board/README.md", "catalog/README.md",
+                     "backend/deploy.py", "backend/python/bench_controller/main.py"):
         assert expected in files and (target / expected).is_file(), expected
     assert "build/" in (target / ".gitignore").read_text().splitlines()
     project = Project.load(target)
     assert project.spec.robot.name == "trail-bot"
     assert project.fingerprint()["platform_revision"] == "abc123"
     # Comments of the template survive the rename.
-    assert "# Robot frame: +x forward" in (target / "robot.yaml").read_text()
+    assert "# Robot frame: stationary" in (target / "robot.yaml").read_text()
     agents = (target / "AGENTS.md").read_text()
     assert "r3_patch_spec" in agents and "--yes" in agents and "trail-bot" in agents
     assert (target / "CLAUDE.md").read_text().startswith("# Claude Code instructions\n\n@AGENTS.md")
 
 
 def test_generated_deploy_keeps_blitz_hooks(tmp_path):
-    scaffold.create_project(tmp_path / "bot", platform_ref="main")
+    scaffold.create_project(tmp_path / "bot", template="bench", platform_ref="main")
     source = (tmp_path / "bot" / "backend" / "deploy.py").read_text()
     compile(source, "deploy.py", "exec")
     assert "def get_modules()" in source and "def pi_name_to_process_types(" in source
-    assert 'modules.python("rc_car_controller", process=ProcessType.RC_CAR_CONTROLLER, entrypoint="main.py"' in source
-    compile((tmp_path / "bot" / "backend/python/rc_car_controller/main.py").read_text(), "main.py", "exec")
+    assert 'modules.python("bench_controller", process=ProcessType.BENCH_CONTROLLER, entrypoint="main.py"' in source
+    compile((tmp_path / "bot" / "backend/python/bench_controller/main.py").read_text(), "main.py", "exec")
 
 
 def test_blank_template_and_errors(tmp_path):
@@ -103,15 +103,15 @@ def test_job_summary_script_renders(tmp_path, monkeypatch):
     monkeypatch.chdir(root)
     exec(compile(script, "summary.py", "exec"), {})
     text = out.read_text()
-    assert "R3 validation: r3-rc-car FAILED" in text and "`component_interference`" in text
+    assert "R3 validation: r3-bench FAILED" in text and "`component_interference`" in text
 
 
 def test_lock_entries(tmp_path):
     lock.pin_onshape(tmp_path, "doc", "ws", "el", "mv42")
-    lock.pin_board(tmp_path, "carrier-hat", "deadbeef", kicad="8.0")
+    lock.pin_board(tmp_path, "carrier-controller", "deadbeef", kicad="8.0")
     data = lock.read_lock(tmp_path)
     assert data["onshape"]["revision"] == "mv42" and data["onshape"]["document_id"] == "doc"
-    assert data["pcb_carrier-hat"] == {**data["pcb_carrier-hat"], "revision": "deadbeef", "kicad": "8.0"}
+    assert data["pcb_carrier-controller"] == {**data["pcb_carrier-controller"], "revision": "deadbeef", "kicad": "8.0"}
     assert (tmp_path / "r3.lock.yaml").read_text().startswith("# Pinned external revisions")
 
 

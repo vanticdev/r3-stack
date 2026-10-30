@@ -9,7 +9,7 @@ const transcript = [
   "| Part | Check | Result | Next step |\n|---|---|---|---|\n| Battery lead | Clearance | **8 mm** | Run wiring |\n| Motor lead | Bend radius | Passed | Keep route |",
   "- [x] Inspect the route\n- [ ] Run simulation",
   "> Keep the lead clear of moving parts.",
-  '```python\nprint("Ready for simulation")\nvalidate_route(harness="battery_lead", min_clearance_mm=8, moving_parts=["front_wheel", "rear_wheel"], allow_estimates=False)\n```',
+  '```python\nprint("Ready for simulation")\nvalidate_route(harness="supply", min_clearance_mm=8, moving_parts=["front_wheel", "rear_wheel"], allow_estimates=False)\n```',
   "[Review guide](https://example.com/guide)",
 ].join("\n\n");
 
@@ -26,13 +26,13 @@ for (const width of [1600, 390]) for (const theme of ["light", "dark"]) {
       const events = [
         { type: "session_started", provider: "claude" },
         { type: "message", role: "assistant", text: transcript },
-        { type: "tool_call", id: "inspect", name: "inspect_route", input: { harness: "battery_lead" } },
+        { type: "tool_call", id: "inspect", name: "inspect_route", input: { harness: "supply" } },
         { type: "tool_result", id: "inspect", ok: true, content: "### Tool findings\n\n- **Clearance** verified\n\n`8 mm`" },
         { type: "session_finished", status: "completed" },
       ];
       await route.fulfill({ contentType: "text/event-stream", body: events.map((event, seq) => `data: ${JSON.stringify({ ...event, seq })}\n\n`).join("") });
     });
-    await page.goto("/#/p/rc-car/agent");
+    await page.goto("/#/p/robot/agent");
     await page.getByLabel("Prompt").fill("Review the wiring");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     const chat = page.getByTestId("transcript");
@@ -44,7 +44,7 @@ for (const width of [1600, 390]) for (const theme of ["light", "dark"]) {
     await expect(chat.getByRole("link", { name: "Review guide" })).toHaveAttribute("rel", "noopener noreferrer");
     await chat.locator(".tool summary").click();
     await expect(chat.locator(".tool h3")).toHaveText("Tool findings");
-    await expect(chat.locator(".tool pre")).toContainText('"harness": "battery_lead"');
+    await expect(chat.locator(".tool pre")).toContainText('"harness": "supply"');
     // Long prose/code wrap; only wide tables scroll within their own container.
     expect(await chat.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
     const tableRegion = chat.getByRole("region", { name: "Markdown table" });

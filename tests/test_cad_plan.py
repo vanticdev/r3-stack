@@ -14,12 +14,12 @@ from r3_model.project import Project
 from r3_onshape.geometry import Hole, Prism, Revolve, axis_base, operation_manifold, plan_manifold
 from r3_onshape.parts import build_part_catalog, instance_poses, world_manifold
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "mechanism"
 
 
 @pytest.fixture(scope="module")
 def project() -> Project:
-    return Project.load(RC_CAR)
+    return Project.load(BENCH)
 
 
 @pytest.fixture(scope="module")
@@ -32,8 +32,9 @@ def test_every_component_and_fastener_is_an_instance(project, catalog):
     plain = [f for f in project.spec.mechanical.fasteners if not f.body]
     assert set(instances) == set(project.spec.components) | {f.part for f in plain} | {f.nut_part for f in plain if f.nut}
     assert all(parts[instances[f.part]].plan.kind == "fastener" for f in plain)
-    purchased = [p for p in parts.values() if p.plan.kind == "purchased"]
-    assert purchased and all(p.plan.mass is not None and p.library for p in purchased if p.type != "r3-carrier-hat")
+    purchased_parts, _ = build_part_catalog(Project.load(Path(__file__).parent / "fixtures/bench"))
+    purchased = [p for p in purchased_parts.values() if p.plan.kind == "purchased"]
+    assert purchased and all(p.plan.mass is not None and p.library for p in purchased if p.type != "test-controller")
     assert all(p.plan.density > 0 for p in parts.values() if p.plan.kind != "purchased")
 
 
@@ -78,19 +79,19 @@ def test_purchased_parts_get_no_interface_holes(project, catalog):
 
 def test_fabricated_holes_come_from_interfaces(catalog):
     parts, _ = catalog
-    chassis = next(p for p in parts.values() if p.name == "Chassis plate")
-    holes = [op for op in chassis.plan.ops if isinstance(op, Hole)]
-    assert len(holes) == 4 + 8 + 4 + 4 + 4 + 5  # gearbox, hubs, standoffs, arms, servo and five cable posts
-    assert all(op.style == "clearance" and op.diameter == pytest.approx(3.4e-3) for op in holes)
-    slots = [op for op in chassis.plan.ops if isinstance(op, Prism) and "slot" in op.name]
-    assert len(slots) == 4
+    base = next(p for p in parts.values() if p.name == "Coupon base")
+    holes = [op for op in base.plan.ops if isinstance(op, Hole)]
+    assert len(holes) == 2
+    assert all(op.style == "clearance" and op.diameter == pytest.approx(.0034) for op in holes)
+    slots = [op for op in base.plan.ops if isinstance(op, Prism) and "slot" in op.name]
+    assert len(slots) == 1
 
 
 def test_thread_overlap_matches_engagement(project, catalog):
-    """Plan-level thread volume = pi/4 (d^2 - D^2) x engagement (gb_mount_1: M3x10 through 3 mm of plate, 7 mm into the case)."""
     parts, instances = catalog
     poses = instance_poses(project)
-    screw = world_manifold(parts[instances["fastener:gb_mount_1"]], poses["fastener:gb_mount_1"])
-    case = world_manifold(parts[instances["gearbox"]], poses["gearbox"])
-    expected = np.pi / 4 * (0.003 ** 2 - 0.0025 ** 2) * 0.007
-    assert (screw ^ case).volume() == pytest.approx(expected, rel=0.03)
+    fastener = project.spec.mechanical.fasteners[0]
+    screw = world_manifold(parts[instances[fastener.part]], poses[fastener.part])
+    support = world_manifold(parts[instances["support"]], poses["support"])
+    expected = np.pi / 4 * (.003 ** 2 - .0025 ** 2) * (fastener.length - .004)
+    assert (screw ^ support).volume() == pytest.approx(expected, rel=.03)

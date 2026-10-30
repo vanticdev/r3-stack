@@ -62,12 +62,12 @@ jobs:
             -e CI=true \
             r3-worker:ci python -m pytest tests -q -rs
 
-      - name: Headless pipeline smoke test (rc-car)
+      - name: Headless pipeline smoke test (robot)
         run: |
           mkdir -p smoke
           docker run --rm -v "$PWD":/opt/r3/platform -v "$PWD/smoke":/smoke r3-worker:ci bash -euc '
-            cp -r /opt/r3/platform/examples/robots/rc-car /smoke/rc-car
-            cd /smoke/rc-car
+            cp -r /opt/r3/platform/examples/robots/robot /smoke/robot
+            cd /smoke/robot
             r3 validate --stage model --json > /smoke/validate-model.json || true
             r3 sim run --scenario steering_sweep --json > /smoke/sim-steering_sweep.json || true
             ls -R build | head -50'

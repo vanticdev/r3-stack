@@ -854,7 +854,16 @@ class FitChecker:
                          f"reached {missing}", [transmission.id, *broken, *missing], unverified=broken, unreached=missing)
 
     # ---------------------------------------------------------------- retention
-    def check_retention(self, root: str = "chassis") -> None:
+    def check_retention(self, root: str | None = None) -> None:
+        if root is None:
+            root = self.project.spec.assembly.root if self.project.spec.assembly else None
+            if not root:
+                roots = [cid for cid, component in self.project.spec.components.items() if component.mount in (None, "world")]
+                if len(roots) != 1:
+                    self.warn("retention_root_ambiguous", "Retention needs one assembly root or one unmounted component",
+                              roots, candidates=len(roots))
+                    return
+                root = roots[0]
         if root not in self.model.parts:
             return
         adjacency: dict[str, set[str]] = {name: set() for name in self.model.parts}

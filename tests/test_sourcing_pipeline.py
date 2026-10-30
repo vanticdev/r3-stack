@@ -1,4 +1,4 @@
-"""Sourcing end to end on the RC car (recorded fixtures, no network): search, rank with twin
+"""Sourcing end to end on the bench (recorded fixtures, no network): search, rank with twin
 checks, choose, lockfile pinning, catalog generation, the model stage, CLI, MCP, HTTP API and CAD import."""
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from r3_catalog.sourcing.providers import ExpressLrsProvider, RaspberryPiProvide
 from r3_model.project import Project
 from r3_orchestrator import model_stage, sourcing
 from sourcing_helpers import (FIXTURES, PI_SOURCE, RECEIVER_SOURCE, CassetteHttp, block_network, fake_research, recorded_http,
-                              sourced_rc_car)
+                              sourced_bench)
 
 pytestmark = pytest.mark.usefixtures("block_network")
 _ = block_network
@@ -40,23 +40,23 @@ def interference_pairs(result) -> set[frozenset[str]]:
 
 def source_all(root: Path, tmp_path: Path, monkeypatch) -> dict[str, dict]:
     project = Project.load(root)
-    found = {slot: sourcing.search_slot(project, slot, providers=providers(tmp_path, monkeypatch)) for slot in ("pi", "receiver", "front_wheels")}
+    found = {slot: sourcing.search_slot(project, slot, providers=providers(tmp_path, monkeypatch)) for slot in ("pi", "receiver", "sample_pair")}
     chosen = {slot: sourcing.choose(root, slot, 1) for slot in found}
     return {"found": found, "chosen": chosen}
 
 
-def test_rc_car_sources_wheel_receiver_and_pi_and_passes_the_model_stage(tmp_path, monkeypatch):
-    baseline_root = sourced_rc_car(tmp_path / "plain", sources={})
+def test_bench_sources_wheel_receiver_and_pi_and_passes_the_model_stage(tmp_path, monkeypatch):
+    baseline_root = sourced_bench(tmp_path / "plain", sources={})
     baseline = model_stage.run(Project.load(baseline_root))
-    root = sourced_rc_car(tmp_path)
+    root = sourced_bench(tmp_path)
 
     before = model_stage.run(Project.load(root))
     unmet = [d for d in before.diagnostics if d.code == "source_requirement_unmet"]
     assert [d.data["param"] for d in unmet] == ["hub"]  # the authored 6 mm plain-bore wheel is not a 12 mm hex wheel
-    assert set(unmet[0].subjects) == {"wheel_fl", "wheel_fr"}
+    assert set(unmet[0].subjects) == {"sample_a", "sample_b"}
 
     out = source_all(root, tmp_path, monkeypatch)
-    pi, receiver, wheels = (out["found"][s] for s in ("pi", "receiver", "front_wheels"))
+    pi, receiver, wheels = (out["found"][s] for s in ("pi", "receiver", "sample_pair"))
     assert pi["counts"] == {"eligible": 3, "unverified": 0, "rejected": 2}
     assert pi["ranked"][0]["candidate"]["name"] == "Raspberry Pi 5 (4 GB)" and pi["ranked"][0]["unit_price"] == 110.0
     assert receiver["ranked"][0]["candidate"]["name"] == "RadioMaster RP1 2.4GHz RX"  # the incumbent wins the tie
@@ -74,16 +74,16 @@ def test_rc_car_sources_wheel_receiver_and_pi_and_passes_the_model_stage(tmp_pat
 
     lock = yaml.safe_load((root / "r3.lock.yaml").read_text())
     assert lock["cad"]["document_id"]  # existing lock sections are preserved
-    assert set(lock["sourcing"]) == {"pi", "receiver", "front_wheels"}
-    pin = lock["sourcing"]["front_wheels"]
-    assert pin["components"] == ["wheel_fl", "wheel_fr"] and pin["price"] == {"amount": 7.5, "currency": "USD", "quantity": 2}
+    assert set(lock["sourcing"]) == {"pi", "receiver", "sample_pair"}
+    pin = lock["sourcing"]["sample_pair"]
+    assert pin["components"] == ["sample_a", "sample_b"] and pin["price"] == {"amount": 7.5, "currency": "USD", "quantity": 2}
     assert pin["vendor"] == "Fixture Hobby Shop" and pin["url"] == "https://example.com/shop/fw-110-45" and pin["mpn"] == "FW-110-45-HEX12"
     assert lock["sourcing"]["pi"]["cad"] == "vendor_step" and lock["sourcing"]["receiver"]["cad"] == "proxy"
     for slot_pin in lock["sourcing"].values():
         assert (root / slot_pin["catalog_file"]).is_file() and slot_pin["digest"] and slot_pin["retrieved_at"] > 0
 
     project = Project.load(root)
-    assert project.spec.components["wheel_fl"].type == project.spec.components["wheel_fr"].type == pin["catalog_id"]
+    assert project.spec.components["sample_a"].type == project.spec.components["sample_b"].type == pin["catalog_id"]
     assert project.spec.components["pi"].type.startswith("sourced-raspberrypi")
     assert "sourcing_sha256" in project.fingerprint()
     after = model_stage.run(project)
@@ -94,14 +94,14 @@ def test_rc_car_sources_wheel_receiver_and_pi_and_passes_the_model_stage(tmp_pat
     # No new interference: every overlap is one the authored layout already had.
     assert interference_pairs(after) <= interference_pairs(baseline)
     graph = json.loads((root / "build" / "model" / "graph.json").read_text())
-    assert graph["components"]["wheel_fl"]
+    assert graph["components"]["sample_a"]
 
 
 def test_catalog_entry_provenance_per_field(tmp_path, monkeypatch):
-    root = sourced_rc_car(tmp_path)
+    root = sourced_bench(tmp_path)
     source_all(root, tmp_path, monkeypatch)
     lock = yaml.safe_load((root / "r3.lock.yaml").read_text())["sourcing"]
-    wheel = yaml.safe_load((root / lock["front_wheels"]["catalog_file"]).read_text())
+    wheel = yaml.safe_load((root / lock["sample_pair"]["catalog_file"]).read_text())
     (entry,) = wheel["components"]
     meta = wheel["sourced"]
     assert entry["mechanical"]["size"] == pytest.approx([0.11, 0.045]) and entry["mechanical"]["mass"] == pytest.approx(0.092)
@@ -122,7 +122,7 @@ def test_catalog_entry_provenance_per_field(tmp_path, monkeypatch):
 
 
 def test_pins_are_reproducible_and_guarded(tmp_path, monkeypatch):
-    root = sourced_rc_car(tmp_path, sources={"pi": PI_SOURCE})
+    root = sourced_bench(tmp_path, sources={"pi": PI_SOURCE})
     project = Project.load(root)
     sourcing.search_slot(project, "pi", providers=providers(tmp_path, monkeypatch))
     pinned = sourcing.choose(root, "pi", "raspberrypi-raspberry-pi-ltd-raspberry-pi-5-8gb")  # by candidate id
@@ -153,7 +153,7 @@ def test_pins_are_reproducible_and_guarded(tmp_path, monkeypatch):
 
 
 def test_source_only_slot_uses_a_template_by_connectors(tmp_path, monkeypatch):
-    root = sourced_rc_car(tmp_path, sources={"receiver": RECEIVER_SOURCE}, drop_type=("receiver",))
+    root = sourced_bench(tmp_path, sources={"receiver": RECEIVER_SOURCE}, drop_type=("receiver",))
     project = Project.load(root)
     assert "component_unsourced" in {d.code for d in project.graph.diagnostics}
     found = sourcing.search_slot(project, "receiver", providers=providers(tmp_path, monkeypatch))
@@ -164,11 +164,11 @@ def test_source_only_slot_uses_a_template_by_connectors(tmp_path, monkeypatch):
 
 
 def test_list_slots(tmp_path, monkeypatch):
-    root = sourced_rc_car(tmp_path)
+    root = sourced_bench(tmp_path)
     listed = sourcing.list_slots(Project.load(root))
     slots = {s["slot"]: s for s in listed["slots"]}
-    assert set(slots) == {"pi", "receiver", "front_wheels"} and slots["front_wheels"]["quantity"] == 2
-    assert slots["front_wheels"]["budget"] == {"amount": 40.0, "currency": "USD"}
+    assert set(slots) == {"pi", "receiver", "sample_pair"} and slots["sample_pair"]["quantity"] == 2
+    assert slots["sample_pair"]["budget"] == {"amount": 40.0, "currency": "USD"}
     providers_by_id = {p["id"]: p for p in listed["providers"]}
     assert not providers_by_id["nexar"]["available"] and providers_by_id["raspberrypi"]["available"]
 
@@ -186,7 +186,7 @@ def offline_cache(tmp_path, monkeypatch) -> Path:
 def test_cli_source(tmp_path, offline_cache, capsys):
     from r3_orchestrator import cli
 
-    root = sourced_rc_car(tmp_path, sources={"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE})
+    root = sourced_bench(tmp_path, sources={"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE})
     assert cli.main(["source", "-C", str(root)]) == 0
     assert "pi" in capsys.readouterr().out
     assert cli.main(["source", "pi", "--offline", "-C", str(root)]) == 0
@@ -203,7 +203,7 @@ def test_cli_source(tmp_path, offline_cache, capsys):
 def test_mcp_tools(tmp_path, offline_cache):
     from r3_orchestrator import mcp_server
 
-    root = sourced_rc_car(tmp_path, sources={"pi": PI_SOURCE})
+    root = sourced_bench(tmp_path, sources={"pi": PI_SOURCE})
     assert {"r3_source_slots", "r3_source_search", "r3_source_choose"} <= set(mcp_server.ungated_tools())
     assert mcp_server.TOOL_TIERS["r3_source_search"] == "design" and mcp_server.TOOL_TIERS["r3_source_choose"] == "edit"
     assert mcp_server.r3_source_slots(project=str(root))["slots"][0]["slot"] == "pi"
@@ -223,7 +223,7 @@ def test_http_api_search_job_and_choose(tmp_path, monkeypatch):
     from r3_orchestrator.api.sourcing_jobs import SourcingJobs
 
     projects = tmp_path / "projects"
-    root = sourced_rc_car(projects, sources={"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE})
+    root = sourced_bench(projects, sources={"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE})
     jobs = SourcingJobs(http_factory=lambda: recorded_http(tmp_path))
     with TestClient(create_app([projects], web_dist=tmp_path / "dist", sourcing_jobs=jobs)) as client:
         pid = client.get("/api/projects").json()["projects"][0]["id"]
@@ -278,7 +278,7 @@ def test_import_vendor_step_and_add_mate_connectors(tmp_path, monkeypatch):
     from r3_onshape import sourced
 
     monkeypatch.setattr(sourced.time, "sleep", lambda s: None)
-    root = sourced_rc_car(tmp_path, sources={"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE})
+    root = sourced_bench(tmp_path, sources={"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE})
     project = Project.load(root)
     for slot in ("pi", "receiver"):
         sourcing.search_slot(project, slot, providers=providers(tmp_path, monkeypatch))
@@ -290,6 +290,7 @@ def test_import_vendor_step_and_add_mate_connectors(tmp_path, monkeypatch):
     http = CassetteHttp(tmp_path, [])
     monkeypatch.setattr(http, "_fetch", lambda m, u, b, h, raw=archive.getvalue(): sourced_response(u, raw))
     transport = FakeOnshape([0.085, 0.056, 0.0176])
+    monkeypatch.setenv("R3_ONSHAPE_PARTS_LIBRARY", "https://cad.onshape.com/documents/" + "a" * 24 + "/w/" + "b" * 24 + "/e/" + "c" * 24)
     out = sourced.import_sourced(project, transport=transport, http=http)
     results = {r["slot"]: r for r in out["slots"]}
     assert results["receiver"]["status"] == "proxy"
@@ -318,7 +319,7 @@ def sourced_response(url, raw):
 def test_import_without_transport_is_skipped(tmp_path, monkeypatch):
     from r3_onshape import sourced
 
-    root = sourced_rc_car(tmp_path, sources={"pi": PI_SOURCE})
+    root = sourced_bench(tmp_path, sources={"pi": PI_SOURCE})
     sourcing.search_slot(Project.load(root), "pi", providers=providers(tmp_path, monkeypatch))
     sourcing.choose(root, "pi", 1)
 

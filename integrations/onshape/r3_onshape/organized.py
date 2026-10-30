@@ -1241,7 +1241,7 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = argparse.ArgumentParser(description="Organized CAD rebuild or pinned organization")
     parser.add_argument("command", choices=("organize", "rebuild"))
-    parser.add_argument("project", nargs="?", default="examples/robots/rc-car")
+    parser.add_argument("project", nargs="?", default="examples/robots/robot")
     parser.add_argument("--full", action="store_true", help="build a fresh robot document instead of updating the lock")
     parser.add_argument("--dry-run", action="store_true", help="offline: list every studio, feature and estimated /features call")
     args = parser.parse_args(argv)

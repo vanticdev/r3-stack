@@ -20,8 +20,8 @@ def _serve(server: TwinHalServer) -> None:
 
 
 @pytest.fixture()
-def twin(rc_car_fresh):
-    project = Project.load(rc_car_fresh)
+def twin(bench_fresh):
+    project = Project.load(bench_fresh)
     scenario = next(s for s in project.spec.simulation.scenarios if s.id == "full_throttle")
     kernel = CoSimKernel(project, scenario)
     server = TwinHalServer(kernel, request_timeout=2.0)  # r3_hal close() leaves its socket open; do not wait long

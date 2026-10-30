@@ -32,7 +32,7 @@ def test_clearance_envelope_keeps_board_frame_under_rotation():
     from r3_model.project import Project
     from pathlib import Path
 
-    root = Path(__file__).resolve().parents[1] / 'examples/robots/rc-car'
+    root = Path(__file__).resolve().parents[1] / 'tests/fixtures/bench'
     project = Project.load(root)
     mech = project.catalog.component(project.spec.components['pi'].type).mechanical
     xyz, rpy = [.1, .2, .3], [.2, -.3, 1.2]

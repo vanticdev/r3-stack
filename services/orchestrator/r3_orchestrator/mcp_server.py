@@ -261,7 +261,7 @@ def deploy_fleet(confirm: bool = False, project: str = "", deploy_args: list[str
 def r3_create_project(name: str, parent: str = ".", template: str = "blank") -> dict[str, Any]:
     """Scaffold a new local R3 project directory (robot.yaml, catalog/, cad/, backend/, agent docs). Local only: it never
     creates a GitHub repository. template="blank" starts from nothing (grow it with r3_patch_spec); an example robot
-    id (e.g. "rc-car") copies that robot. Then pass project=<path> to the other tools (or set R3_PROJECT)."""
+    id (e.g. "robot") copies that robot. Then pass project=<path> to the other tools (or set R3_PROJECT)."""
     return api.create_project(name, parent=parent, template=template)
 
 

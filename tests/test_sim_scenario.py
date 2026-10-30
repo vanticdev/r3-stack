@@ -10,7 +10,7 @@ from r3_sim.evaluation import lap_progress
 from r3_sim.scenario import run_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
-RC_CAR = ROOT / "examples" / "robots" / "rc-car"
+BENCH = ROOT / "tests" / "fixtures" / "bench"
 CONTROLLER = ROOT / "tests" / "sim_test_controller.py"
 
 

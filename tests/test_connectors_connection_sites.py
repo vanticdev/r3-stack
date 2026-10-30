@@ -187,13 +187,12 @@ def test_inventory_occupancy_and_access(tmp_path, catalog):
     assert used["access_blocker"] == "obstacle" and used["access_geometry"] == "cad_aabb"
 
 
-def test_rc_car_stage_writes_every_site(tmp_path):
+def test_bench_stage_writes_every_site(tmp_path):
     import shutil
     from r3_orchestrator.stages import run_stage
 
-    source = Path(__file__).resolve().parents[1] / "examples/robots/rc-car"
-    shutil.copy(source / "robot.yaml", tmp_path / "robot.yaml")
-    shutil.copytree(source / "pcb", tmp_path / "pcb")
+    source = Path(__file__).resolve().parents[1] / "tests/fixtures/bench"
+    shutil.copytree(source, tmp_path, dirs_exist_ok=True, ignore=shutil.ignore_patterns("build", "__pycache__", "_vendor"))
     project = Project.load(tmp_path)
     result = run_stage(project, "connectors", render=False)
     assert not [d for d in result.diagnostics if d.code == "stage_crashed"]
@@ -204,7 +203,7 @@ def test_rc_car_stage_writes_every_site(tmp_path):
     assert {(p["component"], p["connector"], p["site"]) for p in points if p["component"]} == expected
     # Direct HAT socket occupies the whole Pi header, including all smaller options.
     pi = [p for p in points if p["component"] == "pi" and p["connector"] == "J8"]
-    assert next(p for p in pi if p["site"] == "full")["occupied_by"] == "hat.J_GPIO"
+    assert next(p for p in pi if p["site"] == "full")["occupied_by"] == "controller.J_GPIO"
     assert all(p["status"] != "free" for p in pi)
     assert any(a.path == "connectors/connection_points.json" for a in result.artifacts)
 

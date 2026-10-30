@@ -10,16 +10,16 @@ import {
 const apply = (m: ReturnType<typeof poseMatrix>, p: Vec3) => new Vector3(...p).applyMatrix4(m).toArray();
 const close = (a: number[], b: number[], digits = 9) => a.forEach((v, i) => expect(v).toBeCloseTo(b[i]!, digits));
 
-// RC-car-like tree: chassis <- arm <- knuckle <- wheel; servo <- tie_rod.
+// robot-like tree: base <- arm <- knuckle <- wheel; servo <- tie_rod.
 const components = {
-  chassis: { mount: "world", xyz: [0.13, 0, 0.025] as Vec3 },
-  arm_fl: { mount: "chassis", xyz: [0.26, 0.0475, 0.025] as Vec3 },
-  knuckle_fl: { mount: "arm_fl", xyz: [0.26, 0.0675, 0.035] as Vec3 },
-  wheel_fl: { mount: "knuckle_fl", xyz: [0.26, 0.1, 0.055] as Vec3 },
-  servo: { mount: "chassis", xyz: [0.25, 0, 0.028] as Vec3 },
+  base: { mount: "world", xyz: [0.13, 0, 0.025] as Vec3 },
+  support: { mount: "base", xyz: [0.26, 0.0475, 0.025] as Vec3 },
+  pivot_left: { mount: "support", xyz: [0.26, 0.0675, 0.035] as Vec3 },
+  sensor: { mount: "pivot_left", xyz: [0.26, 0.1, 0.055] as Vec3 },
+  servo: { mount: "base", xyz: [0.25, 0, 0.028] as Vec3 },
 };
-const steer: SpecJoint = { id: "steer_fl", type: "revolute", parent: "chassis", child: "knuckle_fl", origin: [0.26, 0.0675, 0.055], axis: [0, 0, 1], limits: [-0.45, 0.45] };
-const spin: SpecJoint = { id: "spin_fl", type: "continuous", parent: "knuckle_fl", child: "wheel_fl", origin: [0.26, 0.1, 0.055], axis: [0, 1, 0] };
+const steer: SpecJoint = { id: "pivot", type: "revolute", parent: "base", child: "pivot_left", origin: [0.26, 0.0675, 0.055], axis: [0, 0, 1], limits: [-0.45, 0.45] };
+const spin: SpecJoint = { id: "roll", type: "continuous", parent: "pivot_left", child: "sensor", origin: [0.26, 0.1, 0.055], axis: [0, 1, 0] };
 
 describe("robot.yaml poses", () => {
   it("rpy is R = Rz(yaw)·Ry(pitch)·Rx(roll)", () => {
@@ -48,21 +48,21 @@ describe("playback body poses", () => {
 
   it("restPoses: server-provided rest poses win; otherwise bodies relative to the root at frame 0", () => {
     const s = Math.SQRT1_2;
-    // At t0 the car already sits at (5, 1) yawed 90°; the wheel is 0.1 m to the car's left (+y) => world -x.
+    // At t0 the robot already sits at (5, 1) yawed 90°; the wheel is 0.1 m to the robot's left (+y) => world -x.
     const frames = {
       bodies: {
-        chassis: [[5, 1, 0, s, 0, 0, s], [6, 1, 0, s, 0, 0, s]] as Pose7[],
+        base: [[5, 1, 0, s, 0, 0, s], [6, 1, 0, s, 0, 0, s]] as Pose7[],
         wheel: [[4.9, 1, 0.055, s, 0, 0, s]] as Pose7[],
       },
     };
-    const rest = restPoses(frames, "chassis");
-    expect(rest.chassis).toEqual([0, 0, 0, 1, 0, 0, 0]);
+    const rest = restPoses(frames, "base");
+    expect(rest.base).toEqual([0, 0, 0, 1, 0, 0, 0]);
     close(rest.wheel!.slice(0, 3), [0, 0.1, 0.055], 9);
     close(rest.wheel!.slice(3), [1, 0, 0, 0], 9);
     // Placing the wheel mesh (authored at rest) with bodyDelta lands it on the recorded pose.
     close(apply(bodyDelta(rest.wheel!, frames.bodies.wheel[0]!), [0, 0.1, 0.055]), [4.9, 1, 0.055]);
-    const given = { ...frames, rest: { chassis: [0, 0, 0.0005, 1, 0, 0, 0] as Pose7 } };
-    expect(restPoses(given, "chassis")).toBe(given.rest);
+    const given = { ...frames, rest: { base: [0, 0, 0.0005, 1, 0, 0, 0] as Pose7 } };
+    expect(restPoses(given, "base")).toBe(given.rest);
   });
 
   it("frameAt brackets and clamps", () => {
@@ -94,16 +94,16 @@ describe("mount tree and joints", () => {
   const tree = mountTree(components);
 
   it("builds parents and ancestry (world mount is a root)", () => {
-    expect(tree.chassis).toBeNull();
-    expect(ancestry(tree, "wheel_fl")).toEqual(["chassis", "arm_fl", "knuckle_fl", "wheel_fl"]);
+    expect(tree.base).toBeNull();
+    expect(ancestry(tree, "sensor")).toEqual(["base", "support", "pivot_left", "sensor"]);
     expect(ancestry({ a: "b", b: "a" }, "a")).toEqual(["b", "a"]); // cycles are cut
   });
 
   it("joint chains move the child subtree only", () => {
     const chains = jointChains(tree, [steer, spin]);
-    expect(chains.wheel_fl!.map((j) => j.id)).toEqual(["steer_fl", "spin_fl"]);
-    expect(chains.knuckle_fl!.map((j) => j.id)).toEqual(["steer_fl"]);
-    expect(chains.arm_fl).toEqual([]);
+    expect(chains.sensor!.map((j) => j.id)).toEqual(["pivot", "roll"]);
+    expect(chains.pivot_left!.map((j) => j.id)).toEqual(["pivot"]);
+    expect(chains.support).toEqual([]);
     expect(chains.servo).toEqual([]);
   });
 
@@ -116,8 +116,8 @@ describe("mount tree and joints", () => {
 
   it("chains compose root-first: wheel spin happens in the steered frame", () => {
     const chains = jointChains(tree, [steer, spin]);
-    const q = { steer_fl: Math.PI / 2, spin_fl: Math.PI / 2 };
-    const m = chainMatrix(chains.wheel_fl!, q);
+    const q = { pivot: Math.PI / 2, roll: Math.PI / 2 };
+    const m = chainMatrix(chains.sensor!, q);
     // A point on the tyre's front (+x of the wheel centre) spins down (−z), then steering rotates the wheel centre.
     const point = apply(m, [0.26 + 0.055, 0.1, 0.055]);
     close(point, [0.26 - 0.0325, 0.0675, 0.055 - 0.055]);
@@ -131,10 +131,10 @@ describe("mount tree and joints", () => {
   });
 
   it("componentBody walks up to the nearest simulated body", () => {
-    const bodies = new Set(["chassis", "knuckle_fl", "wheel_fl"]);
-    expect(componentBody(tree, "wheel_fl", bodies, "chassis")).toBe("wheel_fl");
-    expect(componentBody(tree, "arm_fl", bodies, "chassis")).toBe("chassis");
-    expect(componentBody(tree, "servo", new Set(), "chassis")).toBe("chassis");
+    const bodies = new Set(["base", "pivot_left", "sensor"]);
+    expect(componentBody(tree, "sensor", bodies, "base")).toBe("sensor");
+    expect(componentBody(tree, "support", bodies, "base")).toBe("base");
+    expect(componentBody(tree, "servo", new Set(), "base")).toBe("base");
   });
 });
 
@@ -154,10 +154,10 @@ describe("Ackermann steering", () => {
 describe("exploded view", () => {
   it("offsets accumulate along the joins from the root", () => {
     const offsets = explodeOffsets(components, 1);
-    expect(offsets.chassis).toEqual([0, 0, 0]);
-    close(offsets.arm_fl!, [0.13, 0.0475, 0]);
-    close(offsets.knuckle_fl!, [0.13, 0.0675, 0.01]);
-    expect(explodeOffsets(components, 0).wheel_fl).toEqual([0, 0, 0]);
+    expect(offsets.base).toEqual([0, 0, 0]);
+    close(offsets.support!, [0.13, 0.0475, 0]);
+    close(offsets.pivot_left!, [0.13, 0.0675, 0.01]);
+    expect(explodeOffsets(components, 0).sensor).toEqual([0, 0, 0]);
   });
 
   it("concentric parts still separate along +z", () => {

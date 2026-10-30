@@ -24,7 +24,7 @@ def linkage(horn_x: float, ball_y: float, arm: float = 25.0, alpha_deg: float = 
     return Linkage(servo, np.array([0.0, 0.0, 1.0]), sides, 0.26, 0.135)
 
 
-def test_rc_car_linkage_reaches_limit_with_ackermann():
+def test_bench_linkage_reaches_limit_with_ackermann():
     table = steering_table(linkage(19.8, 6.0), (-math.radians(30), math.radians(30)), samples=31)
     assert {s.status for s in table["solutions"].values()} == {"ok"}
     full = table["rows"][-1]

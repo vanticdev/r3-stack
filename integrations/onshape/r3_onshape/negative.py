@@ -7,7 +7,7 @@ scoped fit/motion checks on the imported geometry and delete the document;
 build (``build/cad/fixtures/onshape_geometry.json.gz``) with the mutated spec.
 Results go to ``build/cad/negative_tests.json``.
 
-    python -m r3_onshape.negative examples/robots/rc-car [case ...]
+    python -m r3_onshape.negative examples/robots/robot [case ...]
 """
 
 from __future__ import annotations
@@ -54,52 +54,39 @@ def _shift(item: dict[str, Any], key: str, index: int, delta: str) -> None:
     values[index] = to_si(values[index]) + to_si(delta)
 
 
-def _remove_strap(spec: dict[str, Any]) -> None:
-    spec["components"].pop("battery_strap")
-    spec["mechanical"]["interfaces"] = [i for i in spec["mechanical"]["interfaces"] if i["id"] != "battery_strap_loop"]
-
-
-def _joint(spec: dict[str, Any], jid: str) -> dict[str, Any]:
-    return next(j for j in spec["mechanical"]["joints"] if j["id"] == jid)
-
-
-PI_STACK = ["deck", "pi", "hat", *[f"pi_spacer_{i}" for i in range(1, 5)], *[f"fastener:pi_d{i}" for i in range(1, 5)],
-            *[f"fastener:pi_s{i}" for i in range(1, 5)], *[f"fastener:hat_{i}" for i in range(1, 5)]]
-
-CASES = [
-    Case("hat_offset_2_5mm", "HAT at its pre-redesign pose (2.5 mm toward +x): its catalog holes no longer meet the Pi standoffs",
-         lambda s: _shift(s["components"]["hat"], "xyz", 0, "2.5 mm"),
-         ["cad_interference", "fastener_hole_missing", "connector_misaligned"], PI_STACK),
-    Case("arm_screw_too_short", "Front-arm screw shortened from M3x10 to M3x6: 3 mm of thread in PA12 (needs 2 d = 6 mm)",
-         lambda s: _fastener(s, "arm_l1").update(length="6 mm"),
-         ["thread_engagement_short"], ["chassis", "arm_fl", "fastener:arm_l1", "fastener:arm_l2"]),
-    Case("motor_screw_misplaced", "Motor screw moved 1.5 mm off its tapped hole (spec position error)",
-         lambda s: _shift(_fastener(s, "mot_1"), "position", 0, "1.5 mm"),
-         ["cad_interference"], ["gearbox", "motor", "fastener:mot_1", "fastener:mot_2"]),
-    Case("battery_strap_removed", "Battery strap deleted: the battery only rests on the plate (contact is not attachment)",
-         _remove_strap, ["part_not_retained"], ["chassis", "battery"]),
-    Case("encoder_gap_too_large", "Encoder board 2 mm lower: magnet air gap 3 mm and the screws miss the board's holes",
-         lambda s: _shift(s["components"]["encoder"], "xyz", 2, "-2 mm"),
-         ["magnet_gap_out_of_range", "cad_interference"],
-         ["gearbox", "encoder", "fastener:enc_1", "fastener:enc_2", "axle_rl", "enc_ring", *[f"enc_magnet_{i}" for i in range(1, 5)]]),
-    Case("servo_travel_51deg", "Original +-51 deg servo end points (1122/1878 us): the inner knuckle is driven past its 0.45 rad stop",
-         lambda s: s["software"]["config"].update(steering_pulse_us={"left": 1878, "center": 1500, "right": 1122}),
-         ["steering_range_unreachable"], mode="recorded", motion=True),
-    Case("joint_axis_wrong", "steer_fl declared about +y instead of the verified kingpin axis",
-         lambda s: _joint(s, "steer_fl").update(axis=[0, 1, 0]), ["joint_axis_mismatch"], mode="recorded"),
-    Case("drive_path_broken", "Left wheel drive flat omitted from the drivetrain path",
-         lambda s: next(t for t in s["mechanical"]["transmissions"] if t["id"] == "drivetrain").update(
-             path=["motor_pinion", "output_l", "output_r", "wheel_drive_rr"]),
-         ["transmission_path_broken"], mode="recorded"),
-    Case("ball_socket_too_tight", "Tie-rod ball joint fit limit tightened to 0.03-0.05 mm (socket has 0.025 mm)",
-         lambda s: _interface(s, "bj_hl")["params"].update(clearance=["0.03 mm", "0.05 mm"]),
-         ["interface_fit_out_of_range"], mode="recorded"),
-]
+def cases_for_project(project: Project) -> list[Case]:
+    """Generate applicable negative probes from the project's declared mechanics."""
+    cases: list[Case] = []
+    for fastener in project.spec.mechanical.fasteners:
+        if fastener.length and fastener.thread_into and not fastener.body:
+            fid = fastener.id
+            cases.append(Case("short_thread", "Reduce a declared screw's engagement",
+                lambda spec, fid=fid: _fastener(spec, fid).update(length="1 mm"),
+                ["thread_engagement_short"], project.spec.link_parts(fid) or []))
+            break
+    for interface in project.spec.mechanical.interfaces:
+        if interface.kind in ("revolute_fit", "press_fit"):
+            iid = interface.id
+            key = "interference" if interface.kind == "press_fit" else "clearance"
+            cases.append(Case("fit_limit", "Require an intentionally incompatible shaft/bore fit",
+                lambda spec, iid=iid, key=key: _interface(spec, iid)["params"].update({key: ["1 m", "2 m"]}),
+                ["interface_fit_out_of_range"], list(interface.parts), mode="recorded"))
+            break
+    if project.spec.mechanical.joints:
+        joint = project.spec.mechanical.joints[0]
+        jid = joint.id
+        # Pick a Cartesian axis perpendicular to the largest declared component.
+        index = min(range(3), key=lambda index: abs(joint.axis[index]))
+        axis = [float(index == k) for k in range(3)]
+        cases.append(Case("joint_axis", "Change a declared joint axis away from its physical interface",
+            lambda spec, jid=jid, axis=axis: next(j for j in spec["mechanical"]["joints"] if j["id"] == jid).update(axis=axis),
+            ["joint_axis_mismatch"], mode="recorded"))
+    return cases
 
 
 def _mutated_project(root: Path, case: Case, workdir: Path) -> Project:
-    spec = yaml.safe_load((root / "robot.yaml").read_text())
-    spec = copy.deepcopy(spec)
+    spec = Project.load(root).spec.model_dump(mode="json")
+    spec.pop("assembly", None)
     case.mutate(spec)
     target = workdir / case.id
     target.mkdir(parents=True, exist_ok=True)
@@ -156,7 +143,8 @@ def run_case(root: Path, case: Case, api: Any | None, workdir: Path) -> dict[str
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    root = Path(argv.pop(0) if argv else "examples/robots/rc-car").resolve()
+    root = Path(argv.pop(0) if argv else ".").resolve()
+    candidates = cases_for_project(Project.load(root))
     wanted = set(argv)
     from .client import default_transport
 
@@ -164,7 +152,7 @@ def main(argv: list[str] | None = None) -> int:
     out_path = root / "build" / "cad" / "negative_tests.json"
     previous = {c["id"]: c for c in json.loads(out_path.read_text())["cases"]} if out_path.exists() else {}
     with tempfile.TemporaryDirectory() as tmp:
-        for case in CASES:
+        for case in candidates:
             if wanted and case.id not in wanted:
                 continue
             if case.mode == "onshape" and api is None:
@@ -173,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
             record = run_case(root, case, api, Path(tmp))
             previous[case.id] = record
             print(f"{'PASS' if record['passed'] else 'FAIL'} {case.id}: expected {case.expect}, observed {record['observed_codes']}")
-    cases = [previous[c.id] for c in CASES if c.id in previous]
+    cases = [previous[c.id] for c in candidates if c.id in previous]
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps({"cases": cases, "all_passed": all(c.get("passed") for c in cases)}, indent=1, default=str))
     return 0 if all(c.get("passed") for c in cases) else 1

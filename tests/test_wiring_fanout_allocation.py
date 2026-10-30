@@ -5,10 +5,10 @@ from r3_wiring.router import HarnessRouter, NodePoint, fan_curve, curvature_radi
 
 
 def test_one_ended_fanout_uses_available_straight_run_without_shrinking_bend_limit():
-    node = NodePoint('power', 'hat', 'connector', exit=np.zeros(3),
+    node = NodePoint('power', 'controller', 'connector', exit=np.zeros(3),
                      direction=np.array([0., 1., 0.]), fan_length=.0207)
     points = np.array([[0., 0., 0.], [0., .022, 0.]])
-    end = PinEnd('power.hat', '1', np.array([.0025, 0., 0.]),
+    end = PinEnd('power.controller', '1', np.array([.0025, 0., 0.]),
                  node.direction, np.array([.0025, 0., 0.]), 'solder_cup')
     single = HarnessRouter._breakout(node, points, opposite_fanout=False)
     shared = HarnessRouter._breakout(node, points, opposite_fanout=True)

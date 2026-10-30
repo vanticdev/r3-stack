@@ -42,7 +42,7 @@ r3 status            # revision, git state, lock pins, per-stage status (stale i
 r3 diagnose          # errors grouped by subject, with hints
 r3 deploy --target sim [--scenario id]
 r3 deploy --target fleet --yes [--force] [-- <backend/deploy.py args>]
-r3 create <name> [--from rc-car|blank] [--dir .] [--github [--private|--public]]
+r3 create <name> [--from robot|blank] [--dir .] [--github [--private|--public]]
 r3 status --release  # release gate: requirement evidence matrix; exit 1 unless fabrication ready
 r3 serve [--host 127.0.0.1] [--port 8321] [--projects-root DIR]   # HTTP API + apps/web/dist
 ```
@@ -77,14 +77,14 @@ Project scope: copy [`examples/mcp.json`](examples/mcp.json) to `.mcp.json` in
 the project root (projects scaffolded by `r3 create` already have one), or:
 
 ```bash
-claude mcp add r3 -e R3_PROJECT=$PWD/examples/robots/rc-car -- \
+claude mcp add r3 -e R3_PROJECT=$PWD/examples/robots/robot -- \
   $PWD/.venv/bin/python -m r3_orchestrator.mcp_server
 ```
 
 ### Register in Codex
 
 ```bash
-codex mcp add r3 --env R3_PROJECT=$PWD/examples/robots/rc-car -- \
+codex mcp add r3 --env R3_PROJECT=$PWD/examples/robots/robot -- \
   $PWD/.venv/bin/python -m r3_orchestrator.mcp_server
 ```
 

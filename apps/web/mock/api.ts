@@ -757,7 +757,7 @@ export function createMockApi(options: MockOptions) {
       await step({ type: "tool_call", id: "t1", name: "r3_get_spec", server: "r3", input: { section: "electrical.harnesses" } });
       await step({ type: "tool_result", id: "t1", name: "r3_get_spec", ok: true, content: JSON.stringify({ sha256: doc.sha256, harnesses: (doc.spec as RobotSpec).electrical?.harnesses?.length ?? 0 }) });
       const harnesses = (doc.spec as RobotSpec).electrical?.harnesses ?? [];
-      const lead = harnesses.find((h) => h.id === "battery_lead") ?? harnesses[0];
+      const lead = harnesses.find((h) => h.id === "supply") ?? harnesses[0];
       if (lead && !session.cancelled) {
         const patch = { electrical: { harnesses: harnesses.map((h) => (h.id === lead.id ? { ...h, route: { ...(h.route ?? {}), slack: "10 mm" } } : h)) } };
         await step({ type: "tool_call", id: "t2", name: "r3_patch_spec", server: "r3", input: { patch: { [`electrical.harnesses[${lead.id}].route.slack`]: "10 mm" }, sha256: doc.sha256 } });

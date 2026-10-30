@@ -1,0 +1,699 @@
+# Robot frame: stationary instrumentation bench, SI coordinates.
+schema: r3/robot@1
+robot:
+  name: r3-bench
+  description: Stationary sensor arm and electrical test bench
+  mobility: stationary
+  version: 0.1.0
+requirements:
+  max_mass: 5 kg
+  min_wire_clearance_moving: 8 mm
+  max_wire_voltage_drop_fraction: 0.03
+  min_runtime: 15 min
+components:
+  base:
+    type: test-base
+    pose:
+      xyz:
+      - 0
+      - 0
+      - 0.02
+  panel:
+    type: test-panel
+    mount: base
+    pose:
+      xyz:
+      - 0
+      - 0
+      - 0.25
+  pi:
+    type: raspberry-pi-5-4gb
+    mount: base
+    pose:
+      xyz:
+      - 0
+      - 0.1
+      - 0.08
+  controller:
+    type: test-controller
+    mount: base
+    pose:
+      xyz:
+      - -0.01
+      - 0.1245
+      - 0.090076
+    params:
+      seating_gap: 0.0002
+  battery:
+    type: lipo-2s-5000-25c
+    mount: base
+    pose:
+      xyz:
+      - -0.1
+      - -0.1
+      - 0.03
+  esc:
+    type: esc-brushed-60a
+    mount: base
+    pose:
+      xyz:
+      - -0.12
+      - 0
+      - 0.03
+  motor:
+    type: motor-540-brushed
+    mount: base
+    pose:
+      xyz:
+      - 0.12
+      - 0
+      - 0.12
+  servo:
+    type: servo-digital-20kg
+    mount: base
+    pose:
+      xyz:
+      - 0.12
+      - 0.1
+      - 0.08
+  fuse:
+    type: fuse-atc-10a
+    mount: base
+    pose:
+      xyz:
+      - -0.05
+      - -0.04
+      - 0.04
+  gps:
+    type: gnss-rtk-zed-f9p
+    mount: base
+    pose:
+      xyz:
+      - -0.1
+      - 0.1
+      - 0.06
+  receiver:
+    type: elrs-receiver-2g4
+    mount: base
+    pose:
+      xyz:
+      - 0.1
+      - -0.1
+      - 0.07
+  imu:
+    type: gy-521-mpu6050
+    mount: base
+    pose:
+      xyz:
+      - 0
+      - 0.04
+      - 0.1
+    owned: true
+  rtk_radio:
+    type: telemetry-sik-915-100mw
+    mount: base
+    pose:
+      xyz:
+      - -0.1
+      - 0.04
+      - 0.14
+  rx_antenna:
+    type: elrs-t-antenna
+    mount: base
+    pose:
+      xyz:
+      - 0.1
+      - -0.1
+      - 0.4
+  encoder:
+    type: test-encoder
+    mount: base
+    pose:
+      xyz:
+      - 0.14
+      - 0
+      - 0.18
+  arm:
+    type: test-arm
+    mount: base
+    pose:
+      xyz:
+      - -0.1
+      - -0.1
+      - 0.25
+mechanical:
+  joints:
+  - id: pivot
+    type: revolute
+    parent: base
+    child: arm
+    origin:
+    - -0.1
+    - -0.1
+    - 0.25
+    axis:
+    - 0
+    - 0
+    - 1
+    limits:
+    - -0.6
+    - 0.6
+    damping: 0.02
+    interface: capture
+  interfaces:
+  - id: capture
+    kind: revolute_fit
+    parts:
+    - base
+    - arm
+    axis_point:
+    - -0.1
+    - -0.1
+    - 0.25
+    axis_dir:
+    - 0
+    - 0
+    - 1
+    params:
+      physics:
+        retention_force:
+          value: 10000
+          status: datasheet
+          source: Synthetic rated pivot
+        shear_force:
+          value: 10000
+          status: datasheet
+          source: Synthetic rated pivot
+        radius:
+          value: 0.006
+          status: datasheet
+          source: Synthetic rated pivot
+electrical:
+  ground_net: GND
+  direct_mates:
+  - a: controller.J_GPIO
+    b: pi.J8
+  harnesses:
+  - id: supply
+    connectors:
+      A:
+        type: integral
+        mates: battery.J1
+      B:
+        type: xt60-female
+    wires:
+    - id: W_BAT_P
+      from: A.1
+      to: B.1
+      awg: 12
+      color: red
+      signal: VBAT
+    - id: W_BAT_N
+      from: A.2
+      to: B.2
+      awg: 12
+      color: black
+      signal: GND
+    route:
+      slack: 15 mm
+  - id: distribution
+    connectors:
+      P1:
+        type: xt60-male
+        mates: supply.B
+      P2:
+        type: integral
+        mates: esc.J_PWR
+      P3:
+        type: xt30-female
+        mates: controller.J_BATT
+      F1:
+        type: integral
+        mates: fuse.J1
+      F2:
+        type: integral
+        mates: fuse.J2
+    wires:
+    - id: W_Y_P_IN
+      from: P1.1
+      to: SP
+      awg: 12
+      color: red
+      signal: VBAT
+    - id: W_Y_P_ESC
+      from: SP
+      to: P2.1
+      awg: 12
+      color: red
+      signal: VBAT
+    - id: W_Y_P_FUSE
+      from: SP
+      to: F1.1
+      awg: 18
+      color: red
+      signal: VBAT
+    - id: W_Y_P_HAT
+      from: F2.1
+      to: P3.1
+      awg: 18
+      color: red
+      signal: VBAT_FUSED
+    - id: W_Y_N_IN
+      from: P1.2
+      to: SN
+      awg: 12
+      color: black
+      signal: GND
+    - id: W_Y_N_ESC
+      from: SN
+      to: P2.2
+      awg: 12
+      color: black
+      signal: GND
+    - id: W_Y_N_HAT
+      from: SN
+      to: P3.2
+      awg: 18
+      color: black
+      signal: GND
+    route:
+      slack: 15 mm
+    splices:
+      SP:
+        position:
+        - -0.08
+        - -0.06
+        - 0.07
+      SN:
+        position:
+        - -0.08
+        - -0.08
+        - 0.07
+  - id: actuator_power
+    connectors:
+      A:
+        type: integral
+        mates: esc.J_MOT
+      BP:
+        type: integral
+        mates: motor.J_POS
+      BN:
+        type: integral
+        mates: motor.J_NEG
+    wires:
+    - id: W_MOT_A
+      from: A.1
+      to: BP.1
+      awg: 14
+      color: blue
+      signal: MOTOR_A
+    - id: W_MOT_B
+      from: A.2
+      to: BN.1
+      awg: 14
+      color: yellow
+      signal: MOTOR_B
+    route:
+      slack: 15 mm
+  - id: esc_signal
+    connectors:
+      A:
+        type: integral
+        mates: esc.J_SIG
+      B:
+        type: servo-3-female
+        mates: controller.J_ESC
+    wires:
+    - id: W_ESC_SIG
+      from: A.1
+      to: B.1
+      awg: 22
+      color: white
+      signal: ESC_PWM
+    - id: W_ESC_BEC
+      from: A.2
+      to: B.2
+      awg: 22
+      color: red
+      signal: ESC_BEC
+    - id: W_ESC_GND
+      from: A.3
+      to: B.3
+      awg: 22
+      color: black
+      signal: ESC_GND
+    route:
+      slack: 15 mm
+  - id: actuator_signal
+    connectors:
+      A:
+        type: integral
+        mates: servo.J1
+      B:
+        type: servo-3-female
+        mates: controller.J_SERVO
+    wires:
+    - id: W_SRV_SIG
+      from: A.1
+      to: B.1
+      awg: 22
+      color: white
+      signal: SERVO_PWM
+    - id: W_SRV_VCC
+      from: A.2
+      to: B.2
+      awg: 22
+      color: red
+      signal: SERVO_6V
+    - id: W_SRV_GND
+      from: A.3
+      to: B.3
+      awg: 22
+      color: black
+      signal: GND
+    route:
+      slack: 15 mm
+  - id: rx_link
+    connectors:
+      A:
+        type: integral
+        mates: receiver.J1
+      B:
+        type: jst-gh-4-housing
+        mates: controller.J_RX
+    wires:
+    - id: W_RX_5V
+      from: A.1
+      to: B.1
+      awg: 28
+      color: red
+      signal: 5V
+    - id: W_RX_PI_TX
+      from: A.3
+      to: B.2
+      awg: 28
+      color: white
+      signal: CRSF_TX
+    - id: W_RX_PI_RX
+      from: A.2
+      to: B.3
+      awg: 28
+      color: green
+      signal: CRSF_RX
+    - id: W_RX_GND
+      from: A.4
+      to: B.4
+      awg: 28
+      color: black
+      signal: GND
+    route:
+      slack: 15 mm
+  - id: sensor_link
+    connectors:
+      A:
+        type: integral
+        mates: gps.J1
+      B:
+        type: jst-gh-4-housing
+        mates: controller.J_GPS
+    wires:
+    - id: W_GPS_5V
+      from: A.1
+      to: B.1
+      awg: 28
+      color: red
+      signal: 5V
+    - id: W_GPS_PI_TX
+      from: A.2
+      to: B.2
+      awg: 28
+      color: white
+      signal: GPS_TX
+    - id: W_GPS_PI_RX
+      from: A.3
+      to: B.3
+      awg: 28
+      color: green
+      signal: GPS_RX
+    - id: W_GPS_GND
+      from: A.4
+      to: B.4
+      awg: 28
+      color: black
+      signal: GND
+    route:
+      slack: 15 mm
+  - id: encoder_link
+    connectors:
+      A:
+        type: jst-xh-3-housing
+        mates: encoder.J1
+      B:
+        type: jst-xh-3-housing
+        mates: controller.J_ENC
+    wires:
+    - id: W_ENC_VCC
+      from: A.1
+      to: B.1
+      awg: 26
+      color: red
+      signal: 3V3
+    - id: W_ENC_OUT
+      from: A.2
+      to: B.2
+      awg: 26
+      color: yellow
+      signal: ENC
+    - id: W_ENC_GND
+      from: A.3
+      to: B.3
+      awg: 26
+      color: black
+      signal: GND
+    route:
+      slack: 15 mm
+  - id: imu_link
+    connectors:
+      A:
+        type: solder-wire-1x8-2.54
+        mates: imu.J1
+      B:
+        type: jst-gh-4-housing
+        mates: controller.J_IMU
+    wires:
+    - id: W_IMU_VCC
+      from: A.1
+      to: B.1
+      awg: 28
+      color: red
+      signal: 3V3
+    - id: W_IMU_GND
+      from: A.2
+      to: B.2
+      awg: 28
+      color: black
+      signal: GND
+    - id: W_IMU_SDA
+      from: A.4
+      to: B.3
+      awg: 28
+      color: blue
+      signal: I2C_SDA
+    - id: W_IMU_SCL
+      from: A.3
+      to: B.4
+      awg: 28
+      color: yellow
+      signal: I2C_SCL
+    route:
+      slack: 15 mm
+  - id: correction_link
+    connectors:
+      A:
+        type: integral
+        mates: gps.J2
+      B:
+        type: integral
+        mates: rtk_radio.J1
+    wires:
+    - id: W_RTK_5V
+      from: B.1
+      to: A.1
+      awg: 28
+      color: red
+      signal: 5V
+    - id: W_RTK_RTCM
+      from: B.3
+      to: A.2
+      awg: 28
+      color: white
+      signal: RTCM
+    - id: W_RTK_GND
+      from: B.6
+      to: A.4
+      awg: 28
+      color: black
+      signal: GND
+    - id: W_RTK_RETURN
+      from: A.3
+      to: B.2
+      awg: 28
+      color: blue
+      signal: RTCM_TX
+    route:
+      slack: 15 mm
+pcb:
+  boards:
+  - component: controller
+    tool: kicad
+    source: pcb/test-board
+    layers: 2
+    copper_oz: 1
+cad:
+  provider: onshape
+  document_name: Test bench
+software:
+  modules:
+  - name: bench_controller
+    language: python
+    runs_on: pi
+    entrypoint: main.py
+  bindings:
+    esc_pwm:
+      interface: pwm
+      computer: pi
+      pins:
+      - pi.J8.12
+      expects:
+      - esc.J_SIG.1
+      device: pwmchip0
+      channel: 2
+      frequency: 50 Hz
+    servo_pwm:
+      interface: pwm
+      computer: pi
+      pins:
+      - pi.J8.35
+      expects:
+      - servo.J1.1
+      device: pwmchip0
+      channel: 3
+      frequency: 50 Hz
+    crsf:
+      interface: uart
+      computer: pi
+      pins:
+      - pi.J8.8
+      - pi.J8.10
+      expects:
+      - receiver.J1.3
+      - receiver.J1.2
+      device: /dev/ttyAMA0
+      baud: 420000
+    gps:
+      interface: uart
+      computer: pi
+      pins:
+      - pi.J8.7
+      - pi.J8.29
+      expects:
+      - gps.J1.2
+      - gps.J1.3
+      device: /dev/ttyAMA2
+      baud: 115200
+    i2c:
+      interface: i2c
+      computer: pi
+      pins:
+      - pi.J8.3
+      - pi.J8.5
+      expects:
+      - imu.SDA
+      - imu.SCL
+      device: /dev/i2c-1
+    encoder:
+      interface: gpio
+      computer: pi
+      pins:
+      - pi.J8.11
+      expects:
+      - encoder.J1.2
+      device: gpiochip0
+      channel: 17
+    heartbeat:
+      interface: gpio
+      computer: pi
+      pins:
+      - pi.J8.13
+      expects:
+      - controller.HEARTBEAT
+      device: gpiochip0
+      channel: 27
+  config:
+    control_rate_hz: 100
+    mode: manual
+    radio_failsafe_timeout_s: 0.2
+    failsafe_action: brake
+simulation:
+  timestep: 1 ms
+  seed: 11
+  environment:
+    ground_friction: 0.9
+    ambient_temperature_c: 25
+    radio_transmitter:
+      position:
+      - -3 m
+      - 0
+      - 1.5 m
+      power_dbm: 20
+      antenna_gain_dbi: 2
+    obstacles:
+    - id: screen
+      center:
+      - 2
+      - 1
+      - 0.15
+      size:
+      - 0.3
+      - 0.3
+      - 0.3
+      material: plastic
+    gnss_base:
+      position:
+      - -4
+      - -3
+      - 1.6
+      radio: telemetry-sik-915-100mw
+      receiver: gnss-rtk-zed-f9p
+  scenarios:
+  - id: idle
+    duration: 2 s
+    initial:
+      battery_soc: 1
+    expect:
+      brownouts: 0
+  - id: full_throttle
+    duration: 2 s
+    initial:
+      battery_soc: 1
+      mode: manual
+    pilot:
+      throttle:
+      - - 0
+        - 1
+    expect:
+      brownouts: 0
+  - id: autonomous_course
+    duration: 2 s
+    initial:
+      battery_soc: 1
+    expect:
+      brownouts: 0
+  - id: pi_hang
+    duration: 20 s
+    expect:
+      brownouts: 0
+    faults:
+    - type: software_freeze
+      at: 15 s
+      method: sigstop

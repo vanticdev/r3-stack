@@ -1,0 +1,422 @@
+components:
+- id: test-base
+  name: Test base
+  kind: structure
+  mechanical:
+    shape: box
+    size:
+    - 0.36
+    - 0.32
+    - 0.006
+    mass: 0.9
+    material: Aluminum 6061-T6
+    fabricated: true
+    density: 2700
+- id: test-panel
+  name: Sensor panel
+  kind: structure
+  mechanical:
+    shape: box
+    size:
+    - 0.09
+    - 0.09
+    - 0.004
+    mass: 0.03
+    material: Aluminum 6061-T6
+    fabricated: true
+    features:
+    - id: access_slot
+      kind: slot
+      slot_dir:
+      - 1
+      - 0
+      - 0
+      position:
+      - 0
+      - 0
+      - 0
+      axis:
+      - 0
+      - 0
+      - 1
+      diameter: 0.008
+      length: 0.03
+      depth: 0.004
+    density: 2700
+- id: test-arm
+  name: Sensor arm
+  kind: structure
+  mechanical:
+    shape: box
+    size:
+    - 0.08
+    - 0.012
+    - 0.012
+    mass: 0.025
+    material: Aluminum 6061-T6
+    fabricated: true
+    density: 2700
+- id: test-encoder
+  name: Incremental sensor
+  kind: sensor
+  mechanical:
+    shape: box
+    size:
+    - 0.012
+    - 0.012
+    - 0.004
+    mass: 0.002
+    material: Aluminum 6061-T6
+  pins:
+    VCC:
+      role: power_in
+      voltage_nominal: 3.3
+      voltage_min: 3
+      voltage_max: 3.6
+    GND:
+      role: ground
+    OUT:
+      role: gpio
+      logic_level: 3.3
+  connectors:
+    J1:
+      type: jst-xh-3-header
+      position:
+      - 0
+      - 0
+      - 0
+      direction:
+      - 0
+      - 0
+      - 1
+      pins:
+        '1': VCC
+        '2': OUT
+        '3': GND
+  behavior:
+    model: encoder.hall
+    params:
+      pulses_per_rev: 8
+- id: test-controller
+  name: Bench controller
+  kind: pcb
+  mechanical:
+    shape: box
+    size:
+    - 0.04
+    - 0.03
+    - 0.0016
+    mass: 0.01
+    material: Aluminum 6061-T6
+  pins:
+    GND:
+      role: ground
+    ESC_GND:
+      role: ground
+    VBAT:
+      role: power_in
+      voltage_nominal: 7.4
+      voltage_min: 5.5
+      voltage_max: 10
+      current_max: 8
+    5V:
+      role: power_out
+      voltage_nominal: 5.1
+      current_max: 5.5
+    SERVO_6V:
+      role: power_out
+      voltage_nominal: 6
+      current_max: 4
+    3V3:
+      role: power_in
+      voltage_nominal: 3.3
+      voltage_min: 3
+      voltage_max: 3.6
+    ESC_BEC:
+      role: power_in
+      voltage_nominal: 6
+      voltage_min: 4
+      voltage_max: 7
+    BEC_6V:
+      role: power_in
+      voltage_nominal: 6
+      voltage_min: 4
+      voltage_max: 7
+    PI_ESC_PWM:
+      role: gpio
+      logic_level: 3.3
+    ESC_PWM:
+      role: pwm_out
+      logic_level: 3.3
+    PI_SERVO_PWM:
+      role: gpio
+      logic_level: 3.3
+    SERVO_PWM:
+      role: pwm_out
+      logic_level: 3.3
+    HEARTBEAT:
+      role: gpio
+      logic_level: 3.3
+    CRSF_TX:
+      role: uart_tx
+      logic_level: 3.3
+    CRSF_RX:
+      role: uart_rx
+      logic_level: 3.3
+    GPS_TX:
+      role: uart_tx
+      logic_level: 3.3
+    GPS_RX:
+      role: uart_rx
+      logic_level: 3.3
+    ENC:
+      role: gpio
+      logic_level: 3.3
+    I2C_SDA:
+      role: i2c_sda
+      logic_level: 3.3
+    I2C_SCL:
+      role: i2c_scl
+      logic_level: 3.3
+  connectors:
+    J_GPIO:
+      type: socket-2x20-2.54
+      position:
+      - 0
+      - 0
+      - -0.006
+      direction:
+      - 0
+      - 0
+      - -1
+      pins:
+        '1': 3V3
+        '2': 5V
+        '4': 5V
+        '6': GND
+        '9': GND
+        '14': GND
+        '20': GND
+        '25': GND
+        '30': GND
+        '34': GND
+        '39': GND
+        '3': I2C_SDA
+        '5': I2C_SCL
+        '7': GPS_TX
+        '29': GPS_RX
+        '8': CRSF_TX
+        '10': CRSF_RX
+        '11': ENC
+        '12': PI_ESC_PWM
+        '35': PI_SERVO_PWM
+        '13': HEARTBEAT
+      x:
+      - 1.0
+      - 0.0
+      - 0.0
+    J_BATT:
+      type: xt30pw-male
+      position:
+      - -0.02
+      - 0
+      - 0
+      direction:
+      - -1
+      - 0
+      - 0
+      pins:
+        '1': VBAT
+        '2': GND
+    J_ESC:
+      type: header-1x3-2.54
+      position:
+      - 0.02
+      - -0.01
+      - 0
+      direction:
+      - 1
+      - 0
+      - 0
+      pins:
+        '1': ESC_PWM
+        '2': ESC_BEC
+        '3': ESC_GND
+    J_SERVO:
+      type: header-1x3-2.54
+      position:
+      - 0.02
+      - 0.01
+      - 0
+      direction:
+      - 1
+      - 0
+      - 0
+      pins:
+        '1': SERVO_PWM
+        '2': SERVO_6V
+        '3': GND
+    J_RX:
+      type: jst-gh-4-header
+      position:
+      - 0
+      - -0.015
+      - 0
+      direction:
+      - 0
+      - -1
+      - 0
+      pins:
+        '1': 5V
+        '2': CRSF_TX
+        '3': CRSF_RX
+        '4': GND
+    J_GPS:
+      type: jst-gh-4-header
+      position:
+      - -0.01
+      - -0.015
+      - 0
+      direction:
+      - 0
+      - -1
+      - 0
+      pins:
+        '1': 5V
+        '2': GPS_TX
+        '3': GPS_RX
+        '4': GND
+    J_ENC:
+      type: jst-xh-3-header
+      position:
+      - 0.01
+      - 0.015
+      - 0
+      direction:
+      - 0
+      - 1
+      - 0
+      pins:
+        '1': 3V3
+        '2': ENC
+        '3': GND
+    J_IMU:
+      type: jst-gh-4-header
+      position:
+      - -0.01
+      - 0.015
+      - 0
+      direction:
+      - 0
+      - 1
+      - 0
+      pins:
+        '1': 3V3
+        '2': GND
+        '3': I2C_SDA
+        '4': I2C_SCL
+  internal_links:
+  - a: PI_ESC_PWM
+    b: ESC_PWM
+    kind: failsafe_arbiter
+    value: 0.12
+  - a: PI_SERVO_PWM
+    b: SERVO_PWM
+    kind: series_resistor
+    value: 220
+  - a: BEC_6V
+    b: ESC_BEC
+    kind: wire
+  behavior:
+    model: board.pcb
+    params:
+      regulator:
+        model: regulator.buck
+        part: test buck
+        v_out: 5.1
+        efficiency:
+        - - 0
+          - 0.88
+        - - 1
+          - 0.92
+        - - 6
+          - 0.88
+        input_pin: VBAT
+        output_pin: 5V
+        i_max: 6.2
+        i_limit_min: 6.2
+        v_in_min: 4.1
+        v_in_max: 18
+        v_in_abs_max: 20
+        uvlo_falling: 3.7
+        uvlo_rising: 4.1
+        hold_up_capacitance: 0.00015
+        dropout_voltage: 0.15
+        dropout_resistance: 0.04
+      servo_regulator:
+        model: regulator.buck_boost
+        v_out: 6
+        efficiency:
+        - - 0
+          - 0.88
+        - - 1
+          - 0.92
+        - - 6
+          - 0.88
+        input_pin: VBAT
+        output_pin: SERVO_6V
+        i_max: 4.0
+        i_limit_min: 4.0
+        v_in_min: 4.1
+        v_in_max: 18
+        v_in_abs_max: 20
+        uvlo_falling: 3.7
+        uvlo_rising: 4.1
+        hold_up_capacitance: 0.00015
+        dropout_voltage: 0.15
+        dropout_resistance: 0.04
+      reverse_protection:
+        rds_on: 0.008
+      ina226:
+        address: 64
+        bus: i2c
+        shunt: 0.01
+        current: 0.001
+        supply_pin: 3V3
+      isolator:
+        bus: signal
+        current: 0.003
+        supply_pin: ESC_BEC
+        ground_pin: ESC_GND
+      failsafe:
+        part: test watchdog
+        timeout: 0.12
+        frame: 0.02
+        neutral_us: 1500
+        rearm_edges: 3
+        rearm_band_us: 50
+        brake_us: 1000
+        brake_hold: 3
+        deadband_us: 15
+        esc_reverse_delay: 0.1
+        supply: 3V3
+        heartbeat_pin: HEARTBEAT
+        input_pin: PI_ESC_PWM
+      tvs:
+        part: SMAJ10A
+        v_breakdown_max: 12.3
+        v_clamp: 17
+        i_pp: 23.5
+      input_capacitance:
+      - capacitance: 0.00047
+        esr: 0.04
+      - capacitance: 3.3e-05
+        esr: 0.02
+  software:
+  - bus: i2c
+    address: 64
+    protocol: ina226
+  - bus: gpio
+    protocol: heartbeat
+    params:
+      pin: HEARTBEAT

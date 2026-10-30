@@ -13,12 +13,12 @@ from r3_kicad.library import find_install, footprint_exists, load_symbol, pin_ou
 from r3_kicad.schematic_layout import plan_sheet
 
 ROOT = Path(__file__).resolve().parents[1]
-BOARD = ROOT / "examples/robots/rc-car/pcb/carrier-hat"
+BOARD = ROOT / "tests/fixtures/pcb/pcb/test-board"
 needs_kicad = pytest.mark.skipif(find_install() is None, reason="KiCad libraries not installed")
 
 
 def _module():
-    spec = importlib.util.spec_from_file_location("carrier_hat_test", BOARD / "carrier_hat.py")
+    spec = importlib.util.spec_from_file_location("carrier_hat_test", BOARD / "board.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
@@ -37,23 +37,10 @@ def intent(module):
 
 def test_intent_is_consistent(intent):
     assert intent.validate() == []
-    refs = {p.ref for p in intent.parts}
-    assert {"U2", "U3", "U4", "U1", "J9", "Q1", "R2"} <= refs
-    nets = intent.nets()
-    # Brief: dedicated servo rail (buck-boost output Q5) on J_SERVO.2, heartbeat on header pin 13.
-    servo = intent.connectors()["J_SERVO"]
-    esc = intent.connectors()["J_ESC"]
-    gpio = intent.connectors()["J_GPIO"]
-    assert servo.pins["2"] == "SERVO_6V" and "Q5.5" in nets["SERVO_6V"] and "U3.12" in nets["SERVO_6V"]
-    assert gpio.pins["13"] == "HEARTBEAT" and "U4.3" in nets["HEARTBEAT"]
-    # The Pi's ESC PWM reaches the ESC only through the arbiter and then the isolator (no resistor straight across).
-    assert not [p for p in intent.parts if set(p.pins.values()) == {"PI_ESC_PWM", "ESC_PWM"}]
-    assert "U4.2" in nets["PI_ESC_PWM"] and {"U4.7", "U6.2"} <= set(nets["ESC_OUT"])
-    # Ground-loop break: J_ESC is the isolator's ESC side; its ground is not HAT GND and only U6/U7 touch it.
-    assert esc.pins == {"1": "ESC_PWM", "2": "ESC_BEC", "3": "ESC_GND"}
-    assert {n.split(".")[0] for n in nets["ESC_GND"] if not n.startswith("#")} == {"J3", "U6", "U7", "C37", "C38", "C39", "R26"}
-    assert "U6.5" in nets["ESC_GND"] and "U6.4" in nets["GND"]
-    assert {n.split(".")[0] for n in nets["ESC_BEC"] if not n.startswith("#")} == {"J3", "U7", "C38"}
+    assert {p.ref for p in intent.parts} == {"J1", "J2", "R1", "C1", "H1", "H2"}
+    assert intent.connectors()["INPUT"].pins == {"1": "SIGNAL_IN", "2": "SUPPLY", "3": "GND"}
+    assert intent.nets()["SIGNAL_IN"] == ["J1.1", "R1.1"]
+    assert intent.nets()["SIGNAL_OUT"] == ["C1.1", "J2.1", "R1.2"]
 
 
 @needs_kicad
@@ -93,7 +80,7 @@ def test_schematic_plan_has_no_overlaps_or_shorts(module, intent):
         symbol = load_symbol(part.lib_id)
         connected = {p.number for p in symbol.pins if p.number in part.pins}
         assert connected <= {pin for ref, pin in labelled if ref == part.ref}, part.ref
-    assert intent.sheet == "A2"
+    assert intent.sheet == "A3"
     for sym in plan.symbols:   # inside the A2 frame (594 x 420 mm), clear of the title block
         x0, y0, x1, y1 = sym.box
         assert 10 <= x0 and x1 <= 584 and 10 <= y0 and y1 <= 410, sym
@@ -105,7 +92,7 @@ def test_placement_covers_every_footprint(intent):
     on_board = {p.ref for p in intent.parts if not p.ref.startswith("#")}
     assert on_board == placed
     j1 = intent.part("J1").pcb
-    assert j1.side == "B" and dict(j1.anchors)["1"] == pytest.approx((8.37, 4.77))
+    assert j1.side == "F" and (j1.x, j1.y) == pytest.approx((8, 8))
     # Every hand-routed track starts or ends on a pad of its own net.
     nets = intent.nets()
     for track in intent.power_tracks:

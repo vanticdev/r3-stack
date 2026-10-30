@@ -20,26 +20,26 @@ from r3_sim.hal_server import TwinHalServer
 from r3_sim.kernel import CoSimKernel
 from r3_sim.signals import map_bindings
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
 needs_ngspice = pytest.mark.skipif(find_library() is None, reason="libngspice not installed")
 
 
 @pytest.fixture(scope="module")
 def project():
-    return Project.load(RC_CAR)
+    return Project.load(BENCH)
 
 
 # ------------------------------------------------------------------ catalog, graph, model stage
 def test_catalog_hat_matches_the_board(project):
-    hat = project.catalog.component("r3-carrier-hat")
-    assert hat.connectors["J_SERVO"].pins["2"] == "SERVO_6V"
+    controller = project.catalog.component("test-controller")
+    assert controller.connectors["J_SERVO"].pins["2"] == "SERVO_6V"
     # J_ESC is the ESC side of the U6 isolator: its BEC powers U6/U7 only, its ground is not HAT GND.
-    assert hat.connectors["J_ESC"].pins == {"1": "ESC_PWM", "2": "ESC_BEC", "3": "ESC_GND"}
-    assert hat.pins["ESC_GND"].role == "ground" and hat.pins["ESC_BEC"].role == "power_in"
-    assert hat.connectors["J_GPIO"].pins["13"] == "HEARTBEAT"
-    link = next(link for link in hat.internal_links if link.a == "PI_ESC_PWM")
-    assert link.kind == "failsafe_arbiter" and link.value == pytest.approx(0.06)
-    params = hat.behavior.params
+    assert controller.connectors["J_ESC"].pins == {"1": "ESC_PWM", "2": "ESC_BEC", "3": "ESC_GND"}
+    assert controller.pins["ESC_GND"].role == "ground" and controller.pins["ESC_BEC"].role == "power_in"
+    assert controller.connectors["J_GPIO"].pins["13"] == "HEARTBEAT"
+    link = next(link for link in controller.internal_links if link.a == "PI_ESC_PWM")
+    assert link.kind == "failsafe_arbiter" and link.value == pytest.approx(.12)
+    params = controller.behavior.params
     assert params["tvs"]["part"] == "SMAJ10A" and params["servo_regulator"]["model"] == "regulator.buck_boost"
 
 
@@ -53,7 +53,7 @@ def test_arbiter_link_carries_the_signal_but_no_dc(project):
     from r3_sim.electrical.network import build_passive_network
 
     network = build_passive_network(project, None)
-    links = network.internal_links.get("hat", [])
+    links = network.internal_links.get("controller", [])
     assert not [b for b in links if b.meta.get("link_kind") == "failsafe_arbiter"]
     assert [b for b in links if b.meta.get("link_kind") == "series_resistor"]
 
@@ -61,10 +61,10 @@ def test_arbiter_link_carries_the_signal_but_no_dc(project):
 def test_esc_lead_feeds_only_the_isolator_and_servo_runs_from_the_hat(project):
     wires = {w.id: w for h in project.spec.electrical.harnesses for w in h.wires}
     assert wires["W_ESC_BEC"].signal == "ESC_BEC" and wires["W_SRV_VCC"].signal == "SERVO_6V"
-    assert project.graph.connected("servo.J1.2", "hat.SERVO_6V")
+    assert project.graph.connected("servo.J1.2", "controller.SERVO_6V")
     assert not project.graph.connected("servo.J1.2", "esc.J_SIG.2")
-    assert project.graph.connected("esc.J_SIG.2", "hat.ESC_BEC")       # the BEC reaches only the isolator's LDO
-    assert project.graph.connected("esc.J_SIG.3", "hat.ESC_GND")
+    assert project.graph.connected("esc.J_SIG.2", "controller.ESC_BEC")       # the BEC reaches only the isolator's LDO
+    assert project.graph.connected("esc.J_SIG.3", "controller.ESC_GND")
 
 
 @needs_ngspice
@@ -87,10 +87,10 @@ def test_model_stage_understands_the_arbiter_and_failsafe_chain(project):
     # Electrical/binding/failsafe checks; static interference needs the CAD B-rep (a source-only copy has no CAD export,
     # so the stage falls back to coarse envelopes) and is covered by the CAD fit tests.
     errors = [d for d in result.diagnostics if d.severity.value == "error" and d.code != "component_interference"]
-    assert {d.code for d in errors} == {"joint_capacity_zero", "joint_assembly_overload"}
+    assert errors == [], [d.message for d in errors]
     chain = next(d for d in result.diagnostics if d.code == "failsafe_chain")
     timeouts = list(chain.data.values())
-    assert timeouts == sorted(timeouts) and timeouts[0] == pytest.approx(0.08) and timeouts[-1] == pytest.approx(1.0)
+    assert timeouts == sorted(timeouts) and timeouts[0] == pytest.approx(.14) and timeouts[-1] == pytest.approx(1.0)
 
 
 def test_failsafe_chain_flags_a_receiver_that_holds(project):
@@ -110,13 +110,13 @@ def test_failsafe_chain_flags_a_receiver_that_holds(project):
 
 def test_heartbeat_binding_reaches_the_board(project):
     bindings = map_bindings(project)
-    assert [(a.component, a.pin) for a in bindings["heartbeat"].attachments] == [("hat", "HEARTBEAT")]
+    assert [(a.component, a.pin) for a in bindings["heartbeat"].attachments] == [("controller", "HEARTBEAT")]
     assert [a.component for a in bindings["esc_pwm"].attachments] == ["esc"]
 
 
 # ------------------------------------------------------------------ arbiter device (twin)
 def _device(**overrides) -> ArbiterDevice:
-    return ArbiterDevice("hat", arbiter_params({"timeout": 0.1, "frame": 0.02, "neutral_us": 1500, "rearm_edges": 3,
+    return ArbiterDevice("controller", arbiter_params({"timeout": 0.1, "frame": 0.02, "neutral_us": 1500, "rearm_edges": 3,
                                                 "rearm_band_us": 50, **overrides}))
 
 
@@ -133,10 +133,10 @@ def _run(device: ArbiterDevice, t0: float, t1: float, pulse: float, beat: bool, 
 
 
 def test_arbiter_params_from_catalog(project):
-    params = arbiter_params(project.catalog.component("r3-carrier-hat").behavior.params["failsafe"])
-    assert params == ArbiterParams(part="ATtiny412", timeout=0.06, neutral_us=1500.0, frame=0.02, rearm_edges=3,
-                                   rearm_band_us=50.0, brake_us=1000.0, brake_hold=3.0, deadband_us=15.0,
-                                   esc_reverse_delay=0.1, brake_pattern_us=(1460.0, 1484.0))
+    params = arbiter_params(project.catalog.component("test-controller").behavior.params["failsafe"])
+    assert params == ArbiterParams(part="test watchdog", supply="3V3", input_pin="PI_ESC_PWM", timeout=.12, neutral_us=1500, frame=.02,
+        rearm_edges=3, rearm_band_us=50, brake_us=1000, brake_hold=3, deadband_us=15,
+        esc_reverse_delay=.1)
 
 
 def test_arbiter_boots_neutral_and_rearms_only_at_neutral():
@@ -175,8 +175,8 @@ def test_unpowered_arbiter_outputs_no_pulses_and_reboots_in_failsafe():
     assert device.failsafe and device.output(0.52, 1600.0) == 1500.0
 
 
-def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(rc_car_fresh):
-    project = Project.load(rc_car_fresh)  # no stale build/wiring cables in the kernel
+def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(bench_fresh):
+    project = Project.load(bench_fresh)  # no stale build/wiring cables in the kernel
     scenario = next(s for s in project.spec.simulation.scenarios if s.id == "pi_hang")
     kernel = CoSimKernel(project, scenario)
     assert kernel.freeze_at == pytest.approx(15.0)
@@ -205,7 +205,7 @@ def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(rc_car_fresh):
         esc.set_pulse_us(1700.0)
         hal.clock.sleep_until(0.5)                         # no heartbeat for 200 ms
         # After forward driving the arbiter brakes first (brake_us), then holds neutral.
-        assert device.failsafe and kernel.esc_pulse in device.params.brake_pattern_us
+        assert device.failsafe and kernel.esc_pulse == device.params.brake_us
     finally:
         hal.close()
         thread.join(5.0)
@@ -214,29 +214,26 @@ def test_heartbeat_gpio_writes_reach_the_arbiter_through_the_hal(rc_car_fresh):
 
 # ------------------------------------------------------------------ regulators and TVS (ngspice)
 @needs_ngspice
-def test_hat_regulators_follow_catalog_uvlo_dropout_and_limits(project):
+def test_regulators_follow_declared_uvlo_dropout_and_limits(project):
     from r3_sim.electrical import ElectricalSystem
-
     system = ElectricalSystem(project, routes={})
-    hat = system.models["hat"]
-    pi_core, servo_core = hat.cores["regulator"], hat.cores["servo_regulator"]
-    assert (pi_core.uvlo_falling, pi_core.uvlo_rising) == (pytest.approx(3.8), pytest.approx(4.4))
-    assert pi_core.current_limit == pytest.approx(8.1) and servo_core.current_limit == pytest.approx(4.86)
-    assert pi_core.hold_up == pytest.approx(268e-6)
-    # LM5175 buck-boost: no dropout; below the 4.18 V UVLO it stops. Its boost-mode limit scales with V_in.
-    assert servo_core.buck_boost and servo_core.dropout_input(2.5) == pytest.approx(4.18)
-    assert (servo_core.uvlo_falling, servo_core.uvlo_rising) == (pytest.approx(4.18), pytest.approx(4.53))
-    inputs = {"esc": {"throttle": 0.0}, "motor": {"omega": 0.0}, "servo": {"horn_torque": 5.0, "horn_speed": 0.0},
-              "pi": {"activity": 0.5}}
-    full = system.operating_point(inputs, soc=1.0)["hat"]
-    empty = system.operating_point(inputs, soc=0.0)["hat"]
-    # Servo stalled (2.4 A): 6.0 V from a full and from an empty pack (the TPS56528 buck gave 4.78 V empty).
-    for point in (full, empty):
-        assert point["servo_regulator"]["v_out"] == pytest.approx(6.0, abs=0.03)
-        assert not point["servo_regulator"]["in_dropout"] and point["servo_regulator"]["i_out"] > 2.0
-    assert empty["v_out"] == pytest.approx(5.1, abs=0.02) and not empty["uvlo"]
-    # INA226 sees the whole HAT branch (both regulators), VBUS on the shunt's load side.
-    assert empty["ina226_current"] == pytest.approx(empty["current_in"]) and empty["ina226_bus_voltage"] < empty["v_in"]
+    controller = system.models["controller"]
+    declared = project.catalog.component("test-controller").behavior.params
+    for key, core in controller.cores.items():
+        params = declared[key]
+        assert (core.uvlo_falling, core.uvlo_rising) == (pytest.approx(params["uvlo_falling"]), pytest.approx(params["uvlo_rising"]))
+        assert core.current_limit == pytest.approx(params["i_limit_min"])
+        assert core.hold_up == pytest.approx(params["hold_up_capacitance"])
+    servo_core = controller.cores["servo_regulator"]
+    assert servo_core.buck_boost and servo_core.dropout_input(2.5) == pytest.approx(declared["servo_regulator"]["uvlo_falling"])
+    inputs = {"esc": {"throttle": 0}, "motor": {"omega": 0}, "servo": {"horn_torque": 5, "horn_speed": 0}, "pi": {"activity": .5}}
+    for soc in (1, 0):
+        point = system.operating_point(inputs, soc=soc)["controller"]
+        assert point["servo_regulator"]["v_out"] == pytest.approx(declared["servo_regulator"]["v_out"], abs=.03)
+        assert not point["servo_regulator"]["in_dropout"] and point["servo_regulator"]["i_out"] > 2
+        assert point["v_out"] == pytest.approx(declared["regulator"]["v_out"], abs=.02) and not point["uvlo"]
+        assert point["ina226_current"] == pytest.approx(point["current_in"])
+        assert point["ina226_bus_voltage"] < point["v_in"]
     system.close()
 
 
@@ -250,24 +247,24 @@ def test_hold_up_keeps_the_pi_rail_after_the_input_drops(project):
     from r3_sim.electrical import ElectricalSystem
 
     system = ElectricalSystem(project, routes={}, initial={"battery_soc": 0.9})
-    hat = system.models["hat"]
-    assert [round(c * 1e6, 1) for c, _, _ in hat.input_caps] == [220.0, 71.5]
+    controller = system.models["controller"]
+    assert [c for c, _, _ in controller.input_caps] == [.00047, .000033]
     inputs = {"esc": {"pulse_us": 1500.0}, "motor": {"omega": 0.0}, "servo": {"pulse_us": 1500.0}, "pi": {"activity": 0.5}}
     for _ in range(5):
         out = system.step(1e-3, inputs)
-    v0, load = out["_nets"]["5V"], out["hat"]["regulator"]["power_out"]
-    v_in, p_in = out["hat"]["v_in"], out["hat"]["v_in"] * out["hat"]["current_in"]
+    v0, load = out["_nets"]["5V"], out["controller"]["regulator"]["power_out"]
+    v_in, p_in = out["controller"]["v_in"], out["controller"]["v_in"] * out["controller"]["current_in"]
     dt, t_fault = 2e-5, system.time
     out = system.step(dt, {**inputs, "_faults": [{"type": "open", "branch": "W_Y_P_HAT"}]})
     while out["pi"]["powered"]:
         out = system.step(dt, inputs)
         assert system.time - t_fault < 0.05
     held = system.time - t_fault
-    c_in = sum(c for c, _, _ in hat.input_caps)
-    v_drop = hat.cores["regulator"].dropout_input(load / v0)
-    expected = c_in * (v_in ** 2 - v_drop ** 2) / (2 * p_in) + hold_up_time(268e-6, v0, 4.63, load)
+    c_in = sum(c for c, _, _ in controller.input_caps)
+    v_drop = controller.cores["regulator"].dropout_input(load / v0)
+    expected = c_in * (v_in ** 2 - v_drop ** 2) / (2 * p_in) + hold_up_time(controller.cores["regulator"].hold_up, v0, 4.63, load)
     assert held == pytest.approx(expected, rel=0.35), (held, expected, load)
-    assert held > hold_up_time(268e-6, v0, 4.63, load) * 2   # the input bulk dominates the hold-up
+    assert held > hold_up_time(controller.cores["regulator"].hold_up, v0, 4.63, load) * 2   # the input bulk dominates the hold-up
     for _ in range(20):  # the reset Pi's 3V3 rail switches off cleanly while the hold-up still decays
         out = system.step(1e-4, inputs)
     assert out["_nets"]["3V3"] < 0.1 and 0.5 < out["_nets"]["5V"] < 4.63
@@ -289,10 +286,10 @@ def test_electrical_stage_tvs_check(project):
 
     system = ElectricalSystem(project, routes={})
     result = StageResult(stage="electrical")
-    report = check_tvs(system, result)["hat"]
-    assert report["expected_surge_current"] == pytest.approx(15.0) and report["clamp_at_expected_surge"] < report["abs_max"]
+    report = check_tvs(system, result)["controller"]
+    assert report["expected_surge_current"] == pytest.approx(20.0) and report["clamp_at_expected_surge"] < report["abs_max"]
     assert not [d for d in result.diagnostics if d.code == "tvs_clamp_exceeds_abs_max"]
-    system.models["hat"].params.values["tvs"] = {"part": "SMAJ16A", "v_breakdown_max": 19.7, "v_clamp": 26.0, "i_pp": 15.4}
+    system.models["controller"].params.values["tvs"] = {"part": "SMAJ16A", "v_breakdown_max": 19.7, "v_clamp": 26.0, "i_pp": 15.4}
     result = StageResult(stage="electrical")
     check_tvs(system, result)
     assert [d for d in result.diagnostics if d.code == "tvs_clamp_exceeds_abs_max"]

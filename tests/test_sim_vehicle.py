@@ -14,8 +14,9 @@ from r3_sim.vehicle.servo import ackermann_angles
 
 
 @pytest.fixture(scope="module")
-def project(rc_car_fresh) -> Project:
-    return Project.load(rc_car_fresh)
+def project(tmp_path_factory) -> Project:
+    from test_joint_physics import drivetrain_project
+    return drivetrain_project(tmp_path_factory.mktemp("triangular-drive"))
 
 
 def test_mjcf_compiles_with_expected_structure(project):
@@ -35,7 +36,7 @@ def test_mjcf_compiles_with_expected_structure(project):
     assert set(project.spec.components) <= set(vm.bodies)
     assert all(members == [cid] for cid,members in vm.bodies.items() if cid in project.spec.components)
     assert model.neq >= len(project.spec.mechanical.interfaces)
-    assert {model.joint(i).name for i in range(model.njnt)} >= {"ball_tie_rod", "ball_tie_rod_r", "steer_servo"}
+    assert {model.joint(i).name for i in range(model.njnt)} >= {j.id for j in project.spec.mechanical.joints}
     for cid in project.spec.components:
         assert model.body(cid).mass > 0
         assert model.body(cid).geomnum > 0
@@ -45,30 +46,25 @@ def test_mjcf_compiles_with_expected_structure(project):
     drive = next(t for t in project.spec.mechanical.transmissions if t.type == "differential")
     params = lambda cid: {**project.catalog.component(project.spec.components[cid].type).behavior.params,  # noqa: E731
                           **project.spec.components[cid].params}
-    expected_armature = to_si(params(drive.actuator)["rotor_inertia"]) * drive.ratio ** 2 + to_si(params("gearbox")["output_inertia"])
+    expected_armature = to_si(params(drive.actuator)["rotor_inertia"]) * drive.ratio ** 2 + sum(to_si(params(cid).get("output_inertia", 0)) for cid, c in project.spec.components.items() if project.catalog.component(c.type).behavior)
     assert expected_armature > 0
     assert model.tendon_armature[0] == pytest.approx(expected_armature)
     estimated = [cid for cid, source in vm.mass_source.items() if source == "catalog"]
     assert any(d.code == "cad_mass_estimated" for d in vm.diagnostics) == bool(estimated)
-    assert model.geom_type[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "tire_wheel_rl")] == mujoco.mjtGeom.mjGEOM_CYLINDER
+    assert model.geom_type[mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, "tire_roller_left")] == mujoco.mjtGeom.mjGEOM_CYLINDER
 
 
 def test_steering_follows_cad_linkage_table(project):
-    vm = build_vehicle_model(project)
-    (steer,) = vm.steering
-    table = ((project.read_build_json("cad/cad_model.json") or {}).get("kinematics") or {}).get("steering")
-    if not table:
-        assert steer.source == "ackermann_ratio"
-        assert steer.wheel_angles(0.2) == ackermann_angles(steer.ratio * 0.2, steer.wheelbase, steer.kingpin_track,
-                                                            steer.max_steer)
-        return
-    assert steer.source == "cad_linkage"
-    for row in table["table"]:
-        assert steer.wheel_angles(row["servo_rad"]) == pytest.approx([row[j] for j in steer.joints], abs=1e-9)
-    # Horn travel stops hold the end rows; the inner wheel turns more than the outer one.
-    end = max(row["servo_rad"] for row in table["table"])
-    assert steer.wheel_angles(end + 0.2) == pytest.approx(steer.wheel_angles(end))
-    left, right = steer.wheel_angles(0.3)
+    from r3_sim.vehicle.mjcf import SteeringInfo
+    steering = SteeringInfo("linkage", "servo", ["left", "right"], .5, .4, .2, .5, [])
+    assert steering.wheel_angles(.2) == ackermann_angles(.1, .4, .2, .5)
+    steering.table_servo = [-.4, 0, .4]
+    steering.table_angles = {"left": [-.2, 0, .3], "right": [-.3, 0, .2]}
+    assert steering.source == "cad_linkage"
+    for index, horn in enumerate(steering.table_servo):
+        assert steering.wheel_angles(horn) == pytest.approx([steering.table_angles[j][index] for j in steering.joints], abs=1e-9)
+    assert steering.wheel_angles(.6) == pytest.approx(steering.wheel_angles(.4))
+    left, right = steering.wheel_angles(.3)
     assert left > right > 0
 
 
@@ -89,7 +85,7 @@ def test_ackermann_inner_wheel_turns_more():
     assert math.tan(left) == pytest.approx(0.26 / (radius - 0.085))
 
 
-def test_car_rolls_straight_under_constant_torque(tmp_path):
+def test_base_rolls_straight_under_constant_torque(tmp_path):
     from test_joint_physics import drivetrain_project
     project = drivetrain_project(tmp_path)
     vehicle = Vehicle(project, build_vehicle_model(project))
@@ -102,7 +98,7 @@ def test_car_rolls_straight_under_constant_torque(tmp_path):
     assert abs(vehicle.position()[1]) < 0.02
     assert abs(vehicle.yaw()) < 0.01
     # No longitudinal slip at moderate torque: ground speed = motor speed * r / N.
-    assert vehicle.forward_speed() == pytest.approx(vehicle.motor_omega() * 0.055 / 9.066, rel=0.02)
+    assert vehicle.forward_speed() == pytest.approx(vehicle.motor_omega() * 0.07 / 12.0, rel=0.02)
 
 
 def test_top_speed_consistent_with_motor_limit(tmp_path):
@@ -124,8 +120,8 @@ def test_top_speed_consistent_with_motor_limit(tmp_path):
     ke = 60.0 / (2 * math.pi * float(params["kv_rpm_per_v"]))
     v_batt = kernel.last_outputs[kernel.battery_id]["v_terminal"]
     omega_max = (v_batt - float(params.get("brush_drop", 0.2))) / ke  # no-load motor speed at this supply
-    bound = omega_max * 0.055 / 9.066
+    bound = omega_max * 0.07 / 12.0
     # The 9.066:1 drive spins the motor nearer its no-load speed only up to the load line: drag and rolling resistance
     # hold it near 80 % of the no-load wheel speed (8.5 of 10.7 m/s at this supply).
     assert 0.75 * bound < speed < bound
-    assert speed == pytest.approx(kernel.vehicle.motor_omega() * 0.055 / 9.066, rel=0.03)
+    assert speed == pytest.approx(kernel.vehicle.motor_omega() * 0.07 / 12.0, rel=0.03)

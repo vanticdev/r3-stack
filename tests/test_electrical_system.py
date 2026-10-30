@@ -1,4 +1,4 @@
-"""System-level electrical twin tests on the reference RC car."""
+"""System-level electrical twin tests on the reference bench."""
 
 import math
 from pathlib import Path
@@ -12,14 +12,14 @@ from r3_sim.electrical.ngspice import find_library
 
 pytestmark = pytest.mark.skipif(find_library() is None, reason="libngspice not installed")
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
 KT = 60 / (2 * math.pi * 2100)
 
 
 @pytest.fixture(scope="module")
-def project(rc_car_wiring):
-    """The RC car with routes generated in this session (wire lengths and gauges as routed); never the example's build."""
-    return Project.load(rc_car_wiring.root)
+def project(bench_fresh):
+    """The bench with routes generated in this session (wire lengths and gauges as routed); never the example's build."""
+    return Project.load(bench_fresh)
 
 
 def test_contract_step_outputs(project):
@@ -28,15 +28,15 @@ def test_contract_step_outputs(project):
                               "servo": {"pulse_us": 1500.0, "horn_torque": 0.2, "horn_speed": 0.5}, "pi": {"activity": 0.6}})
     assert out["pi"]["powered"] and out["_solver"]["converged"]
     assert out["_nets"]["5V"] == pytest.approx(5.1, abs=0.03)
-    assert out["_nets"]["SERVO_6V"] == pytest.approx(6.05, abs=0.05)  # HAT TPS56528 servo rail
+    assert out["_nets"]["SERVO_6V"] == pytest.approx(6.0, abs=0.05)  # HAT TPS56528 servo rail
     assert out["_branches"]["W_Y_P_IN"]["current"] == pytest.approx(out["battery"]["current"], rel=1e-6)
     for key in ("torque", "current"):
         assert key in out["motor"]
     for key in ("v_terminal", "soc", "current", "temperature_c"):
         assert key in out["battery"]
     assert {"temperature_c", "bec_voltage"} <= set(out["esc"])
-    contact = out["_branches"]["power_y.P1|battery_lead.B#1"]
-    assert contact["kind"] == "contact" and contact["to"] == "H:battery_lead.B.1"
+    contact = out["_branches"]["distribution.P1|supply.B#1"]
+    assert contact["kind"] == "contact" and contact["to"] == "H:supply.B.1"
     assert -contact["current"] == pytest.approx(out["battery"]["current"], rel=1e-6)  # flows battery -> P1
 
 
@@ -101,7 +101,7 @@ def test_fuse_blows_on_short_and_pi_browns_out(project):
         out = system.step(1e-3, inputs)
     assert not out["fuse"]["blown"]
     events = []
-    short = {**inputs, "_faults": [{"type": "short", "a": "hat.VBAT", "b": "GND", "resistance": 0.05}]}
+    short = {**inputs, "_faults": [{"type": "short", "a": "controller.VBAT", "b": "GND", "resistance": 0.05}]}
     for k in range(200):
         out = system.step(1e-3, short if k == 0 else inputs)
         events.extend(out["_events"])
@@ -155,8 +155,8 @@ def test_hand_calculations_agree_with_ngspice(project):
     v_hand = 2 * 3.82 - i_b * (battery.r0_ref + battery.r1_ref)
     assert stall["battery"]["v_terminal"] == pytest.approx(v_hand, rel=1e-6)
     # 3. Buck power balance: V_in I_in = V_out I_out / eta(I_out) + V_in I_q.
-    reg = stall["hat"]["regulator"]
-    core = system.models["hat"].core
+    reg = stall["controller"]["regulator"]
+    core = system.models["controller"].core
     p_in = reg["v_out"] * reg["i_out"] / reg["efficiency"] + reg["v_in"] * core.quiescent
     assert reg["power_in"] == pytest.approx(p_in, rel=1e-4)
     # 4. Kirchhoff: the battery current leaves through the battery lead.

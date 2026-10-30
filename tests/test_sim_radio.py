@@ -7,13 +7,13 @@ import pytest
 from r3_model.project import Project
 from r3_sim.radio import Propagation, RadioLink, knife_edge_loss_db, packet_error_rate, reflection_coefficient
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
-RX_HEIGHT = 0.078 + 0.10  # receiver pose z + antenna height above mount
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
+RX_HEIGHT = .4  # synthetic antenna height
 
 
 @pytest.fixture(scope="module")
 def link() -> RadioLink:
-    project = Project.load(RC_CAR)
+    project = Project.load(BENCH)
     params = dict(project.catalog.component("elrs-receiver-2g4").behavior.params)
     radio = RadioLink(project.spec.simulation.environment, params, np.random.default_rng(0))
     radio.uplink_shadow.sigma = 0.0  # deterministic mean link
@@ -34,14 +34,13 @@ def test_rssi_ranges(link):
 def test_breakpoint_distance_and_slope(link):
     prop = link.propagation
     assert prop.wavelength == pytest.approx(299_792_458.0 / 2.44e9)
-    d_c = prop.breakpoint_distance(1.2, RX_HEIGHT)
-    assert d_c == pytest.approx(4 * 1.2 * RX_HEIGHT / prop.wavelength)
-    assert d_c == pytest.approx(6.95, abs=0.05)
+    d_c = prop.breakpoint_distance(link.tx_position[2], RX_HEIGHT)
+    assert d_c == pytest.approx(4 * link.tx_position[2] * RX_HEIGHT / prop.wavelength)
     loss = lambda d: prop.two_ray_loss_db(link.tx_position, rx_at(link, d))  # noqa: E731
     # Beyond the breakpoint the loss approaches 40 dB/decade (vs 20 dB/decade free space).
     assert loss(2000) - loss(200) == pytest.approx(40.0, abs=2.5)
     # Asymptote 40 log d - 20 log(ht hr) at long range.
-    assert loss(3000) == pytest.approx(40 * math.log10(3000) - 20 * math.log10(1.2 * RX_HEIGHT), abs=1.5)
+    assert loss(3000) == pytest.approx(40 * math.log10(3000) - 20 * math.log10(link.tx_position[2] * RX_HEIGHT), abs=1.5)
 
 
 def test_reflection_coefficient_limits():

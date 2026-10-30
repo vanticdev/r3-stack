@@ -1,0 +1,12 @@
+robot: {name: rotary-instrument, mobility: stationary}
+components:
+  base: {type: coupon-base, pose: {xyz: [0, 0, 0.02]}}
+  support: {type: coupon-support}
+  sleeve: {type: coupon-sleeve}
+  rotor: {type: coupon-rotor}
+assembly:
+  root: base
+  joins:
+    - {id: support_mount, a: base.mount, b: support.base, clock: 0, fasteners: {type: M3x12, count: 2}}
+    - {id: sleeve_press, a: support.shaft, b: sleeve.inner, fit: interference}
+    - {id: rotor_pivot, a: sleeve.outer, b: rotor.inner, kind: revolute, joint: pivot, damping: 0.02}

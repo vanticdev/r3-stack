@@ -17,7 +17,7 @@ from r3_onshape.recompose import plan_sha
 
 @pytest.fixture
 def project(tmp_path):
-    source = Project.load(Path(__file__).resolve().parents[1] / "examples/robots/rc-car")
+    source = Project.load(Path(__file__).resolve().parents[1] / "tests/fixtures/bench")
     source.spec.components = {"pi": source.spec.components["pi"]}
     source.spec.components["pi"].type = "raspberry-pi-5-4gb"
     source.spec.components["pi"].source = None

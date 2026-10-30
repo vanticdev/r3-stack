@@ -31,7 +31,7 @@ export function stagePage(stage: string): string {
 const ACRONYMS = new Set(["pi", "esc", "bec", "gps", "hat", "imu", "rx", "tx", "pwm", "uart", "i2c", "spi", "led", "pcb", "lipo", "crsf", "vcc", "gnd", "sig"]);
 const CORNERS: Record<string, string> = { fl: "front-left", fr: "front-right", rl: "rear-left", rr: "rear-right" };
 
-/** "knuckle_fr" → "front-right knuckle", "battery_lead" → "battery lead", "power_y" → "power Y", "pi" → "Pi".
+/** "pivot_right" → "front-right knuckle", "supply" → "battery lead", "distribution" → "power Y", "pi" → "Pi".
  * Wire ids ("W_BAT_P") and pin ids ("esc.BEC") are already names and stay as they are. */
 export function partLabel(id: string): string {
   if (!id || /^[A-Z0-9_]+$/.test(id) || id.includes(".") || id.includes(":")) return id;

@@ -12,7 +12,7 @@ shaker table, :class:`r3_wiring.cable_sim.CableSimulator`). Load case
 Reports the minimum clearance of each wire to any moving part over the run and
 whether any cable sags into a moving part (clearance < 0).
 
-Run: ``python -m r3_wiring.driver examples/robots/rc-car``
+Run: ``python -m r3_wiring.driver examples/robots/robot``
 """
 
 from __future__ import annotations

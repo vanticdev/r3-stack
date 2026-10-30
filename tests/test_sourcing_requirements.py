@@ -10,7 +10,7 @@ from r3_catalog import default_catalog
 from r3_catalog.sourcing import Requirement, SourcedValue, catalog_params, parse_constraint, parse_money, parse_value
 from r3_catalog.sourcing.quantities import Approx, Bound, Equals, Range, Tagged
 from r3_model.spec import RobotSpec
-from sourcing_helpers import RC_CAR
+from sourcing_helpers import BENCH
 
 
 @pytest.mark.parametrize(("text", "expected"), [
@@ -72,7 +72,7 @@ def test_requirement_evaluate_and_digest():
     assert other.digest() != requirement.digest()
 
 
-def test_catalog_params_of_rc_car_parts():
+def test_catalog_params_of_bench_parts():
     catalog = default_catalog()
     pi = catalog_params(catalog.component("raspberry-pi-5-8gb"))
     assert pi["family"].value == "raspberry-pi-5" and pi["ram"].value == 8e9
@@ -83,11 +83,12 @@ def test_catalog_params_of_rc_car_parts():
 
 
 def _spec(mutate):
-    """The RC-car spec without its authored sourcing slots, then ``mutate``."""
-    data = yaml.safe_load((RC_CAR / "robot.yaml").read_text())
+    """The bench spec without its authored sourcing slots, then ``mutate``."""
+    data = yaml.safe_load((BENCH / "robot.yaml").read_text())
     for component in data["components"].values():
         component.pop("source", None)
         component.pop("owned", None)
+    data["components"].update(sample_a={"type": "wheel-110x45"}, sample_b={"type": "wheel-110x45"})
     mutate(data["components"])
     return data
 
@@ -109,8 +110,8 @@ def test_source_validation():
         RobotSpec.model_validate(_spec(lambda c: c["pi"].update(source={"requires": {"ram": ">= 4 GB"}})))
 
     def mismatched(components):
-        components["wheel_fl"]["source"] = {"requires": {"kind": "wheel", "diameter": "110 mm"}, "group": "wheels"}
-        components["wheel_fr"]["source"] = {"requires": {"kind": "wheel", "diameter": "100 mm"}, "group": "wheels"}
+        components["sample_a"]["source"] = {"requires": {"kind": "wheel", "diameter": "110 mm"}, "group": "wheels"}
+        components["sample_b"]["source"] = {"requires": {"kind": "wheel", "diameter": "100 mm"}, "group": "wheels"}
 
     with pytest.raises(ValidationError, match="share sourcing group"):
         RobotSpec.model_validate(_spec(mismatched))

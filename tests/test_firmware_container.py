@@ -17,8 +17,8 @@ from firmware_hal_stub import LockstepStub, serve
 from r3_hal import container
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE = ROOT / "examples/robots/rc-car/backend/python/rc_car_controller"
-TAG = "r3/rc-car-controller:smoke-test"
+MODULE = ROOT / "tests/fixtures/bench/backend/python/bench_controller"
+TAG = "r3/bench-controller:smoke-test"
 
 pytestmark = pytest.mark.skipif(not container.docker_available(), reason="Docker is not available")
 
@@ -46,7 +46,7 @@ def test_image_is_pi_os_userspace(image: str) -> None:
     assert info["machine"] == "aarch64"
     assert info["python"] == [3, 11], "Debian bookworm / Raspberry Pi OS bookworm ship CPython 3.11"
     assert 'VERSION_CODENAME=bookworm' in info["os"] and "ID=debian" in info["os"]
-    assert info["uid"] == 1000 and info["cwd"] == "/opt/blitz/backend/python/rc_car_controller"
+    assert info["uid"] == 1000 and info["cwd"] == "/opt/blitz/backend/python/bench_controller"
 
 
 def test_firmware_runs_in_container_against_tcp_stub(image: str) -> None:
@@ -63,7 +63,7 @@ def test_firmware_runs_in_container_against_tcp_stub(image: str) -> None:
     assert stub.done.is_set(), "firmware closed the session with bye"
 
     hello = stub.requests[0]
-    assert hello["op"] == "hello" and hello["module"] == "rc_car_controller"
+    assert hello["op"] == "hello" and hello["module"] == "bench_controller"
     sleeps = [r["t"] for r in stub.requests if r["op"] == "clock.sleep_until"]
     assert len(sleeps) == 200, "100 Hz control loop for 2.0 s of simulated time"
     steps = [b - a for a, b in zip(sleeps, sleeps[1:])]
@@ -92,13 +92,13 @@ def _pi5_dependency_cache_present() -> bool:
 @pytest.mark.skipif(not _pi5_dependency_cache_present(), reason="no cached BLITZ Pi 5 dependency image (run deploy.py cache)")
 def test_real_blitz_bundle_runs_in_container(tmp_path: Path) -> None:
     import runpy
-    twin = runpy.run_path(str(ROOT / "examples/robots/rc-car/backend/twin.py"), run_name="rc_car_twin_blitz_test")
-    tag = twin["build_image"]("r3/rc-car-controller:smoke-test-blitz", blitz=True, staging=tmp_path,
+    twin = runpy.run_path(str(ROOT / "tests/fixtures/bench/backend/twin.py"), run_name="bench_twin_blitz_test")
+    tag = twin["build_image"]("r3/bench-controller:smoke-test-blitz", blitz=True, staging=tmp_path,
                               allow_stale_dependencies=True)
     spec = json.loads((tmp_path / "context/runtime-spec.json").read_text())
-    assert spec["argv"] == ["/opt/blitz/.venv/bin/python", "-u", "/opt/blitz/backend/python/rc_car_controller/main.py"]
+    assert spec["argv"] == ["/opt/blitz/.venv/bin/python", "-u", "/opt/blitz/backend/python/bench_controller/main.py"]
     assert (tmp_path / "context/bundle/runtime-manifest.json").is_file()
-    assert (tmp_path / "context/bundle/python/rc_car_controller/_vendor/r3_hal/virtual.py").is_file()
+    assert (tmp_path / "context/bundle/python/bench_controller/_vendor/r3_hal/virtual.py").is_file()
     stub = LockstepStub()
     server = serve(stub)
     try:

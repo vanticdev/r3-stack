@@ -67,22 +67,22 @@ def test_bench_compiles_with_exact_poses(tmp_path):
     assert xyz["motor"] == [103, 0, 34]  # 25 mm half-can beyond the bracket face at x = 78
     assert xyz["wheel"] == [-50, 0, 6]
     assert xyz["pi"] == [-20, 0, 43]
-    assert xyz["hat"] == [-30, 0, 55.6]
+    assert xyz["controller"] == [-30, 0, 55.6]
     assert xyz["hat_so_4"] == [-1, -24.5, 44.6]
     # The motor faces the bracket: its +x axis points along robot -x (yaw 180 deg).
     assert np.allclose(project.assembly.poses["motor"][:3, 0], [-1, 0, 0], atol=1e-15)
     # Every object is placed from joins; mount is the tree parent.
     assert len(result.poses) == len(project.spec.components) == 20
-    assert project.spec.components["deck"].mount == "s_fl" and project.spec.components["hat"].mount == "pi"
+    assert project.spec.components["deck"].mount == "s_fl" and project.spec.components["controller"].mount == "pi"
 
 
 def test_bench_loops_close_and_header_clock_is_inferred(tmp_path):
     result = bench(tmp_path).assembly
     assert len(result.tree) == 19 and len(result.loops) == 10
     assert max(loop["position_error"] for loop in result.loops) < 1e-15
-    assert {loop["join"] for loop in result.loops} >= {"s_fr.top~deck.h_fr", "pi_so_4.top~pi.b4", "hat_so_1.top~hat.h1"}
+    assert {loop["join"] for loop in result.loops} >= {"s_fr.top~deck.h_fr", "pi_so_4.top~pi.b4", "hat_so_1.top~controller.h1"}
     # 2x20 grid is 180-degree symmetric; pin 1 picks clock 0 without an authored clock.
-    assert result.joins["pi.gpio~hat.socket"]["clock_deg"] == pytest.approx(0.0)
+    assert result.joins["pi.gpio~controller.socket"]["clock_deg"] == pytest.approx(0.0)
 
 
 def test_wheel_joint_is_derived_and_moves(tmp_path):
@@ -104,7 +104,7 @@ def test_assembly_stage_writes_artifacts(tmp_path):
     assert result.ok and result.diagnostics == []
     payload = json.loads((project.root / "build" / "model" / "assembly.json").read_text())
     assert payload["root"] == "plate" and len(payload["poses"]) == 20 and len(payload["loops"]) == 10
-    assert payload["poses"]["hat"]["xyz"] == pytest.approx([-0.03, 0, 0.0556])
+    assert payload["poses"]["controller"]["xyz"] == pytest.approx([-0.03, 0, 0.0556])
     assert payload["joints"][0]["id"] == "wheel_spin"
     # Exact solids: every overlap is an allowed one (the bench parts are catalog envelopes without modeled holes, so the
     # axle in the wheel hub and the screws in their parts overlap them), and each is recorded with its reason.
@@ -123,7 +123,7 @@ def test_model_stage_sees_compiled_poses(tmp_path):
     project = bench(tmp_path)
     result = stages.run_stage(project, "model")
     graph = json.loads((project.root / "build" / "model" / "graph.json").read_text())
-    assert graph["components"]["hat"]["aabb_min"][2] == pytest.approx(0.0556)
+    assert graph["components"]["controller"]["aabb_min"][2] == pytest.approx(0.0556)
     assert "stage_crashed" not in {d.code for d in result.diagnostics}
 
 
@@ -242,14 +242,14 @@ def test_wrong_explicit_clock_reports_matching_clocks(tmp_path):
 
 def test_header_pin1_reversed_is_header_mismatch(tmp_path):
     def flip(types):
-        types["hat-bench"]["interfaces"]["socket"]["params"]["pin1"] = ["-24.13 mm", "-1.27 mm"]
+        types["controller-bench"]["interfaces"]["socket"]["params"]["pin1"] = ["-24.13 mm", "-1.27 mm"]
     diag = only(bench(tmp_path, catalog=flip), "header_mismatch")
     assert diag.data["pin1_offset"] == pytest.approx(2.54e-3) and diag.data["max_pin_offset"] == pytest.approx(0.0, abs=1e-15)
 
 
 def test_header_pitch_mismatch(tmp_path):
     def pitch(types):
-        types["hat-bench"]["interfaces"]["socket"]["params"]["pitch"] = "2.0 mm"
+        types["controller-bench"]["interfaces"]["socket"]["params"]["pitch"] = "2.0 mm"
     diag = only(bench(tmp_path, catalog=pitch), "header_mismatch")
     assert (diag.data["header_pitch"], diag.data["socket_pitch"]) == pytest.approx((2.54e-3, 2.0e-3))
     assert diag.data["max_pin_offset"] > 0.5e-3
@@ -307,7 +307,7 @@ def test_kind_mismatch_and_join_kind_invalid(tmp_path):
 
 def test_unknown_interface(tmp_path):
     def typo(data):
-        join(data, "pi.gpio~hat.socket")["b"] = "hat.sockett"
+        join(data, "pi.gpio~controller.socket")["b"] = "controller.sockett"
     diag = only(bench(tmp_path, spec=typo), "interface_unknown")
     assert diag.data["interface"] == "sockett" and "socket" in diag.data["available"]
 
@@ -354,14 +354,14 @@ def test_authored_pose_matching_is_ignored_and_conflict_is_error(tmp_path):
 
 def test_unjoined_object_with_authored_pose_is_kept_with_warning(tmp_path):
     def legacy(data):
-        data["components"]["gps"] = {"type": "hat-bench", "pose": {"xyz": [0.1, 0, 0.1]}}
+        data["components"]["gps"] = {"type": "controller-bench", "pose": {"xyz": [0.1, 0, 0.1]}}
     project = bench(tmp_path, spec=legacy)
     diag = only(project, "object_not_joined")
     assert diag.severity.value == "warning" and project.spec.components["gps"].pose.xyz == [0.1, 0, 0.1]
 
 
 def test_specs_without_assembly_are_untouched():
-    legacy = ROOT / "tests" / "fixtures" / "rc_car_layout_v0"  # an authored-pose robot (the RC car now uses joins)
+    legacy = ROOT / "tests" / "fixtures" / "bench"  # an authored-pose robot (the bench now uses joins)
     project = Project.load(legacy)
     raw = yaml.safe_load((legacy / "robot.yaml").read_text())
     assert project.spec.assembly is None and project.assembly is None

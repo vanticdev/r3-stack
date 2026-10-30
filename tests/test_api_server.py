@@ -1,4 +1,4 @@
-"""HTTP API endpoints (FastAPI TestClient) against a temporary copy of examples/robots/rc-car."""
+"""HTTP API endpoints (FastAPI TestClient) against a temporary copy of tests/fixtures/bench."""
 
 from __future__ import annotations
 
@@ -13,24 +13,27 @@ import pytest
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
-from api_helpers import copy_rc_car, write_sim_scenario, write_stage_outputs  # noqa: E402
+from api_helpers import copy_bench, write_sim_scenario, write_stage_outputs  # noqa: E402
 from r3_orchestrator import api  # noqa: E402
 from r3_orchestrator.api.agents import AgentManager  # noqa: E402
 from r3_orchestrator.api.server import create_app  # noqa: E402
 
-PID = "rc-car"
+PID = "bench"
 DOCTOR = {"ok": True, "environment": {"python": "3", "display": False}, "tools": {"mujoco": {"available": True}}, "stages": []}
 
 
 @pytest.fixture(scope="module")
 def built_template(tmp_path_factory):
-    """rc-car with real assembly/model/report results plus stage hand-off files (built once per module)."""
+    """bench with real assembly/model/report results plus stage hand-off files (built once per module)."""
     parent = tmp_path_factory.mktemp("template")
-    root = copy_rc_car(parent)
+    root = copy_bench(parent)
     # A real model error to exercise failed-stage paths: the heartbeat GPIO binding on an unwired header pin.
-    text = (root / "robot.yaml").read_text()
-    line = next(row for row in text.splitlines() if row.strip().startswith("heartbeat:"))
-    (root / "robot.yaml").write_text(text.replace(line, re.sub(r"pins: \[[^\]]*\]", "pins: [pi.J8.32]", line)))
+    data = yaml.safe_load((root / "robot.yaml").read_text())
+    data["software"]["bindings"]["heartbeat"]["pins"] = ["pi.J8.32"]
+    data["simulation"]["scenarios"][1]["expect"]["min_top_speed_mps"] = 8.0
+    data["simulation"]["scenarios"].append({"id": "low_battery", "duration": "1 s", "expect": {"min_cell_voltage_v": 3.0}})
+    (root / "robot.yaml").write_text("# Robot frame: synthetic instrument fixture\n" + yaml.safe_dump(data, sort_keys=False))
+    (root / "r3.lock.yaml").write_text(yaml.safe_dump({"cad": {"provider": "onshape", "document_id": "d1", "workspace_id": "w1", "element_id": "e1", "url": "https://cad.onshape.com/documents/d1/w/w1/e/e1"}}))
     api.validate(root, ["assembly", "model"])
     write_stage_outputs(root)
     write_sim_scenario(root, fingerprint=api.load_project(root).fingerprint())
@@ -90,7 +93,7 @@ def test_unknown_routes_and_web_fallback(client, tmp_path):
     (dist / "assets").mkdir(parents=True)
     (dist / "index.html").write_text("<html>R3 app</html>")
     (dist / "assets" / "app.js").write_text("console.log(1)")
-    assert client.get("/projects/rc-car/wiring").text == "<html>R3 app</html>"  # SPA route
+    assert client.get("/projects/bench/wiring").text == "<html>R3 app</html>"  # SPA route
     assert client.get("/assets/app.js").text == "console.log(1)"
 
 
@@ -98,10 +101,10 @@ def test_unknown_routes_and_web_fallback(client, tmp_path):
 def test_list_projects(client):
     body = client.get("/api/projects").json()
     (row,) = body["projects"]
-    assert row["id"] == PID and row["name"] == "r3-rc-car" and row["error"] is None
+    assert row["id"] == PID and row["name"] == "r3-bench" and row["error"] is None
     assert row["stages"]["model"] == "failed" and row["stages"]["cad"] == "missing"
     assert row["last_run"]["status"] == "failed" and "model" in row["last_run"]["failed_stages"]
-    assert "rc-car" in body["templates"] and "blank" in body["templates"]
+    assert "bench" in body["templates"] and "blank" in body["templates"]
 
 
 def test_project_detail_with_release_matrix(client):
@@ -154,7 +157,7 @@ def test_create_project(client, projects, monkeypatch):
 # ------------------------------------------------------------------- spec
 def test_spec_read_and_patch_keeps_comments(client, projects):
     spec = client.get(f"/api/projects/{PID}/spec").json()
-    assert spec["spec"]["robot"]["name"] == "r3-rc-car" and "# Robot frame" in spec["yaml"]
+    assert spec["spec"]["robot"]["name"] == "r3-bench" and "# Robot frame" in spec["yaml"]
     patched = client.patch(f"/api/projects/{PID}/spec", json={"patch": {"robot": {"description": "patched over HTTP"}},
                                                              "sha256": spec["sha256"]})
     assert patched.status_code == 200, patched.text
@@ -194,17 +197,17 @@ def test_model(client):
 
 def test_cad(client):
     body = client.get(f"/api/projects/{PID}/cad").json()
-    assert body["meshes"]["chassis"] == f"/api/projects/{PID}/artifacts/cad/meshes/chassis.stl"
+    assert body["meshes"]["base"] == f"/api/projects/{PID}/artifacts/cad/meshes/base.stl"
     assert body["onshape"]["part_studio"] == "https://cad.onshape.com/documents/d1/w/w1/e/e1"
-    assert client.get(body["meshes"]["chassis"]).text.startswith("solid chassis")
+    assert client.get(body["meshes"]["base"]).text.startswith("solid base")
 
 
 def test_wiring(client):
     body = client.get(f"/api/projects/{PID}/wiring").json()
     assert body["routes"]["wires"]["W_BAT_P"]["awg"] == 12
-    assert body["bom"] == [{"section": "wire", "harness": "battery_lead", "item": "W_BAT_P", "awg": 12, "quantity": 1, "cut_length_mm": 79}]
+    assert body["bom"] == [{"section": "wire", "harness": "supply", "item": "W_BAT_P", "awg": 12, "quantity": 1, "cut_length_mm": 79}]
     assert body["clearances"]["static"][0]["min_distance"] == 0.012 and body["clearances"]["requirement"] == pytest.approx(0.008)
-    assert body["harnesses"]["battery_lead"]["index"] == 0 and "via" in body["harnesses"]["battery_lead"]["route"]
+    assert body["harnesses"]["supply"]["index"] == 0 and "via" in body["harnesses"]["supply"]["route"]
     assert "slack_timeline" in body["missing"]
 
 
@@ -221,8 +224,8 @@ def test_electrical(client):
 
 def test_pcb(client):
     (board,) = client.get(f"/api/projects/{PID}/pcb").json()["boards"]
-    assert board["board"] == "carrier-hat" and board["erc"] == {"errors": 0, "warnings": 1}
-    assert board["gerbers_url"].endswith("/artifacts/pcb/carrier-hat/gerbers.zip") and board["renders"][0]["path"].endswith("top.png")
+    assert board["board"] == "test-board" and board["erc"] == {"errors": 0, "warnings": 1}
+    assert board["gerbers_url"].endswith("/artifacts/pcb/test-board/gerbers.zip") and board["renders"][0]["path"].endswith("top.png")
     assert board["catalog_connectors"]  # the HAT's catalog pin map, to compare with board.json
 
 
@@ -232,7 +235,7 @@ def test_software(client):
     esc = bindings["esc_pwm"]
     assert esc["pin_map"][0]["node"].startswith("C:pi.") and "esc.SIG" in esc["pin_map"][0]["reaches"]
     assert esc["expects_reached"] == [{"pin": "esc.J_SIG.1", "reached": True}]
-    assert body["modules"][0]["name"] == "rc_car_controller" and body["modules"][0]["exists"]
+    assert body["modules"][0]["name"] == "bench_controller" and body["modules"][0]["exists"]
     (logs,) = body["firmware_logs"]
     assert logs["firmware_logs"] == [{"t": 0.5, "msg": "armed"}] and "controller started" in logs["software_log_tail"]
 
@@ -247,10 +250,10 @@ def test_sim_list_and_detail(client):
     assert recording["hz"] == 10 and len(series["t"]) == 21 and series["speed"][5] == pytest.approx(2.0)
     assert series["rssi"][-1] is None  # NaN is not JSON
     frames = recording["frames"]
-    assert len(frames["t"]) == 21 and frames["component_bodies"] == {"chassis": "chassis", "battery": "chassis", "wheel_rl": "wheel_rl"}
-    chassis = frames["bodies"]["chassis"]
-    assert chassis[10][0] == pytest.approx(2.0 * frames["t"][10], abs=1e-4) and len(chassis[0]) == 7
-    assert frames["bodies"]["wheel_rl"][0][1] == pytest.approx(0.1, abs=1e-4)  # world pose via forward kinematics
+    assert len(frames["t"]) == 21 and frames["component_bodies"] == {"base": "base", "battery": "base", "arm": "arm"}
+    base = frames["bodies"]["base"]
+    assert base[10][0] == pytest.approx(2.0 * frames["t"][10], abs=1e-4) and len(base[0]) == 7
+    assert frames["bodies"]["arm"][0][1] == pytest.approx(0.1, abs=1e-4)  # world pose via forward kinematics
     cable = frames["cables"]["cable00s0"]
     assert len(cable["points"]) == 21 and len(cable["points"][0]) == 4 and cable["rgba"] == [0.85, 0.1, 0.1, 1.0]
     assert cable["od"] == pytest.approx(0.004)

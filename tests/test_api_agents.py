@@ -12,13 +12,13 @@ import yaml
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
-from api_helpers import copy_rc_car, fake_cli_bin, sse  # noqa: E402
+from api_helpers import copy_bench, fake_cli_bin, sse  # noqa: E402
 from r3_orchestrator import mcp_server  # noqa: E402
 from r3_orchestrator.api import agents as agent_runner  # noqa: E402
 from r3_orchestrator.api.agents import AgentManager  # noqa: E402
 from r3_orchestrator.api.server import create_app  # noqa: E402
 
-PID = "rc-car"
+PID = "bench"
 GATED = {"deploy_fleet", "create_github_repo"}
 
 
@@ -26,7 +26,7 @@ GATED = {"deploy_fleet", "create_github_repo"}
 def env(tmp_path, monkeypatch):
     parent = tmp_path / "projects"
     parent.mkdir()
-    root = copy_rc_car(parent)
+    root = copy_bench(parent)
     bin_dir = fake_cli_bin(tmp_path / "bin")
     monkeypatch.setenv("PATH", f"{bin_dir}:{__import__('os').environ['PATH']}")
     log = tmp_path / "agent-call.json"
@@ -146,7 +146,7 @@ def test_generated_mcp_config_starts_the_r3_server(tmp_path):
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
-    root = copy_rc_car(tmp_path)
+    root = copy_bench(tmp_path)
     server = agent_runner.mcp_config(root)["mcpServers"]["r3"]
 
     async def check() -> tuple[set[str], dict]:
@@ -159,4 +159,4 @@ def test_generated_mcp_config_starts_the_r3_server(tmp_path):
 
     tools, status = asyncio.run(asyncio.wait_for(check(), 60))
     assert {"r3_status", "r3_patch_spec", "r3_release_status"} | GATED <= tools
-    assert status["robot"]["name"] == "r3-rc-car" and status["project"] == str(root.resolve())
+    assert status["robot"]["name"] == "r3-bench" and status["project"] == str(root.resolve())

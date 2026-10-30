@@ -1,4 +1,4 @@
-"""Phase B: the RC car as joined objects, local-frame CAD parts and the organized
+"""Phase B: the bench as joined objects, local-frame CAD parts and the organized
 Onshape document plan. No Onshape access: the organization check runs against a
 fake REST transport."""
 
@@ -19,12 +19,12 @@ from r3_model.diagnostics import StageResult
 from r3_model.project import Project
 
 ROOT = Path(__file__).resolve().parents[1]
-RC_CAR = ROOT / "examples" / "robots" / "rc-car"
+BENCH = ROOT / "tests" / "fixtures" / "mechanism"
 
 
 @pytest.fixture(scope="module")
 def project():
-    return Project.load(RC_CAR)
+    return Project.load(BENCH)
 
 
 @pytest.fixture(scope="module")
@@ -39,98 +39,65 @@ def _errors(diagnostics):
 
 
 # ------------------------------------------------------------------ compile
-def test_rc_car_compiles_with_every_object_joined(project):
+def test_bench_compiles_with_every_object_joined(project):
     result = project.assembly
     assert _errors(result.diagnostics) == []
     assert set(result.poses) == set(project.spec.components)
-    assert all(loop["ok"] for loop in result.loops)
-    assert max(loop["position_error"] for loop in result.loops) < 1e-9
-    authored = [cid for cid, c in yaml.safe_load((RC_CAR / "robot.yaml").read_text())["components"].items() if "pose" in c]
-    assert authored == ["chassis"]  # only the root keeps an authored pose
-    warnings = {d.code for d in result.diagnostics if d.severity.value == "warning"}
-    assert warnings <= {"loop_mobility_low", "mount_pattern_estimated"}
-    provisional = [d for d in result.diagnostics if d.code == "mount_pattern_estimated"]
-    assert len(provisional) == 1 and "front_camera" in provisional[0].subjects
-    assert "30 × 30 mm" in provisional[0].message  # owned UC-717 measurements are pending
+    authored = [cid for cid, c in yaml.safe_load((BENCH / "robot.yaml").read_text())["components"].items() if "pose" in c]
+    assert authored == ["base"]
+    loops = Project.load(ROOT / "tests/fixtures/assembly_bench").assembly.loops
+    assert loops and all(loop["ok"] for loop in loops)
+    assert max(loop["position_error"] for loop in loops) < 1e-9
 
 
 def test_exact_interference_and_seats_are_clean(project):
     from r3_orchestrator.assembly_stage import run
-
-    stage = run(Project.load(RC_CAR))
+    stage = run(project)
     codes = {d.code for d in stage.diagnostics}
     assert "object_interference" not in codes and "seat_not_in_contact" not in codes
-    assert stage.metrics["interferences"] == 0 and stage.metrics["exact_solids"] >= 130
+    assert stage.metrics["interferences"] == 0
+    assert stage.metrics["exact_solids"] == len(project.spec.components) + len(project.spec.mechanical.fasteners)
 
 
 def test_derived_mechanics_cover_fasteners_interfaces_and_joints(project):
     mech = project.spec.mechanical
-    fasteners = {f.id: f for f in mech.fasteners}
-    assert len(fasteners) >= 60 and all(f.join for f in fasteners.values())
-    kingpin = fasteners["kingpin_thread_fl"]
-    assert kingpin.body == "kp_fl" and kingpin.thread_into == "arm_fl" and not kingpin.preloaded
-    assert kingpin.part == "kp_fl" and kingpin.length == pytest.approx(7.85e-3)
-    nut = fasteners["wheel_nut_rl"]
-    assert nut.body == "nut_rl" and nut.thread_into == "axle_rl" and nut.clamps == ["wheel_rl", "spacer_rl", "bearing_rl"]
-    mast = fasteners["mast_mount_1"]
-    assert mast.nut == "nut-m3-nyloc" and mast.clamps == ["antenna_mast", "deck"] and mast.grip == pytest.approx(6e-3)
-    screw = fasteners["gb_mount_1"]
-    assert screw.type == "shcs-m3" and screw.length == pytest.approx(0.010) and screw.thread_into == "gearbox"
-    assert screw.axis == pytest.approx([0, 0, 1]) and screw.position[2] == pytest.approx(0.025)  # head under the plate
-    kinds = {i.id: i.kind for i in mech.interfaces}
-    assert kinds["kingpin_fl"] == "revolute_fit" and kinds["horn_spline"] == "spline" and kinds["bj_kl"] == "ball_joint"
-    assert kinds["output_l"] == "drive_flat" and kinds["stub_press_fl"] == "press_fit" and kinds["gpio_header"] == "connector_retention"
-    assert kinds["enc_magnet_1_bond"] == "adhesive" and kinds["battery_strap_loop"] == "strap" and kinds["enc_target"] == "magnetic_target"
-    joints = {j.id: j for j in mech.joints}
-    assert set(joints) == {"spin_rl", "spin_rr", "steer_fl", "steer_fr", "spin_fl", "spin_fr", "steer_servo"}
-    assert joints["steer_fl"].interface == "kingpin_fl" and joints["steer_fl"].damping == pytest.approx(0.02)
-    assert joints["steer_fl"].limits == pytest.approx([-0.45, 0.45]) and joints["spin_fl"].type == "continuous"
+    assert len(mech.fasteners) == 2 and all(f.join == "support_mount" for f in mech.fasteners)
+    assert all(f.type == "shcs-m3" and f.length == pytest.approx(.012) and f.thread_into == "support" for f in mech.fasteners)
+    assert all(f.axis == pytest.approx([0, 0, 1]) and f.position[2] == pytest.approx(.02) for f in mech.fasteners)
+    assert {i.id: i.kind for i in mech.interfaces} == {"sleeve_press": "press_fit", "rotor_pivot": "revolute_fit"}
+    (joint,) = mech.joints
+    assert joint.id == "pivot" and joint.interface == "rotor_pivot" and joint.damping == pytest.approx(.02)
 
 
 def test_mirrored_parts_place_symmetrically(project):
-    poses = project.assembly.poses
-    for left, right in (("knuckle_fl", "knuckle_fr"), ("arm_fl", "arm_fr"), ("hub_rl", "hub_rr"), ("tie_rod", "tie_rod_r")):
-        assert poses[right][:3, 3] == pytest.approx(poses[left][:3, 3] * np.array([1, -1, 1]), abs=1e-12)
-    joints = {j.id: j for j in project.spec.mechanical.joints}
-    assert joints["steer_fr"].origin == pytest.approx(np.array(joints["steer_fl"].origin) * [1, -1, 1], abs=1e-12)
+    from r3_onshape.parts import build_part_catalog
+    from r3_model.spec import ComponentInstance
+    variant = Project(root=project.root, spec=copy.deepcopy(project.spec), lock={})
+    variant.spec.components["mirror"] = ComponentInstance(type="coupon-support", params={"mirror": [1, -1, 1]})
+    parts, instances = build_part_catalog(variant)
+    original, mirrored = parts[instances["support"]], parts[instances["mirror"]]
+    assert mirrored.mirror_of == original.key and mirrored.mirror == [1, -1, 1]
 
 
-def test_hat_follows_board_json_hole_offset(project):
-    """board.json puts the 58 x 49 pattern 0.25 mm toward the GPIO edge: the HAT center sits 0.25 mm off the Pi pattern."""
-    pi, hat = project.assembly.poses["pi"], project.assembly.poses["hat"]
-    assert hat[1, 3] - pi[1, 3] == pytest.approx(-0.25e-3, abs=1e-12)
 
 
 def test_printed_bores_use_the_print_fit_table(project, tmp_path):
     from r3_model.assembly import compile_assembly
-
-    spec = copy.deepcopy(project.spec)
     catalog = copy.deepcopy(project.catalog)
-    knuckle = catalog.components["steering-knuckle"]
-    knuckle.interfaces["kingpin"].params["d"] = "3.5 mm"  # 0.5 mm on a 3 mm shank: beyond the SLS sliding range
-    result = compile_assembly(spec, catalog)
-    fits = [d for d in result.diagnostics if d.code == "fit_out_of_range" and "kingpin_fl" in d.subjects]
-    assert fits and fits[0].data["print_process"] == "sls" and fits[0].data["limit_max"] == pytest.approx(0.3e-3)
+    catalog.components["coupon-rotor"].interfaces["inner"].params["d"] = .017
+    result = compile_assembly(copy.deepcopy(project.spec), catalog)
+    fits = [d for d in result.diagnostics if d.code == "fit_out_of_range" and "rotor_pivot" in d.subjects]
+    assert fits and fits[0].data["print_process"] == "fdm"
+    assert fits[0].data["clearance_min"] > fits[0].data["limit_max"]
 
 
-def test_caps_follow_the_print_clearance(project):
-    for type_id, head in (("screw-cap-m2.5-petg", "shcs-m2.5"), ("screw-cap-m3-petg", "shcs-m3")):
-        seat = project.catalog.component(type_id).interfaces["seat"].params
-        fit = project.catalog.print_fits["fdm"]
-        from r3_model.units import to_si
-
-        assert to_si(seat["inner_d"]) == pytest.approx(project.catalog.fastener(head).head_diameter + 2 * to_si(fit.cap_clearance))
 
 
 # ------------------------------------------------------------------ CAD parts and assembly plan
 def test_parts_are_local_and_exactly_disjoint(project, catalog_parts):
-    from r3_onshape.parts import instance_poses, world_manifold
-
     parts, instances = catalog_parts
-    assert len(instances) == len(project.spec.components) + sum(1 + bool(f.nut) for f in project.spec.mechanical.fasteners if not f.body)
-    assert {p.name for p in parts.values()} >= {"Chassis plate", "Steering knuckle L", "Steering knuckle R", "SHCS M3x10"}
-    mirrored = [p for p in parts.values() if p.mirror_of]
-    assert {p.name for p in mirrored} == {"Steering knuckle R", "Front arm R", "Front stub axle R", "Rear hub carrier R", "Tie rod R"}
+    assert len(instances) == len(project.spec.components) + len(project.spec.mechanical.fasteners)
+    assert {p.name for p in parts.values()} == {"Coupon base", "Coupon support", "Coupon sleeve", "Coupon rotor", "SHCS M3x12"}
     assert all(not p.library for p in parts.values() if p.plan.kind == "fabricated")
 
 
@@ -139,7 +106,7 @@ def test_mates_reproduce_the_compiled_poses(project, catalog_parts):
 
     parts, instances = catalog_parts
     plan = plan_assembly(project, parts, instances)
-    assert {m.kind for m in plan.mates} == {"FASTENED", "REVOLUTE", "BALL"}
+    assert {m.kind for m in plan.mates} == {"FASTENED", "REVOLUTE"}
     mated = {x for m in plan.mates for x in (m.a[0], m.b[0])}
     assert mated == set(plan.placements)
     for mate in plan.mates:
@@ -249,7 +216,7 @@ def _fake_document(default_name=False, loose_tab=False, loose_sketch=False):
     from r3_onshape.parts import ConnectorSpec, LocalPart
     from r3_onshape.geometry import PartPlan
 
-    part = LocalPart(key="post", name="Servo post", studio="Servo post", type="servo-post-al6061",
+    part = LocalPart(key="post", name="Servo post", studio="Servo post", type="coupon-support",
                      plan=PartPlan(name="Servo post", kind="fabricated", material="Al", density=2700),
                      connectors=[ConnectorSpec("mc_base", np.eye(4), "base"), ConnectorSpec("mc_top", np.eye(4), "top")])
     features = [{"name": "Extrude 1" if default_name else "envelope extrude 27.5 mm", "featureType": "extrude", "featureId": "F1"},
@@ -288,28 +255,12 @@ def test_organization_check_flags_bad_documents(flags, code):
 
 
 def test_misaligned_hole_pattern_is_a_compile_error(tmp_path):
-    """Negative test: move one gearbox mounting hole in the chassis by 0.5 mm."""
     import shutil
-
-    shutil.copy(RC_CAR / "robot.yaml", tmp_path / "robot.yaml")
-    catalog = tmp_path / "catalog" / "components"
-    catalog.mkdir(parents=True)
-    data = yaml.safe_load((ROOT / "packages/component-catalog/r3_catalog/data/components/rc_car.yaml").read_text())
-    plate = copy.deepcopy(next(c for c in data["components"] if c["id"] == "chassis-plate-al6061"))
-    plate["interfaces"]["gearbox"]["params"]["holes"][0][0] = "18.5 mm"
-    (catalog / "override.yaml").write_text(yaml.safe_dump({"components": [plate]}))
+    shutil.copytree(BENCH, tmp_path, dirs_exist_ok=True, ignore=shutil.ignore_patterns("build", "__pycache__"))
+    path = tmp_path / "catalog/components/coupons.yaml"
+    data = yaml.safe_load(path.read_text())
+    data["components"][0]["interfaces"]["mount"]["params"]["holes"][0][0] += .0005
+    path.write_text(yaml.safe_dump(data))
     mismatch = [d for d in Project.load(tmp_path).assembly.diagnostics if d.code == "hole_pattern_mismatch"]
-    assert mismatch and "gb_mount" in mismatch[0].subjects and mismatch[0].data["max_offset"] == pytest.approx(5e-4, abs=1e-9)
-
-
-def test_sim_encoder_reads_the_differential_carrier(project):
-    from r3_sim.vehicle.mjcf import build_vehicle_model
-
-    vm = build_vehicle_model(project)
-    assert {w.component for w in vm.wheels.values()} == {"wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"}
-    assert {w.steered_by for w in vm.wheels.values()} == {"steer_fl", "steer_fr", None}
-    assert vm.steering[0].horn_joint == "steer_servo"
-    params = project.catalog.component("hall-encoder-a1120").behavior.params
-    assert params["target"] == "differential_carrier"
-    assert project.spec.software.config["encoder_pulses_per_rev"] == pytest.approx(4 * params["target_ratio"], abs=1e-3)
-    assert json.loads(json.dumps(project.spec.software.config["traction"]))["gear_ratio"] == pytest.approx(9.066)
+    assert mismatch and "support_mount" in mismatch[0].subjects
+    assert mismatch[0].data["max_offset"] == pytest.approx(5e-4, abs=1e-9)

@@ -22,27 +22,9 @@ witnesses in its data. When they disagree, the finding is replaced by
 ``geometry_uncertain`` (warning) carrying all three values: a hard violation is
 never asserted from a single, possibly broken, representation.
 
-Forensics (review packet, ``-236.7 mm`` from ``esc_motor`` to ``knuckle_fl``): the
-packet's wiring run (commit 9c33004) took the SDF sign from the outward normal
-of the nearest surface sample. Seen from a far point, the nearest point of a
-part is almost always an edge or a corner, where samples of two faces coincide;
-when the tie-break picks the face whose plane the point is behind, the sign
-flips and the true *distance* (232.8 mm, the knuckle is at the front of the
-car) is reported as a *penetration*. Re-evaluating that rule on the archived
-28-part CAD reproduces -235.1 mm at the reported point; the winding number
-gives +232.8 mm. The meshes themselves were closed and consistently wound
-(volume = CAD volume). The CAD was also stale (the knuckle sat 16 mm further
-aft than in the current 119-part CAD), which changes the magnitudes but not the
-sign. :func:`legacy_nearest_normal_sdf` keeps the old rule for the regression
-fixture in ``tests/test_wiring_witness.py``.
-
-The CAD audit checks every mesh the wiring stage loads for closure
-(watertight), consistent winding, outward orientation (positive volume), units
-and placement (mesh bounds versus ``cad_model.json`` ``bbox_min``/``bbox_max``),
-volume versus the CAD mass properties and revision staleness versus
-``robot.yaml``. It audits the CAD export after welding tessellation seams, with
-a chord-error volume envelope, and separately audits the vertex-clustered routing
-copy, which must stay a closed oriented surface (see :mod:`r3_wiring.geometry_audit`).
+Clearance witnesses must be evaluated in the same world frame as the routed
+wire and the component mesh. A point sampled in another frame can produce an
+arbitrarily large negative distance, so independent representations are compared.
 """
 
 from __future__ import annotations

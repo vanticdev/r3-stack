@@ -1,4 +1,4 @@
-"""Model stage: the unmodified RC car and injected faults."""
+"""Model stage: the unmodified bench and injected faults."""
 
 from __future__ import annotations
 
@@ -31,20 +31,17 @@ def baseline(tmp_path_factory):
     return root, run(root)
 
 
-def test_rc_car_electrical_and_bindings_clean(baseline):
+def test_bench_electrical_and_bindings_clean(baseline):
     _, result = baseline
     assert not (codes(result) & ELECTRICAL_CODES), [d.message for d in result.diagnostics if d.code in ELECTRICAL_CODES]
     assert "mass_exceeds_requirement" not in codes(result)
     assert result.metrics["total_mass"] < result.metrics["mass_limit"]
 
 
-def test_rc_car_layout_interference(baseline):
+def test_bench_layout_interference(baseline):
     _, result = baseline
     pairs = {frozenset(d.subjects) for d in find(result, "component_interference")}
-    # Real overlaps in the authored layout (see the stage report): standoffs inside the ESC and the
-    # motor can; the HAT envelope inside the Pi envelope; knuckles 0.5 mm into the wheel envelopes.
-    assert frozenset({"esc", "standoff_rl"}) in pairs
-    assert frozenset({"motor", "standoff_rr"}) in pairs
+    assert frozenset({"block_a", "block_b"}) in pairs
     for d in find(result, "component_interference"):
         assert d.data["overlap_volume"] > 0 and d.data["depth"] > 0
 
@@ -52,10 +49,10 @@ def test_rc_car_layout_interference(baseline):
 def test_graph_json_written(baseline):
     root, result = baseline
     graph = json.loads((root / "build" / "model" / "graph.json").read_text())
-    assert set(graph["components"]) >= {"pi", "hat", "esc", "battery"}
+    assert set(graph["components"]) >= {"pi", "controller", "esc", "battery"}
     assert graph["wires"]["W_ESC_SIG"]["harness"] == "esc_signal"
     assert graph["nets"] and graph["edges"]
-    assert {r["source"] for r in graph["rails"]} >= {"battery.POS", "hat.5V", "pi.3V3", "esc.BEC"}
+    assert {r["source"] for r in graph["rails"]} >= {"battery.POS", "controller.5V", "pi.3V3", "esc.BEC"}
     assert any({d["address"] for d in bus["devices"]} == {0x40, 0x68} for bus in graph["i2c_buses"])
     assert (root / "build" / "model" / "layout.png").stat().st_size > 10_000
     assert {a.path for a in result.artifacts} == {"model/graph.json", "model/layout.png", "model/connections.json"}
@@ -100,22 +97,24 @@ def test_uart_device_mismatch(tmp_path):
 
 
 def test_duplicate_i2c_address(tmp_path):
-    hat = catalog_entry("r3-carrier-hat")
-    hat["software"].append({"bus": "i2c", "address": 0x40, "protocol": "ina226"})  # second monitor, default strap
-    result = run(make_project(tmp_path, catalog_components=[hat]))
+    controller = catalog_entry("test-controller")
+    controller["software"].append({"bus": "i2c", "address": 0x40, "protocol": "ina226"})  # second monitor, default strap
+    result = run(make_project(tmp_path, catalog_components=[controller]))
     conflict = find(result, "i2c_address_conflict")
     assert len(conflict) == 1 and conflict[0].data == {"address": 0x40, "devices": 2}
 
 
 def test_component_overlap_volume(tmp_path):
-    # GPS module sunk entirely inside the Pi envelope: overlap = the GPS volume, 20 x 20 x 7 mm.
-    result = run(make_project(tmp_path, lambda s: s["components"]["gps"].update(pose={"xyz": ["110 mm", 0, "85 mm"]})))
-    hits = [d for d in find(result, "component_interference") if set(d.subjects) == {"gps", "pi"}]
-    assert hits and hits[0].data["overlap_volume"] == pytest.approx(20e-3 * 20e-3 * 7e-3, rel=1e-6)
+    def mutate(spec):
+        spec["components"]["gps"]["type"] = "test-panel"
+        spec["components"]["gps"]["pose"] = {"xyz": [0, 0, .3]}
+    result = run(make_project(tmp_path, mutate))
+    hits = [d for d in find(result, "component_interference") if set(d.subjects) == {"gps", "block_a"}]
+    assert hits and hits[0].data["overlap_volume"] == pytest.approx(.09 * .09 * .004, rel=1e-6)
 
 
 def test_logic_level_overvoltage(tmp_path):
-    gps = catalog_entry("gps-ublox-m10")
+    gps = catalog_entry("gnss-rtk-zed-f9p")
     gps["pins"]["TX"]["logic_level"] = 5.0  # a 5 V-logic GNSS module into the Pi's 3.3 V UART RX
     result = run(make_project(tmp_path, catalog_components=[gps]))
     over = find(result, "logic_level_overvoltage")
@@ -129,11 +128,11 @@ def test_3v3_into_tolerant_inputs_is_fine(baseline):
 
 
 def test_power_conflict(tmp_path):
-    hat = catalog_entry("r3-carrier-hat")
-    hat["pins"]["BEC_6V"]["role"] = "power_out"  # HAT also sourcing the 6 V servo rail the ESC BEC drives
-    result = run(make_project(tmp_path, catalog_components=[hat]))
+    controller = catalog_entry("test-controller")
+    controller["pins"]["BEC_6V"]["role"] = "power_out"  # HAT also sourcing the 6 V servo rail the ESC BEC drives
+    result = run(make_project(tmp_path, catalog_components=[controller]))
     conflict = find(result, "power_conflict")
-    assert conflict and set(conflict[0].subjects) == {"esc.BEC", "hat.BEC_6V"}
+    assert conflict and set(conflict[0].subjects) == {"esc.BEC", "controller.BEC_6V"}
 
 
 def test_supply_out_of_range(tmp_path):
@@ -141,7 +140,7 @@ def test_supply_out_of_range(tmp_path):
     servo["pins"]["VCC"].update(voltage_min=4.0, voltage_max=5.5)  # a 5 V-only servo on the 6 V BEC rail
     result = run(make_project(tmp_path, catalog_components=[servo]))
     bad = find(result, "power_in_voltage_out_of_range")
-    assert bad and bad[0].subjects == ["servo.VCC", "esc.BEC"] and bad[0].data["rail_nominal"] == 6.0
+    assert bad and bad[0].subjects == ["servo.VCC", "controller.SERVO_6V"] and bad[0].data["rail_nominal"] == 6.0
 
 
 def test_wire_gauge_vs_connector(tmp_path):
@@ -154,7 +153,7 @@ def test_mass_requirement(tmp_path):
     result = run(make_project(tmp_path, lambda s: s["requirements"].update(max_mass="1.2 kg")))
     over = find(result, "mass_exceeds_requirement")[0]
     assert over.data["limit"] == pytest.approx(1.2) and over.data["mass"] > 1.5
-    assert "chassis" in over.subjects
+    assert "base" in over.subjects
 
 
 def test_geometry_box_and_cylinder_volumes():
@@ -175,7 +174,7 @@ def test_geometry_box_and_cylinder_volumes():
 def test_concave_outline_does_not_fill_notch():
     from r3_orchestrator.geometry import make_solid, outline_solid, overlap
 
-    # The RC-car plate tapers from 130 mm to 70 mm wide: a box inside the notch must not collide.
+    # The bench plate tapers from 130 mm to 70 mm wide: a box inside the notch must not collide.
     outline = [[-0.17, -0.065], [0.04, -0.065], [0.07, -0.035], [0.17, -0.035], [0.17, 0.035], [0.07, 0.035], [0.04, 0.065], [-0.17, 0.065]]
     plate = outline_solid("plate", outline, 0.003, [0.13, 0, 0.025], [0, 0, 0])
     assert abs(plate.volume - 0.003 * (0.21 * 0.13 + 0.03 * 0.10 + 0.10 * 0.07)) < 1e-9

@@ -1,5 +1,5 @@
 """Cables as MuJoCo elastic cables: catenary, bending stiffness, 10 s stability, pins on
-moving bodies, contact-based clearance vs mj_geomDistance, and the RC-car steering sweep."""
+moving bodies, contact-based clearance vs mj_geomDistance, and the bench steering sweep."""
 
 import math
 
@@ -168,14 +168,14 @@ def test_pins_follow_moving_body(tmp_path):
 
 
 @pytest.fixture(scope="module")
-def rc_car(rc_car_wiring):
-    return rc_car_wiring.project, rc_car_wiring.bundle["obstacles"], rc_car_wiring.bundle["routes"]
+def bench(bench_wiring):
+    return bench_wiring.project, bench_wiring.bundle["obstacles"], bench_wiring.bundle["routes"]
 
 
-def test_rc_car_steering_sweep(rc_car):
+def test_bench_steering_sweep(bench):
     """Lock-to-lock steering with spinning wheels on the shaker: stable, and every clearance is a
     physical surface distance (the PBD-era kernel reported -0.2 m from a frame/sign bug)."""
-    project, obstacles, routes = rc_car
+    project, obstacles, routes = bench
     sim = CableSimulator(project, routes, obstacles)
     limit = sim.kin.steering_limit()
     worst = math.inf
@@ -185,7 +185,7 @@ def test_rc_car_steering_sweep(rc_car):
         report = sim.step(0.001, joints=drive_joints(sim.kin, steer, 36.0 * t))
         worst = min(worst, min(d for d, _ in report.min_clearance.values()))
     history = sim.min_history
-    print("RC car sweep worst clearance:", round(worst * 1e3, 2), "mm;",
+    print("bench sweep worst clearance:", round(worst * 1e3, 2), "mm;",
           {w: (round(d * 1e3, 2), c) for w, (d, c, _) in sorted(history.items(), key=lambda kv: kv[1][0])[:4]})
     assert sim.data.warning[mujoco.mjtWarning.mjWARN_BADQACC].number == 0
     assert all(np.isfinite(d) and -0.01 < d <= sim.plan.margin for d, _, _ in history.values())

@@ -15,7 +15,7 @@ from r3_model.project import Project
 from r3_sim.electrical.stage import vehicle_model
 from r3_wiring.bodies import Kinematics
 
-RC_CAR = Path(__file__).resolve().parents[1] / "examples" / "robots" / "rc-car"
+BENCH = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "bench"
 
 
 def _steering_cad() -> dict:
@@ -31,8 +31,8 @@ def _steering_cad() -> dict:
 
 @pytest.fixture()
 def bare_project(tmp_path: Path) -> Project:
-    root = tmp_path / "rc-car"
-    shutil.copytree(RC_CAR, root, ignore=shutil.ignore_patterns("build", "__pycache__"))
+    root = tmp_path / "bench"
+    shutil.copytree(BENCH, root, ignore=shutil.ignore_patterns("build", "__pycache__"))
     return Project.load(root)
 
 

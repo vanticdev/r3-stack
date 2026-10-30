@@ -40,16 +40,16 @@ Y = ±24.5 mm. No consumer should derive their location from the enlarged box.
 Envelope consumers in assembly/model checks, wiring obstacles, radio geometry,
 simulation fallback geometry/mass centres, native feature-envelope plans and
 fabrication fallback geometry now preserve that offset. The source placement and
-RC-car assembly joins remain in the board frame. The RC-car needs no change to
-its authored join offsets or deck-hole pattern.
+robot assembly joins remain in the board frame. The robot needs no change to
+its authored join offsets or panel-hole pattern.
 
 ## Fit evidence and limits
 
-`r3 validate -C examples/robots/rc-car --stage assembly,model,cad --json` passes
+`r3 validate -C examples/robots/robot --stage assembly,model,cad --json` passes
 assembly and model checks with **zero interferences** (132 plan solids, 83
 objects, 105 joins). A separate FCL triangle-surface collision check placed the
 **entire downloaded Pi tessellation**, including its open shells, at the compiled
-Pi pose and compared it with every other existing RC-car part plan: **zero
+Pi pose and compared it with every other existing robot part plan: **zero
 collisions**. Thus the corrected protrusions do not reveal an interference against
 those current counterpart plans.
 

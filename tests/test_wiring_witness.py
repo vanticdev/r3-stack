@@ -70,7 +70,7 @@ def test_transformed_mesh_matches_transformed_analytic_box():
 
 def test_legacy_nearest_normal_sign_flips_at_edges_and_corners():
     """The pre-85f2fb6 rule reports far-away points as deep penetrations: the review
-    packet's -236.7 mm (esc_motor vs knuckle_fl) came from this, not from the geometry."""
+    packet's -236.7 mm (actuator_power vs knuckle_fl) came from this, not from the geometry."""
     v, f = box_mesh()
     mesh = MeshShape(v, f)
     # 180 mm in front of the end faces, a fraction of a sample step below an edge: the nearest

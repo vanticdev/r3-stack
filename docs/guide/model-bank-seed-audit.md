@@ -26,7 +26,7 @@ catalog's 13.6 mm; it is indexed, visibly **mismatch**, and cannot be used as an
 approved XT30U-F. Savox SC-0251MG+ CAD was found, but it is not SC-0251MG; no
 substitution was made. A bare u-blox chip is not a GNSS breakout board.
 
-## Pi decision and RC-car checks
+## Pi decision and robot checks
 
 [Full Pi measurement evidence](model-bank-pi5-measurement.md): the official STEP
 and native B-rep confirm the **85 × 56 mm PCB** and **58 × 49 mm hole pattern**.
@@ -37,10 +37,10 @@ validation tolerance is unchanged; `r3 models validate raspberry-pi-5-4gb` passe
 its bbox/outline/hole checks. Geometry-derived native mate frames still require
 review of the nominal 1.6 mm mounting stack versus the STEP's 1.276 mm PCB.
 
-RC-car assembly/model validation passes: **132 plan solids, 83 objects, 105
+robot assembly/model validation passes: **132 plan solids, 83 objects, 105
 joins, zero interferences**. A separate FCL check using the entire official Pi
 mesh, including open STEP shells, finds **zero surface collisions** against the
-other current RC-car part plans. This is a local geometry check, not a live
+other current robot part plans. This is a local geometry check, not a live
 Onshape proof or certification of the remaining proxy parts.
 
 CAD validation reports the newly exposed **DS3218 `model_datasheet_mismatch`**:
@@ -130,7 +130,6 @@ not an exact match. Account/access restrictions are respected.
 | `gensace-5000-2s-60c-xt60` — Gens Ace 5000 mAh 7.4 V 60C 2S1P LiPo, hard case, XT60 (GEA50002S60X6) | No exact downloadable model acquired | Proxy: No exact GEA50002S60X6 CAD download found in the inspected Gens Ace/vendor resources or public libraries. Vendor pages disagree on hard/soft case and dimensions; no other 2S 5000 mAh battery was substituted. |
 | `gps-ublox-m10` — u-blox M10 GNSS module | No exact downloadable model acquired | Proxy: The generic 20 x 20 mm breakout has no board vendor or MPN. u-blox MAX/NEO-M10 package CAD would model the soldered module, not this breakout/antenna/connector assembly. No exact board model published in the inspected sources. |
 | `gy-521-mpu6050` — GY-521 MPU-6050 6-axis IMU breakout (3.3-5 V regulator on board), I2C 0x68 | [database](https://raw.githubusercontent.com/adam-kabbara/RSX-CANSAT-2026/6e7b39f8cbd07e0290e0925f2fbab3cb3e0e376f/electrical/DO_NOT_EDIT__KICAD_LIBRARIES/Custom_3D_Models.3dshapes/GY-521_%28MPU-6050%29.step) | Downloaded; bbox within tolerance; holes/contacts, placement and native mate frames remain unverified. |
-| `hall-encoder-a1120` — Hall-effect drivetrain encoder (Allegro A1120 + magnets on the spur shaft) | No exact downloadable model acquired | Proxy: Public models exist for the bare A1120 IC package, but no exact purchased 12 x 8 mm encoder board/target assembly is identified or published. An IC model cannot replace the catalog encoder board and magnets. |
 | `hat-standoff-mf-m2.5-11` — Male-female hex standoff M2.5, 11 mm body + 6 mm stud, brass (HAT stacking) | No exact downloadable model acquired | Proxy: No exact downloadable brass M2.5 male-female standoff with 11 mm body and 6 mm stud found in the inspected standard/Adafruit libraries. Nylon kit parts and 8 mm standoffs are different geometry/material variants; supplier SKU absent. |
 | `hobbywing-quicrun-wp-1060` — Hobbywing QuicRun WP 1060 brushed ESC, 60 A, 2-3S, 6 V / 3 A switch-mode BEC | No exact downloadable model acquired | Proxy: No official 30120200 STEP found in the inspected Hobbywing resources/public CAD search. Published search results include basic mock-ups and mounts, not an authenticated complete vendor model. No model was downloaded behind an account. |
 | `kingpin-screw-m3x20` — Kingpin pivot, ISO 4762 M3 x 20 socket head cap screw (threadlocked, unclamped) | [database](https://raw.githubusercontent.com/FreeCAD/FreeCAD-library/f5ca01cdcaa2f69b9295a6382719c2d90628780c/Mechanical%20Parts/Fasteners/Bolts%20%26%20Screws/Metric/ISO4762%20Hexagon%20socket%20head%20cap%20screws/Screw%20M3x20%20ISO4762%208%2C8%20A2K.step) | Downloaded; bbox within tolerance; holes/contacts, placement and native mate frames remain unverified. |
@@ -168,7 +167,7 @@ python -m r3_orchestrator models search 'Pi 5'
 python -m r3_orchestrator models validate raspberry-pi-5-4gb --json
 python -m r3_orchestrator models validate servo-digital-20kg --json  # intentional mismatch
 python -m r3_orchestrator models validate connector-xt30-female --json  # intentional mismatch
-R3_ONSHAPE_TRANSPORT=api-keys python -m r3_orchestrator validate -C examples/robots/rc-car --stage assembly,model,cad --json
+R3_ONSHAPE_TRANSPORT=api-keys python -m r3_orchestrator validate -C examples/robots/robot --stage assembly,model,cad --json
 python -m pytest -q
 ```
 

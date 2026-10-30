@@ -1,4 +1,4 @@
-"""Fixtures for the sourcing tests: recorded HTTP, distributor cassettes, a fake research agent, a sourced RC car.
+"""Fixtures for the sourcing tests: recorded HTTP, distributor cassettes, a fake research agent, a sourced bench.
 
 No test touches the network: :func:`block_network` replaces ``urllib.request.urlopen``,
 recorded responses (``tests/fixtures/sourcing/http``, captured live from the
@@ -25,12 +25,12 @@ from r3_catalog.sourcing.providers import AgentResearchProvider
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ROOT / "tests" / "fixtures" / "sourcing"
-RC_CAR = ROOT / "examples" / "robots" / "rc-car"
+BENCH = ROOT / "tests" / "fixtures" / "bench"
 
 PI_SOURCE = {"requires": {"kind": "computer", "family": "raspberry-pi-5", "ram": ">= 4 GB"}}
 RECEIVER_SOURCE = {"requires": {"kind": "radio", "protocol": "crsf", "band": "2.4 GHz", "supply": ["4.5 V", "5.5 V"]}}
 WHEEL_SOURCE = {"requires": {"kind": "wheel", "diameter": ["100 mm", "115 mm"], "width": ["40 mm", "50 mm"], "hub": "12 mm hex"},
-                "group": "front_wheels", "budget": "40 USD"}
+                "group": "sample_pair", "budget": "40 USD"}
 
 
 @pytest.fixture
@@ -91,11 +91,11 @@ def fake_research(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fixture: str 
     return AgentResearchProvider(http=pages_http(tmp_path), agent="claude", executable=str(wrapper), verify=verify)
 
 
-def sourced_rc_car(parent: Path, sources: dict[str, dict[str, Any]] | None = None, drop_type: tuple[str, ...] = ()) -> Path:
-    """A copy of examples/robots/rc-car with exactly these `source:` blocks (in addition to `type`, unless dropped).
+def sourced_bench(parent: Path, sources: dict[str, dict[str, Any]] | None = None, drop_type: tuple[str, ...] = ()) -> Path:
+    """A copy of tests/fixtures/bench with exactly these `source:` blocks (in addition to `type`, unless dropped).
     The example's own slots, pins and sourced catalog files are removed first, so each test controls its slots."""
-    root = parent / "rc-car"
-    shutil.copytree(RC_CAR, root, ignore=shutil.ignore_patterns("build", "__pycache__", ".venv", "*.pyc", "sourced_*.yaml"))
+    root = parent / "bench"
+    shutil.copytree(BENCH, root, ignore=shutil.ignore_patterns("build", "__pycache__", ".venv", "*.pyc", "sourced_*.yaml"))
     spec = yaml.safe_load((root / "robot.yaml").read_text())
     for component in spec["components"].values():
         component.pop("source", None)
@@ -104,8 +104,14 @@ def sourced_rc_car(parent: Path, sources: dict[str, dict[str, Any]] | None = Non
         lock = yaml.safe_load(lock_path.read_text()) or {}
         lock.pop("sourcing", None)
         lock_path.write_text(yaml.safe_dump(lock, sort_keys=True))
-    sources = sources if sources is not None else {"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE, "wheel_fl": WHEEL_SOURCE,
-                                                   "wheel_fr": WHEEL_SOURCE}
+    for cid, y in (("sample_a", .3), ("sample_b", -.3)):
+        spec["components"][cid] = {"type": "wheel-110x45", "mount": "base", "pose": {"xyz": [.3, y, .1]}}
+    spec["mechanical"]["interfaces"].extend([
+        {"id": "sample_fit_" + cid, "kind": "revolute_fit", "parts": ["base", cid],
+         "axis_point": [.3, y, .1], "axis_dir": [0, 1, 0], "params": {"bore_feature": "hub"}}
+        for cid, y in (("sample_a", .3), ("sample_b", -.3))])
+    sources = sources if sources is not None else {"pi": PI_SOURCE, "receiver": RECEIVER_SOURCE, "sample_a": WHEEL_SOURCE,
+                                                   "sample_b": WHEEL_SOURCE}
     for cid, source in sources.items():
         spec["components"][cid].pop("owned", None)  # fixture explicitly switches this part to buying
         spec["components"][cid]["source"] = json.loads(json.dumps(source))

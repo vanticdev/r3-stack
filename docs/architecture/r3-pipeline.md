@@ -156,7 +156,7 @@ Execution may overlap without changing this order or any result: MuJoCo's
 solved (its inputs are final then). `R3_SIM_OVERLAP=0` runs strictly serially;
 both produce bit-identical recordings.
 
-Electrical interface, keyed by component id (generic, not RC-car specific):
+Electrical interface, keyed by component id (generic, not robot specific):
 
 ```python
 system = ElectricalSystem(project, routes=None)          # routes.json optional
@@ -177,10 +177,10 @@ monitor.update()            # after each mj_step: clearance from MuJoCo contact 
 monitor.wire_clearance()    # {wire_id: (signed surface distance, moving component)}
 monitor.exact_distances()   # the same from mj_geomDistance (cross-check)
 
-# Standalone shaker (wiring stage): chassis-only MuJoCo world plus cables.
+# Standalone shaker (wiring stage): base-only MuJoCo world plus cables.
 cables = CableSimulator(project, routes)
-report = cables.step(dt, chassis={"pos", "quat", "lin_acc", "ang_vel", "ang_acc"},
-                     moving={"knuckle_fl": {"pos", "quat"}, ...})  # or joints={"steer_fl": 0.2}
+report = cables.step(dt, base={"pos", "quat", "lin_acc", "ang_vel", "ang_acc"},
+                     moving={"pivot_left": {"pos", "quat"}, ...})  # or joints={"pivot": 0.2}
 report.min_clearance  # {wire_id: (distance, component)}
 ```
 

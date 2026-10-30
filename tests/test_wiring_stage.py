@@ -1,4 +1,4 @@
-"""Wiring stage on the reference RC car: artifacts, contract format, and real findings."""
+"""Wiring stage on the reference bench: artifacts, contract format, and real findings."""
 
 import csv
 import json
@@ -10,11 +10,11 @@ from r3_model.project import Project
 
 
 @pytest.fixture(scope="module")
-def stage(rc_car_wiring):
-    """The full stage on a fresh copy of the RC car (shared session run, see conftest.py)."""
-    print("worst static clearance:", rc_car_wiring.result.metrics["worst_static_clearance"])
-    print("worst dynamic clearance:", rc_car_wiring.result.metrics["worst_dynamic_clearance"])
-    return rc_car_wiring.root, rc_car_wiring.result
+def stage(bench_wiring):
+    """The full stage on a fresh copy of the bench (shared session run, see conftest.py)."""
+    print("worst static clearance:", bench_wiring.result.metrics["worst_static_clearance"])
+    print("worst dynamic clearance:", bench_wiring.result.metrics["worst_dynamic_clearance"])
+    return bench_wiring.root, bench_wiring.result
 
 
 def test_routes_json_contract(stage):
@@ -40,14 +40,14 @@ def test_artifacts_written(stage):
     for name in ("routes_iso.png", "routes_top_side.png", "slack_peak_bump.png", "slack_clearance_timeline.png",
                  "harness_bom.csv", "slack_sim.json", "routing_detail.json", "result.json", "supports_iso.png",
                  "planned_routes.png", "geometry_audit.json", "cut_lengths.json", "bundles.json",
-                 "manufacturing/manifest.json", "manufacturing/power_y.svg", "manufacturing/cut_list.csv"):
+                 "manufacturing/manifest.json", "manufacturing/ysplit.svg", "manufacturing/cut_list.csv"):
         assert (out / name).stat().st_size > 0, name
     rows = list(csv.DictReader((out / "harness_bom.csv").open()))
     assert {r["section"] for r in rows} >= {"wire", "connector", "splice", "tie", "total"}
     assert result.inputs["robot_yaml_sha256"]
 
 
-def test_rc_car_findings_are_structured(stage):
+def test_bench_findings_are_structured(stage):
     root, result = stage
     codes = {d.code for d in result.diagnostics}
     assert "cad_geometry_estimated" in codes and "harness_mass" in codes

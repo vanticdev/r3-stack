@@ -1,39 +1,7 @@
-"""Hardware failsafe arbiter on the carrier HAT (U4, Microchip ATtiny412-SS).
+"""PWM failsafe state machine, driven by the board's declared heartbeat input.
 
-The Pi's ESC PWM (GPIO18, header pin 12) reaches the ESC only through U4. The
-Pi proves it is alive by toggling a heartbeat GPIO (GPIO27, header pin 13) at
-the control rate. U4 behaviour (firmware contract; the twin models this class):
-
-* PASS: every edge of ``PI_ESC_PWM`` is mirrored to ``ESC_OUT`` by a pin-change
-  interrupt (ATtiny412 at 20 MHz: ~1.5 us latency, < 1 us jitter, estimated
-  from the 8-cycle interrupt entry plus the port write).
-* A heartbeat *edge* (either direction) older than ``timeout`` (100 ms)
-  switches to FAILSAFE. The switch waits for the output to be low, so a pulse
-  in flight is never truncated.
-* FAILSAFE: the Pi input is ignored and TCA0 generates the arbiter's own
-  pulses every 20 ms (50 Hz); the status LED (D4) is lit. A hobby ESC coasts at
-  neutral (a 4 m/s car rolls > 5 m), so U4 first *brakes*: when the switch to
-  FAILSAFE happens while the ESC is in its brake-armed state, U4 sends
-  the optional frame-by-frame ``brake_pattern_us`` (otherwise ``brake_us``)
-  for ``brake_hold``, then ``neutral_us``. Every pattern pulse stays on the
-  brake side of the neutral deadband, so modulation cannot arm reverse.
-  Hobbywing QuicRun 1060 forward/brake/reverse logic (manual, "Fwd/Rev/Brk"
-  mode): a reverse pulse after forward is the brake, and it stays the brake
-  until the stick returns to neutral; reverse needs neutral first and then a
-  second push ("double-click"), and never follows forward directly. U4 mirrors
-  that state machine from the pulses it passes (forward / reverse side outside
-  ``deadband_us`` of neutral, ``esc_reverse_delay`` at neutral), so it brakes
-  only when the reverse pulse is the brake: after forward driving or during a
-  brake. If the ESC could interpret it as reverse (the Pi was reversing, or it
-  had already returned to neutral after braking) U4 goes straight to neutral.
-  Holding the brake at standstill is harmless (the motor is shorted, like a
-  parking brake), so ``brake_hold`` covers the longest stop (top speed).
-* Re-arm: ``rearm_edges`` consecutive heartbeat edges, each within the
-  timeout, *and* an input pulse within ``rearm_band`` of neutral. The ESC is
-  never handed a non-neutral command on recovery.
-* Power: U4 runs from the Pi's 3V3. If the Pi loses power, U4 stops and the
-  100 k pull-down holds ``ESC_PWM`` low; the ESC's own signal-loss failsafe
-  then applies (no pulses, not a hold of the last command).
+Pulse and reverse/brake semantics follow a compatible ESC's documented protocol.
+The board's catalog supplies its pins, supply, timing and optional brake pattern.
 """
 
 from __future__ import annotations
@@ -52,16 +20,16 @@ class ArbiterState(str, Enum):
 
 @dataclass(frozen=True)
 class ArbiterParams:
-    part: str = "ATtiny412-SS"
-    supply: str = "3V3"
+    part: str = ""
+    supply: str = "VCC"
     timeout: float = 0.100            # s, heartbeat edge age that triggers failsafe (requirement <= 100 ms)
     neutral_us: float = 1500.0
     frame: float = 0.020              # s, failsafe pulse period (50 Hz)
     rearm_edges: int = 3
     rearm_band_us: float = 50.0
     latency_us: float = 1.5           # pass-through edge delay (estimated)
-    heartbeat_pin: str = "J_GPIO.13"  # GPIO27
-    input_pin: str = "J_GPIO.12"      # GPIO18 (PWM0 channel 2)
+    heartbeat_pin: str = "HEARTBEAT"
+    input_pin: str = "PWM_IN"
     brake_us: float = 1000.0          # full reverse stick: the ESC's full brake (QuicRun brake force 100 %)
     brake_hold: float = 3.0           # s of brake pulses before neutral (0: neutral at once, the original contract)
     brake_pattern_us: tuple[float, ...] = ()  # optional fixed frame-by-frame brake modulation; never neutral
@@ -84,8 +52,9 @@ def arbiter_params(failsafe: dict[str, Any] | None, timeout: float | None = None
         values["brake_pattern_us"] = tuple(float(v) for v in failsafe["brake_pattern_us"])
     if failsafe.get("rearm_edges") is not None:
         values["rearm_edges"] = int(failsafe["rearm_edges"])
-    if failsafe.get("part"):
-        values["part"] = str(failsafe["part"])
+    for key in ("part", "supply", "heartbeat_pin", "input_pin"):
+        if failsafe.get(key):
+            values[key] = str(failsafe[key])
     if timeout and "timeout" not in values:
         values["timeout"] = float(timeout)
     return ArbiterParams(**{**defaults.__dict__, **values})

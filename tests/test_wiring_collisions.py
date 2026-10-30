@@ -69,7 +69,7 @@ def test_only_own_entry_zone_is_exempt_not_the_housing(tmp_path):
 def test_jst_lead_cannot_use_hat_exemption_for_parent_usb_block(tmp_path):
     wire = _wire("RX_WHITE", "rx", [[0, 0, 0], [0.03, 0, 0]])
     node = _node("rx", "A", wire.path[0], "connector", connector_type="integral",
-                 component="hat", exempt={"hat"}, lead_length=0.03)
+                 component="controller", exempt={"controller"}, lead_length=0.03)
     shape = Box(np.array([0.01, 0, 0]), np.eye(3), np.array([0.01, 0.005, 0.005]))
     block = Obstacle("pi", "computer", shape, shape, 0, False, "robot", False)
     checker = _checker(tmp_path, [wire], {"rx": {"A": node, "B": _node("rx", "B", wire.path[-1])}},

@@ -10,8 +10,8 @@ a separate process against virtual hardware, in lockstep with the physics.
 | `vehicle/servo.py` | PWM servo: deadband, voltage-scaled stall torque and no-load rate, horn load by virtual work |
 | `kernel.py` | 1 ms fixed-step loop in the documented order; seeded RNG streams per subsystem |
 | `radio.py`, `crsf.py` | link budget, ELRS FHSS hop frequency, Gudmundson shadowing, LoRa PER, ELRS receiver emitting CRSF 0x16/0x14 frames (LQ, RSSI, SNR) |
-| `radio_scene.py` | RF scene from the spec: ITU ground, obstacle boxes, car body per material (CAD meshes or catalog primitives), antennas, CAD `rf.antenna_position` |
-| `radio_sionna.py` | **Sionna RT** ray tracing (CPU, Dr.Jit LLVM): position-cached traces with the posed car body, float64 path lengths, coherent multipath at the hop frequency |
+| `radio_scene.py` | RF scene from the spec: ITU ground, obstacle boxes, robot body per material (CAD meshes or catalog primitives), antennas, CAD `rf.antenna_position` |
+| `radio_sionna.py` | **Sionna RT** ray tracing (CPU, Dr.Jit LLVM): position-cached traces with the posed robot body, float64 path lengths, coherent multipath at the hop frequency |
 | `radio_analytic.py` | **labeled fallback** two-ray + knife-edge model (diagnostic `radio_propagation_fallback`); closed-form dipole two-ray reference for validation |
 | `radio_plots.py` | `coverage_map.png`: Sionna radio map around the course + coherent path-solver RSSI along the route |
 | `devices/` | MPU-6050, INA226 (register level), u-blox NMEA GPS (byte timing), Hall encoder edges, board failsafe arbiter (`r3_kicad.arbiter` behind a `failsafe_arbiter` link: heartbeat GPIO edges, neutral pulses after the timeout) |
@@ -32,7 +32,7 @@ summarizes all scenarios.
 
 ## RF propagation: Sionna RT
 
-The radio channel between the pilot handset and the car antenna is ray-traced with
+The radio channel between the pilot handset and the robot antenna is ray-traced with
 [Sionna RT](https://nvlabs.github.io/sionna/rt/) (NVIDIA, Apache-2.0) on Mitsuba 3 / Dr.Jit.
 
 **Install** (shared venv): `uv pip install --python /Users/godbrigero/Documents/r3-stack/.venv/bin/python sionna-rt`
@@ -53,14 +53,14 @@ The radio channel between the pilot handset and the car antenna is ray-traced wi
 **Model.** The scene comes from the spec:
 * ground: an ITU-R P.2040 `medium_dry_ground` plane, or `radio_environment.ground_material`;
 * obstacle boxes, with ITU materials or a labeled plastic estimate;
-* the car body: chassis plate outline, CAD meshes or catalog primitives, merged per material (without the
+* the robot body: chassis plate outline, CAD meshes or catalog primitives, merged per material (without the
   receiver and the antenna itself);
 * half-wave dipoles, V-polarized, scaled to the catalog peak gains;
-* the car antenna at CAD `rf.antenna_position`, else the center of the antenna component's catalog `dipole`
+* the robot antenna at CAD `rf.antenna_position`, else the center of the antenna component's catalog `dipole`
   solid, else the receiver pose + `antenna_height_above_mount`.
 
 `PathSolver` runs specular reflection to depth 3 with refraction and UTD wedge diffraction. Traces are cached on a
-0.25 m × 15° heading grid (20 traces/s at 5 m/s), with the car body posed for each trace. Between traces each path's
+0.25 m × 15° heading grid (20 traces/s at 5 m/s), with the robot body posed for each trace. Between traces each path's
 last segment is recomputed exactly. The narrowband channel H(f) = Σ aᵢ e^(−j2πf Lᵢ/c) is evaluated per packet at
 the ELRS FHSS hop frequency, so small-scale fading *is* the ray-traced multipath. No statistical fading is added.
 Path lengths are recomputed in float64 from the path vertices: Sionna's float32 delays lose the
@@ -70,13 +70,13 @@ direct-vs-ground phase beyond a few hundred metres (0.8 dB error at 1 km). Gudmu
 **Validation** (`tests/test_sim_radio_sionna.py`): on flat ground without obstacles, Sionna RT matches the closed-form
 two-ray field sum with the same ITU material and dipole patterns within 0.02 dB from 3 m to 1500 m. The test bound is 1 dB.
 
-**Known limits.** The car body is modelled as exact *blockage* only. The antenna sits about 0.65 λ above the Pi/HAT
+**Known limits.** The robot body is modelled as exact *blockage* only. The antenna sits about 0.65 λ above the Pi/HAT
 stack. That is near field, where ray optics and UTD do not hold. A reciprocal trace from the antenna that samples
 the body edges did not converge: it varied by ±8 dB at 300 m between 0.4 M and 2 M rays. The right input
 would be an installed-antenna pattern from a full-wave solver (for example openEMS), loaded as a Sionna antenna pattern.
 Diffuse scattering (ground roughness) is off.
 
-**Path cache.** Before the loop, `CoSimKernel.prepare_radio` predicts the cells the car will occupy (along the
+**Path cache.** Before the loop, `CoSimKernel.prepare_radio` predicts the cells the robot will occupy (along the
 mission polyline, ±1 cell across it, every heading bucket through each corner) and traces the missing ones in
 worker processes (`SionnaPropagation.precompute`: CPU count − 2, at most 12). A precomputed cell is bit-identical
 to one traced in the loop (deterministic solver, same body pose; tested). Cells are saved per scene digest and

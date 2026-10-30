@@ -12,7 +12,7 @@ const invalid = (over: Partial<ApiErrorBody["data"]> = {}): ApiErrorBody => ({
   code: "project_invalid",
   message: "robot.yaml is invalid: 7 validation errors in RobotSpec; first: components.gps.type: Field required",
   data: {
-    project: "rc-car",
+    project: "robot",
     errors: [
       { path: "components.gps.type", message: "Field required", type: "missing" },
       { path: "electrical.harnesses.0.wires", message: "Input should be a valid list", type: "list_type" },

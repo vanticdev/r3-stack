@@ -143,7 +143,7 @@ describe("wiring", () => {
 
 describe("scene", () => {
   const graph = {
-    components: { esc: { type: "esc", kind: "esc", name: "ESC", mount: "chassis", shape: "box", size: [0.04, 0.03, 0.03], axis: "z", xyz: [0, 0, 0], rpy: [0, 0, 0], color: "#111", moving: false, mass: 0.05 } },
+    components: { esc: { type: "esc", kind: "esc", name: "ESC", mount: "base", shape: "box", size: [0.04, 0.03, 0.03], axis: "z", xyz: [0, 0, 0], rpy: [0, 0, 0], color: "#111", moving: false, mass: 0.05 } },
     wires: { W1: { harness: "esc_power", awg: 12, color: "red", from: "A.1", to: "B.1", ends: [[0, 0, 0], [0.1, 0, 0]] } },
     nets: {}, net_names: {},
   } as unknown as ModelGraph;
@@ -152,7 +152,7 @@ describe("scene", () => {
     const scene = buildScene({ graph, routes: null, diagnostics: [diag({ severity: "error", subjects: ["esc.BEC"] })] });
     expect(resolveSubjects(["esc.BEC", "op:servo_stall@full"], scene)).toEqual({ components: new Set(["esc"]), wires: new Set() });
     expect(resolveSubjects(["esc_power"], scene).wires).toEqual(new Set(["W1"]));
-    expect(resolveSubjects(["esc_power.B|power_y.P2#1"], scene).wires).toEqual(new Set(["W1"]));
+    expect(resolveSubjects(["esc_power.B|distribution.P2#1"], scene).wires).toEqual(new Set(["W1"]));
     expect(scene.wires[0]).toMatchObject({ routed: false, color: wireColor("red"), radius: awgRadius(12) });
     // Severity on the scene model is exact-subject (pins resolve to parts through resolveSubjects).
     expect(scene.components[0]).toMatchObject({ id: "esc", severity: null });

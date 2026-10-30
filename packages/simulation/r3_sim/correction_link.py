@@ -16,7 +16,7 @@ SiK link (transparent serial over FHSS/TDM GFSK, SiK firmware):
 * Channel: handset-independent propagation at the hop frequency (902-928 MHz,
   ``hop_channels``) from the base radio antenna to the rover radio antenna:
   Sionna RT ray tracing of the same scene as the ELRS link (ground, obstacles,
-  car body posed per trace) at 915 MHz, or the analytic two-ray fallback (always
+  robot body posed per trace) at 915 MHz, or the analytic two-ray fallback (always
   reported by ``correction_link_propagation_fallback``), plus Gudmundson
   log-normal shadowing (its own realisation).
 * Packet errors: non-coherent binary FSK, BER = 0.5 exp(-Eb/N0 / 2). The
@@ -271,7 +271,7 @@ class SikCorrectionLink:
 
     def stats(self, since: float = -math.inf) -> dict[str, Any]:
         """Link statistics over packets sent at t >= ``since``. Packets for which the ray tracer found no path at all
-        (the car body blocks every traced ray; UTD around a body this size is not traced) are lost and counted
+        (the robot body blocks every traced ray; UTD around a body this size is not traced) are lost and counted
         separately; the minimum power is over packets with a channel."""
         samples = [s for s in self.samples if s.t >= since]
         powers = [s.rx_power_dbm for s in samples if s.paths > 0]

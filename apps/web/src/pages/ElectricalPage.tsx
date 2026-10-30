@@ -95,7 +95,7 @@ function NodeDetail({ id, graph, point, tree }: { id: string; graph: ModelGraph 
 
 // ------------------------------------------------------------------ worst-case tables
 
-/** "power_y.P1|battery_lead.B#1" → "power_y.P1 ↔ battery_lead.B · pin 1". */
+/** "distribution.P1|supply.B#1" → "distribution.P1 ↔ supply.B · pin 1". */
 const contactLabel = (id: string) => id.replace(/#(\w+)$/, " · pin $1").split("|").join(" ↔ ");
 
 function RatingTable({ rows, limit = 6, label }: { rows: CurrentRow[]; limit?: number; label: string }) {
