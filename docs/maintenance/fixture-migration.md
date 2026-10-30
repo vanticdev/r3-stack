@@ -71,6 +71,7 @@ The following entries retain their data and provenance in `purchased.yaml`:
 - The reference mounting-offset, printed-cap sizing and firmware encoder-calibration tests were removed individually (listed above); they pin retired design results.
 - Purchased-drive wheel-center/track assertions are replaced by standalone motor/gearbox compiled connector poses. Unsafe-drive rejection still uses real firmware and the same 2 m/s requirement, zero brownouts and supply threshold; its replay tail is explicitly bounded after irreversible release.
 - Receiver cable core/pin-end checks use independent three-pin harnesses; endpoint counts are computed from the declared crimp terminations.
+- Report-loader component/wire counts and flagged-part lists are computed from the generated graph and error diagnostics rather than a reference layout.
 - The original application firmware's navigation, traction and supervisor tests are removed with that application. Generic device protocols, estimation math, HAL transport, launch/deployment adapters, electrical failsafe models and simulation infrastructure remain covered.
 
 ## Generality corrections
@@ -94,3 +95,35 @@ The Raspberry Pi, GY-521 and UC-717 entries are unchanged. Purchased consumable 
 ## Ported reference-dependent Python files
 
 `tests/api_helpers.py`, `tests/conftest.py`, `tests/firmware_fake_hal.py`, `tests/orchestrator_helpers.py`, `tests/sim_test_controller.py`, `tests/sourcing_helpers.py`, `tests/test_api_agents.py`, `tests/test_api_release.py`, `tests/test_api_robustness.py`, `tests/test_api_runs.py`, `tests/test_api_server.py`, `tests/test_assembly_compiler.py`, `tests/test_cad_consumers.py`, `tests/test_cad_kinematics.py`, `tests/test_cad_library_aliases.py`, `tests/test_cad_phaseb.py`, `tests/test_cad_plan.py`, `tests/test_cad_spec.py`, `tests/test_connector_mesh_mates.py`, `tests/test_connectors_connection_sites.py`, `tests/test_connectors_geometry.py`, `tests/test_connectors_onshape.py`, `tests/test_connectors_stage.py`, `tests/test_electrical_finish_b2.py`, `tests/test_electrical_stage.py`, `tests/test_electrical_system.py`, `tests/test_firmware_container.py`, `tests/test_firmware_deploy.py`, `tests/test_mechanical_pi_stack.py`, `tests/test_model_core.py`, `tests/test_modelbank_pi5.py`, `tests/test_orchestrator_cli.py`, `tests/test_orchestrator_mcp.py`, `tests/test_orchestrator_model_stage.py`, `tests/test_orchestrator_scaffold.py`, `tests/test_pcb_board.py`, `tests/test_pcb_intent.py`, `tests/test_pcb_rollout.py`, `tests/test_pcb_stage.py`, `tests/test_sim_cables.py`, `tests/test_sim_hal.py`, `tests/test_sim_radio.py`, `tests/test_sim_radio_sionna.py`, `tests/test_sim_rtk.py`, `tests/test_sim_scenario.py`, `tests/test_sim_vehicle.py`, `tests/test_sourcing_pipeline.py`, `tests/test_sourcing_requirements.py`, `tests/test_wiring_layout_fixes.py`, `tests/test_wiring_overhaul.py`, `tests/test_wiring_sim.py`, `tests/test_wiring_stage.py`.
+
+
+## Final validation
+
+- Full Python run: `python -m pytest -q -p no:randomly tests --basetemp=/tmp/retire-full-suite`: **934 passed, 3 skipped, 2 failed**, 863.96 s. Both failures were stale expectations: the guide’s assembly explanation and a report-loader fixture count/list. Both were corrected without weakening checks. `python -m pytest -q -p no:randomly --lf tests`: **2 passed**, 27.69 s. Across the full run and corrected-case rerun: **936 passed, 3 skipped; no remaining failures**.
+- The three skipped tests require Docker (including the optional cached BLITZ dependency image). Docker is unavailable in this environment.
+- Web: `npx tsc --noEmit`, `npm run typecheck`, **73 unit tests across 9 files**, and `npm run build` pass. The Node artifact-loader checks also pass (**4 tests**).
+- A real `r3 serve --projects-root examples/robots` starts with only the directory README present. The dedicated Playwright empty-root test passes: zero project cards, no page errors, and the blank template selected in New project. The temporary verification server was stopped afterward.
+- The build-from-nothing guide is retained and its MCP flow passes (**3 tests**).
+- The required word-level search and the design-specific harness/component identifier searches return no hits. Generic base-frame/steering vocabulary and purchased-part identities are retained for the reasons above.
+- `cicd/`, `backend/`, `watchdog/`, `proto/` and generated protobufs are unchanged. No deployment version bump, push, history rewrite, branch deletion, live CAD call or remote repository mutation was performed.
+
+## Implementation commits
+
+- `a4c3fe0` — Preserve purchased catalog data and remove design session records
+- `cc74eac` — Create blank projects by default and support empty project roots
+- `5c0f5df` — WIP: retire reference design and port infrastructure onto synthetic fixtures
+- `f2da22a` — Port CAD and sourcing checks to independent synthetic fixtures
+- `2c54513` — Use neutral instrument data throughout web tests
+- `2a93fac` — Verify the web empty state against an empty project root
+- `b859cd1` — Derive CAD roots and dimensions from authored geometry
+- `4ae897e` — Remove installed layout geometry from purchased consumable proxies
+- `a0036e6` — Replace dashboard artifact fixtures with a stationary sensor rig
+- `0e93152` — Finish neutral API and sensor fixture references
+- `fd64b33` — Qualify independent drive fixtures and generic supply telemetry
+- `b13bf48` — Complete PCB and elastic cable ports with synthetic geometry
+- `16259e1` — Finish generic CAD views and document fixture migration
+- `0cd05db` — Remove remaining installation evidence and stale example paths
+- `5b9de4e` — Choose cable playback and release evidence from project scenarios
+- `a3382bc` — Preserve the blank-project guide assembly contract
+- `d5d526a` — Keep project paths independent of the platform checkout
+- `2fc951e` — Derive report-loader expectations from the synthetic graph
