@@ -105,7 +105,7 @@ def resolve_step(ref: ModelRef, project: "Project | None" = None) -> Path:
         entry = ModelBank().get(ref.params["bank_id"])
         errors = []
         for source in entry.sources:
-            if source.format not in ("step", "stp", "stp.zip") or source.kind == "onshape_public":
+            if source.format not in ("step", "stp", "stp.zip", "stp.rar") or source.kind == "onshape_public":
                 continue
             try:
                 path, _ = acquire(source)

@@ -40,3 +40,21 @@ def test_supplied_plate_keeps_real_thickness_hole_and_seat_faces(tmp_path, monke
                      PartPlan("fixture", "purchased", "board", 0), source_model=ref)
     solid = world_manifold(local, np.eye(4))
     assert solid.volume() == pytest.approx(part.manifold().volume(), rel=1e-6)
+
+
+def test_supplied_sphere_keeps_center_and_radius_after_placement(tmp_path):
+    from OCP.BRepPrimAPI import BRepPrimAPI_MakeSphere
+    from OCP.gp import gp_Pnt
+    from OCP.STEPControl import STEPControl_Writer, STEPControl_AsIs
+    path = tmp_path / 'ball.step'
+    writer = STEPControl_Writer()
+    writer.Transfer(BRepPrimAPI_MakeSphere(gp_Pnt(2, 3, 4), 5).Shape(), STEPControl_AsIs)
+    writer.Write(str(path))
+    frame = Frame.from_axes([.02, .03, .04], [0, 1, 0], [1, 0, 0])
+    part = read_step('synthetic ball', path, frame)
+    spheres = part.faces_of('SPHERE')
+    assert spheres
+    for face in spheres:
+        assert face.radius == pytest.approx(.005)
+        np.testing.assert_allclose(face.origin, frame.point([.002, .003, .004]))
+    assert part.manifold().volume() == pytest.approx(4 / 3 * np.pi * .005**3, rel=.01)
