@@ -53,6 +53,9 @@ internal briefs, builds an autonomous RC car from scratch ("literally nothing") 
 - The user already owns a **Raspberry Pi 5 4 GB** (confirmed by the user), an MPU-6050 IMU and an **Arducam UC-717** camera. Everything else is bought: GPS module, wheels,
   motor(s), ESC/drivers, battery, servo, and so on.
 - The Arducam UC-717 faces forward. No LiDAR.
+- No custom PCBs (user, 2026-10-29). The agent must not design a board: no `pcb.boards`, no KiCad. It wires off-the-shelf
+  modules directly (Pi GPIO header, breakout boards, regulator/BEC modules), so the pcb stage reports
+  `not_applicable` and the release gate must still reach fabrication_ready.
 - It must drive autonomously in the twin.
 The run passes when that agent's project meets the same finish line (sections 1–4 above), with only
 the project's own files authored. Its transcript, friction points and failures become the next
