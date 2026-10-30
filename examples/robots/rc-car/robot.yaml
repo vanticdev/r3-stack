@@ -41,7 +41,7 @@ components:
       # Rear-right notch clears the transmission's gear cover.
       # Rear-left tab carries the so_rl standoff behind the motor terminals (3 mm clear of the gear case at y < 30 mm);
       # the right-edge tab carries the lead post's screw (edge distance) beside the lead slot.
-      outline: [[-66 mm, -55 mm], [-28 mm, -55 mm], [-28 mm, -59 mm], [-16 mm, -59 mm], [-16 mm, -55 mm], [5 mm, -55 mm], [5 mm, -74 mm], [35 mm, -74 mm], [35 mm, -55 mm], [85 mm, -55 mm],
+      outline: [[-66 mm, -55 mm], [-34 mm, -55 mm], [-34 mm, -94 mm], [-15 mm, -94 mm], [-15 mm, -55 mm], [5 mm, -55 mm], [5 mm, -74 mm], [35 mm, -74 mm], [35 mm, -55 mm], [85 mm, -55 mm],
                 [85 mm, 55 mm], [-94 mm, 55 mm], [-94 mm, 33 mm], [-85 mm, 33 mm], [-85 mm, -28 mm], [-66 mm, -28 mm]]
   standoff_rl: {type: standoff-m3-47}
   standoff_rr: {type: standoff-m3-47}

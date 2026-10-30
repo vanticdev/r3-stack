@@ -97,7 +97,7 @@ components:
       cap_imu_south_post: {kind: adhesive_pad, origin: [15 mm, -67 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       cap_imu_outboard_post: {kind: adhesive_pad, origin: [40 mm, -8 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
       cap_imu_corner_post: {kind: adhesive_pad, origin: [46 mm, -40 mm, 0], z: [0, 0, -1], x: [1, 0, 0]}
-      rx_pad: {kind: adhesive_pad, origin: [56 mm, 42 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      rx_pad: {kind: adhesive_pad, origin: [-24.5 mm, -85 mm, 3 mm], z: [0, 0, 1], x: [0, -1, 0]}
       gps_pad: {kind: adhesive_pad, origin: [-65 mm, 30 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
       # RTCM correction radio, case on edge along the right deck edge (antenna jack forward).
       rtk_radio_pad: {kind: adhesive_pad, origin: [46.5 mm, -49.15 mm, 3 mm], z: [0, 0, 1], x: [1, 0, 0]}
@@ -1142,22 +1142,20 @@ components:
   - id: lead-post-petg
     kind: structure
     cad_name: Lead post
-    name: Printed cable tie post, PETG, 7 mm x 62 mm
+    name: Printed cable tie post, PETG, 7 mm x 15 mm
     description: >
-      Tie post beside the deck's lead slot. The ESC and servo leads plug into the HAT's top-entry headers, so they
-      climb ~45 mm above the deck; a cable tie around this post holds them halfway up (the climb alone exceeds
-      their unsupported-span limit). Screwed from below the deck into a 9 mm M3 thread.
+      Short tie post below the HAT south-facing cable exits. Screwed from below the deck into a 9 mm M3 thread.
     mechanical:
       shape: cylinder
       axis: z
-      size: [7 mm, 62 mm]
-      mass: 0.0031
+      size: [7 mm, 15 mm]
+      mass: 0.00075
       material: PETG
       density: 1270
       color: "#2c6e9e"
       fabricated: true
       solids:
-        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 62 mm}
+        - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 15 mm}
     interfaces:
       base: {kind: hole_pattern, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0], params: {holes: [[0, 0, 3 mm, tapped, 9 mm]]}}
   - id: servo-horn-al7075
@@ -1548,19 +1546,19 @@ components:
   - id: receiver-riser-petg
     kind: structure
     cad_name: Receiver riser
-    name: Printed receiver riser, PETG, 12 x 10 x 2 mm
-    description: Bonded riser under the receiver tape; gives the purchased receiver pigtail room above the deck.
+    name: Printed receiver riser, PETG, 12 x 10 x 22.446 mm
+    description: Bonded riser under the receiver tape; aligns the purchased receiver pigtail with the south-facing HAT J_RX exit.
     mechanical:
       shape: box
-      size: [12 mm, 10 mm, 2 mm]
-      mass: 0.0003
+      size: [12 mm, 10 mm, 22.446 mm]
+      mass: 0.00342
       material: PETG
       density: 1270
       color: "#2c6e9e"
       fabricated: true
     interfaces:
       bottom: {kind: adhesive_pad, origin: [0, 0, 0], z: [0, 0, -1], x: [1, 0, 0]}
-      top: {kind: adhesive_pad, origin: [0, 0, 2 mm], z: [0, 0, 1], x: [1, 0, 0]}
+      top: {kind: adhesive_pad, origin: [0, 0, 22.446 mm], z: [0, 0, 1], x: [1, 0, 0]}
   - id: imu-pedestal-petg
     kind: structure
     cad_name: GY-521 rigid pedestal
