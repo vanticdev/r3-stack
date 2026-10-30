@@ -174,6 +174,17 @@ def instrumentation_pull(root: Path) -> Project:
 
 def wiring_pull(project: Project, *, long_arm: bool = False) -> Project:
     """Explicit solids for the two connector routing/dynamics coupon."""
+    from r3_model.spec import RobotSpec
+    # Start the new fixture publication from its authored ratings/poses. A
+    # preceding native wiring fixture may have projected joints and metadata;
+    # those belong to its old immutable pull, not this new CAD revision.
+    source = yaml.safe_load((project.root / "robot.yaml").read_text())
+    source.pop("attachments", None)
+    for component in source["components"].values():
+        component.pop("pulled", None)
+    project.spec = RobotSpec.model_validate(source)
+    project.__dict__.pop("_assembly", None)
+    project.__dict__.pop("_graph", None)
     shapes = {"plate": box((320,160,3)), "src": box((20,20,20)), "dst": box((20,20,20))}
     if "arm" in project.spec.components:
         shapes["arm"] = box((20,80,20), (0,30,0)) if long_arm else box((20,20,20))
@@ -198,6 +209,8 @@ def wiring_pull(project: Project, *, long_arm: bool = False) -> Project:
                 params={"physics": ratings(dict(area=.0004, shear_strength=1e7, peel_strength=1e7, radius=.01))}))
     # Separate native cable plugs, with explicit shell coupons. Their electrical
     # termination metadata still resides on harness lead.A / lead.B.
+    from r3_connectors.pins import component_connector_frame
+    connector_frames = {}
     for name, owner, offset in [("lead.A", "src", [.014,0,.008]), ("lead.B", "dst", [-.014,0,.008])]:
         point = (np.asarray(project.spec.components[owner].pose.xyz) + offset).tolist()
         project.spec.components[name] = ComponentInstance(type="native-test-plug", mount=owner, pose=Pose(xyz=point))
@@ -206,6 +219,12 @@ def wiring_pull(project: Project, *, long_arm: bool = False) -> Project:
                 key: dict(value=value,status="measured",source="Synthetic captive plug fixture")
                 for key,value in dict(area=.0001,shear_strength=1e8,peel_strength=1e8,radius=.003).items()}}))
         shapes[name] = box((4,8,4))
+        # The housing's part frame is offset from its mating plane. Publish
+        # that local connector explicitly; routing must never move the mesh.
+        local = component_connector_frame(project, owner + ".J1").mated().matrix()
+        local[:3, 3] -= point
+        connector_frames[name] = {"mating": local}
+
     (project.root / "catalog/components/native-plug.yaml").write_text(yaml.safe_dump({"components": [
         dict(id="native-test-plug", name="Synthetic cable plug coupon", kind="cable", mechanical=dict(size=[.001,.001,.001], mass=1e-9))]}))
     (project.root / "robot.yaml").write_text(yaml.safe_dump(project.spec.model_dump(mode="json", exclude_none=True, by_alias=True), sort_keys=False))
@@ -213,7 +232,8 @@ def wiring_pull(project: Project, *, long_arm: bool = False) -> Project:
     masses.update(plate=.3)
     if "block" in shapes:
         masses["block"] = .1
-    return publish_project(project, shapes, mass=masses, attachments=fixture_attachments(project))
+    return publish_project(project, shapes, mass=masses, attachments=fixture_attachments(project),
+                           connector_frames=connector_frames)
 
 
 def revise_project(project: Project, *, shapes=None, materials=None) -> Project:
