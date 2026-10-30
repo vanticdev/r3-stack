@@ -128,3 +128,45 @@ def shape_state(shape: Any) -> Any:
             return ('posed_mesh', shape.vertices, shape.faces, shape._pose, shape_state(shape._base))
         return ('mesh', shape.vertices, shape.faces, shape.spacing, shape._local[:2])
     raise TypeError(f'uncacheable shape: {type(shape).__name__}')
+
+
+FIELD_NAMES = ('static', 'moving', 'structure', 'hardware')
+
+
+def field_probes(fields: Any) -> dict[str, np.ndarray]:
+    """The exact voxel corners read during a solve, including its final audit.
+
+    A deterministic solve can be replayed when all of its reads are identical,
+    even when remote, unread voxels changed. Record corners rather than rounded
+    positions or sampled values: both interpolation values and gradients then
+    remain bit-identical throughout the complete optimizer trajectory.
+    """
+    _, ny, nz = fields.grid.shape
+    offsets = np.array([dx * ny * nz + dy * nz + dz
+                        for dx in (0, 1) for dy in (0, 1) for dz in (0, 1)])
+    arrays = {}
+    for name, visited in fields._visited.items():
+        cells = np.flatnonzero(visited)
+        indices = np.unique((cells[:, None] + offsets).ravel())
+        arrays[f'{name}_indices'] = indices
+        arrays[f'{name}_values'] = getattr(fields, name)[indices]
+    return arrays
+
+
+def fields_match(fields: Any, arrays: dict[str, np.ndarray]) -> bool:
+    """Check every previous read exactly, including dtype and signed zero."""
+    for name in FIELD_NAMES:
+        current = getattr(fields, name)
+        if current is None:
+            if f'{name}_indices' in arrays:
+                return False
+            continue
+        indices, values = arrays.get(f'{name}_indices'), arrays.get(f'{name}_values')
+        if (indices is None or values is None or indices.dtype.kind not in 'iu'
+                or indices.ndim != 1 or values.shape != indices.shape
+                or (indices.size and (indices.min() < 0 or indices.max() >= current.size))):
+            return False
+        actual = current[indices]
+        if actual.dtype != values.dtype or actual.tobytes() != values.tobytes():
+            return False
+    return True

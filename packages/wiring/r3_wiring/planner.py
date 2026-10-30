@@ -65,7 +65,7 @@ from scipy.optimize import minimize
 
 from r3_model.diagnostics import Diagnostic
 
-from .cache import NumericCache
+from .cache import FIELD_NAMES, NumericCache, field_probes, fields_match
 from .geometry import polyline_length, resample_polyline
 from .grid import FIELD_CUTOFF, VoxelGrid
 
@@ -98,10 +98,13 @@ class ClearanceField:
     hardware: np.ndarray | None = None  # routed housings / bundles, no blanket termination relaxation
 
     def sample(self, name: str, points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        return trilinear(self.grid, getattr(self, name), points)
+        visited = getattr(self, "_visited", None)
+        return trilinear(self.grid, getattr(self, name), points,
+                         visited=visited[name] if visited is not None else None)
 
 
-def trilinear(grid: VoxelGrid, values: np.ndarray, points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def trilinear(grid: VoxelGrid, values: np.ndarray, points: np.ndarray, *,
+              visited: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
     """Trilinear interpolation of a flat voxel field and its exact gradient."""
     f = values.reshape(grid.shape)
     rel = (np.atleast_2d(points) - grid.origin) / grid.voxel
@@ -109,6 +112,8 @@ def trilinear(grid: VoxelGrid, values: np.ndarray, points: np.ndarray) -> tuple[
     clipped = np.clip(rel, 0.0, upper)
     inside = (rel >= 0.0) & (rel <= upper)
     i0 = np.floor(clipped).astype(int)
+    if visited is not None:
+        visited[(i0[:, 0] * grid.shape[1] + i0[:, 1]) * grid.shape[2] + i0[:, 2]] = True
     t = clipped - i0
     out = np.zeros(len(rel))
     grad = np.zeros((len(rel), 3))
@@ -727,22 +732,41 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     constrained optimisation. Returns the planned segments and junctions,
     feasibility and the violated constraints (with the parts that cause them)."""
     spacing = {k: float(np.clip(seg.r_min / 3.0, 0.0015, 0.004)) for k, seg in enumerate(segments)}
+    cache = NumericCache(cache_dir, "plans-v2")
+    fields._visited = ({name: np.zeros(fields.grid.size, dtype=bool) for name in FIELD_NAMES
+                        if getattr(fields, name) is not None} if cache.directory is not None else None)
+    if cache.directory is not None:
+        base = cache.key(segments, junctions, fields.grid, fields.hardware is not None, requirement, max_iterations)
+        cache = NumericCache(cache.directory, base)
+    key = cache.key(fields) if cache.directory is not None else ""
     problem = _Problem(segments, junctions, fields, requirement, spacing)
     x0 = problem.x0_array.copy()
-    cache = NumericCache(cache_dir, "plans")
-    key = cache.key(segments, junctions, fields, requirement, max_iterations) if cache.directory is not None else ""
-    hit = cache.load(key)
-    if hit is not None:
+
+    candidates = [key]
+    if cache.directory is not None and cache.directory.exists():
+        candidates += sorted(p.stem for p in cache.directory.glob("*.npz") if p.stem != key)
+    for candidate in candidates:
+        hit = cache.load(candidate)
+        if hit is None:
+            continue
         arrays, saved_stats = hit
         x = arrays.get("x")
-        if x is not None and x.shape == x0.shape and np.isfinite(x).all():
+        if x is not None and x.shape == x0.shape and np.isfinite(x).all() and fields_match(fields, arrays):
             # Rebuild the constraints and findings against the current obstacles.
             # Only the numeric solve is reused; no validity check is bypassed.
+            if candidate != key:
+                cache.store(key, arrays, saved_stats)
+            fields._visited = None
             return _result(problem, x, segments, junctions, saved_stats, obstacles)
+
+    def save(x: np.ndarray, stats: dict[str, Any]) -> None:
+        if cache.directory is not None:
+            cache.store(key, {"x": x, **field_probes(fields)}, stats)
+        fields._visited = None
 
     def finish(x: np.ndarray, stats: dict[str, Any]) -> BundlePlan:
         plan = _result(problem, x, segments, junctions, stats, obstacles)
-        cache.store(key, {"x": x}, stats)
+        save(x, stats)
         return plan
     # The distance fields are defined only on this routing volume. In an
     # infeasible layout an unbounded elastic solve can otherwise send a point
@@ -810,7 +834,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
                           "planned_length": float(sum(polyline_length(p) for p in problem.points(x1)))}
         accepted = _result(problem, x1, segments, junctions, accepted_stats, obstacles)
         if accepted.feasible:
-            cache.store(key, {"x": x1}, accepted_stats)
+            save(x1, accepted_stats)
             return accepted
 
     # Phase 2: elastic SLSQP. One slack t >= 0 relaxes every constraint (g + t >= 0) and

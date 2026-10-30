@@ -43,7 +43,7 @@ def test_empty_arrays_are_cacheable():
     assert content_key(np.zeros((0, 3))) == content_key(np.empty((0, 3)))
 
 
-def test_plan_cache_reuses_only_solve_and_invalidates_every_numeric_input(tmp_path, monkeypatch):
+def test_plan_cache_reuses_only_solve_and_validates_every_voxel_read(tmp_path, monkeypatch):
     import r3_wiring.planner as planner
     from test_wiring_feasible_stop import _fixed_exit_problem
 
@@ -76,8 +76,43 @@ def test_plan_cache_reuses_only_solve_and_invalidates_every_numeric_input(tmp_pa
         np.testing.assert_array_equal(a.points, b.points)
     fields.hardware = fields.hardware.copy()
     fields.hardware[0] = np.nextafter(fields.hardware[0], np.inf)
+    remote = planner.plan_bundle([segment], junctions, fields, .008, cache_dir=tmp_path)
+    assert not calls  # this voxel was never read anywhere along the original solve
+    exact = planner.plan_bundle([segment], junctions, fields, .008)
+    assert calls and exact.stats == remote.stats
+    np.testing.assert_array_equal(exact.segments[0].points, remote.segments[0].points)
+    calls.clear()
+    from r3_wiring.cache import NumericCache
+
+    file = next((tmp_path / 'plans-v2').rglob('*.npz'))
+    arrays, _ = NumericCache(file.parent.parent, file.parent.name).load(file.stem)
+    touched = arrays['hardware_indices'][0]
+    fields.hardware[touched] = np.nextafter(fields.hardware[touched], np.inf)
     planner.plan_bundle([segment], junctions, fields, .008, cache_dir=tmp_path)
     assert calls
     calls.clear()
     planner.plan_bundle([segment], junctions, fields, .009, cache_dir=tmp_path)
     assert calls
+
+
+def test_field_read_footprint_covers_all_gradient_corners_and_signed_zero():
+    from r3_wiring.cache import field_probes, fields_match
+    from r3_wiring.grid import VoxelGrid
+    from r3_wiring.planner import ClearanceField
+
+    grid = VoxelGrid(np.zeros(3), (5, 5, 5), .001)
+    fields = ClearanceField(grid, np.zeros(grid.size), np.zeros(grid.size), np.zeros(grid.size))
+    fields._visited = {name: np.zeros(grid.size, bool) for name in ('static', 'moving', 'structure')}
+    # At a grid corner, several interpolation weights are zero but their
+    # gradients can still depend on adjacent values. Record every corner.
+    fields.sample('static', np.array([[.001, .001, .001]]))
+    arrays = field_probes(fields)
+    expected = np.array([(x * 5 + y) * 5 + z for x in (1, 2) for y in (1, 2) for z in (1, 2)])
+    np.testing.assert_array_equal(arrays['static_indices'], expected)
+    assert fields_match(fields, arrays)
+    fields.static[0] = 9.
+    assert fields_match(fields, arrays)
+    fields.static[expected[-1]] = -0.
+    assert not fields_match(fields, arrays)
+    fields.static[expected[-1]] = 1e-10
+    assert not fields_match(fields, arrays)
