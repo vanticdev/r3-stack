@@ -707,8 +707,8 @@ export interface PlaybackFrames {
   bodies: Record<string, Pose7[]>;
   /** component -> MuJoCo body that carries it */
   component_bodies: Record<string, string>;
-  /** cable span (e.g. cable00s0) -> colour and per-frame body positions */
-  cables: Record<string, { rgba: number[] | null; points: Vec3[][] }> | null;
+  /** Wire id -> conductor dimensions and deformed pin-to-pin display path. */
+  cables: Record<string, { rgba: number[] | null; points: Vec3[][]; wire_id?: string; bundle?: string; harness?: string; od?: number; color?: string }> | null;
   /** Body rest poses (q = 0), when the server provides them. */
   rest?: Record<string, Pose7>;
   error?: string;
