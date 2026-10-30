@@ -487,6 +487,22 @@ class ModelChecker:
                         hint="Strap one device to an alternate address or move it to a second I2C bus."))
         return summary
 
+    def check_mount_estimates(self) -> None:
+        """Owned parts with estimated mounting holes still require measurement."""
+        for cid, comp in self.spec.components.items():
+            if not comp.owned or comp.type not in self.catalog.components:
+                continue
+            mechanical = self.catalog.component(comp.type).mechanical
+            holes = [f for f in mechanical.features if f.kind == "clearance_hole"
+                     and f.provenance.status == "estimated"]
+            if mechanical.fabricated or not holes:
+                continue
+            self.add(Diagnostic.warning(
+                "mount_geometry_estimated",
+                f"{cid}: {len(holes)} mounting holes use estimated geometry; measure the owned part before releasing its mount",
+                subjects=[cid], data={"holes": [f.model_dump(mode="json") for f in holes]},
+                hint="Confirm the hole centres and diameters, then update their catalog provenance."))
+
     # ------------------------------------------------------------ flat cables
     def _connector_point(self, ref: str) -> np.ndarray | None:
         cid, _, name = ref.partition(".")
@@ -896,6 +912,7 @@ def run(project: Project) -> StageResult:
     checker.check_roles()
     rails = checker.check_voltages()
     buses = checker.check_i2c()
+    checker.check_mount_estimates()
     checker.check_cable_reach()
     solids = checker.solids()
     overlaps = checker.check_interference(solids)
