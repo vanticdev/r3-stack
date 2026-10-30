@@ -299,8 +299,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("create", parents=[common], help="Scaffold a new R3 robot project repository.")
     p.add_argument("name")
-    p.add_argument("--from", "--template", dest="template", default="rc-car",
-                   help="Template: blank (start from nothing) or an example robot such as rc-car (default: rc-car).")
+    p.add_argument("--from", "--template", dest="template", default="blank",
+                   help="Template: blank (start from nothing, default) or the id of an installed example.")
     p.add_argument("--dir", default=".", help="Parent directory (default: cwd).")
     p.add_argument("--github", action="store_true", help="Also create the GitHub repository with `gh repo create` and push.")
     visibility = p.add_mutually_exclusive_group()

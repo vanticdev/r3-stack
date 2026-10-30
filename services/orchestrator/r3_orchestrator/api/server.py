@@ -56,7 +56,7 @@ class GithubOptions(BaseModel):
 
 class CreateProjectRequest(BaseModel):
     name: str = Field(description="Directory and robot name: letters, digits, '.', '_' or '-'.")
-    template: str = Field("rc-car", description="An example robot id, or 'blank'.")
+    template: str = Field("blank", description="An example robot id, or 'blank'.")
     github: GithubOptions | None = Field(None, description="Also create the GitHub repository (needs confirm=true).")
     confirm: bool = Field(False, description="Required with `github`: creating a repository is an external action.")
 

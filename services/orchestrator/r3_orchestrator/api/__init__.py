@@ -276,7 +276,7 @@ def deploy_fleet(project_path: str | Path | None = None, confirm: bool = False, 
             "stdout_tail": completed.stdout[-4000:], "stderr_tail": completed.stderr[-4000:]}
 
 
-def create_project(name: str, parent: str | Path = ".", template: str = "rc-car", github: bool = False, private: bool = True,
+def create_project(name: str, parent: str | Path = ".", template: str = "blank", github: bool = False, private: bool = True,
                    confirm: bool = False, platform_url: str | None = None) -> dict[str, Any]:
     from r3_github import scaffold
 
