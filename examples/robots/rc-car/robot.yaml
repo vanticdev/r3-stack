@@ -567,7 +567,7 @@ electrical:
         - {id: W_IMU_SDA, from: A.3, to: B.4, awg: 28, color: blue, signal: I2C_SDA}
         - {id: W_IMU_SCL, from: A.4, to: B.3, awg: 28, color: yellow, signal: I2C_SCL}
       # Three capped posts hold the lead above the Pi IO block and clear of the drivetrain.
-      route: {slack: 15 mm, tie_points: [[135 mm, -65.293 mm, 105 mm], [161.2929 mm, -40 mm, 114.9 mm], [155.2929 mm, -8 mm, 114.6 mm]], via: [[155 mm, -65 mm, 114 mm]]}
+      route: {slack: 15 mm, tie_points: [[135 mm, -65.293 mm, 105 mm], [159.293 mm, -40 mm, 114.9 mm], [153.293 mm, -8 mm, 114.6 mm]], via: [[155 mm, -65 mm, 114 mm]]}
 
 pcb:
   boards:

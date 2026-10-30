@@ -1912,10 +1912,11 @@ components:
     mechanical:
       shape: cylinder
       axis: z
-      size: [7 mm, 40 mm]
-      mass: 0.002
+      size: [11 mm, 40 mm]
+      mass: 0.0022
       solids:
       - {kind: cylinder, name: post, position: [0, 0, 0], axis: [0, 0, 1], diameter: 7 mm, length: 40 mm}
+      - {kind: cylinder, name: IMU tie stand-off collar, position: [0, 0, 35.9 mm], axis: [0, 0, 1], diameter: 11 mm, length: 2 mm}
   - id: imu-screw-cap-1-petg
     kind: structure
     cad_name: IMU screw cap 1
