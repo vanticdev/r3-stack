@@ -74,7 +74,10 @@ def regulator_lines(net: Netlist, prefix: str, out: str, gnd: str, vin: str, v_s
         table = efficiency if efficiency is not None else np.array([[0.0, 0.9], [1.0, 0.9]])
         # With ``reverse_limit`` the (small) reverse current is not returned to the input: an input node left
         # without a source (fault) then has only sinks and a unique solution.
-        flow = i if reverse_limit is None else f"max({i},0)"
+        # A hard corner at zero stalls transient step control when the hold-up
+        # capacitor finishes discharging after UVLO. Smooth only the 1 uA
+        # neighbourhood; the reverse-current limit itself is unchanged.
+        flow = i if reverse_limit is None else softplus(i, 1e-6)
         draw = f"v({out},{gnd})*{flow}/({pwl(f'abs({i})', table)}*max({vin_rel},0.5))"
     else:
         return lines
