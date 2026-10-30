@@ -1,0 +1,152 @@
+{
+  "equal": true,
+  "stage_runs_completed": true,
+  "tolerance": {
+    "rtol": 1e-07,
+    "atol_m": 1e-09
+  },
+  "input_content_equal": true,
+  "input_files": 271,
+  "paths_compared": 50,
+  "path_shapes_equal": true,
+  "max_absolute_path_difference_m": 0.0,
+  "routes_byte_identical": true,
+  "diagnostics_before": {
+    "error:cable_sags_into_moving_part": 1,
+    "error:cable_support_unplaceable": 4,
+    "error:cable_unsupported_span": 5,
+    "error:connector_clearance_violation": 1,
+    "error:route_infeasible": 16,
+    "error:wire_bend_radius_violation": 15,
+    "error:wire_intersects_wire": 1,
+    "info:harness_mass": 12,
+    "info:wire_pass_through": 2,
+    "warning:edge_protection_required": 10,
+    "warning:excess_slack_loop": 57,
+    "warning:wire_bend_radius_violation": 2
+  },
+  "diagnostics_after": {
+    "error:cable_sags_into_moving_part": 1,
+    "error:cable_support_unplaceable": 4,
+    "error:cable_unsupported_span": 5,
+    "error:connector_clearance_violation": 1,
+    "error:route_infeasible": 16,
+    "error:wire_bend_radius_violation": 15,
+    "error:wire_intersects_wire": 1,
+    "info:harness_mass": 12,
+    "info:wire_pass_through": 2,
+    "warning:edge_protection_required": 10,
+    "warning:excess_slack_loop": 57,
+    "warning:wire_bend_radius_violation": 2
+  },
+  "diagnostic_count_before": 126,
+  "diagnostic_count_after": 126,
+  "release_before": {
+    "status": "unreleased",
+    "blocking_codes": [
+      "cable_sags_into_moving_part",
+      "cable_support_unplaceable",
+      "cable_unsupported_span",
+      "connector_clearance_violation",
+      "route_infeasible",
+      "wire_bend_radius_violation",
+      "wire_intersects_wire"
+    ],
+    "rule": "a harness is released when no error-level geometry/buildability diagnostic (or geometry_uncertain) names it or its wires"
+  },
+  "release_after": {
+    "status": "unreleased",
+    "blocking_codes": [
+      "cable_sags_into_moving_part",
+      "cable_support_unplaceable",
+      "cable_unsupported_span",
+      "connector_clearance_violation",
+      "route_infeasible",
+      "wire_bend_radius_violation",
+      "wire_intersects_wire"
+    ],
+    "rule": "a harness is released when no error-level geometry/buildability diagnostic (or geometry_uncertain) names it or its wires"
+  },
+  "before_timing": {
+    "wall_s": 5815.972374790988,
+    "stage_s": 5815.0258729457855,
+    "ok": false,
+    "diagnostic_count": 126,
+    "source_revision": "143518c"
+  },
+  "after_timing": {
+    "wall_s": 5074.922679625015,
+    "stage_s": 5073.48259139061,
+    "ok": false,
+    "diagnostic_count": 126,
+    "source_revision": "working-tree"
+  },
+  "mismatch_count": 0,
+  "first_mismatches": [],
+  "test_summary": "888 passed, 3 skipped, 8 warnings in 2235.56s",
+  "before_cpu": {
+    "wall_s": 5818.886965274811,
+    "user_s": 4048.2315842916664,
+    "system_s": 18.278067083333333,
+    "cpu_s": 4066.5096513749995,
+    "cpu_method": "proc_pid_rusage cumulative user + system, including children",
+    "observed_peak_processes": 2,
+    "logical_cpus": 16,
+    "sampling_interval_s": 0.1,
+    "cpu_total_covers_full_process_lifetime": true,
+    "load_1m": {
+      "min": 59.931640625,
+      "max": 272.3681640625,
+      "mean": 147.61481867258257
+    },
+    "machine_processes": {
+      "min": 937,
+      "max": 1012
+    },
+    "load_observation_started_at": 1793365633.273689,
+    "load_observations": 1877
+  },
+  "after_cpu": {
+    "wall_s": 5077.440438708989,
+    "user_s": 2819.327704,
+    "system_s": 53.557939,
+    "cpu_s": 2872.8856429999996,
+    "cpu_method": "wait4 cumulative process-tree user + system",
+    "observed_peak_processes": 2,
+    "logical_cpus": 16,
+    "exit_code": 0,
+    "load_1m": {
+      "min": 22.7822265625,
+      "max": 272.3681640625,
+      "mean": 139.0179753037022
+    },
+    "machine_processes": {
+      "min": 930,
+      "max": 1010,
+      "mean": 955.8539372532724
+    },
+    "load_observations": 4813
+  },
+  "after_tests": {
+    "wall_s": 2235.8430197499983,
+    "user_s": 3208.994511,
+    "system_s": 118.046747,
+    "cpu_s": 3327.0412579999997,
+    "cpu_method": "wait4 cumulative process-tree user + system",
+    "observed_peak_processes": 13,
+    "logical_cpus": 16,
+    "exit_code": 0,
+    "load_1m": {
+      "min": 109.68212890625,
+      "max": 272.3681640625,
+      "mean": 157.4615399369232
+    },
+    "machine_processes": {
+      "min": 946,
+      "max": 1009,
+      "mean": 967.1268338854709
+    },
+    "load_observations": 2113
+  },
+  "validation_passed": true
+}
