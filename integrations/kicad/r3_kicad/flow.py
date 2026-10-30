@@ -270,10 +270,10 @@ class Flow:
                            if i.get("severity") == "error"][:30]
         return counts
 
-    def run(self, start: str = "schematic", stop: str = "drc") -> dict[str, Any]:
+    def run(self, start: str = "schematic", stop: str = "drc", *, watch_interval: float = .25) -> dict[str, Any]:
         steps = STEPS[STEPS.index(start): STEPS.index(stop) + 1]
         t0 = time.time()
-        with GuiWatch() as watch:
+        with GuiWatch(interval=watch_interval) as watch:
             try:
                 for name in steps:
                     self._step(name, getattr(self, name))

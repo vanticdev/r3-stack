@@ -172,17 +172,18 @@ def bench(bench_wiring):
     return bench_wiring.project, bench_wiring.bundle["obstacles"], bench_wiring.bundle["routes"]
 
 
-def test_bench_steering_sweep(bench):
-    """Lock-to-lock steering with spinning wheels on the shaker: stable, and every clearance is a
+def test_bench_joint_sweep(bench):
+    """A stationary sensor and connector pivot sweep: stable, and every clearance is a
     physical surface distance (the PBD-era kernel reported -0.2 m from a frame/sign bug)."""
     project, obstacles, routes = bench
     sim = CableSimulator(project, routes, obstacles)
-    limit = sim.kin.steering_limit()
+    joints = project.spec.mechanical.joints
+    assert joints and all(j.limits for j in joints)
     worst = math.inf
     for k in range(1000):
         t = (k + 1) * 0.001
-        steer = limit * math.sin(2 * math.pi * t)
-        report = sim.step(0.001, joints=drive_joints(sim.kin, steer, 36.0 * t))
+        positions = {j.id: max(abs(v) for v in j.limits) * math.sin(2 * math.pi * t) for j in joints}
+        report = sim.step(0.001, joints=positions)
         worst = min(worst, min(d for d, _ in report.min_clearance.values()))
     history = sim.min_history
     print("bench sweep worst clearance:", round(worst * 1e3, 2), "mm;",
@@ -198,7 +199,7 @@ def test_bench_steering_sweep(bench):
 
 
 def test_mesh_sdf_sign_is_exact_near_corners():
-    box = Box(np.array([0.26, 0.068, 0.055]), np.eye(3), np.array([0.015, 0.01, 0.02]))
+    box = Box(np.array([0.06, 0.04, 0.03]), np.eye(3), np.array([0.01, 0.02, 0.015]))
     corners = box.corners()
     hull = [(0, 1, 3), (0, 3, 2), (4, 6, 7), (4, 7, 5), (0, 4, 5), (0, 5, 1), (2, 3, 7), (2, 7, 6), (0, 2, 6),
             (0, 6, 4), (1, 5, 7), (1, 7, 3)]
@@ -209,6 +210,6 @@ def test_mesh_sdf_sign_is_exact_near_corners():
     points = box.center + rng.uniform(-0.25, 0.25, size=(400, 3))
     points[:50] = box.center + rng.uniform(-0.016, 0.016, size=(50, 3)) * [1, 1, 1.3]
     # The point that the nearest-sample sign called -0.196 m (behind the top face, beside the box).
-    points = np.vstack([points, [[0.0546, 0.0112, 0.0749]]])
+    points = np.vstack([points, [box.center + [-.1, .01, .0149]]])
     assert np.all(np.sign(mesh.sdf(points)) == np.sign(box.sdf(points)))
     assert np.allclose(mesh.sdf(points), box.sdf(points), atol=0.0015)

@@ -152,5 +152,5 @@ def pcb_project(tmp_path_factory: pytest.TempPathFactory):
         pytest.skip("KiCad (kicad-cli + pcbnew) not installed")
     root = tmp_path_factory.mktemp("pcb-coupon")
     shutil.copytree(EXAMPLES / "pcb", root, dirs_exist_ok=True, ignore=_SOURCE_ONLY)
-    record = Flow(root / "pcb/test-board").run()
+    record = Flow(root / "pcb/test-board").run(watch_interval=.05)
     return Project.load(root), record

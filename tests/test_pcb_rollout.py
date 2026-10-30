@@ -1,4 +1,4 @@
-"""The KiCad carrier HAT applied across R3: catalog/graph semantics of the failsafe arbiter, the twin's
+"""An explicit controller board applied across R3: catalog/graph semantics of the failsafe arbiter, the twin's
 arbiter device and heartbeat path, the HAT's two regulators in ngspice, the TVS check and the failsafe chain."""
 
 from __future__ import annotations

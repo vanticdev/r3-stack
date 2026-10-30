@@ -1,4 +1,4 @@
-"""Tool-independent carrier-HAT design checks: regulators, failsafe arbiter, IPC-2152."""
+"""Tool-independent converter design checks: regulators, failsafe arbiter, IPC-2152."""
 
 from __future__ import annotations
 

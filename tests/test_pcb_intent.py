@@ -1,4 +1,4 @@
-"""Carrier-HAT design intent: official KiCad library parts, schematic plan, placement plan."""
+"""Passive filter design intent: official KiCad library parts, schematic plan, placement plan."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ needs_kicad = pytest.mark.skipif(find_install() is None, reason="KiCad libraries
 
 
 def _module():
-    spec = importlib.util.spec_from_file_location("carrier_hat_test", BOARD / "board.py")
+    spec = importlib.util.spec_from_file_location("filter_board_test", BOARD / "board.py")
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

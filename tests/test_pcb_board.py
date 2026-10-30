@@ -1,4 +1,4 @@
-"""The committed carrier-HAT KiCad project, checked with KiCad's own tools (headless)."""
+"""A generated passive filter KiCad project, checked with KiCad's own tools (headless)."""
 
 from __future__ import annotations
 

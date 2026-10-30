@@ -126,12 +126,13 @@ def test_component_connectors_mate_in_place(project):
 
 
 @needs_kicad
-def test_hat_connector_poses_match_kicad_board(project):
+def test_connector_poses_match_generated_kicad_board(pcb_project):
     from r3_connectors.board import board_connectors
 
-    ctype = project.catalog.component("test-controller")
+    project, _ = pcb_project
+    ctype = project.catalog.component("test-filter")
     refs = {n: i.source.split()[0].split(":")[1] for n, i in ctype.connectors.items() if i.source.startswith("kicad:")}
-    placed = board_connectors(BENCH / "pcb" / "carrier-controller" / "carrier-controller.kicad_pcb", ctype, project.catalog, refs)
+    placed = board_connectors(project.root / "pcb/test-board/test-board.kicad_pcb", ctype, project.catalog, refs)
     assert set(placed) == set(ctype.connectors)
     for name, b in placed.items():
         frame = instance_frame(ctype.connectors[name])
@@ -203,7 +204,12 @@ def routed(bench_wiring):
 
 def test_every_wire_ends_on_its_pins(bench_wiring, routed):
     checked = assert_wires_end_on_pins(bench_wiring.project, routed["routing"], routed["routes"])
-    assert checked == 8  # Every crimp end in the independent branched fixture.
+    expected = sum(
+        ref.split(".")[0] in harness.connectors and harness.connectors[ref.split(".")[0]].type != "integral"
+        for harness in bench_wiring.project.spec.electrical.harnesses
+        for wire in harness.wires for ref in (wire.from_, wire.to)
+    )
+    assert checked == expected and checked > 0
 
 
 def test_branch_project_wires_end_on_their_pins(branch_wiring):
@@ -236,14 +242,14 @@ def test_branch_project_floating_pair_shares_mating_face(branch_wiring):
     assert_floating_pairs_share_mating_face(branch_wiring.bundle["routing"], branch_wiring.project.catalog)
 
 
-def test_fanout_core_is_shared_by_bundle(routed):
+def test_fanout_core_is_shared_by_bundle(small_wiring):
     """Wires of one branch share their bundle core exactly (MuJoCo cables group them)."""
     from r3_wiring.mujoco_cables import core_path
 
-    wires = routed["routes"]["wires"]
-    a, b = core_path(wires["W_RX_5V"]), core_path(wires["W_RX_GND"])
+    wires = small_wiring.bundle["routes"]["wires"]
+    a, b = core_path(wires["W1"]), core_path(wires["W2"])
     assert a.shape == b.shape and np.allclose(a, b)
-    assert not np.allclose(wires["W_RX_5V"]["path"][0], wires["W_RX_GND"]["path"][0])
+    assert not np.allclose(wires["W1"]["path"][0], wires["W2"]["path"][0])
 
 
 def test_fanout_core_is_shared_by_small_bundle(small_wiring):
