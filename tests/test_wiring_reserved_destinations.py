@@ -37,8 +37,10 @@ def test_required_tie_destination_is_reserved_before_its_harness_is_planned(tmp_
     assert router.grid.sample(earlier, query)[1] == pytest.approx(.05)
 
 
-def test_future_tie_reserves_the_later_emc_margin(tmp_path):
+def test_future_tie_reserves_the_later_emc_margin(tmp_path, monkeypatch):
     from r3_wiring.bundles import SEPARATION
+    from types import SimpleNamespace
+    import r3_wiring.router as router_module
 
     project = Project.load(write_project(tmp_path, block=False))
     lead = project.spec.electrical.harnesses[0]
@@ -56,3 +58,12 @@ def test_future_tie_reserves_the_later_emc_margin(tmp_path):
     query = np.array([[.1, .008, .04]])
     difference = router.grid.sample(ordinary, query) - router.grid.sample(power, query)
     assert difference == pytest.approx([SEPARATION[frozenset({"power", "signal"})]])
+    # Match occupancy_field's short-fanout policy without erasing the physical
+    # support reservation: only the additional EMC margin stops at an exit.
+    monkeypatch.setattr(router_module, "cable_obstacles", lambda *_: [])
+    node = SimpleNamespace(harness="supply", kind="connector", exit=query[0])
+    terminal = router.cable_field({"supply": {"A": node}}, {"supply"})
+    assert router.grid.sample(terminal, query) == pytest.approx(router.grid.sample(ordinary, query))
+    remote = np.array([[.12, .008, .04]])
+    assert router.grid.sample(ordinary, remote) - router.grid.sample(terminal, remote) == pytest.approx(
+        [SEPARATION[frozenset({"power", "signal"})]])

@@ -419,11 +419,16 @@ class HarnessRouter:
         # planned. Include the permitted support-placement match distance;
         # placement/access checks still have to find real hardware there.
         from .supports import HINT_MATCH
-        from .bundles import SEPARATION, category
+        from .bundles import SEPARATION, TERMINATION_ZONE, category
         from .planner import CROSSING_GAP
 
         current_categories = {category(w.signal, w.awg) for h in self.spec.electrical.harnesses
                               if h.id in harnesses for w in h.wires}
+        termination = np.zeros(self.grid.size, dtype=bool)
+        for group in nodes.values():
+            for node in group.values():
+                if node.harness in harnesses and node.kind == "connector" and node.exit is not None:
+                    termination |= np.linalg.norm(centers - node.exit, axis=1) <= TERMINATION_ZONE
 
         for harness in self.spec.electrical.harnesses:
             if harness.id in harnesses or not harness.route.tie_points:
@@ -435,12 +440,13 @@ class HarnessRouter:
             # at this fixed support. Reserving only the wire radius lets an
             # earlier bundle make the later harness infeasible at its own tie.
             radius = (bundle_diameter(self._wire_od(w.awg) for w in harness.wires) / 2
-                      + HINT_MATCH + separation + CROSSING_GAP)
+                      + HINT_MATCH + CROSSING_GAP)
             for number, point in enumerate(harness.route.tie_points):
                 key = ("required_support", harness.id, number, tuple(point), radius)
                 if key not in self._cable_fields:
                     self._cable_fields[key] = np.minimum(np.linalg.norm(centers - point, axis=1) - radius, FIELD_CUTOFF)
-                np.minimum(out, self._cable_fields[key], out=out)
+                margin = np.where(termination, 0.0, separation) if separation else 0.0
+                np.minimum(out, self._cable_fields[key] - margin, out=out)
         return out
 
     def _nonincident_hardware(self, harness: str, terminals: tuple[str, str], radius: float) -> np.ndarray:
