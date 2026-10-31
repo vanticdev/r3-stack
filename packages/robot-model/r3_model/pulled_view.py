@@ -16,7 +16,8 @@ from .spec_files import validate_pulled_spec as load_pulled
 def world_mesh(pulled: PulledModel, name: str):
     import trimesh
 
-    mesh = trimesh.load_mesh(pulled.parts[name].stl, process=True)
+    from .mesh_io import load_exported_stl
+    mesh = load_exported_stl(pulled.parts[name].stl)
     if not isinstance(mesh, trimesh.Trimesh) or not len(mesh.faces):
         raise PullError("cad_pull_invalid", f"{name}: pulled STL has no triangles")
     mesh.apply_transform(pulled.poses[name])

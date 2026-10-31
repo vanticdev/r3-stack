@@ -221,7 +221,7 @@ def pull_lock(root: Path) -> Iterator[None]:
 
 
 def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_url: str) -> None:
-    import trimesh
+    from r3_model.mesh_io import load_exported_stl
 
     (directory / "parts").mkdir()
     files: dict[tuple, bytes] = {}
@@ -234,7 +234,7 @@ def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_
                 files[identity] = getattr(transport, kind)(*identity[1:])
             path.write_bytes(files[identity])
             part["sha256"][kind] = hashlib.sha256(path.read_bytes()).hexdigest()
-        mesh = trimesh.load(directory / part["stl"], force="mesh", process=True)
+        mesh = load_exported_stl(directory / part["stl"])
         if not len(mesh.faces) or not mesh.is_watertight or not np.isfinite(mesh.vertices).all() or mesh.volume <= 0:
             raise PullError("cad_pull_geometry_invalid", f"{name}: STL is not a finite, closed positive-volume solid")
         part.update(mass_properties(directory / part["step"], part["density"]))
@@ -289,7 +289,22 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
     backup = folder / ".pulled-previous"
     destination = folder / "pulled"
     try:
-        download(transport, manifest, staging, pin["url"])
+        try:
+            download(transport, manifest, staging, pin["url"])
+        except Exception as error:
+            # Preserve unchanged exports for diagnosis, never install failed CAD.
+            failed = project.root / "build" / "cad" / "failed-pulls" / staging.name.removeprefix(".pull-")
+            failed.parent.mkdir(parents=True, exist_ok=True)
+            files = [{"path": p.relative_to(staging).as_posix(), "bytes": p.stat().st_size,
+                      "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+                     for p in staging.rglob("*") if p.is_file()]
+            (staging / "failure.json").write_text(json.dumps({
+                "validated": False, "source": pin, "files": files,
+                "error": {"code": getattr(error, "code", "cad_pull_failed"), "message": str(error)},
+                "note": "Diagnostic exports only; not an active CAD pull."}, indent=2) + "\n")
+            staging.rename(failed)
+            raise PullError(getattr(error, "code", "cad_pull_failed"),
+                            f"{error}; inspect unchanged exports at {failed.relative_to(project.root)}") from error
         checksum = hashlib.sha256((staging / "pull.json").read_bytes()).hexdigest()
         from r3_model.description import refresh_pulled
         previous_lock = (project.root / "r3.lock.yaml").read_bytes() if (project.root / "r3.lock.yaml").exists() else None

@@ -475,3 +475,10 @@ asynchronous imports at sensible intervals while doing independent work; an ACTI
 translation is not a final blocker report. Ordinary recoverable errors require another
 iteration. Conclude with completed integrated work or a demonstrated external constraint
 that cannot be resolved under the research, assumption and proxy policies above.
+
+If acquisition or geometry validation fails, `r3 cad pull` retains the unchanged
+STL/STEP downloads under `build/cad/failed-pulls/<attempt>/`. `failure.json` records
+the pin, file hashes and error. Inspect these files to diagnose the failure; they
+are not a valid pull and cannot replace `cad/pulled/`. Repair CAD in Onshape and
+pull again. Mesh decoding joins only exactly identical coordinates, without
+rounding nearby vertices, filling holes or removing failing geometry.

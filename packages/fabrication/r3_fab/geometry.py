@@ -33,7 +33,8 @@ def build_geometry(project: Any, cid: str) -> PartGeometry:
     if cid not in pulled.parts:
         raise PullError("cad_pull_missing", f"{cid}: no pulled part")
     part = pulled.parts[cid]
-    mesh = trimesh.load_mesh(part.stl, process=True)
+    from r3_model.mesh_io import load_exported_stl
+    mesh = load_exported_stl(part.stl)
     if not isinstance(mesh, trimesh.Trimesh) or not mesh.is_volume:
         raise PullError("cad_pull_invalid", f"{cid}: pulled STL is not a closed positive-volume mesh")
     mesh.apply_scale(MM)

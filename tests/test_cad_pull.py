@@ -282,3 +282,25 @@ def test_undeclared_components_fail_before_export(tmp_path,native_snapshot):
         def capture(self,*args):pytest.fail('Do not render before checking local selectors')
     result=pull(Project.load(tmp_path),url='https://cad.onshape.com/documents/doc/v/version/e/assembly',transport=NoExport())
     assert not result['ok'] and result['code']=='cad_pull_invalid'
+
+
+def test_failed_download_keeps_raw_evidence_without_replacing_active_pull(project, geometry, native_snapshot):
+    from r3_onshape.pull import pull
+    assert pull(project, transport=fake_transport(geometry, native_snapshot))['ok']
+    active = (project.root / 'cad/pulled/pull.json').read_bytes()
+    transport = fake_transport(geometry, native_snapshot)
+    import trimesh
+    cube = trimesh.creation.box()
+    broken = trimesh.Trimesh(cube.vertices, cube.faces[:-1], process=False).export(file_type='stl')
+    transport.stl = lambda *args: broken
+    result = pull(project, transport=transport)
+    assert not result['ok'] and result['code'] == 'cad_pull_geometry_invalid'
+    assert (project.root / 'cad/pulled/pull.json').read_bytes() == active
+    failure, = (project.root / 'build/cad/failed-pulls').glob('*/failure.json')
+    data = json.loads(failure.read_text())
+    assert not data['validated'] and data['source']['version_id'] == 'version'
+    for record in data['files']:
+        raw = (failure.parent / record['path']).read_bytes()
+        assert hashlib.sha256(raw).hexdigest() == record['sha256']
+        if record['path'].endswith('.stl'): assert raw == broken
+    assert 'build/cad/failed-pulls/' in result['message']
