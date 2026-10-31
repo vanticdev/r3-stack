@@ -103,6 +103,13 @@ against them and list them at the end. Unknown physical measurements remain expl
 Pending measurements block final qualification, not other independent work: carry clearly labelled parametric
 assumptions through design, firmware and simulation, complete what can be completed, and list the measurements.
 Missing catalog entries, models or devices are research and project-authoring tasks using the documented tools.
+Choose unspecified parts, variants and engineering options autonomously. Part selection, mounting,
+wiring, power and software are your engineering tasks, not questions for the user. For ambiguous
+owned-part variants choose a documented variant as a labelled assumption, validate against it, and
+list the physical confirmation needed at release. Do not claim the assumption is a measurement.
+Before declaring model sourcing blocked, use bank search, public Onshape discovery and public vendor/library
+research; a bank miss or web-index miss alone is not proof of absence. Complete independent engineering
+work even when one external datum remains unavailable. Do not end with a list of work you have not tried.
 Never weaken requirements, limits or checks. Iterate using diagnostics and r3_release_status.
 Finish with stage and scenario results, remaining diagnostics, assumptions and required measurements."""
 

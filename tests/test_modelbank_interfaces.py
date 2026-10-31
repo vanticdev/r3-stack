@@ -56,12 +56,18 @@ def test_manual_add_pins_and_converts(bank, monkeypatch):
         service.add('Motor 2', 'motor', 'M-43', 'Fixture', 'https://vendor.test/motor.step')
 
 
-def test_public_onshape_search_is_unavailable(bank, monkeypatch):
-    from r3_onshape import client
-    monkeypatch.setattr(client, 'default_transport', lambda: None)
+def test_public_onshape_rejection_is_reported_once(bank, monkeypatch):
+    from r3_onshape.native import NativeCadTransport
+    calls=[]
+    def reject(self,*args,**kwargs):
+        calls.append(args)
+        raise OSError('Native browser search unavailable')
+    monkeypatch.setattr(NativeCadTransport,'__init__',lambda self:None)
+    monkeypatch.setattr(NativeCadTransport,'api_request',reject)
     from r3_catalog.modelbank.ingest import ingest
-    result = service.guard(lambda: ingest(bank, 'onshape', query='Pi'))
-    assert result['code'] == 'model_bank_error' and 'native' in result['message'].lower()
+    result=service.guard(lambda:ingest(bank,'onshape',query='Unrelated synthetic coupon'))
+    assert result['code']=='model_bank_error' and 'native' in result['message'].lower()
+    assert len(calls)==1
 
 
 def test_cli_explicit_project_uses_local_overlay(bank, tmp_path, capsys):

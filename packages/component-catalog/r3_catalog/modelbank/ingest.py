@@ -128,18 +128,20 @@ def _copy(path: Path, target: Path) -> Path:
     return target
 
 
-def ingest_onshape(query: str, transport: Any) -> list[ModelEntry]:
+def ingest_onshape(query: str, transport: Any, limit: int = 10) -> list[ModelEntry]:
     """Search public documents only; only immutable versions become insertable models."""
-    response = transport.json('GET', '/documents', query={'q': query, 'filter': 2, 'limit': 50})
+    if not query.strip() or not 1 <= limit <= 50:
+        raise ValueError('Supply a public model query and limit between 1 and 50')
+    response = transport.json('GET', '/documents', query={'q': query, 'filter': 2, 'limit': limit})
     entries = []
-    for document in response.get('items', []):
-        if document.get('isPublic') is not True:
+    for document in response.get('items', [])[:limit]:
+        if document.get('isPublic', document.get('public')) is not True:
             continue
         did = document['id']
         versions = transport.json('GET', f'/documents/d/{did}/versions')
         if not versions:
             continue
-        vid = versions[-1]['id']
+        vid = max(versions, key=lambda v: v.get('createdAt') or '')['id']
         elements = transport.json('GET', f'/documents/d/{did}/v/{vid}/elements')
         for element in elements:
             if element.get('elementType') != 'PARTSTUDIO':
@@ -152,12 +154,23 @@ def ingest_onshape(query: str, transport: Any) -> list[ModelEntry]:
     return entries
 
 
+def public_onshape(query: str, limit: int = 10) -> list[ModelEntry]:
+    """Metadata discovery through the browser bridge only; no exports or writes."""
+    from r3_onshape.native import NativeCadTransport
+
+    native = NativeCadTransport()
+    class Browser:
+        def json(self, method: str, path: str, query: dict | None = None) -> Any:
+            return native.api_request(method, "/api/v9" + path, query=query)
+    return ingest_onshape(query, Browser(), limit)
+
+
 def ingest(bank: ModelBank, provider: str, **options: Any) -> dict[str, Any]:
     if provider == 'kicad':
         root = options.get('root')
         entries = ingest_kicad(Path(root) if root else None, query=options.get('query', ''))
     elif provider == 'onshape':
-        raise ValueError('Public Onshape search API is unavailable; search the local model bank or use native tools to select an immutable source')
+        entries = public_onshape(options.get('query', ''), options.get('limit', 10))
     else:
         entries = ingest_page(provider, options['url'], name=options.get('name') or provider,
                               category=options.get('category', 'other'), mpn=options.get('mpn', ''))

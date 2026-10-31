@@ -58,7 +58,12 @@ for a fixed instrument or arm. Mobile robots must declare their actual joints an
 When no human is available, make routine engineering choices independently. Choose
 conservative, clearly labelled assumptions for unspecified screw lengths, printer build
 volume, nozzle, material and process settings. Validate the design against those settings
-and include an assumptions list in the final report. Unknown physical dimensions and
+and include an assumptions list in the final report. Select unspecified purchased parts,
+mounting arrangements, power/wiring options and software architecture independently.
+For an ambiguous owned-part variant, choose a documented variant as an explicit assumption,
+finish the design against that assumption, and list the physical confirmation still needed.
+These choices are engineering work, not reasons to ask the user or stop early.
+Unknown physical dimensions and
 unconfirmed purchased-part interfaces remain measurement blockers; never label them verified.
 These block final qualification, rather than all other engineering work: finish the
 independent parametric design, software and simulations under labelled assumptions,
@@ -124,7 +129,15 @@ For a public Onshape model, supply its immutable `/documents/D/v/V/e/E` URL as
 `onshape` instead of `url`. Use onshape-native to import/insert the exact vendor model in your working document,
 keep its source unchanged and add the required mate connectors in Onshape.
 
-`r3_models_search(query)` searches the shared bank plus project records;
+`r3_models_search(query)` searches the shared bank plus project records. On a miss,
+use `r3_models_search_public(query, limit=10)` to discover public Onshape Part Studios
+through the browser session. Try appropriate manufacturer/product aliases yourself;
+web indexing alone may miss public models. Results pin an actual version and retain
+provenance but do not imply dimensional correctness or redistribution permission.
+Inspect the exact source and license, then explicitly add the chosen source.
+The search does not write catalog entries or export CAD. API rejections are findings,
+not retry loops. Continue independent engineering work while external data is pending.
+
 `r3_models_fetch(model_id)` downloads a pinned source and reports geometry or a
 specific acquisition error. In a project session, added records live under
 `catalog/modelbank/` and override the read-only platform bank. These human-editable

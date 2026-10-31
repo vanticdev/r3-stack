@@ -370,6 +370,19 @@ def r3_models_search(query: str = "", category: Category | None = None, manufact
     return service.guard(lambda: service.search(query, category, manufacturer, specs, limit))
 
 
+@_tool(_READ)
+def r3_models_search_public(query: str, limit: int = 10) -> dict[str, Any]:
+    """Discover public Onshape Part Studios by query through the browser session.
+    Returns immutable source URLs/provenance, never adds model-bank data or exports geometry.
+    A search result is unverified: inspect the exact model and license before r3_models_add.
+    API rejection is returned once; no keys, saved session or retry loop.
+    """
+    from r3_catalog.modelbank.ingest import public_onshape
+    from r3_catalog.modelbank.service import guard
+    return guard(lambda: {"ok": True, "provider": "onshape_public", "query": query,
+                          "models": [entry.model_dump(mode="json") for entry in public_onshape(query, limit)]})
+
+
 @_tool(_SEARCH)
 def r3_models_add(name: str, category: Category, mpn: str = "", manufacturer: str = "", url: str = "", onshape: str = "",
                   model_id: str = "", license: str = "unspecified; verify redistribution terms", format: str = "step",
