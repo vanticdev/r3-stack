@@ -30,7 +30,7 @@ def target(url: str, version_id: str = "") -> dict[str, str]:
         raise PullError("cad_pull_target_invalid", "URL and requested version differ")
     vid = revision if mode == "v" else version_id
     if not vid:
-        raise PullError("cad_pull_version_required", "Create/select a version through onshape-native, then supply its /v URL or --version. The documented bridge has no create-version local route; R3 will not call the public API.")
+        raise PullError("cad_pull_version_required", "Create/select a version through onshape-native, then supply its /v URL or --version. Create versions using the browser-session api_write/api_request tool.")
     configuration = parse_qs(parsed.query).get("configuration", [""])[0]
     result = {"document_id": did, "version_id": vid, "element_id": eid, "configuration": configuration}
     result["url"] = f"https://cad.onshape.com/documents/{did}/v/{vid}/e/{eid}" + ("?" + parsed.query if parsed.query else "")
@@ -224,11 +224,15 @@ def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_
     import trimesh
 
     (directory / "parts").mkdir()
+    files: dict[tuple, bytes] = {}
     for name, part in manifest["parts"].items():
         ref = part["onshape"]
         for kind in ("stl", "step"):
             path = directory / part[kind]
-            path.write_bytes(getattr(transport, kind)(ref["document_id"], ref["version_id"], ref["element_id"], ref["part_id"], ref["configuration"]))
+            identity = (kind, ref["document_id"], ref["version_id"], ref["element_id"], ref["part_id"], ref["configuration"])
+            if identity not in files:
+                files[identity] = getattr(transport, kind)(*identity[1:])
+            path.write_bytes(files[identity])
             part["sha256"][kind] = hashlib.sha256(path.read_bytes()).hexdigest()
         mesh = trimesh.load(directory / part["stl"], force="mesh", process=True)
         if not len(mesh.faces) or not mesh.is_watertight or not np.isfinite(mesh.vertices).all() or mesh.volume <= 0:
@@ -270,6 +274,9 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
         if path:
             selectors[name] = list(path)
     manifest = describe(transport.assembly(pin["url"]), pin, selectors)
+    undeclared = set(manifest["parts"]) - set(project.spec.components)
+    if undeclared:
+        raise PullError("cad_pull_invalid", "Declare local component metadata and occurrence selectors before pulling: " + ", ".join(sorted(undeclared)))
     for name, part in manifest["parts"].items():
         component = project.spec.components.get(name)
         selection = getattr(component, "onshape", None)

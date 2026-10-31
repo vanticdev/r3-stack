@@ -18,8 +18,9 @@ def transport(tmp_path):
 def test_public_routes_refused_before_network(tmp_path, path):
     client = transport(tmp_path)
     client._opener = Mock()
-    with pytest.raises(PullError, match='public /api is disabled'):
+    with pytest.raises(PullError) as error:
         client._request('GET', path)
+    assert error.value.code == 'cad_native_route_forbidden'
     client._opener.open.assert_not_called()
 
 
@@ -42,7 +43,7 @@ def test_step_uses_translation_result_document(tmp_path, monkeypatch):
     assert client.step('source-document', 'version', 'studio', 'part') == b'step-bytes'
     calls = client._request.call_args_list
     assert calls[0].args[0] == 'POST'
-    assert calls[0].args[2]['partIds'] == ['part']
+    assert calls[0].args[2]['partIds'] == 'part'
     assert calls[1].args[1] == '/native/api/v17/translations/job'
     assert calls[2].args[1] == '/native/api/v17/documents/d/result-document/externaldata/file'
 

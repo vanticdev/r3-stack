@@ -253,3 +253,32 @@ def test_failed_pull_preserves_concurrent_authored_description_edit(project, geo
     assert pull(project, transport=transport)['code'] == 'cad_pull_invalid'
     assert (project.root / 'cad/pulled/pull.json').read_bytes() == manifest
     assert Project.load(project.root).spec.robot.description == 'Concurrent authored edit'
+
+
+def test_repeated_native_occurrences_export_once_per_pinned_source(tmp_path, geometry, native_snapshot):
+    pin=target('https://cad.onshape.com/documents/doc/v/version/e/assembly')
+    other=copy.deepcopy(native_snapshot['rows'][0]);other.update(occurrence_path=['second'],name='second')
+    native_snapshot['rows'].append(other)
+    manifest=describe(native_snapshot,pin,{})
+    calls=[]
+    class Export:
+        def stl(self,*args):calls.append(('stl',args));return geometry[1]
+        def step(self,*args):calls.append(('step',args));return geometry[0]
+        def capture(self,url):return b'\x89PNG\r\n\x1a\nfixture',{'microversion':'revision'}
+    folder=tmp_path/'download';folder.mkdir()
+    download(Export(),manifest,folder,pin['url'])
+    assert len(calls)==2 and len(manifest['parts'])==2
+    assert manifest['parts']['body']['sha256']==manifest['parts']['second']['sha256']
+
+
+def test_undeclared_components_fail_before_export(tmp_path,native_snapshot):
+    from r3_model.project import Project
+    from r3_onshape.pull import pull
+    (tmp_path/'robot.yaml').write_text('robot: {name: blank}\ncomponents: {}\n')
+    class NoExport:
+        def assembly(self,url):return copy.deepcopy(native_snapshot)
+        def stl(self,*args):pytest.fail('Do not export before checking local selectors')
+        def step(self,*args):pytest.fail('Do not export before checking local selectors')
+        def capture(self,*args):pytest.fail('Do not render before checking local selectors')
+    result=pull(Project.load(tmp_path),url='https://cad.onshape.com/documents/doc/v/version/e/assembly',transport=NoExport())
+    assert not result['ok'] and result['code']=='cad_pull_invalid'

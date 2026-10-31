@@ -26,7 +26,7 @@ typed authoring reference, including field descriptions and nested definitions
 (also `connector` and `wire` for project catalog additions).
 Use these tools and this guide; reading platform source is not required.
 The session exposes R3 and onshape-native tools directly and excludes unrelated account
-plugins and skills. Use the native editor tools for CAD; no other project context is needed.
+plugins and skills. Use its browser-session REST feature tools for CAD; no other project context is needed.
 Run native pipeline stages, scenarios and project tests with the R3 MCP tools;
 they execute in the worker's probed environment. On macOS, the Codex shell sandbox
 can deny CoreGraphics access even when native offscreen MuJoCo rendering works in
@@ -138,14 +138,27 @@ category absent from that list; a component's catalog `kind` is a separate field
 
 ## 4. Model and assemble in Onshape
 
-Start with `onshape_native.search_commands` for the concrete task, then discover the native
-message schema and inspect current state. `native_schema`, `native_state`, `native_read`
-and `native_write` provide the native editor lifecycle for sketches and standard features,
-mate connectors and real assembly mates. Keep the exact element URL, occurrence paths,
-IDs and current revision guard. After any write, refresh state and check regeneration.
-Do not blindly retry an uncertain write. No FeatureScript is permitted.
+Use the onshape-native plugin's `api_catalog`, `api_request` and `api_write` through
+the authenticated browser-session bridge. Create sketches, extrudes, holes and mate
+connectors as standard Part Studio features at
+`/api/v9/partstudios/d/D/w/W/e/E/features`; create instances and standard mates at
+`/api/v9/assemblies/d/D/w/W/e/A`. Inspect live schemas with `api_catalog` and feature
+defaults with `inspect_model` → `feature_template` → `feature`. Preserve source
+microversion/rejectMicroversionSkew guards and inspect regeneration after writes.
+When an assembly mate selects a Part Studio mate connector, use the schema
+`BTMPartStudioMateConnectorQuery-1324` with its occurrence path, featureId and
+`partStudioMateConnectorQuery: true`; a generic feature query does not resolve it.
+Inspect mate regeneration before versioning.
+No FeatureScript is permitted. Shapes stay in Onshape, never in local YAML.
 
-Use `document_tree` and `document_edit` for tabs and folders. Create documents in the
+The native editor bootstrap is currently unavailable on some Onshape builds.
+`native_state`/`native_write` failures do not block the tested REST path. Log an
+unavailable editor-only operation and continue using working REST calls. Never
+retry failed operations in a loop or replace CAD with fabricated local data.
+
+Use `document_tree` to read tabs/folders and `api_catalog`/`api_write` for
+`createPartStudio`, `createAssembly` and other tab operations. `document_edit` is
+optional when its native editor dependency works. Create documents in the
 project's designated folder through the native integration's supported workflow. For
 purchased parts, search `r3_models_search` first, download the exact vendor STEP with
 provenance, then import it into Onshape. Add mate connectors on its real seating faces,
@@ -156,13 +169,13 @@ retry in a loop or sculpt a bought part.
 
 Build the real assembly in Onshape using its native insert and mate operations. Define
 attachments there, including joint type, axis and limits. Use full occurrence paths for
-nested subassemblies and repeated parts. R3 reads solved native transforms and connector
+nested subassemblies and repeated parts. R3 reads solved REST occurrence transforms and connector
 frames; it does not derive placements from catalog interfaces or synthesize assemblies.
 
 Verify the design with geometry and images before pulling: body count, dimensions,
 closed solids, material density, connector frames, mate status, solved placements and
-motion limits. Use `native_measure` for supported geometric measurements and
-`view_control` plus `capture_viewport` to inspect the actual viewport. A capture alone
+motion limits. Use REST geometry/mass measurements and pinned `shadedviews` to inspect the model.
+Native editor tools are optional when available. An image alone
 does not establish fit or interference clearance.
 
 ## 5. Pull CAD and qualify fabricated parts
@@ -193,12 +206,12 @@ The MCP equivalent is `r3_cad_pull(url=..., version_id=...)`. `r3_run_stage("cad
 checks the current pulled copy; it never creates geometry or refreshes the native model.
 The pull downloads each exact part's STL in metres and STEP, reads native mate connectors,
 mates, joint axes/limits and solved poses, computes volume/mass/centre of mass/inertia with
-Open CASCADE plus the assigned material density, and captures viewport evidence. A
+Open CASCADE plus the assigned material density, and captures pinned REST shaded-view evidence. A
 missing material, unresolved occurrence, unsupported constraint or missing geometry is an
 error. Pull never substitutes an envelope or drops a part.
 
 Files live at `cad/pulled/pull.json`, `cad/pulled/parts/<name>.stl` and `.step`, with
-viewport evidence alongside them. All are read-only. After a fresh Git checkout, restore their mode with
+pinned shaded-view evidence alongside them. All are read-only. After a fresh Git checkout, restore their mode with
 `find cad/pulled -type f -exec chmod a-w {} +` (Git does not store read-only bits);
 this changes no bytes and validation still checks every hash. The scaffolded CI does this.
 `r3.lock.yaml` pins the manifest's

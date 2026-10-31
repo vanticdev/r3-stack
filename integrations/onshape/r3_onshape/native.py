@@ -42,6 +42,12 @@ class NativeCadTransport:
             raise PullError("cad_native_route_forbidden", "Only loopback browser API, native exports, local and editor routes are supported")
         if ".." in path or "?" in path or "#" in path:
             raise PullError("cad_native_route_forbidden", "Invalid native route")
+        if path.startswith("/api/"):
+            from .policy import check_request
+            check_request(method, path, body)
+            if (re.search(r"/(stl|gltf|parasolid|externaldata|foreigndata|translate|exportinternal)(/|$)", path)
+                    or ("/translations" in path and any(part in path for part in ("/partstudios/", "/assemblies/")))):
+                raise PullError("cad_native_route_forbidden", "Geometry exports require /native/api/v17")
         url = self.base + path + ("?" + urlencode(query) if query else "")
         raw = json.dumps(body, allow_nan=False).encode() if body is not None else None
         headers = {**self._headers, "Content-Type": "application/json"}
@@ -118,13 +124,8 @@ class NativeCadTransport:
         return json.loads(path.read_text())
 
     def assembly(self, url: str) -> dict[str, Any]:
-        tree = self.local("element_tree", {"url": url, "limit": 1})
-        if not tree.get("occurrences_complete"):
-            raise PullError("cad_pull_incomplete", f"Native assembly occurrences are incomplete: {tree.get('issues')}")
-        snapshot = self.artifact(tree["snapshot"])
-        if snapshot.get("tree_kind") != "assembly" or not snapshot.get("definition"):
-            raise PullError("cad_pull_incomplete", "Native tree has no complete assembly definition")
-        return snapshot
+        from .rest_snapshot import assembly
+        return assembly(self, url)
 
     def stl(self, did: str, vid: str, eid: str, pid: str, configuration: str = "") -> bytes:
         path = f"/native/api/v17/parts/d/{quote(did, safe='')}/v/{quote(vid, safe='')}/e/{quote(eid, safe='')}/partid/{quote(pid, safe='')}/stl"
@@ -135,7 +136,7 @@ class NativeCadTransport:
 
     def step(self, did: str, vid: str, eid: str, pid: str, configuration: str = "") -> bytes:
         base = f"/native/api/v17/partstudios/d/{quote(did, safe='')}/v/{quote(vid, safe='')}/e/{quote(eid, safe='')}"
-        body = {"formatName": "STEP", "storeInDocument": False, "partIds": [pid]}
+        body = {"formatName": "STEP", "storeInDocument": False, "partIds": pid}
         if configuration:
             body["configuration"] = configuration
         job = json.loads(self._request("POST", base + "/translations", body))
@@ -154,11 +155,5 @@ class NativeCadTransport:
         return self._request("GET", path)
 
     def capture(self, url: str) -> tuple[bytes, dict[str, Any]]:
-        metadata = self.local("capture_viewport", {"url": url, "max_size": 1600})
-        handle = metadata.get("artifact", "")
-        if not re.fullmatch(r"[a-f0-9]{64}\.png", handle):
-            raise PullError("cad_pull_view_unavailable", "Viewport capture returned no PNG artifact")
-        image = (self.runtime / "artifacts" / handle).read_bytes()
-        if not image.startswith(b"\x89PNG\r\n\x1a\n"):
-            raise PullError("cad_pull_view_unavailable", "Viewport capture is not a PNG")
-        return image, metadata
+        from .rest_snapshot import capture
+        return capture(self, url)
