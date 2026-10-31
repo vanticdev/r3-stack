@@ -4,10 +4,11 @@ from __future__ import annotations
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Category = Literal['computer', 'camera', 'motor', 'gearbox', 'esc', 'servo', 'battery', 'gnss', 'imu',
                    'receiver', 'connector', 'wheel', 'fastener', 'regulator', 'sensor', 'cable', 'bearing', 'other']
+SourceFormat = Literal['step', 'stp', 'stp.zip', 'step.zip', 'stp.rar', 'step.rar', 'wrl', 'glb', 'stl']
 
 
 class Record(BaseModel):
@@ -24,7 +25,7 @@ class Spec(Record):
 class Source(Record):
     kind: Literal['vendor_step', 'onshape_public', 'kicad_3d', 'database', 'local']
     url: str
-    format: Literal['step', 'stp', 'stp.zip', 'stp.rar', 'wrl', 'glb', 'stl'] = 'step'
+    format: SourceFormat = 'step'
     license: str = 'unspecified; verify redistribution terms'
     sha256: str = Field('', pattern=r'^([a-f0-9]{64})?$')
     retrieved_at: str = ''
@@ -38,6 +39,13 @@ class Source(Record):
     vid: str = ''
     eid: str = ''
     part_id: str = Field('', validation_alias=AliasChoices('part_id', 'partId'))
+
+    @field_validator('format', mode='before')
+    @classmethod
+    def normalize_archive_format(cls, value: Any) -> Any:
+        # Both STEP extensions name the same format. Keep the existing cache
+        # and extraction paths canonical, including checksum/member checks.
+        return {'step.zip': 'stp.zip', 'step.rar': 'stp.rar'}.get(value, value) if isinstance(value, str) else value
 
     @model_validator(mode='after')
     def valid_location(self) -> Source:

@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import argparse
 import json
-from typing import Any
+from typing import Any, get_args
 
 
 def register(sub: Any, common: argparse.ArgumentParser) -> None:
     from r3_catalog.modelbank import service
     from r3_catalog.modelbank.bank import ModelBank
     from r3_catalog.modelbank.ingest import PROVIDERS, ingest
+    from r3_catalog.modelbank.schema import SourceFormat
 
     parent = sub.add_parser('models', parents=[common], help='Search, acquire and validate purchased-part CAD.')
     commands = parent.add_subparsers(dest='model_action', required=True)
@@ -34,7 +35,7 @@ def register(sub: Any, common: argparse.ArgumentParser) -> None:
     source.add_argument('--onshape', default='')
     p.add_argument('--id', dest='model_id', default='')
     p.add_argument('--license', default='unspecified; verify redistribution terms')
-    p.add_argument('--format', default='step', choices=['step', 'stp', 'stp.zip', 'stp.rar', 'glb', 'stl', 'wrl'])
+    p.add_argument('--format', default='step', choices=get_args(SourceFormat))
     p.add_argument('--member', default='')
     p.add_argument('--catalog-component')
     fields = ['name', 'category', 'mpn', 'manufacturer', 'url', 'onshape', 'model_id', 'license', 'format', 'member', 'catalog_component']
