@@ -101,3 +101,28 @@ def test_visibility_consent_is_never_inferred_or_unscoped(monkeypatch):
     monkeypatch.setenv('R3_ONSHAPE_DOCUMENT_VISIBILITY','public')
     monkeypatch.delenv('R3_ONSHAPE_DOCUMENT_FOLDER_ID',raising=False)
     with pytest.raises(ValueError,match='folder ID'):agents.session_instructions()
+
+
+def test_transport_backoff_is_scoped_and_reaches_both_providers(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setenv('R3_ONSHAPE_BACKOFFS', json.dumps([
+        {'method': 'GET', 'resource': '/api/v9/partstudios/**/features', 'until': '2099-01-01T00:00:00+00:00'},
+        {'method': 'GET', 'resource': '/api/v9/expired', 'until': '2000-01-01T00:00:00+00:00'}]))
+    conf = config(tmp_path, monkeypatch)
+    codex = agents.codex_command('codex', tmp_path, conf)
+    instruction = next(x for x in codex if x.startswith('developer_instructions='))
+    assert '/api/v9/partstudios/**/features' in instruction
+    assert '/api/v9/expired' not in instruction
+    assert 'preserving fresh revision guards' in instruction
+    assert 'other working REST operations and native exports' in instruction
+    claude = agents.claude_command('claude', tmp_path/'config.json')
+    assert 'Known transport backoff' in claude[claude.index('--append-system-prompt')+1]
+    assert '2099' not in agents.SYSTEM_PROMPT
+
+
+def test_transport_backoff_requires_timezone(monkeypatch):
+    import json, pytest
+    monkeypatch.setenv('R3_ONSHAPE_BACKOFFS', json.dumps([
+        {'method': 'GET', 'resource': '/api/v9/synthetic', 'until': '2099-01-01'}]))
+    with pytest.raises(ValueError, match='timezone-aware'):
+        agents.session_instructions()

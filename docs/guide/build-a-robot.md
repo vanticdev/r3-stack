@@ -494,3 +494,14 @@ For an unattended long build, keep the same session alive through a finite serve
 backoff: checkpoint, do independent work, then use bounded local sleeps and resume
 after the deadline. Do not poll the throttled API or discard the unfinished build
 solely because a finite wait is needed. Stop if the user cancels.
+
+
+A rate limit applies to the observed operation; do not infer an account-wide
+outage. Avoid helpers that internally repeat that operation, and continue with
+other working REST operations and native exports. Direct standard-feature REST
+calls are supported; preserve fresh revision guards and inspect returned feature
+status and actual geometry. Do not bypass checks to avoid an inspection failure.
+Operators may supply known transport backoffs as a JSON list in
+`R3_ONSHAPE_BACKOFFS`, with `method`, `resource` (API path glob), and `until`
+(timezone-aware ISO timestamp). Sessions receive only current backoffs as platform
+context, independently of the unchanged user prompt; expired entries are ignored.

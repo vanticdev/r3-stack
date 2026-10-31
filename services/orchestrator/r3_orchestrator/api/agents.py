@@ -52,6 +52,7 @@ import time
 import uuid
 import tomllib
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -133,15 +134,35 @@ Finish with stage and scenario results, remaining diagnostics, assumptions and r
 
 
 def session_instructions() -> str:
-    """Carry explicit operator visibility consent without changing the user prompt."""
+    """Carry operator transport context without changing the user prompt."""
+    instruction = SYSTEM_PROMPT
+    backoffs = json.loads(os.environ.get("R3_ONSHAPE_BACKOFFS", "[]"))
+    if not isinstance(backoffs, list):
+        raise ValueError("Onshape backoffs must be a list")
+    for backoff in backoffs:
+        method, resource = backoff["method"], backoff["resource"]
+        until = datetime.fromisoformat(backoff["until"])
+        if method not in ("GET", "POST", "PUT", "PATCH", "DELETE") or not isinstance(resource, str) or \
+                not resource.startswith(("/api/", "/native/api/")) or any(c.isspace() for c in resource) or until.tzinfo is None:
+            raise ValueError("Onshape backoffs require a method, API resource pattern and timezone-aware deadline")
+        if until <= datetime.now(timezone.utc):
+            continue
+        instruction += (
+            f"\nKnown transport backoff: {method} {resource} until {until.isoformat()} (glob pattern). "
+            "Do not request matching resources or inspection helpers that read them before that deadline. "
+            "This is not an account-wide outage: continue using other working REST operations and native exports. "
+            "Use direct standard-feature REST authoring when supported, preserving fresh revision guards and checking "
+            "returned feature status, geometry and mates. Never bypass a concurrency or validation check. "
+            "If an operation truly depends on the throttled read, do independent work or wait in this session."
+        )
     visibility = os.environ.get("R3_ONSHAPE_DOCUMENT_VISIBILITY", "")
     if not visibility:
-        return SYSTEM_PROMPT
+        return instruction
     folder = os.environ.get("R3_ONSHAPE_DOCUMENT_FOLDER_ID", "")
     if visibility not in ("public", "private") or len(folder) != 24 or any(c not in "0123456789abcdef" for c in folder):
         raise ValueError("Onshape visibility consent requires public/private and an exact 24-hex folder ID")
     public = "true" if visibility == "public" else "false"
-    return SYSTEM_PROMPT + (
+    return instruction + (
         f"\nThe operator has explicitly authorized NEW {visibility} Onshape documents only in folder {folder}. "
         f"Create them with parentId={folder} and isPublic={public}; no additional visibility approval is needed. "
         "This consent does not authorize changing the visibility of existing documents. "
