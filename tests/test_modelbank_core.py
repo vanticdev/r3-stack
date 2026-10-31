@@ -91,7 +91,7 @@ def test_onshape_search_requires_public_versions():
     class API:
         def json(self, method, path, query=None):
             if path == '/documents':
-                assert query['filter'] == 2
+                assert query['filter'] == 4
                 return {'items': [{'id': 'public', 'name': 'Pi', 'isPublic': True}, {'id': 'private', 'isPublic': False}]}
             if path.endswith('/versions'):
                 return [{'id': 'v1'}]

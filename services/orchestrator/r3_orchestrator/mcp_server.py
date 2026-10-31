@@ -372,7 +372,7 @@ def r3_models_search(query: str = "", category: Category | None = None, manufact
 
 @_tool(_READ)
 def r3_models_search_public(query: str, limit: int = 10) -> dict[str, Any]:
-    """Discover public Onshape Part Studios by query through the browser session.
+    """Discover public Onshape Part Studios by query through the browser session (limit 1-20).
     Returns immutable source URLs/provenance, never adds model-bank data or exports geometry.
     A search result is unverified: inspect the exact model and license before r3_models_add.
     API rejection is returned once; no keys, saved session or retry loop.

@@ -130,9 +130,9 @@ def _copy(path: Path, target: Path) -> Path:
 
 def ingest_onshape(query: str, transport: Any, limit: int = 10) -> list[ModelEntry]:
     """Search public documents only; only immutable versions become insertable models."""
-    if not query.strip() or not 1 <= limit <= 50:
-        raise ValueError('Supply a public model query and limit between 1 and 50')
-    response = transport.json('GET', '/documents', query={'q': query, 'filter': 2, 'limit': limit})
+    if not query.strip() or not 1 <= limit <= 20:
+        raise ValueError('Supply a public model query and limit between 1 and 20')
+    response = transport.json('GET', '/documents', query={'q': query, 'filter': 4, 'limit': limit})
     entries = []
     for document in response.get('items', [])[:limit]:
         if document.get('isPublic', document.get('public')) is not True:

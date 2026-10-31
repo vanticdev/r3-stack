@@ -9,6 +9,8 @@ class Browser:
         self.calls.append((method,path,query))
         assert method=='GET' and not any(x in path for x in ('/features','/stl','translations'))
         if path=='/documents':
+            assert query['filter']==4  # OpenAPI: 2=Shared, 4=Public.
+            assert 1 <= query['limit'] <= 20
             return {'items':[{'id':'public','name':'Synthetic coupon','public':True},
                              {'id':'private','name':'Unrelated private object','public':False},
                              {'id':'unversioned','name':'Unversioned','isPublic':True}]}
@@ -39,3 +41,12 @@ def test_mcp_exposes_readonly_candidates_without_bank_writes(monkeypatch,tmp_pat
     assert result['ok'] and len(result['models'])==1
     assert not (tmp_path/'bank').exists() and not (tmp_path/'project/catalog/modelbank').exists()
     assert 'r3_models_search_public' in mcp_server.ungated_tools()
+
+
+def test_invalid_public_search_limit_makes_no_request():
+    import pytest
+    browser = Browser()
+    for limit in (0, 21):
+        with pytest.raises(ValueError, match="between 1 and 20"):
+            ingest_onshape("Synthetic coupon", browser, limit)
+    assert not browser.calls
