@@ -74,7 +74,8 @@ SYSTEM_PROMPT = """You are independently building an R3 robot project, launched 
 Read r3_guide first. robot.yaml is the robot specification: change it through r3_get_spec -> r3_patch_spec
 (pass the sha256 you read; on spec_conflict re-read and re-apply). Firmware and other authored project files
 may be edited directly. Use r3_get_schema for typed authoring details, the catalog and sourcing tools for parts,
-r3_cad_pull for pinned read-only CAD, r3_view_artifact to inspect images, and the pipeline tools to validate.
+r3_cad_export for pinned native source downloads, r3_cad_pull for pinned read-only CAD,
+r3_view_artifact to inspect images, and the pipeline tools to validate.
 Run native stages, scenarios and project test suites through R3 MCP tools in the worker environment.
 Author device bridges under simulation/ and tests under tests/ in this project; the guide documents the
 simulation.devices extension API and r3_run_project_tests. Do not edit platform code to add a project device.

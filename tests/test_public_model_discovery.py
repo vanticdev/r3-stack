@@ -50,3 +50,45 @@ def test_invalid_public_search_limit_makes_no_request():
         with pytest.raises(ValueError, match="between 1 and 20"):
             ingest_onshape("Synthetic coupon", browser, limit)
     assert not browser.calls
+
+
+def test_candidate_failure_keeps_other_results_and_explicit_warning(monkeypatch):
+    from r3_onshape.native import NativeCadTransport
+    calls = []
+    def request(self, method, endpoint, query=None):
+        calls.append(endpoint)
+        if endpoint == '/api/v9/documents':
+            return {'items': [{'id': name, 'name': name, 'isPublic': True} for name in ('bad', 'good')]}
+        if '/bad/' in endpoint:
+            raise OSError('Synthetic candidate unavailable')
+        if endpoint.endswith('/versions'):
+            return [{'id': 'pin'}]
+        return [{'id': 'studio', 'name': 'Synthetic coupon', 'elementType': 'PARTSTUDIO'}]
+    monkeypatch.setattr(NativeCadTransport, '__init__', lambda self: None)
+    monkeypatch.setattr(NativeCadTransport, 'api_request', request)
+    result = mcp_server.r3_models_search_public('Synthetic fixture')
+    assert result['ok'] and not result['complete'] and len(result['models']) == 1
+    assert result['warnings'][0]['document_id'] == 'bad'
+    assert result['models'][0]['validation']['status'] == 'unverified'
+    assert calls.count('/api/v9/documents/d/bad/versions') == 1
+
+
+def test_discovery_rate_limit_stops_candidate_reads_and_preserves_deadline(monkeypatch):
+    from r3_onshape.native import NativeCadTransport, NativeRateLimitError
+    calls = []
+    def request(self, method, endpoint, query=None):
+        calls.append(endpoint)
+        if endpoint == '/api/v9/documents':
+            return {'items': [{'id': name, 'name': name, 'isPublic': True} for name in ('first', 'second')]}
+        raise NativeRateLimitError('120', method, endpoint)
+    monkeypatch.setattr(NativeCadTransport, '__init__', lambda self: None)
+    monkeypatch.setattr(NativeCadTransport, 'api_request', request)
+    result = mcp_server.r3_models_search_public('Synthetic fixture')
+    assert not result['ok'] and not result['complete'] and result['models'] == []
+    assert result['warnings'][0]['retry_after_seconds'] == 120
+    assert len(calls) == 2
+    calls.clear()
+    def reject(*args, **kwargs): raise NativeRateLimitError('60')
+    monkeypatch.setattr(NativeCadTransport, 'api_request', reject)
+    result = mcp_server.r3_models_search_public('Synthetic fixture')
+    assert result['code'] == 'cad_native_rate_limited' and result['retry_after_seconds'] == 60

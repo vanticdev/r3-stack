@@ -72,4 +72,6 @@ def guard(call: Any) -> dict[str, Any]:
     try:
         return call()
     except (KeyError, ValueError, OSError, RuntimeError) as error:
-        return {'ok': False, 'code': 'model_bank_error', 'message': str(error)}
+        code = getattr(error, 'code', None)
+        return {'ok': False, 'code': code if isinstance(code, str) else 'model_bank_error', 'message': str(error),
+                **getattr(error, 'details', {})}

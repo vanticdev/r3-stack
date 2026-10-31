@@ -17,6 +17,10 @@ from typing import Any, Protocol, runtime_checkable
 from r3_model.diagnostics import Diagnostic
 
 
+class ProjectDeviceConfigurationError(ValueError):
+    """A project extension cannot provide its declared electrical factory."""
+
+
 @runtime_checkable
 class ProjectDevice(Protocol):
     def step(self, dt: float) -> None:
@@ -91,8 +95,12 @@ def electrical_factory(project: Any, component: str, model: str) -> Any:
     name = model.removeprefix("project.")
     definition = project.spec.simulation.devices.get(name)
     if definition is None or definition.component != component or not definition.electrical_factory:
-        raise ValueError(f"{component}: {model} needs a matching simulation.devices electrical_factory")
-    return getattr(load_module(project, name), definition.electrical_factory)
+        raise ProjectDeviceConfigurationError(f"{component}: {model} needs a matching simulation.devices electrical_factory")
+    factory = getattr(load_module(project, name), definition.electrical_factory, None)
+    if not callable(factory):
+        raise ProjectDeviceConfigurationError(
+            f"device {name}: {definition.source} must export callable {definition.electrical_factory}")
+    return factory
 
 
 def create_devices(kernel: Any) -> dict[str, tuple[DeviceContext, ProjectDevice]]:

@@ -80,3 +80,12 @@ def test_cli_explicit_project_uses_local_overlay(bank, tmp_path, capsys):
     assert '"id": "synthetic-local"' in capsys.readouterr().out
     with pytest.raises(KeyError):
         bank.get('synthetic-local')
+
+
+def test_http_status_is_not_mistaken_for_a_diagnostic_code():
+    from urllib.error import HTTPError
+    def reject():
+        raise HTTPError('https://vendor.test/fixture.step', 403, 'Forbidden', {}, None)
+    result = service.guard(reject)
+    assert not result['ok'] and result['code'] == 'model_bank_error'
+    assert '403' in result['message']

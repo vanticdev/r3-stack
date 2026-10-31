@@ -22,7 +22,7 @@ def target(url: str, version_id: str = "") -> dict[str, str]:
     parsed = urlsplit(url)
     match = re.fullmatch(r"/documents/([^/]+)/([wvm])/([^/]+)/e/([^/]+)/?", parsed.path)
     if parsed.scheme != "https" or parsed.hostname != "cad.onshape.com" or not match:
-        raise PullError("cad_pull_target_invalid", "Use an exact Onshape assembly element URL")
+        raise PullError("cad_pull_target_invalid", "Use an exact Onshape element URL; cad pull requires an assembly")
     did, mode, revision, eid = match.groups()
     if mode == "m":
         raise PullError("cad_pull_version_required", "Only STL supports microversions. Select/create an Onshape version and pull /v, including STEP.")

@@ -222,6 +222,7 @@ class ComponentType(_Model):
     kind: Literal[
         "computer", "battery", "motor", "esc", "servo", "regulator", "sensor",
         "radio", "pcb", "structure", "wheel", "fuse", "switch", "gearbox", "antenna", "camera", "cable",
+        "fastener", "connector",
     ]
     name: str
     manufacturer: str = ""

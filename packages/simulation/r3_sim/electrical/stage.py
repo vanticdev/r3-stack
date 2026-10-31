@@ -867,7 +867,13 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
                 "Choose a catalogued gauge or add sourced data to project catalog/wires.yaml; simulation was not started.",
                 subject=wire.id, data={"awg": wire.awg}))
         return result
-    system = ElectricalSystem(project, routes)
+    from ..project_devices import ProjectDeviceConfigurationError
+    try:
+        system = ElectricalSystem(project, routes)
+    except ProjectDeviceConfigurationError as error:
+        result.add(Diagnostic.error("project_device_configuration_invalid", str(error),
+            hint="Define the matching simulation.devices entry and callable electrical_factory in project simulation/ code. Physics was not started."))
+        return result
     result.extend(system.diagnostics)
     from r3_model.pulled import PullError
     try:

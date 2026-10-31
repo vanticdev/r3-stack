@@ -128,7 +128,8 @@ def _copy(path: Path, target: Path) -> Path:
     return target
 
 
-def ingest_onshape(query: str, transport: Any, limit: int = 10) -> list[ModelEntry]:
+def ingest_onshape(query: str, transport: Any, limit: int = 10, *,
+                   warnings: list[dict[str, Any]] | None = None) -> list[ModelEntry]:
     """Search public documents only; only immutable versions become insertable models."""
     if not query.strip() or not 1 <= limit <= 20:
         raise ValueError('Supply a public model query and limit between 1 and 20')
@@ -138,11 +139,20 @@ def ingest_onshape(query: str, transport: Any, limit: int = 10) -> list[ModelEnt
         if document.get('isPublic', document.get('public')) is not True:
             continue
         did = document['id']
-        versions = transport.json('GET', f'/documents/d/{did}/versions')
-        if not versions:
+        try:
+            versions = transport.json('GET', f'/documents/d/{did}/versions')
+            if not versions:
+                continue
+            vid = max(versions, key=lambda v: v.get('createdAt') or '')['id']
+            elements = transport.json('GET', f'/documents/d/{did}/v/{vid}/elements')
+        except (KeyError, ValueError, OSError, RuntimeError) as error:
+            if warnings is None:
+                raise
+            warnings.append({'document_id': did, 'code': getattr(error, 'code', 'model_candidate_unavailable'),
+                             'message': str(error), **getattr(error, 'details', {})})
+            if getattr(error, 'code', '') == 'cad_native_rate_limited':
+                break  # Never probe the same throttled operation on another candidate.
             continue
-        vid = max(versions, key=lambda v: v.get('createdAt') or '')['id']
-        elements = transport.json('GET', f'/documents/d/{did}/v/{vid}/elements')
         for element in elements:
             if element.get('elementType') != 'PARTSTUDIO':
                 continue
@@ -154,7 +164,8 @@ def ingest_onshape(query: str, transport: Any, limit: int = 10) -> list[ModelEnt
     return entries
 
 
-def public_onshape(query: str, limit: int = 10) -> list[ModelEntry]:
+def public_onshape(query: str, limit: int = 10, *,
+                   warnings: list[dict[str, Any]] | None = None) -> list[ModelEntry]:
     """Metadata discovery through the browser bridge only; no exports or writes."""
     from r3_onshape.native import NativeCadTransport
 
@@ -162,7 +173,7 @@ def public_onshape(query: str, limit: int = 10) -> list[ModelEntry]:
     class Browser:
         def json(self, method: str, path: str, query: dict | None = None) -> Any:
             return native.api_request(method, "/api/v9" + path, query=query)
-    return ingest_onshape(query, Browser(), limit)
+    return ingest_onshape(query, Browser(), limit, warnings=warnings)
 
 
 def ingest(bank: ModelBank, provider: str, **options: Any) -> dict[str, Any]:

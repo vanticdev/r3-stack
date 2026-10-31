@@ -317,7 +317,11 @@ def get_catalog_component(project_path: str | Path | None, component_id: str) ->
     """One component in full, including its project-local origin."""
     from ..catalog_ops import get_entry
 
-    result = get_entry(resolve_project(project_path), "component", component_id)
+    try:
+        result = get_entry(resolve_project(project_path), "component", component_id)
+    except ValueError as error:
+        return {"ok": False, "code": "catalog_invalid", "message": str(error),
+                "hint": "Correct the project catalog using r3_get_schema(domain='component') and r3_put_catalog_component; no fallback catalog was substituted."}
     if result["ok"]:
         result["component"] = result.pop("entry")
     return result

@@ -505,3 +505,69 @@ Operators may supply known transport backoffs as a JSON list in
 `R3_ONSHAPE_BACKOFFS`, with `method`, `resource` (API path glob), and `until`
 (timezone-aware ISO timestamp). Sessions receive only current backoffs as platform
 context, independently of the unchanged user prompt; expired entries are ignored.
+
+
+### Physical hardware and typed catalog categories
+
+Use component `kind: fastener` for screw, nut and other physical fastener
+occurrences, and `kind: connector` for physical connector bodies. They can be
+included in a native assembly and indexed locally without being called structural
+parts. `mechanical.fabricated` still declares whether each part is printed; the
+category never substitutes for sourcing, geometry, fit, strength or fabrication
+qualification. The separate `catalog.fasteners` table holds joint-rating data;
+a component model is not proof of a fastener's grade or load capacity.
+`r3_list_catalog(kind="fastener")` returns physical types in `components` and
+rating records in `fasteners`. Connector bodies and mating families similarly
+remain separate `components` and `connectors` collections.
+
+### Pinned source exports and cached geometry inspection
+
+Use `r3_cad_export(url=..., part_id=..., format="step")` to download one part from
+an immutable Onshape Part Studio version. A workspace URL also needs
+`version_id`. `format="stl"` downloads the native mesh in metres. Both formats use
+only the native export transport. The result supplies a local `file`, a manifest,
+the Onshape pin and SHA-256 under `build/cad/inspection-exports/`. These are
+unqualified inspection/source files: import purchased models into your Onshape
+document and assemble them there. Only `r3_cad_pull` installs the read-only,
+verified model used by the viewer and simulation. Never edit exported geometry.
+
+For browser-session imports, pass `encodedFilename` with the actual format suffix,
+for example `source.step`. Use uncompressed STEP. The upload tool derives a
+missing import filename/suffix from the local file, but you must still check the
+returned translation and element type: `DONE` with a BLOB is not a translated
+solid Part Studio. Inspect its parts before qualifying the import.
+
+Public discovery preserves usable candidates when another candidate fails.
+Read `complete` and `warnings` as well as `models`; an empty incomplete result is
+not evidence that no model exists. Rate-limited candidate reads stop without a
+retry and preserve the server deadline.
+
+Cached native artifacts can be inspected in bulk without repeating API calls or
+paging thousands of individual faces. Use the public Python client in the R3
+worker environment (no token handling or source-code discovery is needed):
+
+```python
+from r3_onshape.native import NativeCadTransport
+artifact = NativeCadTransport().artifact("<64-hex artifact id>.json")
+# Query the returned JSON in memory to identify real topology references.
+# Do not construct model geometry from those faces.
+```
+
+For a saved shaded-view response, decode its image unchanged to a PNG under
+`build/`, then open it with `r3_view_artifact`:
+
+```python
+import base64
+from pathlib import Path
+image = artifact["images"][0]
+if isinstance(image, list):
+    image = image[0]
+path = Path("build/inspection/native-view.png")
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_bytes(base64.b64decode(image.split(",")[-1], validate=True))
+```
+
+`r3_guide(topic="project_code")` documents custom device factories. A missing or
+non-callable project electrical factory fails with
+`project_device_configuration_invalid`; define it in the project's `simulation/`
+code and keep the native circuit engine and checks in place.

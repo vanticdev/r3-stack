@@ -17,7 +17,7 @@ so tests and other Python code can call them directly.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 import json
 
 try:  # mcp >= 2 renamed FastMCP to MCPServer
@@ -190,7 +190,7 @@ def r3_put_catalog_entry(kind: str, entry: dict[str, Any], project: str = "", dr
 
 
 @_tool(_READ)
-def r3_guide(topic: str = "build") -> dict[str, Any]:
+def r3_guide(topic: Literal["build", "project_code"] = "build") -> dict[str, Any]:
     """How to build a robot from nothing with R3 (docs/guide/build-a-robot.md): the spec, sourcing, joins and
     interfaces, CAD (standard features only), wiring, electrical, firmware with r3_hal, sim scenarios, the release
     gate, the policies and every tool. Read it before starting a new robot."""
@@ -238,6 +238,22 @@ def r3_onshape_native(operation: str, arguments: dict[str, Any]) -> dict[str, An
     except (PullError, FileNotFoundError) as error:
         return {"ok": False, "code": getattr(error, "code", "cad_native_unavailable"),
                 "message": str(error), **getattr(error, "details", {})}
+
+
+@_tool(_DESIGN)
+def r3_cad_export(url: str, part_id: str, format: Literal["step", "stl"] = "step", version_id: str = "",
+                  project: str = "") -> dict[str, Any]:
+    """Download one part from a version-pinned Onshape Part Studio as STEP or STL through native exports.
+    Use for source research, importing purchased models or inspecting geometry. Returns
+    an unchanged file under build/cad/inspection-exports with its pin and SHA-256.
+    This does not install or qualify a model: use r3_cad_pull for the viewer and simulation.
+    Workspace URLs require version_id. No public export fallback or FeatureScript."""
+    from r3_onshape.exports import export_part
+    from r3_model.pulled import PullError
+    try:
+        return _guard(lambda: export_part(api.load_project(project or None), url, part_id, format, version_id))
+    except PullError as error:
+        return {"ok": False, "code": error.code, "message": str(error), **error.details}
 
 
 @_tool(_DESIGN)
@@ -376,12 +392,20 @@ def r3_models_search_public(query: str, limit: int = 10) -> dict[str, Any]:
     """Discover public Onshape Part Studios by query through the browser session (limit 1-20).
     Returns immutable source URLs/provenance, never adds model-bank data or exports geometry.
     A search result is unverified: inspect the exact model and license before r3_models_add.
+    Per-candidate failures remain explicit in warnings/complete; an incomplete miss is not proof of absence.
     API rejection is returned once; no keys, saved session or retry loop.
     """
     from r3_catalog.modelbank.ingest import public_onshape
     from r3_catalog.modelbank.service import guard
-    return guard(lambda: {"ok": True, "provider": "onshape_public", "query": query,
-                          "models": [entry.model_dump(mode="json") for entry in public_onshape(query, limit)]})
+    def discover() -> dict[str, Any]:
+        warnings: list[dict[str, Any]] = []
+        models = [entry.model_dump(mode="json") for entry in public_onshape(query, limit, warnings=warnings)]
+        result = {"ok": bool(models) or not warnings, "provider": "onshape_public", "query": query,
+                  "models": models, "complete": not warnings, "warnings": warnings}
+        if warnings and not models:
+            result.update(code="model_discovery_incomplete", message="Candidate reads failed; an empty result does not establish model absence.")
+        return result
+    return guard(discover)
 
 
 @_tool(_SEARCH)
@@ -396,7 +420,8 @@ def r3_models_add(name: str, category: Category, mpn: str = "", manufacturer: st
 
 @_tool(_SEARCH)
 def r3_models_fetch(model_id: str) -> dict[str, Any]:
-    """Fetch a checksum-pinned bank model and convert to GLB/STL for viewing and simulation."""
+    """Fetch a checksum-pinned purchased model and research previews for Onshape import.
+    Bank previews are not the robot model. Only verified r3_cad_pull files feed its viewer and simulation."""
     from r3_catalog.modelbank import service
     return service.guard(lambda: service.fetch_model(model_id))
 
