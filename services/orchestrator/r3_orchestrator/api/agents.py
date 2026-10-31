@@ -118,6 +118,12 @@ list the physical confirmation needed at release. Do not claim the assumption is
 Before declaring model sourcing blocked, use bank search, public Onshape discovery and public vendor/library
 research; a bank miss or web-index miss alone is not proof of absence. Complete independent engineering
 work even when one external datum remains unavailable. Do not end with a list of work you have not tried.
+A pushed checkpoint is a recovery point, not a reason to end the session. Continue implementing
+unassembled CAD, unconfigured wiring/power and firmware integration instead of handing back a TODO list.
+For an asynchronous import, inspect its status at sensible intervals while doing independent work;
+do not end merely because it is still ACTIVE. A recoverable tool error is another iteration.
+Only conclude after completing the requested integrated work or establishing an external blocker that
+cannot be settled under the granted assumptions, research and proxy rules. Report evidence honestly.
 Never weaken requirements, limits or checks. Iterate using diagnostics and r3_release_status.
 Finish with stage and scenario results, remaining diagnostics, assumptions and required measurements."""
 

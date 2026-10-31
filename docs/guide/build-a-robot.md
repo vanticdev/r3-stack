@@ -117,7 +117,9 @@ entry and provenance are written to the local catalog and lock file. Inspect est
 values and measure any uncertain mechanical interfaces before fabrication.
 
 Use `owned: true` on parts already on hand. They remain in the model but are excluded
-from purchasing and sourcing; see [owned parts](owned-parts.md).
+from purchasing and sourcing; `components.<id>.source` is a purchasing request, never CAD
+provenance. Keep owned parts typed with `type` and record CAD sources in the project
+catalog/model bank instead of `source`; see [owned parts](owned-parts.md).
 
 For public research, use the session's live web search and shell downloads
 (`curl --fail --location URL -o project-file`). Find official datasheets and exact
@@ -466,3 +468,10 @@ fabrication release or permission to deploy hardware.
 For STEP imports use the uncompressed `.step`/`.stp` file, not a ZIP containing STEP.
 The companion's chunked upload path transfers large files to the authenticated browser,
 which sends one normal Onshape multipart import. Inspect the result before another write.
+
+A checkpoint is a recovery point, not the end of an implementation session. Keep working
+through unassembled parts, unconfigured harnesses/power and firmware integration. Check
+asynchronous imports at sensible intervals while doing independent work; an ACTIVE
+translation is not a final blocker report. Ordinary recoverable errors require another
+iteration. Conclude with completed integrated work or a demonstrated external constraint
+that cannot be resolved under the research, assumption and proxy policies above.

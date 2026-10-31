@@ -173,7 +173,10 @@ class ComponentInstance(_Model):
     @model_validator(mode="after")
     def _check_owned(self) -> "ComponentInstance":
         if self.owned and self.source is not None:
-            raise PydanticCustomError("owned_source_conflict", "An owned component cannot declare source")
+            raise PydanticCustomError("owned_source_conflict",
+                "An owned component cannot declare source: source selects purchases, not CAD provenance. "
+                "Remove source; keep owned, choose type, and record downloaded model provenance "
+                "in the project catalog/model bank.")
         return self
 
     mount: str = Field(default="world", description="Parent component id or 'world'.")
