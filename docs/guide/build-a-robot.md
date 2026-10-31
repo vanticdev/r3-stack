@@ -178,7 +178,7 @@ provenance, then import it into Onshape. Add mate connectors on its real seating
 holes and axes. Electrical and software catalog metadata stays useful; catalog boxes do
 not become CAD. Use the browser-session bridge API tools for document creation and versions, as below.
 If an API operation is rejected, inspect the result and use a native tool instead; never
-retry in a loop or sculpt a bought part.
+retry in a loop or use an unqualified substitute.
 
 Build the real assembly in Onshape using its native insert and mate operations. Define
 attachments there, including joint type, axis and limits. Use full occurrence paths for
@@ -435,3 +435,34 @@ supported comparisons are `<`, `<=`, `==`, `>=` and `>`. Choose a metric the sta
 and reports; an absent metric stays `not_run`. Failed, stale or estimated stage evidence
 cannot become verified custom evidence. Free-text requirements remain visible and pending
 until they have an automatic check; never replace one with a hand-authored passing flag.
+
+
+### Purchased-model search misses
+
+After a real search of the model bank, public Onshape, vendor sources and permitted
+libraries finds no downloadable exact model, author a simple proxy **in Onshape**
+from sourced datasheet dimensions, with standard features. This is the sole exception
+to the purchased-part sculpting prohibition. Name it `PROXY`, record the searched
+sources/queries/results and datasheet references, and keep model provenance `estimated`.
+Set the local component metadata through `r3_patch_spec`, for example on a synthetic fixture:
+`components.fixture.params.cad_proxy: {searches: ["source/query/result"], datasheet: "source reference"}`.
+These are provenance notes, never local shape instructions. Pull the proxy from a pinned
+Onshape version normally; never generate geometry locally or edit the pulled copy.
+Release status keeps a separate estimated item for each declared proxy. Continue the
+entire design, wiring, software and scenarios; estimates do not justify ending the run.
+List every proxy and measurement needed at the end. Remove the proxy declaration only
+after recording real measurement qualification or replacing it with a qualified model.
+No standard fit, physics, fabrication or release checks are waived.
+
+### Project checkpoints
+
+For scaffolded robot projects, commit and push work-in-progress frequently to the
+project's own user-requested repository, even while checks fail or engineering is
+unfinished. Include source, provenance, assumptions and an honest status report; exclude
+secrets and generated `build/` artifacts. This project-specific checkpoint policy overrides
+parent repository guidance forbidding incomplete commits. A pushed checkpoint is not a
+fabrication release or permission to deploy hardware.
+
+For STEP imports use the uncompressed `.step`/`.stp` file, not a ZIP containing STEP.
+The companion's chunked upload path transfers large files to the authenticated browser,
+which sends one normal Onshape multipart import. Inspect the result before another write.

@@ -455,10 +455,26 @@ def _integrity_items(ctx: _Context) -> list[Item]:
     return []
 
 
+def _proxy_items(ctx: _Context) -> list[Item]:
+    """Onshape proxy provenance remains estimated even after successful checks."""
+    items = []
+    for name, component in ctx.project.spec.components.items():
+        proxy = component.params.get("cad_proxy")
+        if proxy is None:
+            continue
+        recorded = isinstance(proxy, dict) and bool(proxy.get("searches")) and bool(proxy.get("datasheet"))
+        items.append(Item(f"cad.proxy.{name}", "stage", name, "measured or replaced purchased model",
+            evidence=[Evidence("cad", "purchased_proxy_estimated", recorded, inputs=ctx.current,
+                               estimated=True, detail=f"{name}: Onshape datasheet proxy; {proxy}")],
+            message="Estimated proxy remains pending measurement or replacement" if recorded else
+                    "Proxy requires recorded searches and a datasheet reference"))
+    return items
+
+
 def evaluate(project: Project) -> dict[str, Any]:
     """The requirement evidence matrix and ``fabrication_ready`` for ``project``."""
     ctx = _Context(project)
-    items = [*_requirement_items(ctx), *_scenario_items(ctx), *_stage_items(ctx), *_integrity_items(ctx)]
+    items = [*_requirement_items(ctx), *_scenario_items(ctx), *_stage_items(ctx), *_integrity_items(ctx), *_proxy_items(ctx)]
     for item in items:
         item.status = _status(item.evidence)
         if not item.message and item.evidence:

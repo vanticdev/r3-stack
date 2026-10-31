@@ -78,7 +78,7 @@ Run native stages, scenarios and project test suites through R3 MCP tools in the
 Author device bridges under simulation/ and tests under tests/ in this project; the guide documents the
 simulation.devices extension API and r3_run_project_tests. Do not edit platform code to add a project device.
 CAD changes must happen only in a real Onshape document, using standard editable features and assemblies.
-No FeatureScript, locally fabricated CAD, hand-written external tool formats, or sculpted purchased parts.
+No FeatureScript, locally fabricated CAD, hand-written external tool formats, or unqualified purchased-part substitutes.
 Use onshape_native directly: discover REST feature schemas/templates, model parts with standard feature API calls, add mate connectors,
 import vendor STEP, create documents in the designated folder and build real assemblies with real mates.
 Use the authenticated browser-session bridge for Onshape; never API keys or an expired saved session.
@@ -86,6 +86,11 @@ Document creation, versions and deletion use onshape_native api_write/api_reques
 Other bridge /api operations may be used when they work. On rejection, inspect and use a native tool;
 never retry in a loop. All geometry exports use /native/api/v17, never public export endpoints.
 Search the R3 model bank first for purchased parts, then import them into Onshape and add connectors there.
+Only after a recorded real search finds no downloadable exact model, make a simple datasheet-dimension
+proxy directly in Onshape with standard features. Label it PROXY and estimated. Record its searches
+and datasheet in components.<id>.params.cad_proxy; keep catalog model provenance estimated.
+Pull it normally; never generate proxy CAD locally. Estimated items do not stop engineering work:
+carry on, retain them visibly in release status until measured or replaced, and list them at the end.
 Verify geometry, regeneration and mates numerically and inspect shaded views before r3_cad_pull.
 Native editor commands may be unavailable on the current frontend. Use tested browser-session REST
 features, assemblies, parts, mates and mate connectors instead; log unavailable native-only operations.
@@ -94,7 +99,10 @@ Onshape-derived fields and cad/pulled files are read-only and refreshed only by 
 then pull again. Never author solids, dimensions, connector frames, poses or mates locally.
 Every viewer and simulation mesh must come from that verified pull. Use real MuJoCo, ngspice and Sionna.
 Use gh and normal git for GitHub repository creation and pushing when the user explicitly requests them;
-that request supplies authorization. Never deploy to physical hardware without an explicit request.
+that request supplies authorization. In this scaffolded project, commit and push work-in-progress
+frequently to its own requested repository, including honest failing validation evidence and TODOs.
+Do not wait for fabrication_ready; these project checkpoints override parent repository guidance
+against committing incomplete work. Exclude generated build files and secrets. Never deploy to physical hardware without an explicit request.
 Work only in this project; you may read the R3 platform source and public technical references.
 Do not read other local projects, worktrees, old robot git history or other agents' session files.
 There is no human available for routine engineering choices: choose sensible conservative assumptions
