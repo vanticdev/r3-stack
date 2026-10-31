@@ -107,6 +107,23 @@ Never weaken requirements, limits or checks. Iterate using diagnostics and r3_re
 Finish with stage and scenario results, remaining diagnostics, assumptions and required measurements."""
 
 
+def session_instructions() -> str:
+    """Carry explicit operator visibility consent without changing the user prompt."""
+    visibility = os.environ.get("R3_ONSHAPE_DOCUMENT_VISIBILITY", "")
+    if not visibility:
+        return SYSTEM_PROMPT
+    folder = os.environ.get("R3_ONSHAPE_DOCUMENT_FOLDER_ID", "")
+    if visibility not in ("public", "private") or len(folder) != 24 or any(c not in "0123456789abcdef" for c in folder):
+        raise ValueError("Onshape visibility consent requires public/private and an exact 24-hex folder ID")
+    public = "true" if visibility == "public" else "false"
+    return SYSTEM_PROMPT + (
+        f"\nThe operator has explicitly authorized NEW {visibility} Onshape documents only in folder {folder}. "
+        f"Create them with parentId={folder} and isPublic={public}; no additional visibility approval is needed. "
+        "This consent does not authorize changing the visibility of existing documents. "
+        "GitHub repository privacy is separate: honor its explicit requested visibility."
+    )
+
+
 # ------------------------------------------------------------------ detection
 def detect(provider: str, executable: str | None = None) -> dict[str, Any]:
     """Is the provider's CLI installed? ``{provider, available, path, version, detail}``."""
@@ -182,7 +199,7 @@ def claude_command(executable: str, config_path: Path, model: str | None = None)
     allowed, gated = _tools()
     command = [executable, "-p", "--output-format", "stream-json", "--verbose",
                "--mcp-config", str(config_path), "--strict-mcp-config", "--permission-mode", "default",
-               "--append-system-prompt", SYSTEM_PROMPT,
+               "--append-system-prompt", session_instructions(),
                "--allowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in allowed], *CLAUDE_READ_TOOLS,
                "--disallowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in gated],
                "mcp__onshape_native__evaluate", "mcp__onshape_native__feature_studio"]
@@ -263,7 +280,7 @@ def codex_command(executable: str, project_root: Path, config: dict[str, Any], m
                "-c", 'default_permissions="r3_session"',
                "-c", f"permissions.r3_session={_toml(codex_permission_profile(project_root))}",
                "-c", 'web_search="live"',
-               "-c", f"developer_instructions={_toml(SYSTEM_PROMPT)}",
+               "-c", f"developer_instructions={_toml(session_instructions())}",
                "-c", f"{prefix}.enabled=true",
                "-c", f"{prefix}.command={_toml(server['command'])}", "-c", f"{prefix}.args={_toml(server['args'])}",
                "-c", f"{prefix}.env={_toml(server['env'])}", "-c", f"{prefix}.disabled_tools={_toml(gated)}",

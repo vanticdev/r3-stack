@@ -186,6 +186,13 @@ Use `onshape_native.api_catalog` to discover `createDocument`, `createVersion` a
 `POST /api/v9/documents/d/{did}/versions` with
 `{name, documentId, workspaceId, microversionId}`. Read the current workspace
 microversion first; the version pins that exact state.
+An operator can persist already-granted visibility consent when starting `r3 serve`:
+set `R3_ONSHAPE_DOCUMENT_VISIBILITY=public` (or `private`) and
+`R3_ONSHAPE_DOCUMENT_FOLDER_ID=<approved-folder-id>`. This adds scoped consent to
+session instructions without altering the user prompt. It applies only to new documents
+in that folder, never to changing existing document visibility. A private GitHub
+requirement does not change that separate Onshape authorization.
+
 Keep `parentId` in the designated project folder. Choose visibility compatible with the
 account and user requirements; never change an existing document's visibility silently.
 Record created IDs. To trash a run's document, verify its name and folder first, then

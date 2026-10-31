@@ -79,3 +79,25 @@ def test_bridge_document_management_has_no_export_or_featurescript_fallback(monk
     result = mcp_server.r3_onshape_native('api_request', {'method':'POST', 'endpoint':'/api/v9/documents',
                                                        'body':{'name':'Synthetic coupon','parentId':'folder'}})
     assert result['ok'] and len(calls) == 4
+
+
+def test_explicit_scoped_visibility_consent_reaches_both_providers(tmp_path,monkeypatch):
+    monkeypatch.setenv('R3_ONSHAPE_DOCUMENT_VISIBILITY','public')
+    monkeypatch.setenv('R3_ONSHAPE_DOCUMENT_FOLDER_ID','1234567890abcdef12345678')
+    conf=config(tmp_path,monkeypatch)
+    codex=agents.codex_command('codex',tmp_path,conf)
+    instruction=next(x for x in codex if x.startswith('developer_instructions='))
+    assert 'isPublic=true' in instruction and '1234567890abcdef12345678' in instruction
+    assert 'NEW public Onshape documents only' in instruction
+    claude=agents.claude_command('claude',tmp_path/'config.json')
+    assert 'GitHub repository privacy is separate' in claude[claude.index('--append-system-prompt')+1]
+    assert 'isPublic=true' not in agents.SYSTEM_PROMPT
+
+
+def test_visibility_consent_is_never_inferred_or_unscoped(monkeypatch):
+    import pytest
+    monkeypatch.delenv('R3_ONSHAPE_DOCUMENT_VISIBILITY',raising=False)
+    assert agents.session_instructions()==agents.SYSTEM_PROMPT
+    monkeypatch.setenv('R3_ONSHAPE_DOCUMENT_VISIBILITY','public')
+    monkeypatch.delenv('R3_ONSHAPE_DOCUMENT_FOLDER_ID',raising=False)
+    with pytest.raises(ValueError,match='folder ID'):agents.session_instructions()
