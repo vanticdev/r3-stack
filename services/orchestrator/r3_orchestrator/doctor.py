@@ -241,7 +241,7 @@ def probe_onshape() -> Tool:
     except ValueError as error:
         return Tool("onshape", False, detail=str(error))
     selected = info["selected"]
-    detail = ("onshape-native editor and /native UI export backend; public API disabled" if selected
+    detail = ("browser-session REST modeling/pull and /native UI exports; no API keys or saved session" if selected
               else "native session unavailable for modeling/pull; headless stages can validate an existing pinned cad/pulled copy")
     return Tool("onshape", selected is not None, None, detail, info)
 
