@@ -28,8 +28,9 @@ SCHEMA = "r3/pull@1"
 class PullError(ValueError):
     """Stable diagnostic code shared by every geometry consumer."""
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(self, code: str, message: str, details: dict[str, Any] | None = None) -> None:
         self.code = code
+        self.details = details or {}
         super().__init__(message)
 
 

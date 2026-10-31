@@ -7,6 +7,9 @@ Writes are submitted exactly once. Unknown outcomes require inspection.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
+from email.utils import parsedate_to_datetime
+import math
 from pathlib import Path
 import re
 import time
@@ -23,6 +26,29 @@ from .client import NativeBridgeTransport
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+class NativeRateLimitError(PullError):
+    """Preserve server pacing without retrying or guessing a reset time."""
+
+    def __init__(self, retry_after: str | None, method: str = "", resource: str = "") -> None:
+        details: dict[str, Any] = {"http_status": 429, "retry_after": retry_after,
+                                   "method": method, "resource": resource}
+        now = datetime.now(timezone.utc)
+        try:
+            if retry_after is not None:
+                if re.fullmatch(r"[0-9]+", retry_after):
+                    seconds = int(retry_after)
+                else:
+                    date = parsedate_to_datetime(retry_after)
+                    date = date.replace(tzinfo=timezone.utc) if date.tzinfo is None else date
+                    seconds = max(0, math.ceil((date - now).total_seconds()))
+                details.update(retry_after_seconds=seconds, resume_at=(now + timedelta(seconds=seconds)).isoformat())
+        except (ValueError, TypeError, OverflowError):
+            pass  # Keep the original header; do not invent a fallback deadline.
+        super().__init__("cad_native_rate_limited",
+                         f"Onshape {method} {resource}: HTTP 429; Retry-After: {retry_after or 'not supplied'}. "
+                         "Do not retry this resource before the reported reset; continue independent offline work.", details)
 
 
 class NativeCadTransport:
@@ -67,6 +93,8 @@ class NativeCadTransport:
                         raise PullError("cad_native_route_forbidden", "Refusing non-native export redirect") from None
                     url = self.base + redirect.path
                     continue
+                if error.code == 429:
+                    raise NativeRateLimitError(error.headers.get("Retry-After"), method, path) from None
                 detail = error.read().decode(errors="replace")[:600]
                 hint = "; restart the updated onshape-native companion to expose /native routes" if error.code == 404 else ""
                 raise PullError("cad_native_request_failed", f"Native {method} {path}: HTTP {error.code}: {detail}{hint}") from None

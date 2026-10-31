@@ -60,8 +60,8 @@ the Onshape UI. Feature Studios, custom features, FeatureScript evaluation and a
 generated `.fs` source are forbidden. `integrations/onshape/r3_onshape/policy.py`
 enforces this in the R3 client, `tests/test_cad_policy.py` tests it, and
 `.claude/settings.json` denies the onshape-native `evaluate` tool. Do not work
-around it. Verification reads pinned STEP with OCP and pulled STL meshes. No public `bodydetails`,
-`massproperties`, `tessellatedfaces` or `shadedviews` calls are available. R3 never generates
+around it. Verification reads pinned STEP with OCP and pulled STL meshes. Browser-session REST
+reads may be used when they work; they never replace exported files as the model. R3 never generates
 parts or assemblies from YAML. Native connector frames, mates and poses are pulled evidence.
 
 ## Tool-use policy (user directive): use every tool the way a human engineer would
@@ -110,27 +110,33 @@ exchange), device/register models that bridge software to the physics, and the
 ## Headless policy (user directive): everything must run headless on a server
 Every stage must run with no display and no interactive browser.
 - **MuJoCo rendering:** `MUJOCO_GL=egl` (or osmesa) on Linux.
-- **Onshape:** author through onshape-native editor/local tools and pull through its
-  `/native/api/v17` UI exports. Capture native viewport images. This authoring/pull step
+- **Onshape:** author standard features, connectors and assembly mates through the
+  onshape-native browser-session `/api` tools; use native editor tools only when supported.
+  Pull through `/native/api/v17` exports. Capture actual viewport images. This authoring/pull step
   needs the signed-in native browser/companion; headless stages consume its pinned copy.
-  Public API-key and session REST transports are unavailable and never fallbacks.
+  Never use API keys or an expired saved session. On a real rejection, inspect and use a
+  supported alternative; on HTTP 429 respect Retry-After without polling the throttled API.
 - **KiCad:** `kicad-cli` plus the bundled `pcbnew` Python module. Never a GUI, not even under Xvfb.
 - **Freerouting:** CLI mode.
 - **Docker:** used for firmware.
 The supported server environment is the R3 worker Docker image. Any GUI-only step
 must document its headless path.
 
-## Purchased-part model policy (user directive): never sculpt a bought part
+## Purchased-part model policy (user directive): source real models first
 A purchased component (Pi, motor, ESC, servo, battery, sensors, connectors, wheels, gearbox, …) must use a
-real downloaded 3D model, never one modelled by R3 or by an agent. Source it in this order:
+real downloaded 3D model whenever available. Source it in this order:
 1. **Onshape public documents:** inserted from the public document version, the way a human uses
    Insert → Other documents → Public.
 2. **The manufacturer's official STEP:** Raspberry Pi, Arducam, Traxxas, u-blox, Pololu, …
 3. **Open model databases with programmatic or public access:** KiCad 3D libraries, TraceParts,
    3D ContentCentral, SnapEDA / Ultra Librarian. Respect terms and robots.txt, and never scrape behind
    logins.
-4. **When nothing exists:** report the missing exact purchased model. Do not sculpt a proxy
-   to substitute for real purchased geometry in the pull, viewer or simulation.
+4. **Recorded search miss:** only after a real search finds no downloadable exact model,
+   the project agent may model a simple datasheet-dimension proxy in Onshape using standard
+   features. Label it PROXY, keep its provenance estimated, and record the search and datasheet
+   with `params.cad_proxy` as described in the build guide. This is the only exception to the
+   prohibition on sculpting purchased parts. Continue with estimated items, keep them visible
+   in release status until measured or replaced, and list them at the end. Never edit or fake a pull.
 
 Every sourced model is:
 - validated against the datasheet (bounding box and key features);

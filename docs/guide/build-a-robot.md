@@ -482,3 +482,15 @@ the pin, file hashes and error. Inspect these files to diagnose the failure; the
 are not a valid pull and cannot replace `cad/pulled/`. Repair CAD in Onshape and
 pull again. Mesh decoding joins only exactly identical coordinates, without
 rounding nearby vertices, filling holes or removing failing geometry.
+
+On HTTP 429, record the response's `Retry-After` and stop requests to that resource
+until the reported deadline; do not retry to see whether it has cleared. R3 native
+transport failures expose `retry_after`, `retry_after_seconds` and `resume_at` when
+the server supplies a valid header (seconds or an HTTP date). Missing/invalid
+headers remain explicit; no reset time is guessed. Continue independent offline
+engineering and retain the quota observation in the project report.
+
+For an unattended long build, keep the same session alive through a finite server
+backoff: checkpoint, do independent work, then use bounded local sleeps and resume
+after the deadline. Do not poll the throttled API or discard the unfinished build
+solely because a finite wait is needed. Stop if the user cancels.

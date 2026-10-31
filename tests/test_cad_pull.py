@@ -304,3 +304,19 @@ def test_failed_download_keeps_raw_evidence_without_replacing_active_pull(projec
         assert hashlib.sha256(raw).hexdigest() == record['sha256']
         if record['path'].endswith('.stl'): assert raw == broken
     assert 'build/cad/failed-pulls/' in result['message']
+
+
+
+def test_rate_limit_metadata_survives_failed_pull(project, geometry, native_snapshot):
+    from r3_onshape.native import NativeRateLimitError
+    from r3_onshape.pull import pull
+    transport = fake_transport(geometry, native_snapshot)
+    calls = []
+    def reject(*args):
+        calls.append(args)
+        raise NativeRateLimitError('120', 'GET', '/native/api/v17/synthetic')
+    transport.stl = reject
+    result = pull(project, transport=transport)
+    assert not result['ok'] and result['code'] == 'cad_native_rate_limited'
+    assert result['retry_after_seconds'] == 120 and result['resource'].endswith('/synthetic')
+    assert len(calls) == 1 and not (project.root / 'cad/pulled').exists()

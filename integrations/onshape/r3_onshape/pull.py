@@ -258,7 +258,7 @@ def pull(project: Any, url: str = "", version_id: str = "", transport: Any = Non
             return _pull(project, url, version_id, transport)
     except (ValueError, FileNotFoundError, ImportError, RuntimeError) as error:
         fallback = "cad_native_unavailable" if isinstance(error, FileNotFoundError) else "cad_pull_failed"
-        return {"ok": False, "code": getattr(error, "code", fallback), "message": str(error)}
+        return {"ok": False, "code": getattr(error, "code", fallback), "message": str(error), **getattr(error, "details", {})}
 
 
 def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, Any]:
@@ -304,7 +304,8 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
                 "note": "Diagnostic exports only; not an active CAD pull."}, indent=2) + "\n")
             staging.rename(failed)
             raise PullError(getattr(error, "code", "cad_pull_failed"),
-                            f"{error}; inspect unchanged exports at {failed.relative_to(project.root)}") from error
+                            f"{error}; inspect unchanged exports at {failed.relative_to(project.root)}",
+                            getattr(error, "details", {})) from error
         checksum = hashlib.sha256((staging / "pull.json").read_bytes()).hexdigest()
         from r3_model.description import refresh_pulled
         previous_lock = (project.root / "r3.lock.yaml").read_bytes() if (project.root / "r3.lock.yaml").exists() else None

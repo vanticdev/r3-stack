@@ -236,7 +236,8 @@ def r3_onshape_native(operation: str, arguments: dict[str, Any]) -> dict[str, An
         return {"ok": True, "result": native.command(arguments) if operation == "command" else
                 native.api_request(**arguments) if operation == "api_request" else native.local(operation, arguments)}
     except (PullError, FileNotFoundError) as error:
-        return {"ok": False, "code": getattr(error, "code", "cad_native_unavailable"), "message": str(error)}
+        return {"ok": False, "code": getattr(error, "code", "cad_native_unavailable"),
+                "message": str(error), **getattr(error, "details", {})}
 
 
 @_tool(_DESIGN)

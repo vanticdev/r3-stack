@@ -84,7 +84,11 @@ import vendor STEP, create documents in the designated folder and build real ass
 Use the authenticated browser-session bridge for Onshape; never API keys or an expired saved session.
 Document creation, versions and deletion use onshape_native api_write/api_request through /api.
 Other bridge /api operations may be used when they work. On rejection, inspect and use a native tool;
-never retry in a loop. All geometry exports use /native/api/v17, never public export endpoints.
+never retry in a loop. On HTTP 429, record Retry-After from returned response metadata and stop requests
+to the throttled resource until its deadline; continue independent offline work. For an unattended
+long build, a finite server backoff is a wait/resume point in this session, not a reason to conclude.
+Checkpoint work and use bounded local sleeps while waiting; resume after the deadline without
+polling the throttled API. User cancellation always takes precedence. All geometry exports use /native/api/v17, never public export endpoints.
 Search the R3 model bank first for purchased parts, then import them into Onshape and add connectors there.
 Only after a recorded real search finds no downloadable exact model, make a simple datasheet-dimension
 proxy directly in Onshape with standard features. Label it PROXY and estimated. Record its searches

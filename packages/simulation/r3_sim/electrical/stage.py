@@ -858,6 +858,15 @@ def run(project: Any, routes: dict[str, Any] | None = None, *, plots: bool = Tru
     build = project.build_dir(STAGE)
     if routes is None:
         routes = project.read_build_json("wiring/routes.json")
+    unknown_gauges = [(h.id, wire) for h in project.spec.electrical.harnesses for wire in h.wires
+                      if wire.awg not in project.catalog.wires]
+    if unknown_gauges:
+        for harness, wire in unknown_gauges:
+            result.add(Diagnostic.error("wire_gauge_unknown",
+                f"{harness}/{wire.id}: AWG {wire.awg} is absent from the wire catalog. "
+                "Choose a catalogued gauge or add sourced data to project catalog/wires.yaml; simulation was not started.",
+                subject=wire.id, data={"awg": wire.awg}))
+        return result
     system = ElectricalSystem(project, routes)
     result.extend(system.diagnostics)
     from r3_model.pulled import PullError

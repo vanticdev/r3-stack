@@ -63,3 +63,41 @@ def test_editor_commands_cannot_proxy_rest(tmp_path, kind):
     with pytest.raises(PullError):
         client.command({'kind': kind})
     client._request.assert_not_called()
+
+
+@pytest.mark.parametrize('header', ['120', 'invalid', None])
+def test_rate_limit_preserves_header_and_never_retries(tmp_path, header):
+    import io
+    from email.message import Message
+    from urllib.error import HTTPError
+    client = transport(tmp_path)
+    headers = Message()
+    if header is not None: headers['Retry-After'] = header
+    client._opener = Mock()
+    client._opener.open.side_effect = HTTPError('http://127.0.0.1:8766/api/v9/documents', 429, 'limited', headers, io.BytesIO(b'{}'))
+    with pytest.raises(PullError) as error: client.api_request('GET', '/api/v9/documents')
+    assert error.value.code == 'cad_native_rate_limited'
+    assert error.value.details['retry_after'] == header
+    assert error.value.details['resource'] == '/api/v9/documents'
+    assert client._opener.open.call_count == 1
+    if header == '120': assert error.value.details['retry_after_seconds'] == 120 and error.value.details['resume_at']
+    else: assert 'resume_at' not in error.value.details
+
+
+def test_http_date_retry_after_and_mcp_metadata(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+    from email.utils import format_datetime
+    from r3_onshape.native import NativeRateLimitError
+    from r3_orchestrator import mcp_server
+    fixed = datetime(2030, 1, 1, tzinfo=timezone.utc)
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None): return fixed
+    monkeypatch.setattr('r3_onshape.native.datetime', FixedDateTime)
+    error = NativeRateLimitError(format_datetime(fixed + timedelta(minutes=5)))
+    assert error.details['retry_after_seconds'] == 300
+    monkeypatch.setattr(NativeCadTransport, '__init__', lambda self: None)
+    def reject(self, **kwargs): raise error
+    monkeypatch.setattr(NativeCadTransport, 'api_request', reject)
+    result = mcp_server.r3_onshape_native('api_request', {'method':'GET','endpoint':'/api/v9/documents'})
+    assert not result['ok'] and result['resume_at'] == error.details['resume_at']
