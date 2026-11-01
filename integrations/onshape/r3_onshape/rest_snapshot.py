@@ -29,8 +29,8 @@ def assembly(transport: Any, url: str) -> dict[str, Any]:
     definitions = {_identity(a): a for a in definition.get('subAssemblies', [])}
     root = definition['rootAssembly']
     occurrences = {tuple(o['path']): o for o in root.get('occurrences', [])}
-    parts = {(p['documentId'], p['elementId'], p['partId'],
-              p.get('fullConfiguration') or p.get('configuration') or ''): p for p in definition.get('parts', [])}
+    from .part_records import NativePartRecords
+    parts = NativePartRecords(definition.get('parts', []))
     rows, metadata = [], {}
 
     def visit(current: dict[str, Any], parent: list[str], ancestors: set[tuple]) -> None:
@@ -69,9 +69,7 @@ def assembly(transport: Any, url: str) -> dict[str, Any]:
             elif kind == 'part':
                 key = (instance['documentId'], instance['elementId'], instance['partId'],
                        instance.get('fullConfiguration') or instance.get('configuration') or '')
-                if key not in parts:
-                    raise PullError('cad_pull_incomplete', f'No REST part record for {path}')
-                ref = parts[key]
+                ref = parts.resolve(instance)
                 version_id = instance.get('documentVersion') or ref.get('documentVersion') or (vid if key[0] == did else None)
                 if not version_id:
                     raise PullError('cad_pull_version_required', f'External part {path} needs a pinned version for STEP')

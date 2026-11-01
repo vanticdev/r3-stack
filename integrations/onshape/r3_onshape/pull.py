@@ -92,11 +92,6 @@ def mass_properties(path: Path, density: float) -> dict[str, Any]:
             "volume": volume, "density": density}
 
 
-def _part_records(snapshot: dict[str, Any]) -> dict[tuple[str, str, str, str], dict[str, Any]]:
-    records = snapshot["definition"].get("parts", [])
-    return {(p["documentId"], p["elementId"], p["partId"], p.get("fullConfiguration") or p.get("configuration") or ""): p for p in records}
-
-
 def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str, list[str]]) -> dict[str, Any]:
     """Normalize complete native assembly data; never infer assembly placement."""
     definition = snapshot["definition"]
@@ -119,7 +114,8 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
             {"missing_selectors": [{"component": by_path[path], "occurrence_path": list(path)} for path in absent[:20]],
              "unmapped_occurrences": [{"name": rows[path].get("name"), "occurrence_path": list(path)} for path in unmapped[:20]],
              "missing_selector_count": len(absent), "unmapped_occurrence_count": len(unmapped)})
-    records = _part_records(snapshot)
+    from .part_records import NativePartRecords
+    records = NativePartRecords(definition.get("parts", []))
     parts, poses = {}, {}
     for name, occurrence in selectors.items():
         if not isinstance(name, str) or not name:
@@ -130,9 +126,7 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
         row = rows[tuple(occurrence)]
         ref = row["reference"]
         key = (ref["documentId"], ref["elementId"], ref["partId"], ref.get("fullConfiguration") or ref.get("configuration") or "")
-        record = records.get(key)
-        if record is None:
-            raise PullError("cad_pull_incomplete", f"{name}: no native part definition")
+        record = records.resolve(ref)
         vid = ref.get("documentVersion") or (pin["version_id"] if ref["documentId"] == pin["document_id"] else None)
         if not vid:
             raise PullError("cad_pull_version_required", f"{name}: external reference is only a microversion; pin that source to an Onshape version for STEP")

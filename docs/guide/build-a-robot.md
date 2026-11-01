@@ -768,3 +768,8 @@ already includes Onshape's evaluated mate alignment and offsets. R3 preserves
 the raw authored connector for port selection, and checks each mate using its
 separate effective frame transformed by the unchanged native occurrence pose.
 A failed closure is reported; R3 never solves or adjusts CAD placements locally.
+
+Native source identity includes the document, element, part ID, configuration
+and immutable source revision. Different revisions of one part keep their own
+connector and material records. Missing or ambiguous revision matches fail
+before export; R3 never substitutes another revision's metadata.
