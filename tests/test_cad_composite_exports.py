@@ -78,6 +78,10 @@ def test_external_gltf_resources_cannot_escape_the_pinned_file(tmp_path, section
 def composite_transport(snapshot):
     geometry = (original_step(), (FIXTURE / 'compound.stl').read_bytes())
     snapshot['rows'][0]['body_type'] = 'composite'
+    from native_mass_fixture import uniform_mesh
+    record = snapshot['definition']['parts'][0]
+    record['native_mass_properties'] = uniform_mesh(load_exported_mesh(FIXTURE / 'compound.gltf'),
+                                                  record['material']['density'])
     transport = fake_transport(geometry, snapshot)
     calls = []
     for kind in ('stl', 'step', 'gltf'):
@@ -98,6 +102,7 @@ def test_composite_pull_pins_native_gltf_and_refreshes_consumers(project, native
     assert result['ok'], result
     model = load_pulled(project.root)
     part = model.parts['body']
+    assert part.mass == pytest.approx(.002)  # Native fixture: two closed cubic coupons.
     assert part.gltf == part.mesh and part.gltf.suffix == '.gltf'
     assert part.gltf.read_bytes() == (FIXTURE / 'compound.gltf').read_bytes()
     assert part.sha256['gltf'] == hashlib.sha256(part.gltf.read_bytes()).hexdigest()
