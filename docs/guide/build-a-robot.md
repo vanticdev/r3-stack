@@ -189,6 +189,14 @@ The native editor bootstrap is currently unavailable on some Onshape builds.
 unavailable editor-only operation and continue using working REST calls. Never
 retry failed operations in a loop or replace CAD with fabricated local data.
 
+The companion's `extension_connected: true` proves the browser bridge is connected,
+not that Onshape still has a signed-in session. An upstream HTTP 401 with
+`Unauthenticated API request` requires signing in to Onshape in that browser;
+R3 reports `cad_native_authentication_required`. A local bearer-token rejection
+or a document permission error is a different failure. Preserve work and continue
+independent offline tasks while browser authentication is restored. Never replay
+a failed write automatically; inspect the saved revision and state first.
+
 Use `document_tree` to read tabs/folders and `api_catalog`/`api_write` for
 `createPartStudio`, `createAssembly` and other tab operations. `document_edit` is
 optional when its native editor dependency works. Create documents in the

@@ -110,15 +110,26 @@ class NativeCadTransport:
                 raw_error = error.read().decode(errors="replace")
                 detail = raw_error[:600]
                 details: dict[str, Any] = {"http_status": error.code, "method": method, "resource": path}
+                authentication_required = False
                 try:
                     payload = json.loads(raw_error)
                     if isinstance(payload, dict):
+                        if (error.code == 401 and payload.get("status") == 401
+                                and payload.get("message") == "Unauthenticated API request"
+                                and path.startswith(("/api/", "/native/api/v17/"))):
+                            authentication_required = True
                         if isinstance(payload.get("translationId"), str):
                             details["translation_id"] = payload["translationId"]
                         if isinstance(payload.get("id"), str) and "requestState" in payload:
                             details["translation"] = payload
                 except ValueError:
                     pass
+                if authentication_required:
+                    raise PullError("cad_native_authentication_required",
+                        f"Native {method} {path}: HTTP 401: {detail}; "
+                        "Onshape browser authentication is required. A connected extension does not "
+                        "prove a signed-in session; sign in to Onshape in the connected browser. "
+                        "Inspect persisted state before retrying any write.", details) from None
                 # A missing upstream object is not evidence of a stale bridge.
                 # Only the companion's plain router 404 suggests a missing route;
                 # leave any restart decision to a health/capability inspection.
