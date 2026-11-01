@@ -113,7 +113,12 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
     by_path = {tuple(path): name for name, path in selectors.items()}
     # Omitting native parts would hide interference and leave the local robot incomplete.
     if set(by_path) != set(rows):
-        raise PullError("cad_pull_selection_invalid", "Description and native assembly must contain exactly the same unsuppressed part occurrences")
+        absent = sorted(set(by_path) - set(rows))
+        unmapped = sorted(set(rows) - set(by_path))
+        raise PullError("cad_pull_selection_invalid", "Description and native assembly must contain exactly the same unsuppressed part occurrences",
+            {"missing_selectors": [{"component": by_path[path], "occurrence_path": list(path)} for path in absent[:20]],
+             "unmapped_occurrences": [{"name": rows[path].get("name"), "occurrence_path": list(path)} for path in unmapped[:20]],
+             "missing_selector_count": len(absent), "unmapped_occurrence_count": len(unmapped)})
     records = _part_records(snapshot)
     parts, poses = {}, {}
     for name, occurrence in selectors.items():
@@ -131,7 +136,11 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
         vid = ref.get("documentVersion") or (pin["version_id"] if ref["documentId"] == pin["document_id"] else None)
         if not vid:
             raise PullError("cad_pull_version_required", f"{name}: external reference is only a microversion; pin that source to an Onshape version for STEP")
-        name_material, density = _material(record.get("material"))
+        try:
+            name_material, density = _material(record.get("material"))
+        except PullError as error:
+            raise PullError(error.code, f"{name}: {error}", {**error.details, "component": name,
+                "onshape": {"document_id": key[0], "version_id": vid, "element_id": key[1], "part_id": key[2]}}) from error
         connectors = {}
         for item in record.get("mateConnectors", []):
             connector_id = item.get("name") or item.get("featureId") or item.get("id")
@@ -233,7 +242,11 @@ def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_
             path = directory / part[kind]
             identity = (kind, ref["document_id"], ref["version_id"], ref["element_id"], ref["part_id"], ref["configuration"])
             if identity not in files:
-                files[identity] = getattr(transport, kind)(*identity[1:])
+                try:
+                    files[identity] = getattr(transport, kind)(*identity[1:])
+                except PullError as error:
+                    raise PullError(error.code, f"{name}: {error}", {**error.details, "component": name,
+                                    "format": kind, "onshape": dict(ref)}) from error
             path.write_bytes(files[identity])
             part["sha256"][kind] = hashlib.sha256(path.read_bytes()).hexdigest()
         try:
@@ -270,7 +283,9 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
     cad = project.spec.cad.model_dump()
     url = url or cad.get("source", "") or cad.get("url", "")
     pin = target(url, version_id or cad.get("version_id") or "")
-    transport = transport or NativeCadTransport()
+    if transport is None:
+        from .translation import project_export_cache
+        transport = NativeCadTransport(export_jobs=project_export_cache(project.root))
     # Spec-schema integration refreshes these selectors from the split part refs.
     selectors = {}
     for name, descriptor in project.spec.components.items():
@@ -282,6 +297,10 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
     undeclared = set(manifest["parts"]) - set(project.spec.components)
     if undeclared:
         raise PullError("cad_pull_invalid", "Declare local component metadata and occurrence selectors before pulling: " + ", ".join(sorted(undeclared)))
+    missing = set(project.spec.components) - set(manifest["parts"])
+    if missing:
+        raise PullError("cad_pull_missing", "Described components missing from CAD pull: " + ", ".join(sorted(missing)),
+                        {"missing_components": sorted(missing)})
     for name, part in manifest["parts"].items():
         component = project.spec.components.get(name)
         selection = getattr(component, "onshape", None)

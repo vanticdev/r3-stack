@@ -135,6 +135,14 @@ def test_missing_native_occurrence_cannot_be_omitted(native_snapshot):
         describe(native_snapshot, target('https://cad.onshape.com/documents/doc/v/version/e/assembly'), {'body': ['instance']})
 
 
+def test_selector_mismatch_names_both_sides_without_dropping_geometry(native_snapshot):
+    with pytest.raises(PullError) as error:
+        describe(native_snapshot, target('https://cad.onshape.com/documents/doc/v/version/e/assembly'), {'body': ['absent']})
+    assert error.value.code == 'cad_pull_selection_invalid'
+    assert error.value.details['missing_selectors'] == [{'component': 'body', 'occurrence_path': ['absent']}]
+    assert error.value.details['unmapped_occurrences'] == [{'name': 'body', 'occurrence_path': ['instance']}]
+
+
 def test_native_mates_are_pulled_not_recomputed(native_snapshot):
     other = copy.deepcopy(native_snapshot['rows'][0])
     other.update(occurrence_path=['other'], name='other')
@@ -156,6 +164,8 @@ def test_missing_material_does_not_use_catalog_estimate(native_snapshot):
     with pytest.raises(PullError) as error:
         describe(native_snapshot, target('https://cad.onshape.com/documents/doc/v/version/e/assembly'), {})
     assert error.value.code == 'cad_pull_material_unavailable'
+    assert error.value.details['component'] == 'body'
+    assert error.value.details['onshape'] == {'document_id': 'doc', 'version_id': 'version', 'element_id': 'studio', 'part_id': 'body'}
 
 
 @pytest.fixture
@@ -282,6 +292,19 @@ def test_undeclared_components_fail_before_export(tmp_path,native_snapshot):
         def capture(self,*args):pytest.fail('Do not render before checking local selectors')
     result=pull(Project.load(tmp_path),url='https://cad.onshape.com/documents/doc/v/version/e/assembly',transport=NoExport())
     assert not result['ok'] and result['code']=='cad_pull_invalid'
+
+
+def test_declared_but_unassembled_components_fail_before_export(project, native_snapshot):
+    from r3_onshape.pull import pull
+    project.spec.components['pending'] = project.spec.components['body'].model_copy(update={'onshape': None})
+    class NoExport:
+        def assembly(self, url): return copy.deepcopy(native_snapshot)
+        def stl(self, *args): pytest.fail('Missing components must be found before export')
+        def step(self, *args): pytest.fail('Missing components must be found before export')
+        def capture(self, *args): pytest.fail('Missing components must be found before rendering')
+    result = pull(project, transport=NoExport())
+    assert not result['ok'] and result['code'] == 'cad_pull_missing'
+    assert result['missing_components'] == ['pending']
 
 
 def test_failed_download_keeps_raw_evidence_without_replacing_active_pull(project, geometry, native_snapshot):

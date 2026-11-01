@@ -241,9 +241,9 @@ def r3_onshape_native(operation: str, arguments: dict[str, Any]) -> dict[str, An
 
 
 @_tool(_DESIGN)
-def r3_cad_export(url: str, part_id: str, format: Literal["step", "stl"] = "step", version_id: str = "",
+def r3_cad_export(url: str, part_id: str, format: Literal["step", "stl", "gltf"] = "step", version_id: str = "",
                   project: str = "") -> dict[str, Any]:
-    """Download one part from a version-pinned Onshape Part Studio as STEP or STL through native exports.
+    """Download one part from a version-pinned Onshape Part Studio as STEP, STL or glTF through native exports.
     Use for source research, importing purchased models or inspecting geometry. Returns
     an unchanged file under build/cad/inspection-exports with its pin and SHA-256.
     This does not install or qualify a model: use r3_cad_pull for the viewer and simulation.

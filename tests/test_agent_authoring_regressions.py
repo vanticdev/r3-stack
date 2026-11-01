@@ -57,9 +57,13 @@ def step_bytes(tmp_path):
 
 def test_agent_export_is_pinned_unchanged_native_and_not_a_pull(project, step_bytes, monkeypatch):
     native = NativeCadTransport.__new__(NativeCadTransport)
-    native._request = Mock(side_effect=[json.dumps({'requestState':'DONE', 'resultDocumentId':'doc',
+    native._request = Mock(side_effect=[json.dumps({'id':'job', 'requestState':'DONE', 'resultDocumentId':'doc',
                                                    'resultExternalDataIds':['file']}).encode(), step_bytes])
-    monkeypatch.setattr('r3_onshape.exports.NativeCadTransport', lambda: native)
+    def make_native(**kwargs):
+        native.export_jobs = kwargs['export_jobs']
+        assert native.export_jobs == project / 'build/cad/native-exports'
+        return native
+    monkeypatch.setattr('r3_onshape.exports.NativeCadTransport', make_native)
     result = m.r3_cad_export('https://cad.onshape.com/documents/doc/v/version/e/studio', 'part/a', project=str(project))
     assert result['ok'] and Path(result['file']).read_bytes() == step_bytes
     record = json.loads((project / result['manifest']).read_text())
@@ -87,6 +91,19 @@ def test_native_stl_export_preserves_bytes_and_units(project):
     result = export_part(SimpleNamespace(root=project), 'https://cad.onshape.com/documents/doc/v/pin/e/studio', 'part', 'stl', transport=native)
     assert result['units'] == 'm' and Path(result['file']).read_bytes() == native.stl.return_value
     native.stl.assert_called_once_with('doc', 'pin', 'studio', 'part', '')
+
+
+def test_native_gltf_inspection_is_pinned_and_never_installed(project):
+    native = Mock()
+    data = (Path(__file__).parent / 'fixtures/cad-composite/compound.gltf').read_bytes()
+    native.gltf.return_value = data
+    result = export_part(SimpleNamespace(root=project), 'https://cad.onshape.com/documents/doc/v/pin/e/studio',
+                         'compound', 'gltf', transport=native)
+    assert result['units'] == 'm' and result['qualification'] == 'unverified_export'
+    assert Path(result['file']).read_bytes() == data
+    assert result['sha256'] == hashlib.sha256(data).hexdigest()
+    native.gltf.assert_called_once_with('doc', 'pin', 'studio', 'compound', '')
+    assert not (project / 'cad/pulled').exists()
 
 
 def test_export_refuses_build_escape_before_request(project, tmp_path):

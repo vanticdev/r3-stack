@@ -198,8 +198,12 @@ def test_gltf_transport_uses_only_pinned_native_export(tmp_path):
     from r3_onshape.native import NativeCadTransport
     (tmp_path / 'bridge.json').write_text(json.dumps({'port': 8766, 'token': 'synthetic-only'}))
     transport = NativeCadTransport(tmp_path)
-    transport._request = Mock(return_value=b'unchanged-native-file')
+    transport._request = Mock(side_effect=[json.dumps({'id': 'job', 'requestState': 'DONE',
+        'resultDocumentId': 'doc', 'resultExternalDataIds': ['file']}).encode(), b'unchanged-native-file'])
     assert transport.gltf('doc', 'version', 'studio', 'part/a', 'setting') == b'unchanged-native-file'
-    transport._request.assert_called_once_with('GET',
-        '/native/api/v17/parts/d/doc/v/version/e/studio/partid/part%2Fa/gltf',
-        query={'chordTolerance': 5e-5, 'angleTolerance': 0.03490658503988659, 'configuration': 'setting'})
+    calls = transport._request.call_args_list
+    assert calls[0].args[:2] == ('POST', '/native/api/v17/partstudios/d/doc/v/version/e/studio/translations')
+    assert calls[0].args[2] == {'formatName': 'GLTF', 'storeInDocument': False, 'partIds': 'part/a',
+        'resolution': 'custom', 'distanceTolerance': 5e-5, 'angularTolerance': 0.03490658503988659,
+        'maximumChordLength': 10, 'exportCompositeConstituentsWithOriginalBodyIds': True, 'configuration': 'setting'}
+    assert calls[1].args == ('GET', '/native/api/v17/documents/d/doc/externaldata/file')

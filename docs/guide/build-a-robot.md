@@ -245,6 +245,15 @@ integrity error. Fix the model in Onshape and pull again.
 The only export backend is the authenticated loopback companion at
 `http://127.0.0.1:8766/native/api/v17`. It supports selected-part STL and STEP through
 UI translations, polling and the translation's `resultDocumentId` external-data download.
+STEP and glTF use asynchronous jobs. R3 records each exact pin, part, options and
+translation ID under `build/cad/native-exports/`, then polls that existing job for up
+to 30 minutes per invocation. If it is still pending or the client is interrupted,
+call the same R3 operation again: it resumes that job and reuses completed,
+checksum-verified bytes. Never resubmit an export just because a direct download
+timed out. These are native export IDs, not the public import translation IDs.
+R3 retains terminal failures and uncertain submissions rather than replaying them.
+Inspect the reported source and job; correct the model in Onshape and pin a new
+version when necessary. Do not edit the job cache or fabricate an export.
 Public export endpoints are never used as fallbacks. Document management and other
 working operations may use the authenticated browser-session `/api/...` bridge; no API keys
 or expired saved sessions. A rejection is a finding, not a reason to retry in a loop. Only STL supports
@@ -533,12 +542,20 @@ remain separate `components` and `connectors` collections.
 
 Use `r3_cad_export(url=..., part_id=..., format="step")` to download one part from
 an immutable Onshape Part Studio version. A workspace URL also needs
-`version_id`. `format="stl"` downloads the native mesh in metres. Both formats use
+`version_id`. `format="stl"` downloads the native mesh in metres;
+`format="gltf"` preserves the exported native body groups. All formats use
 only the native export transport. The result supplies a local `file`, a manifest,
 the Onshape pin and SHA-256 under `build/cad/inspection-exports/`. These are
 unqualified inspection/source files: import purchased models into your Onshape
 document and assemble them there. Only `r3_cad_pull` installs the read-only,
 verified model used by the viewer and simulation. Never edit exported geometry.
+
+Qualify a representative source before repeating it throughout an assembly: check
+closed solid bodies, assigned material density, native STEP and the mesh export
+needed by that source. A composite groups bodies; it does not heal open surfaces.
+An export failure identifies a source to investigate with supported Onshape import
+options or another real model. One failed export does not establish that no exact
+model exists, and does not waive the recorded-search policy for proxies.
 
 For browser-session imports, pass `encodedFilename` with the actual format suffix,
 for example `source.step`. Use uncompressed STEP. The upload tool derives a

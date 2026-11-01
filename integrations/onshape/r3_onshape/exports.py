@@ -15,8 +15,8 @@ from .pull import target
 def export_part(project: Any, url: str, part_id: str, format: str = "step",
                 version_id: str = "", transport: Any = None) -> dict[str, Any]:
     """Download unchanged bytes with a version pin and content-addressed provenance."""
-    if format not in ("step", "stl") or not part_id.strip():
-        raise PullError("cad_export_invalid", "Supply a part_id and format step or stl")
+    if format not in ("step", "stl", "gltf") or not part_id.strip():
+        raise PullError("cad_export_invalid", "Supply a part_id and format step, stl or gltf")
     pin = target(url, version_id)
     source = {**pin, "part_id": part_id, "format": format}
     identity = hashlib.sha256(json.dumps(source, sort_keys=True).encode()).hexdigest()
@@ -25,7 +25,8 @@ def export_part(project: Any, url: str, part_id: str, format: str = "step",
     folder = (build / "cad" / "inspection-exports" / identity).resolve()
     if root not in build.parents or build not in folder.parents:
         raise PullError("cad_export_invalid", "Inspection exports must stay inside this project's build directory")
-    native = transport if transport is not None else NativeCadTransport()
+    from .translation import project_export_cache
+    native = transport if transport is not None else NativeCadTransport(export_jobs=project_export_cache(root))
     data = getattr(native, format)(pin["document_id"], pin["version_id"], pin["element_id"],
                                    part_id, pin["configuration"])
     if not data:
@@ -42,7 +43,7 @@ def export_part(project: Any, url: str, part_id: str, format: str = "step",
         path.write_bytes(data)
     record = {"source": "onshape-native-export", "onshape": source, "sha256": checksum,
               "bytes": len(data), "path": str(path.relative_to(root)),
-              "units": "m" if format == "stl" else "STEP declared units",
+              "units": "STEP declared units" if format == "step" else "m",
               "qualification": "unverified_export", "note": "Inspection only. Run cad pull to install and verify the model."}
     manifest.write_text(json.dumps(record, indent=2) + "\n")
     return {"ok": True, **record, "file": str(path), "manifest": str(manifest.relative_to(root))}

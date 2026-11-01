@@ -54,10 +54,11 @@ class NativeRateLimitError(PullError):
 class NativeCadTransport:
     """Authenticated loopback client; unsupported operations fail closed."""
 
-    def __init__(self, runtime: Path | None = None) -> None:
+    def __init__(self, runtime: Path | None = None, *, export_jobs: Path | None = None) -> None:
         bridge = NativeBridgeTransport(runtime)
         self.base, self.runtime = bridge.base, bridge.runtime
         self._headers = bridge._headers()
+        self.export_jobs = export_jobs
         self._opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
         if urlsplit(self.base).hostname not in ("127.0.0.1", "localhost", "::1"):
             raise PullError("cad_native_unavailable", "onshape-native must use a loopback companion")
@@ -95,9 +96,20 @@ class NativeCadTransport:
                     continue
                 if error.code == 429:
                     raise NativeRateLimitError(error.headers.get("Retry-After"), method, path) from None
-                detail = error.read().decode(errors="replace")[:600]
+                raw_error = error.read().decode(errors="replace")
+                detail = raw_error[:600]
+                details: dict[str, Any] = {"http_status": error.code, "method": method, "resource": path}
+                try:
+                    payload = json.loads(raw_error)
+                    if isinstance(payload, dict):
+                        if isinstance(payload.get("translationId"), str):
+                            details["translation_id"] = payload["translationId"]
+                        if isinstance(payload.get("id"), str) and "requestState" in payload:
+                            details["translation"] = payload
+                except ValueError:
+                    pass
                 hint = "; restart the updated onshape-native companion to expose /native routes" if error.code == 404 else ""
-                raise PullError("cad_native_request_failed", f"Native {method} {path}: HTTP {error.code}: {detail}{hint}") from None
+                raise PullError("cad_native_request_failed", f"Native {method} {path}: HTTP {error.code}: {detail}{hint}", details) from None
             except (OSError, TimeoutError) as error:
                 raise PullError("cad_native_unavailable", f"Native bridge unavailable or command outcome unknown: {error}; inspect before retrying writes") from None
         raise PullError("cad_native_request_failed", "Too many native export redirects")
@@ -163,31 +175,22 @@ class NativeCadTransport:
         return self._request("GET", path, query=query)
 
     def step(self, did: str, vid: str, eid: str, pid: str, configuration: str = "") -> bytes:
+        from .translation import translated_file
         base = f"/native/api/v17/partstudios/d/{quote(did, safe='')}/v/{quote(vid, safe='')}/e/{quote(eid, safe='')}"
         body = {"formatName": "STEP", "storeInDocument": False, "partIds": pid}
         if configuration:
             body["configuration"] = configuration
-        job = json.loads(self._request("POST", base + "/translations", body))
-        deadline = time.monotonic() + 1800
-        while job.get("requestState") not in ("DONE", "FAILED"):
-            if time.monotonic() > deadline:
-                raise PullError("cad_pull_translation_pending", f"STEP translation {job.get('id')} has unknown outcome; poll it, do not resubmit")
-            time.sleep(5)
-            job = json.loads(self._request("GET", "/native/api/v17/translations/" + quote(job["id"], safe="")))
-        if job["requestState"] == "FAILED":
-            raise PullError("cad_pull_translation_failed", f"STEP export failed: {job.get('failureReason')}")
-        files = job.get("resultExternalDataIds") or []
-        if len(files) != 1 or not job.get("resultDocumentId"):
-            raise PullError("cad_pull_translation_failed", "Expected one selected-part STEP file; refusing an ambiguous export")
-        path = f"/native/api/v17/documents/d/{quote(job['resultDocumentId'], safe='')}/externaldata/{quote(files[0], safe='')}"
-        return self._request("GET", path)
+        return translated_file(self, base + "/translations", body)
 
     def gltf(self, did: str, vid: str, eid: str, pid: str, configuration: str = "") -> bytes:
-        path = f"/native/api/v17/parts/d/{quote(did, safe='')}/v/{quote(vid, safe='')}/e/{quote(eid, safe='')}/partid/{quote(pid, safe='')}/gltf"
-        query = {"chordTolerance": 5e-5, "angleTolerance": 0.03490658503988659}
+        from .translation import translated_file
+        path = f"/native/api/v17/partstudios/d/{quote(did, safe='')}/v/{quote(vid, safe='')}/e/{quote(eid, safe='')}/translations"
+        body = {"formatName": "GLTF", "storeInDocument": False, "partIds": pid,
+                "resolution": "custom", "distanceTolerance": 5e-5, "angularTolerance": 0.03490658503988659,
+                "maximumChordLength": 10, "exportCompositeConstituentsWithOriginalBodyIds": True}
         if configuration:
-            query["configuration"] = configuration
-        return self._request("GET", path, query=query)
+            body["configuration"] = configuration
+        return translated_file(self, path, body)
 
     def capture(self, url: str) -> tuple[bytes, dict[str, Any]]:
         from .rest_snapshot import capture

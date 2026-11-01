@@ -98,6 +98,11 @@ and datasheet in components.<id>.params.cad_proxy; keep catalog model provenance
 Pull it normally; never generate proxy CAD locally. Estimated items do not stop engineering work:
 carry on, retain them visibly in release status until measured or replaced, and list them at the end.
 Verify geometry, regeneration and mates numerically and inspect shaded views before r3_cad_pull.
+Qualify source solids, material density and pinned STEP/mesh exports before repeating them in an assembly.
+Use r3_cad_export format=step or gltf to inspect a source. Native export jobs persist under build/cad/native-exports;
+repeat the same R3 operation to resume a pending/interrupted job, never submit a duplicate after a timeout.
+Terminal export failures need source investigation in Onshape; a composite groups bodies and does not heal surfaces.
+Do not edit the export cache. A single failed source export is not a recorded search miss for the proxy rule.
 Native editor commands may be unavailable on the current frontend. Use tested browser-session REST
 features, assemblies, parts, mates and mate connectors instead; log unavailable native-only operations.
 Create or select an immutable Onshape version. robot.yaml is an index into parts/, electrical/ and software/;
