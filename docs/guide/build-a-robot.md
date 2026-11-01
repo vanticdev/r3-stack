@@ -140,7 +140,15 @@ provenance. Keep owned parts typed with `type` and record CAD sources in the pro
 catalog/model bank instead of `source`; see [owned parts](owned-parts.md).
 
 For public research, use the session's live web search and shell downloads
-(`curl --fail --location URL -o project-file`). Find official datasheets and exact
+(`curl --fail --location URL -o project-file`). Check that a download succeeded
+before opening it. For PDF text, the worker Python has `pypdf`: use
+`PdfReader(project_pdf_path)` with `"$R3_PYTHON"` and each page's `extract_text()`.
+For drawings that need visual inspection, use Poppler when installed:
+`pdftoppm -f 1 -singlefile -scale-to 1800 -png project-file.pdf build/drawing`,
+then open `build/drawing.png` with `r3_view_artifact`. `pdftotext` is another
+text-reader option. PyMuPDF's `fitz` module is not a required dependency; an
+unavailable optional reader does not mean the datasheet is inaccessible.
+Find official datasheets and exact
 vendor CAD, not a visually similar SKU. Record the source URL, license, checksum,
 dimensions, mass and which values are estimated in the project catalog. Add a real
 download with `r3_models_add(name, category, url, license, catalog_component)`;
