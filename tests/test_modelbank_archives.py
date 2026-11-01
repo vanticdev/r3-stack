@@ -7,6 +7,26 @@ from r3_catalog.modelbank import Source
 from r3_catalog.modelbank.fetch import acquire, unpack
 
 
+def test_zip_ignores_macos_metadata_without_hiding_real_model_ambiguity(tmp_path):
+    import zipfile
+
+    path = tmp_path / 'fixture.zip'
+    selected = Source(kind='vendor_step', url='https://fixture.test/coupon.zip', format='stp.zip')
+    contents = b'ISO-10303-21;synthetic extraction fixture'
+    with zipfile.ZipFile(path, 'w') as archive:
+        archive.writestr('coupon.step', contents)
+        archive.writestr('__MACOSX/._coupon.step', b'\x00\x05\x16\x07resource fork')
+        archive.writestr('._coupon.step', b'\x00\x05\x16\x07resource fork')
+    assert unpack(path, selected).read_bytes() == contents
+    with pytest.raises(ValueError, match='zero or multiple STEP'):
+        unpack(path, selected.model_copy(update={'member': '__MACOSX/._coupon.step'}))
+    with zipfile.ZipFile(path, 'a') as archive:
+        archive.writestr('other.stp', b'ISO-10303-21;second real fixture')
+    with pytest.raises(ValueError, match='multiple STEP'):
+        unpack(path, selected)
+    assert unpack(path, selected.model_copy(update={'member': 'coupon.step'})).read_bytes() == contents
+
+
 def source(**kwargs):
     return Source(kind='vendor_step', url='https://vendor.test/cad.rar', format='stp.rar', **kwargs)
 
@@ -26,7 +46,8 @@ def test_rar_member_selection_and_bounds(tmp_path, monkeypatch):
     from io import BytesIO
     import importlib
     module = importlib.import_module('r3_catalog.modelbank.fetch')
-    members = [SimpleNamespace(filename='../../motor.step', file_size=16, isdir=lambda: False)]
+    members = [SimpleNamespace(filename='../../motor.step', file_size=16, isdir=lambda: False),
+               SimpleNamespace(filename='__MACOSX/._fixture.step', file_size=16, isdir=lambda: False)]
     class Archive:
         def __enter__(self): return self
         def __exit__(self, *args): pass

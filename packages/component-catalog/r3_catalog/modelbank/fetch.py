@@ -83,7 +83,7 @@ def unpack(path: Path, source: Source) -> Path:
     if source.format != 'stp.zip':
         return path
     with zipfile.ZipFile(path) as archive:
-        members = [m for m in archive.infolist() if not m.is_dir() and m.filename.lower().endswith(('.step', '.stp'))]
+        members = [m for m in archive.infolist() if not m.is_dir() and _step_member(m.filename)]
         if source.member:
             members = [m for m in members if m.filename == source.member]
         if len(members) != 1:
@@ -95,6 +95,13 @@ def unpack(path: Path, source: Source) -> Path:
         # Fixed basename: never extract an archive-controlled path.
         target.write_bytes(archive.read(member))
         return target
+
+
+def _step_member(name: str) -> bool:
+    """Ignore macOS archive metadata, whose resource forks reuse CAD suffixes."""
+    parts = name.replace('\\', '/').split('/')
+    return (name.lower().endswith(('.step', '.stp'))
+            and '__MACOSX' not in parts and not any(part.startswith('._') for part in parts))
 
 
 def unpack_rar(path: Path, source: Source) -> Path:
@@ -110,7 +117,7 @@ def unpack_rar(path: Path, source: Source) -> Path:
     except rarfile.Error as error:
         raise ValueError(f'invalid STEP RAR archive: {error}') from error
     with archive:
-        members = [m for m in archive.infolist() if not m.isdir() and m.filename.lower().endswith(('.step', '.stp'))]
+        members = [m for m in archive.infolist() if not m.isdir() and _step_member(m.filename)]
         if source.member:
             members = [m for m in members if m.filename == source.member]
         if len(members) != 1:
