@@ -148,8 +148,9 @@ class PulledPartSpec(_Model):
     document_id: str
     version_id: str
     stl: str
+    gltf: str | None = None
     step: str
-    sha256: dict[Literal["stl", "step"], str]
+    sha256: dict[Literal["stl", "step", "gltf"], str]
     mate_connectors: dict[str, list[list[float]]]
     pose: list[list[float]]
     mass: float | None = None

@@ -85,6 +85,7 @@ def assembly(transport: Any, url: str) -> dict[str, Any]:
                 if not value or value.get('isMesh'):
                     raise PullError('cad_pull_incomplete', f'Native solid part metadata missing for {path}')
                 ref['material'] = value.get('material')
+                row['body_type'] = value.get('bodyType', 'solid')
                 row['name'] = row['name'] or value.get('name')
             else:
                 raise PullError('cad_pull_incomplete', f'Unsupported native instance type {kind!r} at {path}')

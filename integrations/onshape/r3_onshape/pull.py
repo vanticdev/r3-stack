@@ -142,6 +142,8 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
                        "material": name_material, "density": density, "mate_connectors": connectors,
                        "purchased": False, "onshape": {"document_id": key[0], "version_id": vid, "element_id": key[1],
                            "part_id": key[2], "occurrence_path": occurrence, "configuration": key[3]}}
+        if row.get("body_type") == "composite":
+            parts[name].update(body_type="composite", gltf=f"parts/{filename}.gltf")
         poses[name] = _frame(np.asarray(row["transform"]).reshape(4, 4), f"pose {name}").tolist()
     mates = []
     assembly_poses = {tuple(r["occurrence_path"]): np.asarray(r["transform"]).reshape(4, 4)
@@ -221,22 +223,25 @@ def pull_lock(root: Path) -> Iterator[None]:
 
 
 def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_url: str) -> None:
-    from r3_model.mesh_io import load_exported_stl
+    from r3_model.mesh_io import load_exported_mesh
 
     (directory / "parts").mkdir()
     files: dict[tuple, bytes] = {}
     for name, part in manifest["parts"].items():
         ref = part["onshape"]
-        for kind in ("stl", "step"):
+        for kind in ("stl", "step", *(("gltf",) if "gltf" in part else ())):
             path = directory / part[kind]
             identity = (kind, ref["document_id"], ref["version_id"], ref["element_id"], ref["part_id"], ref["configuration"])
             if identity not in files:
                 files[identity] = getattr(transport, kind)(*identity[1:])
             path.write_bytes(files[identity])
             part["sha256"][kind] = hashlib.sha256(path.read_bytes()).hexdigest()
-        mesh = load_exported_stl(directory / part["stl"])
+        try:
+            mesh = load_exported_mesh(directory / part.get("gltf", part["stl"]))
+        except ValueError as error:
+            raise PullError("cad_pull_geometry_invalid", f"{name}: {error}") from error
         if not len(mesh.faces) or not mesh.is_watertight or not np.isfinite(mesh.vertices).all() or mesh.volume <= 0:
-            raise PullError("cad_pull_geometry_invalid", f"{name}: STL is not a finite, closed positive-volume solid")
+            raise PullError("cad_pull_geometry_invalid", f"{name}: exported mesh is not a finite, closed positive-volume solid")
         part.update(mass_properties(directory / part["step"], part["density"]))
     image, evidence = transport.capture(capture_url)
     revision = evidence.get("microversion")

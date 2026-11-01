@@ -255,6 +255,15 @@ a server must provide that native session or consume an already pulled copy.
 
 All checks and consumers use the pull: fit/interference/thread checks read STEP with OCP;
 wiring, simulation, viewer and fabrication read STL. No checks or tolerances are relaxed.
+For native Composite Parts, the pull also downloads glTF and uses its separate native
+Body nodes for mesh consumers. STL triangle soup loses body ownership at coincident
+edges; do not union or reshape an otherwise valid purchased assembly merely to make
+that soup manifold. R3 preserves every glTF facet and joins exact coordinates only
+within each native body. Every body must still be finite, closed, consistently wound
+and positive-volume. STEP verification likewise preserves its distinct native solids.
+The original STL remains pinned for inspection, and glTF is pinned with its own SHA-256;
+neither file may be edited. Unsupported or failed glTF exports remain errors, with no
+public export or local geometry fallback. Only files exported from Onshape count as the model.
 If a check needs native thread annotations, preload, a material property or another datum
 absent from the pull, the diagnostic names that missing evidence rather than inventing it.
 Run fabrication validation for printed parts and inspect wall thickness, overhangs, loads,

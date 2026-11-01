@@ -364,6 +364,8 @@ def _pulled_values(model: PulledModel, root: Path) -> tuple[dict[str, Any], list
             "pose": model.poses[name].tolist(), "mass": part.mass, "com": part.com,
             "inertia": part.inertia, "material": part.material, "density": metadata.get("density"),
             "volume": metadata.get("volume"), "purchased": part.purchased}
+        if part.gltf is not None:
+            parts[name]["gltf"] = part.gltf.relative_to(root / "cad/pulled").as_posix()
     native_mates = {item["id"]: item for item in manifest["mates"]}
     attachments = [{"owner": "onshape-pull", "feature": native_mates[mate.id].get("feature"), "id": mate.id, "kind": mate.kind,
                     "a": list(mate.a), "b": list(mate.b), "axis": mate.axis, "limits": mate.limits} for mate in model.mates]

@@ -182,6 +182,13 @@ class NativeCadTransport:
         path = f"/native/api/v17/documents/d/{quote(job['resultDocumentId'], safe='')}/externaldata/{quote(files[0], safe='')}"
         return self._request("GET", path)
 
+    def gltf(self, did: str, vid: str, eid: str, pid: str, configuration: str = "") -> bytes:
+        path = f"/native/api/v17/parts/d/{quote(did, safe='')}/v/{quote(vid, safe='')}/e/{quote(eid, safe='')}/partid/{quote(pid, safe='')}/gltf"
+        query = {"chordTolerance": 5e-5, "angleTolerance": 0.03490658503988659}
+        if configuration:
+            query["configuration"] = configuration
+        return self._request("GET", path, query=query)
+
     def capture(self, url: str) -> tuple[bytes, dict[str, Any]]:
         from .rest_snapshot import capture
         return capture(self, url)

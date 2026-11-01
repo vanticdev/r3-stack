@@ -2,7 +2,9 @@
 
 ``cad/pulled/pull.json`` has schema ``r3/pull@1``, document_id, version_id,
 parts, mates and poses. Parts are keyed by instance name and contain stl/step
-paths relative to cad/pulled, sha256 (stl and step), mass (kg), com (m),
+paths relative to cad/pulled, plus gltf for native composite parts; sha256 pins
+every downloaded file. The glTF retains native body topology; STL is retained
+unchanged for inspection. Other fields include mass (kg), com (m),
 inertia (nine row-major kg m² values), material, mate_connectors (4x4 local
 frames), and purchased. Poses are solved 4x4 assembly transforms in metres.
 Additional part metadata may record the pinned Onshape reference.
@@ -46,6 +48,12 @@ class PulledPart:
     material: str | None
     mate_connectors: dict[str, np.ndarray]
     purchased: bool
+    gltf: Path | None = None
+
+    @property
+    def mesh(self) -> Path:
+        """Native body-preserving mesh for composites; STL for ordinary solids."""
+        return self.gltf if self.gltf is not None else self.stl
 
 
 @dataclass(frozen=True)
@@ -130,8 +138,10 @@ def load_pulled(project_root: Path) -> PulledModel:
             if not name or item.get("name", name) != name:
                 raise PullError("cad_pull_invalid", f"Invalid part identity {name!r}")
             hashes = item["sha256"]
-            if set(hashes) != {"stl", "step"} or not all(isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdef" for c in v) for v in hashes.values()):
+            if set(hashes) not in ({"stl", "step"}, {"stl", "step", "gltf"}) or not all(isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdef" for c in v) for v in hashes.values()):
                 raise PullError("cad_pull_invalid", f"{name}: expected STL and STEP SHA-256 hashes")
+            if ("gltf" in item) != ("gltf" in hashes) or item.get("body_type") == "composite" and "gltf" not in hashes:
+                raise PullError("cad_pull_invalid", f"{name}: composite CAD requires a pinned native glTF mesh")
             if type(item["purchased"]) is not bool:
                 raise PullError("cad_pull_invalid", f"{name}: purchased must be a boolean")
             mass = item.get("mass")
@@ -141,7 +151,7 @@ def load_pulled(project_root: Path) -> PulledModel:
                 _file(folder, item["step"], hashes["step"], name), dict(hashes), mass,
                 _numbers(item.get("com"), 3, f"{name}.com"), _numbers(item.get("inertia"), 9, f"{name}.inertia"),
                 item.get("material"), {key: _frame(frame, f"{name}.{key}") for key, frame in item["mate_connectors"].items()},
-                item["purchased"])
+                item["purchased"], _file(folder, item["gltf"], hashes["gltf"], name) if "gltf" in hashes else None)
         poses = {name: _frame(frame, f"pose {name}") for name, frame in data["poses"].items()}
         if set(poses) != set(parts):
             raise PullError("cad_pull_invalid", "Every pulled part must have exactly one solved assembly pose")

@@ -214,11 +214,12 @@ def process_part(project: Project, part: PrintedPart, printer: Any, cases: list[
         return entry
     mesh = geometry.mesh
     entry["geometry_source"] = geometry.source
-    if geometry.source != "pulled_stl":
-        result.add(Diagnostic.warning(
-            "print_geometry_estimated", f"{cid}: print geometry from the catalog {geometry.source} (no usable CAD mesh)",
-            subjects=[cid], data={"source": geometry.source, "notes": geometry.notes, "holes_cut": len(geometry.holes)},
-            hint="Run the cad stage so the printed file is the Onshape part (build/cad/meshes)."))
+    if geometry.source not in {"pulled_stl", "pulled_gltf"}:
+        message = f"{cid}: fabrication requires a verified pulled native mesh, got {geometry.source}"
+        result.add(Diagnostic.error("print_geometry_untrusted", message, subjects=[cid],
+                                    data={"source": geometry.source}, hint="Repair CAD in Onshape and pull again."))
+        entry["error"] = message
+        return entry
     for note in geometry.notes:
         result.assume("fabrication", f"{cid}: {note}")
     nozzle_mm = (printer.nozzle if printer else 0.0004) * 1e3

@@ -1,4 +1,4 @@
-"""Read pulled STL/STEP for fabrication, in part-local millimetres."""
+"""Read pulled native meshes/STEP for fabrication, in part-local millimetres."""
 
 from __future__ import annotations
 
@@ -17,14 +17,14 @@ MM = 1e3  # m -> mm
 @dataclass
 class PartGeometry:
     mesh: trimesh.Trimesh  # component frame, mm, watertight
-    source: str  # pulled_stl
+    source: str  # pulled_stl or pulled_gltf
     notes: list[str] = field(default_factory=list)
     holes: list[dict[str, Any]] = field(default_factory=list)  # cut holes: interface, kind, d_mm, centre/axis (mm)
 
 
 
 def build_geometry(project: Any, cid: str) -> PartGeometry:
-    """Read the pulled part-local STL in print units (millimetres)."""
+    """Read the pulled part-local mesh in print units (millimetres)."""
     from r3_model.pulled import PullError
     from r3_model.spec_files import validate_pulled_spec as load_pulled
     from r3_onshape.step_geometry import part_from_step
@@ -33,10 +33,10 @@ def build_geometry(project: Any, cid: str) -> PartGeometry:
     if cid not in pulled.parts:
         raise PullError("cad_pull_missing", f"{cid}: no pulled part")
     part = pulled.parts[cid]
-    from r3_model.mesh_io import load_exported_stl
-    mesh = load_exported_stl(part.stl)
+    from r3_model.mesh_io import load_exported_mesh
+    mesh = load_exported_mesh(part.mesh)
     if not isinstance(mesh, trimesh.Trimesh) or not mesh.is_volume:
-        raise PullError("cad_pull_invalid", f"{cid}: pulled STL is not a closed positive-volume mesh")
+        raise PullError("cad_pull_invalid", f"{cid}: pulled mesh is not a closed positive-volume mesh")
     mesh.apply_scale(MM)
     # Holes are measured from STEP, never synthesized from catalog interfaces.
     exact = part_from_step(cid, part.step)
@@ -44,8 +44,8 @@ def build_geometry(project: Any, cid: str) -> PartGeometry:
               "center_mm": (face.origin * MM).tolist(), "axis": face.direction.tolist(),
               "depth_mm": float(np.ptp(face.triangles.reshape(-1, 3) @ face.direction)) * MM}
              for face in exact.faces_of("CYLINDER") if face.convex is False]
-    return PartGeometry(mesh=mesh, source="pulled_stl", holes=holes,
-                        notes=[f"Pinned pulled STL; bores measured from STEP: {part.step.name}"])
+    return PartGeometry(mesh=mesh, source="pulled_gltf" if part.gltf else "pulled_stl", holes=holes,
+                        notes=[f"Pinned pulled {part.mesh.suffix[1:].upper()}; bores measured from STEP: {part.step.name}"])
 
 
 def rotation_from_euler_deg(angles: list[float]) -> np.ndarray:

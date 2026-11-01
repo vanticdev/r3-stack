@@ -37,18 +37,43 @@ def read_step_shape(path: Path):
 
 
 def part_from_step(name: str, path: Path, pose: np.ndarray | None = None) -> PartGeometry:
+    return _part_from_shape(name, read_step_shape(path), pose)
+
+
+def _part_from_shape(name: str, shape: Any, pose: np.ndarray | None = None) -> PartGeometry:
     from OCP.BRep import BRep_Tool
     from OCP.BRepAdaptor import BRepAdaptor_Surface
     from OCP.BRepGProp import BRepGProp
     from OCP.BRepMesh import BRepMesh_IncrementalMesh
     from OCP.GProp import GProp_GProps
-    from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED
+    from OCP.TopAbs import TopAbs_FACE, TopAbs_REVERSED, TopAbs_SOLID
     from OCP.TopExp import TopExp_Explorer
     from OCP.TopoDS import TopoDS
     from OCP.TopLoc import TopLoc_Location
     from OCP.GeomAbs import (GeomAbs_Plane, GeomAbs_Cylinder, GeomAbs_Cone,
                              GeomAbs_Sphere, GeomAbs_Torus)
-    shape = read_step_shape(path)
+    solids, explorer = [], TopExp_Explorer(shape, TopAbs_SOLID)
+    while explorer.More():
+        solids.append(explorer.Current())
+        explorer.Next()
+    if len(solids) > 1:
+        if TopExp_Explorer(shape, TopAbs_FACE, TopAbs_SOLID).More():
+            raise PullError("cad_pull_invalid", f"{name}: STEP contains faces outside its native solids")
+        # STEP carries native solid ownership. Welding separate solids together
+        # at coincident coordinates destroys that topology (e.g. edge contact).
+        # Keep the same tessellation/check tolerances within each real solid.
+        children = [_part_from_shape(name, solid, pose) for solid in solids]
+        faces, vertices, triangles, offset = [], [], [], 0
+        for child in children:
+            for face in child.faces:
+                face.id = str(len(faces))
+                faces.append(face)
+            vertices.append(child.vertices)
+            triangles.append(child.triangles + offset)
+            offset += len(child.vertices)
+        part = PartGeometry(name, name, faces, np.concatenate(vertices), np.concatenate(triangles))
+        part.manifold()  # unchanged closed-manifold qualification, no repair
+        return part
     mesher = BRepMesh_IncrementalMesh(shape, CHORD_TOLERANCE, False, ANGLE_TOLERANCE, False)
     if not mesher.IsDone():
         raise PullError("cad_pull_invalid", f"STEP tessellation failed: {name}")

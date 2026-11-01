@@ -1,6 +1,6 @@
 """Consumer projections of pulled CAD; never author or repair geometry.
 
-World-frame STL copies are derived build artifacts for existing renderers. The
+World-frame mesh copies are derived build artifacts for existing renderers. The
 pinned part-local inputs remain untouched. Every projection validates the pull.
 """
 from __future__ import annotations
@@ -16,10 +16,10 @@ from .spec_files import validate_pulled_spec as load_pulled
 def world_mesh(pulled: PulledModel, name: str):
     import trimesh
 
-    from .mesh_io import load_exported_stl
-    mesh = load_exported_stl(pulled.parts[name].stl)
+    from .mesh_io import load_exported_mesh
+    mesh = load_exported_mesh(pulled.parts[name].mesh)
     if not isinstance(mesh, trimesh.Trimesh) or not len(mesh.faces):
-        raise PullError("cad_pull_invalid", f"{name}: pulled STL has no triangles")
+        raise PullError("cad_pull_invalid", f"{name}: pulled mesh has no triangles")
     mesh.apply_transform(pulled.poses[name])
     return mesh
 
@@ -47,7 +47,7 @@ def cad_view(project: Any, *, mass_required: bool = False) -> dict[str, Any]:
         mesh = world_mesh(pulled, name)
         pose = pulled.poses[name]
         # Hash identity and transform, never place an arbitrary part name in a path.
-        key = hashlib.sha256((name + part.sha256['stl'] + repr(pose.tolist())).encode()).hexdigest()
+        key = hashlib.sha256((name + part.sha256['gltf' if part.gltf else 'stl'] + repr(pose.tolist())).encode()).hexdigest()
         path = out / f"{key}.stl"
         content = mesh.export(file_type="stl")
         if not path.exists() or path.read_bytes() != content:
