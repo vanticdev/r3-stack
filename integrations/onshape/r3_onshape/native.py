@@ -31,9 +31,14 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 class NativeRateLimitError(PullError):
     """Preserve server pacing without retrying or guessing a reset time."""
 
-    def __init__(self, retry_after: str | None, method: str = "", resource: str = "") -> None:
+    def __init__(self, retry_after: str | None, method: str = "", resource: str = "", *,
+                 response_excerpt: str = "", remaining: str | None = None) -> None:
         details: dict[str, Any] = {"http_status": 429, "retry_after": retry_after,
                                    "method": method, "resource": resource}
+        if response_excerpt:
+            details["response_excerpt"] = response_excerpt[:600]
+        if remaining is not None:
+            details["rate_limit_remaining"] = remaining
         now = datetime.now(timezone.utc)
         try:
             if retry_after is not None:
@@ -95,7 +100,11 @@ class NativeCadTransport:
                     url = self.base + redirect.path
                     continue
                 if error.code == 429:
-                    raise NativeRateLimitError(error.headers.get("Retry-After"), method, path) from None
+                    # Keep bounded upstream evidence so callers can distinguish
+                    # the server's explanation from our computed resume time.
+                    raise NativeRateLimitError(error.headers.get("Retry-After"), method, path,
+                        response_excerpt=error.read(601).decode(errors="replace"),
+                        remaining=error.headers.get("X-RateLimit-Remaining")) from None
                 raw_error = error.read().decode(errors="replace")
                 detail = raw_error[:600]
                 details: dict[str, Any] = {"http_status": error.code, "method": method, "resource": path}

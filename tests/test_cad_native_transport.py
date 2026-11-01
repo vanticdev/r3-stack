@@ -101,3 +101,26 @@ def test_http_date_retry_after_and_mcp_metadata(monkeypatch):
     monkeypatch.setattr(NativeCadTransport, 'api_request', reject)
     result = mcp_server.r3_onshape_native('api_request', {'method':'GET','endpoint':'/api/v9/documents'})
     assert not result['ok'] and result['resume_at'] == error.details['resume_at']
+
+
+def test_rate_limit_keeps_bounded_server_explanation(tmp_path):
+    import io
+    from email.message import Message
+    from urllib.error import HTTPError
+
+    client = transport(tmp_path)
+    headers = Message()
+    headers['Retry-After'] = '120'
+    headers['X-RateLimit-Remaining'] = '0'
+    explanation = b'{"message":"Synthetic upstream restriction","context":"' + b'x' * 2000 + b'"}'
+    client._opener = Mock()
+    client._opener.open.side_effect = HTTPError(
+        'http://127.0.0.1:8766/native/api/v17/translations/job', 429, 'limited', headers,
+        io.BytesIO(explanation))
+    with pytest.raises(PullError) as error:
+        client._request('GET', '/native/api/v17/translations/job')
+    assert error.value.details['response_excerpt'].startswith('{"message":"Synthetic upstream restriction"')
+    assert len(error.value.details['response_excerpt']) == 600
+    assert error.value.details['rate_limit_remaining'] == '0'
+    assert error.value.details['retry_after_seconds'] == 120
+    client._opener.open.assert_called_once()
