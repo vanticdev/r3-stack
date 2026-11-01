@@ -337,6 +337,9 @@ class NgSpice:
     def load(self, lines: Sequence[str]) -> None:
         """Send a netlist (title line first, ``.end`` last)."""
         self.errors.clear()
+        # Callback name pointers belong to one circuit allocation. A fault
+        # restart can reuse an address for a different EXTERNAL source name.
+        self._source_by_address.clear()
         encoded = [line.encode() for line in lines] + [None]
         array = (ctypes.c_char_p * len(encoded))(*encoded)
         status = self.lib.ngSpice_Circ(array)
