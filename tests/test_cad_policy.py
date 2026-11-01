@@ -29,6 +29,14 @@ def test_standard_features_allowed():
     check_request("GET", "/partstudios/d/D/w/W/e/E/bodydetails")
 
 
+def test_builtin_composite_allowed_but_custom_namespace_still_refused():
+    feature = {"btType": "BTMFeature-134", "featureType": "compositePart", "namespace": "",
+               "parameters": [{"btType": "BTMParameterBoolean-144", "parameterId": "closed", "value": True}]}
+    check_request("POST", "/api/v9/partstudios/d/D/w/W/e/E/features", {"feature": feature})
+    with pytest.raises(FeatureScriptForbidden):
+        check_request("POST", "/api/v9/partstudios/d/D/w/W/e/E/features", {"feature": {**feature, "namespace": "custom::m1"}})
+
+
 def test_transport_enforces_policy_before_network():
     api = ApiKeyTransport("k", "s", base="http://127.0.0.1:9")  # unreachable: proves we never send
     with pytest.raises(FeatureScriptForbidden):

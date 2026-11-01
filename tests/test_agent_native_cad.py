@@ -126,3 +126,18 @@ def test_transport_backoff_requires_timezone(monkeypatch):
         {'method': 'GET', 'resource': '/api/v9/synthetic', 'until': '2099-01-01'}]))
     with pytest.raises(ValueError, match='timezone-aware'):
         agents.session_instructions()
+
+
+def test_unknown_reset_is_scoped_without_inventing_a_deadline(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setenv('R3_ONSHAPE_BACKOFFS', json.dumps([
+        {'method': 'GET', 'resource': '/api/v*/partstudios/**/features', 'until': None}]))
+    conf = config(tmp_path, monkeypatch)
+    codex = agents.codex_command('codex', tmp_path, conf)
+    instruction = next(x for x in codex if x.startswith('developer_instructions='))
+    assert 'no reported reset deadline' in instruction
+    assert 'Do not retry matching resources' in instruction
+    assert 'other working REST operations and native exports' in instruction
+    assert 'preserving fresh revision guards' in instruction
+    claude = agents.claude_command('claude', tmp_path/'config.json')
+    assert 'no reported reset deadline' in claude[claude.index('--append-system-prompt')+1]

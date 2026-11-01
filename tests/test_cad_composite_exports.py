@@ -205,5 +205,20 @@ def test_gltf_transport_uses_only_pinned_native_export(tmp_path):
     assert calls[0].args[:2] == ('POST', '/native/api/v17/partstudios/d/doc/v/version/e/studio/translations')
     assert calls[0].args[2] == {'formatName': 'GLTF', 'storeInDocument': False, 'partIds': 'part/a',
         'resolution': 'custom', 'distanceTolerance': 5e-5, 'angularTolerance': 0.03490658503988659,
-        'maximumChordLength': 10, 'exportCompositeConstituentsWithOriginalBodyIds': True, 'configuration': 'setting'}
+        'maximumChordLength': 10, 'configuration': 'setting'}
     assert calls[1].args == ('GET', '/native/api/v17/documents/d/doc/externaldata/file')
+
+
+def test_native_original_body_id_option_cannot_hide_collapsed_topology():
+    """Same synthetic pin: the native option collapses composite body ownership."""
+    collapsed = FIXTURE / 'original-body-ids.gltf'
+    assert hashlib.sha256(collapsed.read_bytes()).hexdigest() == '2fb9090cecea3fc785e82677b5f9b44ad8db3be79c4551941446f679d2b9de9a'
+    data = json.loads(collapsed.read_text())
+    assert len(data['meshes']) == 1
+    assert sum(data['accessors'][p['indices']]['count'] // 3
+               for m in data['meshes'] for p in m['primitives']) == 24
+    with pytest.raises(ValueError, match='closed positive-volume'):
+        load_exported_mesh(collapsed)
+    # Default native export keeps the identical 24 facets in two closed bodies.
+    mesh = load_exported_mesh(FIXTURE / 'compound.gltf')
+    assert len(mesh.faces) == 24 and mesh.is_watertight

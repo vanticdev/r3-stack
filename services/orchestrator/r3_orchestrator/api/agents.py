@@ -150,15 +150,22 @@ def session_instructions() -> str:
         raise ValueError("Onshape backoffs must be a list")
     for backoff in backoffs:
         method, resource = backoff["method"], backoff["resource"]
-        until = datetime.fromisoformat(backoff["until"])
+        raw_until = backoff["until"]
+        if raw_until is not None and not isinstance(raw_until, str):
+            raise ValueError("Onshape backoff deadline must be a timezone-aware timestamp or null for an unknown reset")
+        until = datetime.fromisoformat(raw_until) if raw_until is not None else None
         if method not in ("GET", "POST", "PUT", "PATCH", "DELETE") or not isinstance(resource, str) or \
-                not resource.startswith(("/api/", "/native/api/")) or any(c.isspace() for c in resource) or until.tzinfo is None:
+                not resource.startswith(("/api/", "/native/api/")) or any(c.isspace() for c in resource) or (until is not None and until.tzinfo is None):
             raise ValueError("Onshape backoffs require a method, API resource pattern and timezone-aware deadline")
-        if until <= datetime.now(timezone.utc):
+        if until is not None and until <= datetime.now(timezone.utc):
             continue
+        restriction = (f"until {until.isoformat()} (glob pattern). "
+                       "Do not request matching resources or inspection helpers that read them before that deadline. "
+                       if until is not None else
+                       "with no reported reset deadline (glob pattern). Do not retry matching resources or inspection "
+                       "helpers that read them in this session; the operator must update this context when a reset is known. ")
         instruction += (
-            f"\nKnown transport backoff: {method} {resource} until {until.isoformat()} (glob pattern). "
-            "Do not request matching resources or inspection helpers that read them before that deadline. "
+            f"\nKnown transport backoff: {method} {resource} {restriction}"
             "This is not an account-wide outage: continue using other working REST operations and native exports. "
             "Use direct standard-feature REST authoring when supported, preserving fresh revision guards and checking "
             "returned feature status, geometry and mates. Never bypass a concurrency or validation check. "

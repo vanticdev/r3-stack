@@ -309,6 +309,9 @@ and positive-volume. STEP verification likewise preserves its distinct native so
 The original STL remains pinned for inspection, and glTF is pinned with its own SHA-256;
 neither file may be edited. Unsupported or failed glTF exports remain errors, with no
 public export or local geometry fallback. Only files exported from Onshape count as the model.
+Do not enable `exportCompositeConstituentsWithOriginalBodyIds` for glTF: the native
+exporter collapses composite Body groups with that option. R3 uses the default
+native grouping and does not reconstruct missing ownership from face data.
 If a check needs native thread annotations, preload, a material property or another datum
 absent from the pull, the diagnostic names that missing evidence rather than inventing it.
 Run fabrication validation for printed parts and inspect wall thickness, overhangs, loads,
@@ -557,8 +560,25 @@ calls are supported; preserve fresh revision guards and inspect returned feature
 status and actual geometry. Do not bypass checks to avoid an inspection failure.
 Operators may supply known transport backoffs as a JSON list in
 `R3_ONSHAPE_BACKOFFS`, with `method`, `resource` (API path glob), and `until`
-(timezone-aware ISO timestamp). Sessions receive only current backoffs as platform
-context, independently of the unchanged user prompt; expired entries are ignored.
+(timezone-aware ISO timestamp), or `until: null` when no reset was reported.
+An unknown reset remains a scoped no-retry instruction for the session until the
+operator supplies new context; it is never converted into a guessed wait.
+Sessions receive current backoffs as platform context, independently of the
+unchanged user prompt; expired timestamped entries are ignored.
+
+If Part Studio feature-list reads are throttled, standard-feature authoring can
+still work without that read. Obtain a fresh workspace microversion from
+`GET /api/v9/documents/d/D/w/W/currentmicroversion`, then submit the complete,
+schema-discovered standard feature to
+`POST /api/v9/partstudios/d/D/w/W/e/E/features` with
+`sourceMicroversion` set to that returned `microversion` and
+`rejectMicroversionSkew: true`. Use `api_request` or the discovered `api_write`
+operation. This route was verified with a synthetic native composite while the
+feature-list read was throttled. Check the returned feature status, parts,
+geometry, material/mass and actual images through working endpoints; never
+treat missing validation as a pass. A conflict requires a fresh read and an
+intentional edit. Do not edit unknown feature definitions or use inspection
+helpers that silently repeat the throttled read.
 
 
 ### Physical hardware and typed catalog categories
@@ -592,6 +612,26 @@ needed by that source. A composite groups bodies; it does not heal open surfaces
 An export failure identifies a source to investigate with supported Onshape import
 options or another real model. One failed export does not establish that no exact
 model exists, and does not waive the recorded-search policy for proxies.
+
+For a composite's independent source test, export `format="gltf"` and use R3's
+public reader, which checks every exported native body without welding bodies
+together. Check exact STEP separately with the supplied native material density:
+
+```python
+from pathlib import Path
+from r3_model.mesh_io import load_exported_mesh
+from r3_onshape.pull import mass_properties
+
+mesh = load_exported_mesh(Path(native_gltf_file))
+properties = mass_properties(Path(native_step_file), native_density_kg_m3)
+```
+
+These inputs are the unchanged pinned files returned by `r3_cad_export`, not
+locally generated geometry. Retain their hashes. A global STL vertex join loses
+body ownership and cannot qualify a composite; do not union a valid purchased
+assembly to satisfy that lossy test. Both readers still reject invalid geometry.
+Add independent dimensional, interface and source checks needed by the design;
+inspection exports remain unqualified until the assembled `r3_cad_pull` succeeds.
 
 For browser-session imports, pass `encodedFilename` with the actual format suffix,
 for example `source.step`. Use uncompressed STEP. The upload tool derives a

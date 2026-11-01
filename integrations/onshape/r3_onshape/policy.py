@@ -36,7 +36,7 @@ STANDARD_FEATURE_TYPES = frozenset({
     "fillet", "chamfer", "hole", "booleanBodies", "splitPart", "transform",
     "linearPattern", "circularPattern", "mirror", "deleteBodies", "moveFace",
     "replaceFace", "deleteFace", "offsetSurface", "modifyFillet", "wrap",
-    "partStudioNumber", "assignVariable",
+    "partStudioNumber", "assignVariable", "compositePart",
     # assembly features
     "mate", "fastenMate", "revoluteMate", "sliderMate", "cylindricalMate", "planarMate",
     "ballMate", "pinSlotMate", "parallelMate", "tangentMate", "mateGroup", "gearRelation",

@@ -185,9 +185,11 @@ class NativeCadTransport:
     def gltf(self, did: str, vid: str, eid: str, pid: str, configuration: str = "") -> bytes:
         from .translation import translated_file
         path = f"/native/api/v17/partstudios/d/{quote(did, safe='')}/v/{quote(vid, safe='')}/e/{quote(eid, safe='')}/translations"
+        # The original-body-ID option collapses composite Body groups in glTF.
+        # Keep native default grouping; never reconstruct that ownership locally.
         body = {"formatName": "GLTF", "storeInDocument": False, "partIds": pid,
                 "resolution": "custom", "distanceTolerance": 5e-5, "angularTolerance": 0.03490658503988659,
-                "maximumChordLength": 10, "exportCompositeConstituentsWithOriginalBodyIds": True}
+                "maximumChordLength": 10}
         if configuration:
             body["configuration"] = configuration
         return translated_file(self, path, body)
