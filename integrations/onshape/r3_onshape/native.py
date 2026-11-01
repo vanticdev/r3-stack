@@ -119,7 +119,12 @@ class NativeCadTransport:
                             details["translation"] = payload
                 except ValueError:
                     pass
-                hint = "; restart the updated onshape-native companion to expose /native routes" if error.code == 404 else ""
+                # A missing upstream object is not evidence of a stale bridge.
+                # Only the companion's plain router 404 suggests a missing route;
+                # leave any restart decision to a health/capability inspection.
+                missing_route = (error.code == 404 and path.startswith("/native/api/v17/")
+                                 and raw_error.strip() == "Not Found")
+                hint = "; inspect companion /health capabilities: this /native route may be unavailable" if missing_route else ""
                 raise PullError("cad_native_request_failed", f"Native {method} {path}: HTTP {error.code}: {detail}{hint}", details) from None
             except (OSError, TimeoutError) as error:
                 raise PullError("cad_native_unavailable", f"Native bridge unavailable or command outcome unknown: {error}; inspect before retrying writes") from None
