@@ -119,7 +119,9 @@ def test_codex_session(env):
     import tomllib
     parsed = tomllib.loads(permission)["permissions"]["r3_session"]
     assert parsed["network"]["enabled"] is True
-    assert parsed["filesystem"] == {str(root / ".git"): "write"}
+    assert parsed["filesystem"][str(root / ".git")] == "write"
+    assert parsed["filesystem"][":root"] == "deny"
+    assert parsed["filesystem"][":slash_tmp"] == "deny"
     assert parsed["extends"] == ":workspace"
     assert 'web_search="live"' in overrides
     assert any(o.startswith("developer_instructions=") for o in overrides)

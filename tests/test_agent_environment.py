@@ -48,7 +48,7 @@ def test_doctor_refuses_unimportable_requested_stage(monkeypatch):
 @pytest.mark.skipif(sys.platform != "darwin" or shutil.which("codex") is None,
                     reason="native Codex/Seatbelt integration probe requires macOS and the CLI")
 def test_session_sandbox_can_commit_and_push_its_own_project(tmp_path):
-    from r3_orchestrator.api.agents import codex_permission_profile, _toml
+    from r3_orchestrator.api.agents import codex_permission_profile, session_environment, _toml
 
     root = (tmp_path / "synthetic-project").resolve()
     root.mkdir()
@@ -58,14 +58,64 @@ def test_session_sandbox_can_commit_and_push_its_own_project(tmp_path):
     (root / "probe.txt").write_text("unrelated synthetic session test\n")
     sandbox = ["codex", "sandbox", "--permission-profile", "r3_session", "-C", str(root), "-c",
                "permissions.r3_session=" + _toml(codex_permission_profile(root)), "--"]
+    env = session_environment(root, root / "build/agent/synthetic", {})
     for command in (["git", "add", "probe.txt"],
                     ["git", "-c", "user.name=R3 Synthetic Test", "-c", "user.email=r3-synthetic@example.invalid", "commit", "-m", "Synthetic probe"],
                     ["git", "push", str(remote), "HEAD:refs/heads/probe"]):
-        process = subprocess.run([*sandbox, *command], capture_output=True, text=True, timeout=30)
+        process = subprocess.run([*sandbox, *command], env=env, capture_output=True, text=True, timeout=30)
         assert process.returncode == 0, process.stderr
     head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
     pushed = subprocess.check_output(["git", "--git-dir", str(remote), "rev-parse", "refs/heads/probe"], text=True).strip()
     assert pushed == head
+
+
+def test_session_owns_its_scratch_cache_and_native_runtime(tmp_path):
+    from r3_orchestrator.api.agents import session_environment
+
+    root = tmp_path / "project"
+    directory = root / "build/agent/synthetic"
+    config = {"mcpServers": {"onshape_native": {"env": {"ONSHAPE_NATIVE_RUNTIME": str(tmp_path / "native")}}}}
+    env = session_environment(root, directory, config, {"SYNTHETIC_OPTION": "preserved"})
+    assert env["SYNTHETIC_OPTION"] == "preserved"
+    assert env["ONSHAPE_NATIVE_RUNTIME"] == str(tmp_path / "native")
+    assert env["R3_PYTHON"] == sys.executable
+    for key in ("TMPDIR", "TMP", "TEMP", "XDG_CACHE_HOME", "UV_CACHE_DIR", "PIP_CACHE_DIR",
+                "MPLCONFIGDIR", "npm_config_cache", "R3_MODEL_CACHE"):
+        assert Path(env[key]).is_relative_to(root)
+    process = subprocess.run([sys.executable, "-c", "import tempfile; print(tempfile.gettempdir())"],
+                             env=env, capture_output=True, text=True, check=True)
+    assert Path(process.stdout.strip()) == directory / "scratch"
+
+
+@pytest.mark.skipif(sys.platform != "darwin" or shutil.which("codex") is None,
+                    reason="native Codex/Seatbelt read-isolation probe requires macOS and the CLI")
+def test_session_can_read_platform_but_not_other_projects_or_shared_temp(tmp_path, monkeypatch):
+    from r3_orchestrator.api import agents
+
+    platform = tmp_path / "platform"
+    root = platform / "examples/robots/synthetic-project"
+    root.mkdir(parents=True)
+    (platform / "guide.txt").write_text("synthetic platform guide")
+    other = platform / "examples/robots/other-project"
+    other.mkdir()
+    (other / "private.txt").write_text("synthetic unrelated canary")
+    external = tmp_path / "alternate-worktree"
+    external.mkdir()
+    (external / "private.txt").write_text("synthetic alternate checkout canary")
+    (root / "outside-link.txt").symlink_to(external / "private.txt")
+    monkeypatch.setattr(agents, "__file__", str(platform / "services/orchestrator/r3_orchestrator/api/agents.py"))
+    env = agents.session_environment(root, root / "build/agent/synthetic", {})
+    sandbox = ["codex", "sandbox", "--permission-profile", "r3_session", "-C", str(root), "-c",
+               "permissions.r3_session=" + agents._toml(agents.codex_permission_profile(root)), "--"]
+    for path in (other / "private.txt", external / "private.txt", root / "outside-link.txt"):
+        result = subprocess.run([*sandbox, "/bin/cat", str(path)], env=env, capture_output=True, text=True, timeout=30)
+        assert result.returncode != 0 and not result.stdout, (path, result.stdout, result.stderr)
+    result = subprocess.run([*sandbox, "/bin/cat", str(platform / "guide.txt")], env=env,
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0 and result.stdout == "synthetic platform guide", result.stderr
+    result = subprocess.run([*sandbox, "rg", "--files", "/private/tmp"], env=env,
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0 and not result.stdout, result.stderr
 
 
 def test_robot_session_does_not_inherit_unrelated_account_tools_and_skills(tmp_path):

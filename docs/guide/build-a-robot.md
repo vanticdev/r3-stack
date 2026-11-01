@@ -27,6 +27,12 @@ typed authoring reference, including field descriptions and nested definitions
 Use these tools and this guide; reading platform source is not required.
 The session exposes R3 and onshape-native tools directly and excludes unrelated account
 plugins and skills. Use its browser-session REST feature tools for CAD; no other project context is needed.
+Temporary work belongs in the session's `TMPDIR`, under this project's `build/agent/`.
+Use it for downloads and extraction, or use another directory inside this project.
+Never search shared `/tmp`, `/private/tmp`, unrelated checkouts, other robots or old transcripts.
+The Codex shell enforces project/platform read scope, with the runtime and authentication
+access normal tools need. Its caches are project-local. Use `"$R3_PYTHON"` for Python
+helpers; a login shell's `python3` can select a different interpreter.
 Run native pipeline stages, scenarios and project tests with the R3 MCP tools;
 they execute in the worker's probed environment. On macOS, the Codex shell sandbox
 can deny CoreGraphics access even when native offscreen MuJoCo rendering works in

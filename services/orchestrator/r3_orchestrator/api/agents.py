@@ -77,6 +77,9 @@ may be edited directly. Use r3_get_schema for typed authoring details, the catal
 r3_cad_export for pinned native source downloads, r3_cad_pull for pinned read-only CAD,
 r3_view_artifact to inspect images, and the pipeline tools to validate.
 Run native stages, scenarios and project test suites through R3 MCP tools in the worker environment.
+Keep downloads and temporary work in this session's TMPDIR, inside the project; never enumerate
+shared /tmp or /private/tmp, unrelated checkouts, other robot projects or previous transcripts.
+Use R3_PYTHON for Python helper commands so they use the platform's installed dependencies.
 Author device bridges under simulation/ and tests under tests/ in this project; the guide documents the
 simulation.devices extension API and r3_run_project_tests. Do not edit platform code to add a project device.
 CAD changes must happen only in a real Onshape document, using standard editable features and assemblies.
@@ -290,15 +293,58 @@ def _toml(value: Any) -> str:
     return json.dumps(value)
 
 
-def codex_permission_profile(project_root: Path) -> dict[str, Any]:
-    """Keep workspace protections, but allow this project's explicitly requested Git operations.
+def codex_permission_profile(project_root: Path, config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Read the platform and runtime, not other projects or shared scratch trees.
 
-    The standard workspace profile protects .git. Noninteractive sessions cannot
-    ask to escalate a normal commit/push, so grant that exact directory rather
-    than disabling the sandbox or making other repositories writable.
+    Keep the workspace profile's protections and the explicit project Git grant.
+    More-specific workspace access reopens the project inside the platform's
+    otherwise denied examples directory. See https://learn.chatgpt.com/docs/permissions.
     """
-    return {"extends": ":workspace", "filesystem": {str(project_root.resolve() / ".git"): "write"},
-            "network": {"enabled": True}}
+    platform = Path(__file__).resolve().parents[4]
+    home = Path.home()
+    filesystem = {":root": "deny", ":minimal": "read", ":slash_tmp": "deny",
+                  str(platform): "read", str(platform / "examples" / "robots"): "deny",
+                  str(platform / ".git"): "deny", str(project_root.resolve() / ".git"): "write",
+                  str(Path(sys.prefix).resolve()): "read", str(Path(sys.base_prefix).resolve()): "read"}
+    # Toolchains, shell initialization and normal Git authentication are runtime
+    # inputs. They do not grant access to arbitrary home/workspace directories.
+    for path in (home / ".gitconfig", home / ".config" / "gh", home / ".config" / "git", home / ".ssh",
+                 home / ".zshenv", home / ".zprofile", home / ".zshrc", home / ".profile",
+                 home / ".bash_profile", home / ".bashrc", home / ".pyenv", home / ".cargo",
+                 home / ".rustup", home / ".rbenv", home / ".nvm", home / "Applications",
+                 home / "Library" / "Keychains"):
+        if path.exists():
+            filesystem[str(path.resolve())] = "read"
+    if brew := shutil.which("brew"):
+        filesystem[str(Path(brew).parent.parent.resolve())] = "read"
+    native = (config or {}).get("mcpServers", {}).get("onshape_native", {})
+    runtime = native.get("env", {}).get("ONSHAPE_NATIVE_RUNTIME") or os.environ.get("ONSHAPE_NATIVE_RUNTIME")
+    if runtime:
+        filesystem[str(Path(runtime).expanduser().resolve() / "bridge.json")] = "read"
+    return {"extends": ":workspace", "filesystem": filesystem, "network": {"enabled": True}}
+
+
+def session_environment(project_root: Path, session_directory: Path, config: dict[str, Any],
+                        extra_env: dict[str, str] | None = None) -> dict[str, str]:
+    """Keep temporary files and disposable tool caches inside this project."""
+    root = project_root.resolve()
+    scratch = session_directory.resolve() / "scratch"
+    cache = root / "build" / "cache"
+    scratch.mkdir(parents=True, exist_ok=True)
+    cache.mkdir(parents=True, exist_ok=True)
+    env = {**os.environ, **(extra_env or {}), "R3_PROJECT": str(root), "R3_PYTHON": sys.executable,
+           "PYTHONPATH": r3_pythonpath(),
+           "MCP_TOOL_TIMEOUT": str(MCP_TOOL_TIMEOUT_S * 1000), "MCP_TIMEOUT": "120000",
+           "TMPDIR": str(scratch), "TMP": str(scratch), "TEMP": str(scratch),
+           "XDG_CACHE_HOME": str(cache), "UV_CACHE_DIR": str(cache / "uv"),
+           "PIP_CACHE_DIR": str(cache / "pip"), "MPLCONFIGDIR": str(cache / "matplotlib"),
+           "npm_config_cache": str(cache / "npm"), "R3_MODEL_CACHE": str(cache / "models")}
+    ceiling = env.get("GIT_CEILING_DIRECTORIES", "")
+    env["GIT_CEILING_DIRECTORIES"] = os.pathsep.join(filter(None, (ceiling, str(root.parent))))
+    native = config.get("mcpServers", {}).get("onshape_native", {})
+    if runtime := native.get("env", {}).get("ONSHAPE_NATIVE_RUNTIME"):
+        env["ONSHAPE_NATIVE_RUNTIME"] = runtime
+    return env
 
 
 def codex_scope_overrides(project_root: Path, account_home: Path | None = None) -> list[str]:
@@ -348,7 +394,7 @@ def codex_command(executable: str, project_root: Path, config: dict[str, Any], m
     command = [executable, "exec", "--json", "--skip-git-repo-check", "--color", "never", "-C", str(project_root),
                "-c", 'approval_policy="never"',
                "-c", 'default_permissions="r3_session"',
-               "-c", f"permissions.r3_session={_toml(codex_permission_profile(project_root))}",
+               "-c", f"permissions.r3_session={_toml(codex_permission_profile(project_root, config))}",
                "-c", 'web_search="live"',
                "-c", f"developer_instructions={_toml(session_instructions())}",
                "-c", f"{prefix}.enabled=true",
@@ -588,8 +634,7 @@ class AgentManager:
             session.command = codex_command(info["path"], Path(root), config, model)
             stdin = prompt
         session._spec_start = session._spec_last = _description(Path(root))
-        env = {**os.environ, **self.extra_env, "R3_PROJECT": str(root), "PYTHONPATH": r3_pythonpath(),
-               "MCP_TOOL_TIMEOUT": str(MCP_TOOL_TIMEOUT_S * 1000), "MCP_TIMEOUT": "120000"}
+        env = session_environment(Path(root), session.directory, config, self.extra_env)
         self._sessions[session.id] = session
         session.events.emit("session_started", session_id=session.id, project=project_id, provider=provider, model=model,
                             cwd=str(root), command=[c if c != SYSTEM_PROMPT else "<system prompt>" for c in session.command],
