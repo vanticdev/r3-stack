@@ -2,6 +2,11 @@
 import hashlib
 import io
 import json
+import shutil
+import subprocess
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import Mock
 
 import pytest
@@ -59,3 +64,56 @@ def test_cache_routes_cannot_enumerate_write_or_traverse(tmp_path, method, path)
         value._request(method, path)
     assert error.value.code == 'cad_native_route_forbidden'
     value._opener.open.assert_not_called()
+
+
+@pytest.mark.skipif(sys.platform != 'darwin' or shutil.which('codex') is None,
+                   reason='native session filesystem probe requires macOS and Codex')
+def test_isolated_session_reads_exact_cached_response_without_cache_filesystem_access(tmp_path):
+    from r3_orchestrator.api.agents import codex_permission_profile, session_environment, _toml
+
+    root = tmp_path / 'synthetic-project'
+    root.mkdir()
+    runtime = tmp_path / 'private-companion'
+    cache = runtime / 'artifacts'
+    cache.mkdir(parents=True)
+    raw = json.dumps({'fixture': 'unrelated cached response'}).encode()
+    handle = hashlib.sha256(raw).hexdigest() + '.json'
+    cached_file = cache / handle
+    cached_file.write_bytes(raw)
+    calls = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            calls.append(self.path)
+            assert self.headers.get('Authorization') == 'Bearer synthetic-token'
+            assert self.path == '/artifacts/' + handle
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *_):
+            pass
+
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    (runtime / 'bridge.json').write_text(json.dumps({
+        'host': '127.0.0.1', 'port': server.server_port, 'token': 'synthetic-token'}))
+    config = {'mcpServers': {'onshape_native': {'env': {'ONSHAPE_NATIVE_RUNTIME': str(runtime)}}}}
+    env = session_environment(root, root / 'build/agent/synthetic', config)
+    sandbox = ['codex', 'sandbox', '--permission-profile', 'r3_session', '-C', str(root), '-c',
+               'permissions.r3_session=' + _toml(codex_permission_profile(root, config)), '--']
+    try:
+        denied = subprocess.run([*sandbox, '/bin/cat', str(cached_file)], cwd=root, env=env,
+                                capture_output=True, text=True, timeout=30)
+        assert denied.returncode != 0 and not denied.stdout
+        script = 'from r3_onshape.native import NativeCadTransport; print(NativeCadTransport().artifact(' + repr(handle) + ')["fixture"])'
+        result = subprocess.run([*sandbox, sys.executable, '-c', script], cwd=root, env=env,
+                                capture_output=True, text=True, timeout=30)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == 'unrelated cached response'
+        assert calls == ['/artifacts/' + handle]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
