@@ -47,6 +47,23 @@ def test_providers_detected_on_path(env):
     assert providers["codex"]["available"] and providers["codex"]["path"].endswith("/bin/codex")
 
 
+def test_native_mcp_failure_evidence_is_project_local_and_keeps_launcher(env, monkeypatch):
+    client, root, _ = env
+    original = {"command": "synthetic-native-runtime", "args": ["synthetic-server", "literal-argument"],
+                "env": {"ONSHAPE_NATIVE_RUNTIME": str(root / "native-runtime")}}
+    monkeypatch.setattr(agent_runner, "native_mcp_config", lambda: original.copy())
+    started = client.post(f"/api/projects/{PID}/agent", json={"prompt": "synthetic instruction", "provider": "codex"})
+    assert started.status_code == 202
+    sid = started.json()["session_id"]
+    sse(client, started.json()["events_url"])
+    directory = root / "build/agent" / sid
+    native = json.loads((directory / ".mcp.json").read_text())["mcpServers"]["onshape_native"]
+    assert native["args"][0].endswith("r3_orchestrator/mcp_process.py")
+    assert native["args"][1:3] == ["--directory", str(directory / "mcp/onshape_native")]
+    assert native["args"][3:] == ["--", original["command"], *original["args"]]
+    assert native["env"] == original["env"]
+
+
 def test_claude_session_streams_transcript_runs_and_spec_diff(env):
     client, root, log = env
     started = client.post(f"/api/projects/{PID}/agent", json={"prompt": "make the battery lead shorter", "provider": "claude",

@@ -33,6 +33,12 @@ Never search shared `/tmp`, `/private/tmp`, unrelated checkouts, other robots or
 The Codex shell enforces project/platform read scope, with the runtime and authentication
 access normal tools need. Its caches are project-local. Use `"$R3_PYTHON"` for Python
 helpers; a login shell's `python3` can select a different interpreter.
+If the native MCP connection reports `Transport closed`, inspect this session's
+`build/agent/<session>/mcp/onshape_native/process.json` and `stderr.log` for its
+exit and bounded error evidence. The companion is a separate process; use R3's
+native bridge client to inspect its health and supported HTTP operations. A lost
+MCP connection alone does not prove that the extension disconnected. Never replay
+a mutation with an unknown outcome; inspect the native state first.
 Run native pipeline stages, scenarios and project tests with the R3 MCP tools;
 they execute in the worker's probed environment. On macOS, the Codex shell sandbox
 can deny CoreGraphics access even when native offscreen MuJoCo rendering works in

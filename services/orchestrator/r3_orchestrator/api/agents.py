@@ -634,6 +634,13 @@ class AgentManager:
         session.directory = Path(root) / "build" / "agent" / session.id
         session.directory.mkdir(parents=True, exist_ok=True)
         config = mcp_config(Path(root), self.python)
+        if native := config["mcpServers"].get("onshape_native"):
+            # The provider otherwise hides native MCP stderr/exit evidence
+            # behind a generic "Transport closed" result. Keep it per-session.
+            original = [native["command"], *native.get("args", [])]
+            native["command"] = self.python
+            native["args"] = [str(Path(__file__).parents[1] / "mcp_process.py"), "--directory",
+                              str(session.directory / "mcp" / "onshape_native"), "--", *original]
         config_path = session.directory / ".mcp.json"
         config_path.write_text(json.dumps(config, indent=2))
         if provider == "claude":
