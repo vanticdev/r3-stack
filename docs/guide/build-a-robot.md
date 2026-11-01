@@ -38,7 +38,13 @@ If the native MCP connection reports `Transport closed`, inspect this session's
 exit and bounded error evidence. The companion is a separate process; use R3's
 native bridge client to inspect its health and supported HTTP operations. A lost
 MCP connection alone does not prove that the extension disconnected. Never replay
-a mutation with an unknown outcome; inspect the native state first.
+a mutation with an unknown outcome; inspect the native state first. Bundled schema
+discovery also works through `r3_onshape_native(operation="api_catalog",
+arguments={"schema": "getDocument", "detail": "full"})`, or
+`NativeCadTransport().local("api_catalog", {...})` in the Python client.
+This uses the same bundled catalog with zero Onshape calls; browser-session
+operations remain available through `operation="api_request"` with their usual
+guards and export restrictions.
 Run native pipeline stages, scenarios and project tests with the R3 MCP tools;
 they execute in the worker's probed environment. On macOS, the Codex shell sandbox
 can deny CoreGraphics access even when native offscreen MuJoCo rendering works in

@@ -35,6 +35,14 @@ def test_part_exports_pin_version_and_exact_part(tmp_path):
     assert args.kwargs['query']['chordTolerance'] == 5e-5
 
 
+def test_bundled_catalog_discovery_survives_native_mcp_exit(tmp_path):
+    client = transport(tmp_path)
+    client._request = Mock(return_value=b'{"data":{"method":"GET"}}')
+    args = {'schema': 'getDocument', 'detail': 'full'}
+    assert client.local('api_catalog', args) == {'data': {'method': 'GET'}}
+    client._request.assert_called_once_with('POST', '/local/api_catalog', args, timeout=300)
+
+
 def test_step_uses_translation_result_document(tmp_path, monkeypatch):
     client = transport(tmp_path)
     client._request = Mock(side_effect=[json.dumps({'id': 'job', 'requestState': 'ACTIVE'}).encode(),

@@ -142,7 +142,7 @@ class NativeCadTransport:
         allowed = {"resolve_target", "search_commands", "browse_commands", "document_tree", "element_tree",
                    "document_history", "document_edit", "sidebar_edit", "display_state", "set_visibility",
                    "mate_animation", "view_control", "capture_viewport", "assembly_transform", "native_measure",
-                   "assembly_feature", "open_document", "editor_tab", "artifact_page"}
+                   "assembly_feature", "open_document", "editor_tab", "artifact_page", "api_catalog"}
         if tool not in allowed:
             raise PullError("cad_native_route_forbidden", f"Unsupported local operation {tool!r}")
         from .policy import check_request
