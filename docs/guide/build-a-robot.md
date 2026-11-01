@@ -593,6 +593,15 @@ iteration. Conclude with completed integrated work or a demonstrated external co
 that cannot be resolved under the research, assumption and proxy policies above.
 
 If acquisition or geometry validation fails, `r3 cad pull` retains the unchanged
+exports for inspection. Check a candidate's pinned files before building the
+complete assembly: use `r3_cad_export` for its STEP and glTF, then call
+`r3_onshape.step_geometry.part_from_step("source-check", exported_step_path)` and
+`r3_model.mesh_io.load_exported_mesh(exported_gltf_path)` from the platform Python
+environment or a project test run through `r3_run_project_tests`. These read-only
+geometry preflights raise on invalid source geometry. Complete the native assembly
+and run `r3 cad pull` and the pipeline for full qualification.
+
+Failed pulls retain the unchanged
 STL/STEP/glTF downloads under `build/cad/failed-pulls/<attempt>/`. `failure.json` records
 the pin, file hashes, error and diagnostic details. A glTF body failure reports
 finite-vertex, winding, watertight and positive-volume flags, plus counts of
