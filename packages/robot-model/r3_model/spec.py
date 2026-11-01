@@ -190,7 +190,8 @@ class ComponentInstance(_Model):
         return self
 
     mount: str = Field(default="world", description="Parent component id or 'world'.")
-    pose: Pose = Field(default_factory=Pose, description="Pose of the component frame in the robot frame.")
+    pose: Pose = Field(default_factory=Pose, description="Compatibility field for legacy consumers. Native CAD placement comes from the pinned "
+                      "Onshape pull; author placement in Onshape, not in this field.")
     params: dict[str, Any] = Field(default_factory=dict, description="Overrides of catalog parameters.")
     label: str = ""
 
@@ -590,11 +591,12 @@ class Fasteners(_Model):
 
 
 class Join(_Model):
-    """Two object interfaces mated like puzzle pieces (see :mod:`r3_model.assembly`).
+    """Interface and fastening requirements checked against native assembly evidence.
 
-    ``b``'s interface frame is placed on ``a``'s with opposing z axes, aligned x
-    axes, then rotated by ``clock`` about ``a``'s z and moved ``offset`` along
-    ``a``'s z (a positive offset leaves a gap)."""
+    Legacy analysis uses opposing z axes, aligned x axes, ``clock`` about
+    ``a``'s z and ``offset`` along it. These requirements do not author CAD or
+    place native occurrences; author their actual mates in Onshape and pull.
+    """
 
     a: str = Field(description="<object>.<interface> on the parent side.")
     rated_internal: RatedJointDemand | None = None
@@ -630,8 +632,11 @@ class AssemblyTolerance(_Model):
 
 
 class Assembly(_Model):
-    """Object/interface assembly: poses are derived from joins, never authored
-    (except the root's pose in the robot frame)."""
+    """Native assembly verification requirements, not a local placement program.
+
+    Solved part poses come from the pinned Onshape pull. Local joins describe
+    intended interfaces and fastening; author placement and mates in Onshape.
+    """
 
     root: str
     joins: list[Join] = Field(default_factory=list)
