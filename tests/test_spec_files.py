@@ -412,3 +412,24 @@ def test_layout_preservation_never_discards_significant_scalar_whitespace(root):
     assert second["ok"]
     assert Project.load(root).spec.components["base"].label == "two spaces"
     assert "# keep this comment" in (root / "parts/base.yaml").read_text()
+
+
+@pytest.mark.parametrize("literal", [
+    "-1.3877787807814457e-17", "1.2345678901234567e-101",
+    "1.200E+003", "0.0001200", "1_234.50", "-0.0",
+])
+def test_unrelated_patch_preserves_float_literal(literal):
+    from r3_model.spec_files import dump_yaml, roundtrip
+
+    text = f"label: Before\nvalues: [{literal}]  # native evidence\n"
+    loader, document = roundtrip(text)
+    document["label"] = "After"
+    assert dump_yaml(loader, document) == text.replace("Before", "After")
+
+
+def test_changed_float_does_not_reuse_original_literal():
+    from r3_model.spec_files import dump_yaml, roundtrip
+
+    loader, document = roundtrip("value: 1.200E+003\n")
+    document["value"] *= 2
+    assert float(yaml.safe_load(dump_yaml(loader, document))["value"]) == 2400

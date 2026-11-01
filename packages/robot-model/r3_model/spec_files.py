@@ -22,6 +22,9 @@ from typing import TYPE_CHECKING, Any, Iterator
 import yaml
 from pydantic import ValidationError
 from ruamel.yaml import YAML
+from ruamel.yaml.constructor import RoundTripConstructor
+from ruamel.yaml.representer import RoundTripRepresenter
+from ruamel.yaml.scalarfloat import ScalarFloat
 
 from .spec import RobotSpec
 
@@ -219,8 +222,35 @@ def spec_lock(root: str | Path, shared: bool = False) -> Iterator[None]:
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
+class _LiteralFloatConstructor(RoundTripConstructor):
+    def construct_yaml_float(self, node: Any) -> Any:
+        value = super().construct_yaml_float(node)
+        if isinstance(value, ScalarFloat):
+            value._r3_literal = (float(value), node.value)
+        return value
+
+
+class _LiteralFloatRepresenter(RoundTripRepresenter):
+    def represent_scalar_float(self, value: ScalarFloat) -> Any:
+        original = getattr(value, "_r3_literal", None)
+        if original is not None and float(value).hex() == original[0].hex():
+            # The default emitter can rewrite a long mantissa even when no
+            # edit touched it. Preserve native evidence byte-for-byte.
+            return self.represent_scalar("tag:yaml.org,2002:float", original[1],
+                                         anchor=value.yaml_anchor(any=True))
+        return super().represent_scalar_float(value)
+
+
+_LiteralFloatConstructor.add_constructor("tag:yaml.org,2002:float",
+                                        _LiteralFloatConstructor.construct_yaml_float)
+for _float_type in (ScalarFloat, *ScalarFloat.__subclasses__()):
+    _LiteralFloatRepresenter.add_representer(_float_type, _LiteralFloatRepresenter.represent_scalar_float)
+
+
 def roundtrip(text: str) -> tuple[YAML, Any]:
     loader = YAML()
+    loader.Constructor = _LiteralFloatConstructor
+    loader.Representer = _LiteralFloatRepresenter
     loader.preserve_quotes = True
     loader.width = 4096
     loader.indent(mapping=2, sequence=4, offset=2)
