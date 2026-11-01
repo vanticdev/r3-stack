@@ -568,7 +568,13 @@ def run(project: Project, render: bool = True) -> StageResult:
         result.add(Diagnostic.error(error.code, str(error)))
         return result
     stage = ConnectorStage(project, result)
-    stage.run(render)
+    try:
+        stage.run(render)
+    except PullError as error:
+        result.add(Diagnostic.error(error.code, str(error), data=error.details))
+        result.duration_s = time.time() - started
+        result.write(stage.out / "result.json")
+        return result
     result.assume("geometry", "Connector frame: origin at the centre of the contact array on the mating face, z toward "
                               "the mating half, x from pin 1; mated halves share origin and x with opposite z.")
     result.assume("geometry", "Model sources, transforms and provenance come from the catalog and build artifacts. "

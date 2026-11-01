@@ -73,8 +73,9 @@ def component_connector_frame(project: "Project", ref: str) -> Frame:
     """Robot-frame connector frame of ``<component>.<connector>``."""
     component, _, name = ref.partition(".")
     ctype = project.catalog.component(project.spec.components[component].type)
-    inst = ctype.connectors[name]
-    if ctype.kind == "cable" and inst.flexible_end:
+    graph = project.graph
+    inst = graph.connector_instance(ref)
+    if graph.native_parts is None and ctype.kind == "cable" and inst.flexible_end:
         partners = [m.b if m.a == ref else m.a for m in project.spec.electrical.direct_mates
                     if ref in (m.a, m.b)]
         if len(partners) == 1:
@@ -93,8 +94,9 @@ def mating_site_frame(project: "Project", ref: str, conn: "HarnessConnector") ->
     with the current component pose, so both contacts and conductors follow it.
     """
     assert conn.mates is not None
+    component_frame = component_connector_frame(project, conn.mates)
     if conn.at is None:
-        return component_connector_frame(project, conn.mates)
+        return component_frame
     site = project.graph.mating_sites.get(ref)
     if site is None:
         raise ValueError(f"{ref}: invalid partial mate (see graph diagnostics)")

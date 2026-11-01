@@ -161,7 +161,7 @@ def publish_wiring_pull(root: Path, nodes: dict[str, dict[str, Any]] | None = No
     installed fixture mating frames, including the inline pair. Publishing
     does not resolve nodes or place hardware through the production router.
     """
-    from pulled_fixture import write_pull
+    from pulled_fixture import write_pull, fixture_connector_frames
     from r3_model.project import Project
     from r3_model.spec import RobotSpec
 
@@ -196,4 +196,6 @@ def publish_wiring_pull(root: Path, nodes: dict[str, dict[str, Any]] | None = No
         "name": "Synthetic cable hardware", "mechanical": {"mass": .002, "size": ["16 mm", "8 mm", "12.5 mm"]}}]}))
     path.write_text(yaml.safe_dump(data, sort_keys=False))
     connectors, mates = _topology(spec, poses, owners)
+    for name, frames in fixture_connector_frames(project).items():
+        connectors[name].update(frames)
     write_pull(root, shapes, poses=poses, connectors=connectors, mates=mates, mass=.02)

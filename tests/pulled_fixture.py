@@ -12,6 +12,23 @@ if TYPE_CHECKING:
     from r3_model.project import Project
 
 
+def fixture_connector_frames(project: Project) -> dict[str, dict[str, np.ndarray]]:
+    """Explicit fake-native port input for fixtures using nominal catalog frames.
+
+    This seeds test snapshot data, never solid geometry or production fallback.
+    Resolver regressions provide contradictory native frames independently.
+    """
+    from r3_connectors.pins import instance_frame
+    frames = {}
+    for name, component in project.spec.components.items():
+        if component.type not in project.catalog.components:
+            continue
+        frames[name] = {"origin": np.eye(4),
+                        **{component.onshape.mate_connectors.get(port, port): instance_frame(inst).matrix()
+                           for port, inst in project.catalog.component(component.type).connectors.items()}}
+    return frames
+
+
 def write_pull(root: Path, shapes: dict[str, Any], *, poses=None, mates=None, connectors=None,
                mass: float | dict[str, float] = 0.02, material: str | dict[str, str] = "PLA") -> dict[str, Any]:
     import trimesh
@@ -92,7 +109,8 @@ def publish_project(project: Project, shapes: dict[str, Any], *, mass=0.02,
         poses[name] = np.eye(4)
         poses[name][:3, :3] = rpy_matrix(pose.rpy)
         poses[name][:3, 3] = pose.xyz
-    connectors = {name: {"origin": np.eye(4), **(connector_frames or {}).get(name, {})} for name in shapes}
+    ports = fixture_connector_frames(project)
+    connectors = {name: {"origin": np.eye(4), **ports.get(name, {}), **(connector_frames or {}).get(name, {})} for name in shapes}
     mates = []
     for name, kind, a, b, point, axis, limits in attachments:
         frame = np.eye(4)

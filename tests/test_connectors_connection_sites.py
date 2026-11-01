@@ -70,7 +70,8 @@ def publish_site_pull(project, *, obstacle=None, hardware=False, floating_frame=
         from connector_native_fixture import cable_coupons
         cable_coupons(project, shapes, poses, floating_frame=floating_frame)
     (project.root / "robot.yaml").write_text(yaml.safe_dump(project.spec.model_dump(mode="json", by_alias=True, exclude_none=True)))
-    model = pull(project.root, shapes, poses=poses)
+    from pulled_fixture import fixture_connector_frames
+    model = pull(project.root, shapes, poses=poses, connectors=fixture_connector_frames(project))
     apply_pulled(project, model)
 
 
@@ -307,6 +308,9 @@ def test_failed_direct_mate_reserves_neither_side(tmp_path, catalog):
     project.spec.components["socket"].type = ctype.id
     from r3_model.spec import DirectMate
     project.spec.electrical.direct_mates.append(DirectMate(a="socket.J", b="board.J"))
+    # This offline test adds a logical component and checks reservation only.
+    # Native placement/selection has dedicated pulled-frame regressions.
+    project._graph = RobotGraph(project.spec, project.catalog)
     assert [d.code for d in project.graph.diagnostics] == ["connection_site_blocked"]
     assert "socket.J" not in project.graph.occupied_sites
     assert project.graph.occupied_sites["board.J"] == {"dupont-1x3@8": "lead.B"}

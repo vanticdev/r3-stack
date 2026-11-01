@@ -155,8 +155,6 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
             parts[name].update(body_type="composite", gltf=f"parts/{filename}.gltf")
         poses[name] = _frame(np.asarray(row["transform"]).reshape(4, 4), f"pose {name}").tolist()
     mates = []
-    assembly_poses = {tuple(r["occurrence_path"]): np.asarray(r["transform"]).reshape(4, 4)
-                      for r in snapshot["rows"] if r.get("kind") == "occurrence" and r.get("transform") is not None}
     # Native definitions retain full nested paths. Reject unsupported relation
     # types rather than silently discarding a kinematic constraint.
     assemblies = [(definition["rootAssembly"], [])]
@@ -193,17 +191,25 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
                 if full not in by_path:
                     raise PullError("cad_pull_incomplete", f"Mate {mate_id}: unresolved occurrence {full}")
                 part = by_path[full]
-                # matedCS is solved in assembly coordinates; pull its exact frame
-                # into the part frame, rather than deriving it from catalog interfaces.
-                world = (assembly_poses[tuple(parent)] if parent else np.eye(4)) @ np.asarray(_cs(entity["matedCS"]))
-                local = np.linalg.inv(poses[part]) @ world
-                connector_id = entity.get("mateConnectorId") or f"{mate_id}:{side}"
+                # Both CS records are part-local. matedCS includes the native
+                # mate's offset/alignment; mateConnectorCS is the raw authored
+                # connector. Keep these distinct when one connector participates
+                # in several adjusted mates. Never infer an offset from poses.
+                local = np.asarray(_cs(entity["matedCS"]))
+                raw_id = entity.get("mateConnectorId")
+                if raw_id and entity.get("mateConnectorCS") is not None:
+                    raw = _cs(entity["mateConnectorCS"])
+                    previous = parts[part]["mate_connectors"].get(raw_id)
+                    if previous is not None and not np.allclose(previous, raw, atol=1e-7):
+                        raise PullError("cad_pull_connector_mismatch", f"{part}.{raw_id}: native connector records differ")
+                    parts[part]["mate_connectors"][raw_id] = raw
+                connector_id = f"{mate_id}:{side}"
                 previous = parts[part]["mate_connectors"].get(connector_id)
                 if previous is not None and not np.allclose(previous, local, atol=1e-7):
                     raise PullError("cad_pull_connector_mismatch", f"{part}.{connector_id}: native connector and mate frames differ")
                 parts[part]["mate_connectors"][connector_id] = local.tolist()
                 ends.append([part, connector_id])
-                world_frames.append(world)
+                world_frames.append(np.asarray(poses[part]) @ local)
             limits = data.get("mateLimits") or {}
             fields = ("limitZMin", "limitZMax") if kind == "slider" else ("limitAxialZMin", "limitAxialZMax")
             pair = [limits.get(key) for key in fields]

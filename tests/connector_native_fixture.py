@@ -58,9 +58,13 @@ def solder_board() -> Any:
     return shape
 
 
-def pull(root: Path, shapes: dict[str, Any], *, poses=None):
+def pull(root: Path, shapes: dict[str, Any], *, poses=None, connectors=None):
     from r3_model.pulled import load_pulled
-    write_pull(root, shapes, poses=poses)
+    from r3_model.project import Project
+    from pulled_fixture import fixture_connector_frames
+    if connectors is None and (root / "robot.yaml").is_file():
+        connectors = fixture_connector_frames(Project.load(root))
+    write_pull(root, shapes, poses=poses, connectors=connectors)
     return load_pulled(root)
 
 
@@ -123,5 +127,6 @@ def add_cables_to_pull(project: Any) -> None:
     (project.root / "robot.yaml").write_text(yaml.safe_dump(source, sort_keys=False))
     # This inventory fixture has no motion qualification; preserve all native
     # component positions and use the explicit cable mating frames above.
-    model = pull(project.root, shapes, poses=poses)
+    model = pull(project.root, shapes, poses=poses,
+                 connectors={name: part.mate_connectors for name, part in native.parts.items()})
     apply_pulled(project, model)

@@ -373,6 +373,18 @@ Each harness declares connectors, wires, optional splices and routing constraint
 name connector pins or declared splices. Choose catalog wire gauges and connector types
 with compatible current and termination ratings. Direct board-to-board mates are explicit.
 
+For every declared component connector, author its mating-plane connector in Onshape.
+Map its logical catalog name to that existing native key through `r3_patch_spec`, for
+example `components.fixture.onshape.mate_connectors: {socket: F_native_port}` on an
+unrelated fixture. Use the actual returned feature ID or pulled connector key, never
+a local frame matrix. When native data supplies the same logical name it remains the
+default; an explicit missing reference is an error. Repeated instances can select their
+own keys without changing shared catalog data. The pulled graph, connector checks,
+partial mating sites and wire endpoints use those native frames and solved poses.
+Catalog connector positions remain unqualified research metadata before a pull; they
+cannot replace an absent native frame in a pulled design. Missing mappings are reported
+with the available native keys. Changing CAD or references makes older evidence stale.
+
 Run `r3 validate --stage connectors,wiring,electrical`. Inspect pin maps, conductor exits,
 route witnesses, bend radii, dynamic clearances, supported spans, cut lengths, ampacity,
 voltage drop, fuse coordination, thermal results and runtime assumptions. The manufacturing
@@ -749,3 +761,10 @@ path.write_bytes(base64.b64decode(image.split(",")[-1], validate=True))
 non-callable project electrical factory fails with
 `project_device_configuration_invalid`; define it in the project's `simulation/`
 code and keep the native circuit engine and checks in place.
+
+Native assembly snapshots retain both raw connector frames (`mateConnectorCS`)
+and effective constraint frames (`matedCS`). Both are part-local; the latter
+already includes Onshape's evaluated mate alignment and offsets. R3 preserves
+the raw authored connector for port selection, and checks each mate using its
+separate effective frame transformed by the unchanged native occurrence pose.
+A failed closure is reported; R3 never solves or adjusts CAD placements locally.

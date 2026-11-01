@@ -143,5 +143,6 @@ def apply_pulled(project: Any, pulled: PulledModel | None = None):
             result.loops.append({"join": mate.id, **result.joins[mate.id]})
     project.spec.mechanical.joints = result.joints
     project._assembly = result
+    project._pulled = pulled
     project.__dict__.pop("_graph", None)
     return result

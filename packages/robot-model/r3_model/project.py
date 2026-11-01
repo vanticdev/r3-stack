@@ -75,8 +75,14 @@ class Project:
     def graph(self):  # -> RobotGraph
         if not hasattr(self, "_graph"):
             from .graph import RobotGraph
-
-            self._graph = RobotGraph(self.spec, self.catalog)
+            from .pulled import PullError
+            if not hasattr(self, "_pulled") and any(comp.pulled is not None for comp in self.spec.components.values()):
+                # Never turn invalid/deleted native evidence back into catalog
+                # geometry for a physical consumer.
+                if self.assembly is None or not hasattr(self, "_pulled"):
+                    raise PullError("cad_pull_missing", "Native connector frames require a validated CAD pull")
+            native = getattr(self, "_pulled", None)
+            self._graph = RobotGraph(self.spec, self.catalog, native=native)
         return self._graph
 
     def apply_sourcing(self) -> dict[str, str]:

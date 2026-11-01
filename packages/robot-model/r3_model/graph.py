@@ -25,7 +25,8 @@ from .diagnostics import Diagnostic
 from .spec import RobotSpec
 
 if TYPE_CHECKING:  # catalog depends on r3_model, not the other way around at import time
-    from r3_catalog.schema import Catalog, ConnectionSite
+    from r3_catalog.schema import Catalog, ConnectionSite, ConnectorInstance
+    from .pulled import PulledModel
 
 
 #: Internal-link kinds that carry a logic signal from ``a`` to ``b`` (signal continuity, like a wire).
@@ -87,9 +88,12 @@ class ConnectorEndpoint:
 
 
 class RobotGraph:
-    def __init__(self, spec: RobotSpec, catalog: "Catalog") -> None:
+    def __init__(self, spec: RobotSpec, catalog: "Catalog", *,
+                 native: "PulledModel | None" = None) -> None:
         self.spec = spec
         self.catalog = catalog
+        self.native_parts = native.parts if native is not None else None
+        self._native_poses = native.poses if native is not None else {}
         self.edges: list[Edge] = []
         self.diagnostics: list[Diagnostic] = []
         self.nodes: set[str] = set()
@@ -106,6 +110,9 @@ class RobotGraph:
         """World (robot-frame) position and rotation of a component frame.
         Poses are authored in the robot frame regardless of ``mount``; mount
         expresses the physical attachment, not a relative transform."""
+        if component_id in self._native_poses:
+            pose = self._native_poses[component_id]
+            return pose[:3, 3].copy(), pose[:3, :3].copy()
         pose = self.spec.components[component_id].pose
         return np.asarray(pose.xyz, dtype=float), rpy_matrix(pose.rpy)
 
@@ -147,11 +154,34 @@ class RobotGraph:
                 return hconn.type, {str(n): f"H:{owner}.{connector}.{n}" for n in range(1, count + 1)}
         return None
 
+    def connector_instance(self, ref: str) -> "ConnectorInstance":
+        """Project connector metadata onto its selected, unchanged native frame.
+
+        Without CAD this remains unqualified catalog research data. A validated
+        native model never falls back to that placement when a key is absent.
+        """
+        owner, _, name = ref.partition(".")
+        component = self.spec.components[owner]
+        inst = self.catalog.component(component.type).connectors[name]
+        if self.native_parts is None:
+            return inst
+        from .pulled import PullError
+        part = self.native_parts.get(owner)
+        selector = component.onshape.mate_connectors.get(name, name)
+        frames = part.mate_connectors if part is not None else {}
+        if selector not in frames:
+            raise PullError("cad_native_connector_missing",
+                f"{ref}: select an existing native mate connector with onshape.mate_connectors",
+                {"component": owner, "connector": name, "mate_connector": selector,
+                 "available_connectors": sorted(frames)})
+        frame = frames[selector]
+        return inst.model_copy(update={"position": frame[:3, 3].tolist(),
+                                      "direction": frame[:3, 2].tolist(), "x": frame[:3, 0].tolist()})
+
     def connection_sites(self, ref: str) -> list["ConnectionSite"]:
         """Lazily derive component-local options for this immutable graph build."""
         if ref not in self._site_options:
-            owner, _, name = ref.partition(".")
-            inst = self.catalog.component(self.spec.components[owner].type).connectors[name]
+            inst = self.connector_instance(ref)
             self._site_options[ref] = self.catalog.connection_sites(inst)
         return self._site_options[ref]
 
@@ -181,6 +211,17 @@ class RobotGraph:
                     "unknown_connector", f"{context}: connector {ref!r} does not exist", subjects=[ref]))
         if left is None or right is None:
             return
+        def geometry_known(ref: str) -> bool:
+            return self.native_parts is None or ref in self.endpoints
+
+        def options(ref: str) -> list["ConnectionSite"]:
+            if not geometry_known(ref):
+                # Contact numbering/type/occupancy is still useful offline.
+                # Its unqualified placement must never enter mating_sites.
+                owner, _, name = ref.partition(".")
+                inst = self.catalog.component(self.spec.components[owner].type).connectors[name]
+                return self.catalog.connection_sites(inst)
+            return self.connection_sites(ref)
         (ltype, lpins), (rtype, rpins) = left, right
         lt, rt = self.catalog.connector(ltype), self.catalog.connector(rtype)
         if at is not None:
@@ -191,31 +232,34 @@ class RobotGraph:
                 self.diagnostics.append(Diagnostic.error(
                     "connection_site_incompatible_type", "at requires a component header", subjects=[a, b]))
                 return
-            inst = self.catalog.component(self.spec.components[owner].type).connectors[name]
+            inst = (self.connector_instance(b) if geometry_known(b) else
+                    self.catalog.component(self.spec.components[owner].type).connectors[name])
             try:
-                site = select_site(self.catalog, inst, ltype, at, self.connection_sites(b))
+                site = select_site(self.catalog, inst, ltype, at, options(b))
             except SiteError as error:
                 self.diagnostics.append(Diagnostic.error(error.code, str(error), subjects=[a, b], data={"at": at}))
                 return
             if not self._occupy(b, site, a):
                 return
-            self.mating_sites[a] = site
+            if geometry_known(b):
+                self.mating_sites[a] = site
             rpins = {n: rpins[target] for n, target in site.pin_map.items() if target in rpins}
         elif rtype not in lt.mates_with:
-            compatible = b.partition(".")[0] in self.spec.components and ltype in self.connection_sites(b)[0].compatible_types
+            compatible = b.partition(".")[0] in self.spec.components and ltype in options(b)[0].compatible_types
             if not compatible:
                 self.diagnostics.append(Diagnostic.error(
                     "connector_mate_mismatch", f"{a} ({ltype}) cannot mate with {b} ({rtype})",
                     subjects=[a, b], data={"left_type": ltype, "right_type": rtype, "left_mates_with": lt.mates_with}))
                 return
         if at is None:
-            reservations = [(ref, self.connection_sites(ref)[0], occupant) for ref, occupant in ((a, b), (b, a))
+            reservations = [(ref, options(ref)[0], occupant) for ref, occupant in ((a, b), (b, a))
                             if ref.partition(".")[0] in self.spec.components]
             if not all(self._occupy(ref, site, occupant, apply=False) for ref, site, occupant in reservations):
                 return
             for ref, site, occupant in reservations:
                 self._occupy(ref, site, occupant)
-                self.mating_sites[occupant] = site
+                if geometry_known(ref):
+                    self.mating_sites[occupant] = site
         for number, node in lpins.items():
             if number in rpins:
                 self._edge(node, rpins[number], "mate", f"{a}|{b}", contact_resistance=lt.contact_resistance,
@@ -244,6 +288,12 @@ class RobotGraph:
                     if pin not in ctype.pins:
                         self.diagnostics.append(Diagnostic.error(
                             "catalog_pin_missing", f"{comp.type}.{name} maps to undefined pin {pin!r}", subjects=[cid]))
+                from .pulled import PullError
+                try:
+                    inst = self.connector_instance(f"{cid}.{name}")
+                except PullError as error:
+                    self.diagnostics.append(Diagnostic.error(error.code, str(error), subjects=[cid, f"{cid}.{name}"], data=error.details))
+                    continue
                 position, rotation = self.component_pose(cid)
                 self.endpoints[f"{cid}.{name}"] = ConnectorEndpoint(
                     f"{cid}.{name}", inst.type, position + rotation @ np.asarray(inst.position),

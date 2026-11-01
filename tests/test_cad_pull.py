@@ -151,7 +151,7 @@ def test_native_mates_are_pulled_not_recomputed(native_snapshot):
     cs = {'origin': [.1, 0, 0], 'xAxis': [1, 0, 0], 'zAxis': [0, 0, 1]}
     native_snapshot['definition']['rootAssembly']['features'] = [{'id': 'pivot', 'featureData': {'mateType': 'REVOLUTE',
         'mateLimits': {'limitAxialZMin': -.5, 'limitAxialZMax': .5},
-        'matedEntities': [{'matedOccurrence': ['instance'], 'matedCS': cs}, {'matedOccurrence': ['other'], 'matedCS': cs}]}}]
+        'matedEntities': [{'matedOccurrence': ['instance'], 'matedCS': cs}, {'matedOccurrence': ['other'], 'matedCS': {**cs, 'origin': [0, 0, 0]}}]}}]
     manifest = describe(native_snapshot, target('https://cad.onshape.com/documents/doc/v/version/e/assembly'), {})
     assert manifest['mates'][0]['limits'] == [-.5, .5]
     assert manifest['parts']['body']['mate_connectors']['pivot:a'][0][3] == .1

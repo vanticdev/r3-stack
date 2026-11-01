@@ -125,6 +125,15 @@ class OnshapeSelection(_Model):
 
     occurrence_path: list[str] | None = None
     configuration: str = ""
+    mate_connectors: dict[str, str] = Field(default_factory=dict, description=
+        "Catalog connector name to an existing native mate-connector key (usually featureId). References only, never local frames.")
+
+    @field_validator("mate_connectors")
+    @classmethod
+    def _connector_references(cls, value: dict[str, str]) -> dict[str, str]:
+        if any(not key.strip() or not target.strip() for key, target in value.items()):
+            raise ValueError("Native mate-connector references need nonempty names and keys")
+        return value
 
 
 class PulledOnshapeReference(_Model):

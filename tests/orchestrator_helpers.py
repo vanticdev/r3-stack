@@ -59,7 +59,8 @@ def write_bench_pull(root: Path) -> None:
     import numpy as np
     from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox
     from OCP.gp import gp_Pnt
-    from pulled_fixture import write_pull
+    from pulled_fixture import write_pull, fixture_connector_frames
+    from r3_model.project import Project
     from r3_model.graph import rpy_matrix
     from r3_model.spec_files import load_spec_files
 
@@ -74,7 +75,8 @@ def write_bench_pull(root: Path) -> None:
         frame[:3, :3] = rpy_matrix(component.pose.rpy)
         frame[:3, 3] = component.pose.xyz
         poses[name] = frame
-    write_pull(root, shapes, poses=poses, mass=0.1)
+    write_pull(root, shapes, poses=poses, mass=0.1,
+               connectors=fixture_connector_frames(Project(root, spec)))
 
 
 def catalog_entry(type_id: str) -> dict[str, Any]:
