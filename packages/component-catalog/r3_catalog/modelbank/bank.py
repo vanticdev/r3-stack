@@ -14,6 +14,7 @@ from typing import Any
 
 import yaml
 
+from ..errors import ModelSelectionRequired
 from .schema import ModelEntry
 
 DATA = Path(__file__).parent / 'data'
@@ -155,5 +156,5 @@ class ModelBank:
             return self.get(bank_id)
         matches = [e for e in self.entries(copy=False) if component.id in [e.catalog_component, *e.catalog_aliases]]
         if len(matches) > 1:
-            raise ValueError(f'ambiguous bank models for {component.id}; set model.params.bank_id')
+            raise ModelSelectionRequired(component, [entry.id for entry in matches])
         return matches[0].model_copy(deep=True) if matches else None

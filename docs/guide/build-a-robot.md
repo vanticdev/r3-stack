@@ -773,3 +773,16 @@ Native source identity includes the document, element, part ID, configuration
 and immutable source revision. Different revisions of one part keep their own
 connector and material records. Missing or ambiguous revision matches fail
 before export; R3 never substitutes another revision's metadata.
+
+If catalog loading reports `catalog_model_selection_required`, inspect its
+`candidate_ids` with `r3_models_get` and choose the qualified source yourself.
+Use the returned component metadata to set `model.params.bank_id` through
+`r3_put_catalog_component`. The error does not choose a model or qualify it;
+stages remain failed until the ambiguity is resolved. No CAD is changed by
+this metadata selection.
+
+Catalog updates preserve the existing project file that owns an entry, including
+other entries and family metadata. If `catalog_entry_ambiguous` lists multiple
+project owners, resolve the duplicate definitions before updating; the tool
+refuses to choose or rewrite an arbitrary owner. Catalog owner lookup and writes
+remain confined to the project.

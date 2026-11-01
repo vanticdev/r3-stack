@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 from fastapi.concurrency import run_in_threadpool
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from r3_catalog.errors import ModelSelectionRequired
 from r3_model.spec_files import SpecError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -298,6 +299,11 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
     @app.exception_handler(ApiError)
     async def _api_error(_: Request, error: ApiError) -> JSONResponse:
         return JSONResponse(error.body(), status_code=error.status)
+
+    @app.exception_handler(ModelSelectionRequired)
+    async def _model_selection(_: Request, error: ModelSelectionRequired) -> JSONResponse:
+        return JSONResponse({"code": error.code, "message": str(error),
+                             "data": {**error.details, "hint": error.hint}}, status_code=422)
 
     @app.exception_handler(RequestValidationError)
     async def _request_invalid(_: Request, error: RequestValidationError) -> JSONResponse:

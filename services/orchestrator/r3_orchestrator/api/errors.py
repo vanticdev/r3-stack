@@ -36,6 +36,7 @@ STATUS_BY_CODE: dict[str, int] = {
     "patch_invalid": 422,
     "request_invalid": 422,
     "usage_error": 422,
+    "catalog_model_selection_required": 422,
     "create_failed": 422,
     "project_invalid": 422,
     "confirmation_required": 428,

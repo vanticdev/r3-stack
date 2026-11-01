@@ -59,6 +59,21 @@ def put_entry(root: Path, kind: str, entry: dict[str, Any], dry_run: bool = Fals
     if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*", str(key)):
         return {"ok": False, "code": "catalog_entry_invalid", "errors": [f"invalid {identity}: {key!r}"]}
     path = root / "catalog" / (f"components/{key}.yaml" if kind == "component" else f"{collection}.yaml")
+    # A project may keep several components in a named family file. Update
+    # the existing owner instead of adding a shadow definition in a new file.
+    owners = []
+    for candidate in _paths(root, collection):
+        if root.resolve() not in candidate.resolve().parents:
+            return {"ok": False, "code": "catalog_entry_invalid", "errors": ["catalog path escapes this project"]}
+        if candidate.exists() and any(str(item.get(identity)) == str(key)
+                for item in (yaml.safe_load(candidate.read_text()) or {}).get(collection, [])):
+            owners.append(candidate)
+    if len(owners) > 1:
+        return {"ok": False, "code": "catalog_entry_ambiguous",
+                "errors": [f"{identity} {key!r} is defined in multiple project catalog files"],
+                "paths": [str(owner.relative_to(root)) for owner in owners]}
+    if owners:
+        path = owners[0]
     if root.resolve() not in path.resolve().parents:
         return {"ok": False, "code": "catalog_entry_invalid", "errors": ["catalog path escapes this project"]}
     payload = {"ok": True, "path": str(path.relative_to(root)), "id": str(key), "kind": kind,

@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+from r3_catalog.errors import ModelSelectionRequired
 from r3_model.diagnostics import Diagnostic, Severity, StageResult
 from r3_model.project import Project
 
@@ -116,6 +117,11 @@ def _execute(stage: StageSpec, project: Project, options: dict[str, Any]) -> Sta
     try:
         result = _call(module.run, project, options)
         return result if isinstance(result, StageResult) else StageResult.model_validate(result)
+    except ModelSelectionRequired as error:
+        result = StageResult(stage=stage.name, inputs=project.fingerprint())
+        result.add(Diagnostic.error(error.code, str(error), subjects=[error.details["component_id"]],
+                                    data=error.details, hint=error.hint))
+        return result
     except Exception as error:  # a crashing stage must not take down the pipeline
         result = StageResult(stage=stage.name, inputs=project.fingerprint())
         result.add(Diagnostic.error(

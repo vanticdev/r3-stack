@@ -29,6 +29,7 @@ from mcp.types import ToolAnnotations, CallToolResult, ImageContent, TextContent
 from . import api, spec_ops
 from .cli import configure_headless
 from r3_catalog.modelbank.schema import Category
+from r3_catalog.errors import ModelSelectionRequired
 from r3_model.spec_files import SpecError
 
 INSTRUCTIONS = """R3 robot project tools. robot.yaml is the single source of truth.
@@ -76,6 +77,8 @@ def _guard(call: Any) -> dict[str, Any]:
     """Turn expected failures into structured results instead of protocol errors."""
     try:
         return call()
+    except ModelSelectionRequired as error:
+        return error.payload()
     except SpecError as error:
         return error.payload()
     except api.ProjectNotFound as error:
