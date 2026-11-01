@@ -174,10 +174,10 @@ def session_instructions() -> str:
                        "helpers that read them in this session; the operator must update this context when a reset is known. ")
         instruction += (
             f"\nKnown transport backoff: {method} {resource} {restriction}"
-            "This is not an account-wide outage: continue using other working REST operations and native exports. "
-            "Use direct standard-feature REST authoring when supported, preserving fresh revision guards and checking "
+            "Honor every listed hold; continue known working operations outside their scopes. "
+            "For unthrottled standard-feature authoring, preserve fresh revision guards and check "
             "returned feature status, geometry and mates. Never bypass a concurrency or validation check. "
-            "If an operation truly depends on the throttled read, do independent work or wait in this session."
+            "If an operation truly depends on a held operation, do independent work or wait in this session."
         )
     visibility = os.environ.get("R3_ONSHAPE_DOCUMENT_VISIBILITY", "")
     if not visibility:

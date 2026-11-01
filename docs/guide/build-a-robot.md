@@ -576,7 +576,8 @@ solely because a finite wait is needed. Stop if the user cancels.
 
 A rate limit applies to the observed operation; do not infer an account-wide
 outage. Avoid helpers that internally repeat that operation, and continue with
-other working REST operations and native exports. Direct standard-feature REST
+known working operations outside every listed hold, including native exports only
+when they are unthrottled. Direct standard-feature REST
 calls are supported; preserve fresh revision guards and inspect returned feature
 status and actual geometry. Do not bypass checks to avoid an inspection failure.
 Operators may supply known transport backoffs as a JSON list in
