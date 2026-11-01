@@ -305,6 +305,10 @@ def test_declared_but_unassembled_components_fail_before_export(project, native_
     result = pull(project, transport=NoExport())
     assert not result['ok'] and result['code'] == 'cad_pull_missing'
     assert result['missing_components'] == ['pending']
+    assert result['matched_components'] == ['body']
+    assert result['phase'] == 'assembly_selection'
+    assert result['geometry_downloaded'] is False
+    assert 'No geometry downloads were attempted' in result['hint']
 
 
 def test_failed_download_keeps_raw_evidence_without_replacing_active_pull(project, geometry, native_snapshot):

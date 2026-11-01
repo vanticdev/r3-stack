@@ -300,7 +300,13 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
     missing = set(project.spec.components) - set(manifest["parts"])
     if missing:
         raise PullError("cad_pull_missing", "Described components missing from CAD pull: " + ", ".join(sorted(missing)),
-                        {"missing_components": sorted(missing)})
+                        {"missing_components": sorted(missing),
+                         "phase": "assembly_selection", "geometry_downloaded": False,
+                         "matched_components": sorted(manifest["parts"]),
+                         "hint": "The pinned native assembly is incomplete or its occurrence selectors do not match. "
+                                 "Insert and mate the missing components in Onshape, verify selectors against actual occurrences, "
+                                 "then create a new version and pull again. No geometry downloads were attempted. "
+                                 "Keep the declared design requirements; inspection exports are not a verified pull."})
     for name, part in manifest["parts"].items():
         component = project.spec.components.get(name)
         selection = getattr(component, "onshape", None)

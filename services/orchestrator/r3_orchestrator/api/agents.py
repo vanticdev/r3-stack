@@ -83,6 +83,9 @@ CAD changes must happen only in a real Onshape document, using standard editable
 No FeatureScript, locally fabricated CAD, hand-written external tool formats, or unqualified purchased-part substitutes.
 Use onshape_native directly: discover REST feature schemas/templates, model parts with standard feature API calls, add mate connectors,
 import vendor STEP, create documents in the designated folder and build real assemblies with real mates.
+For file imports, encodedFilename identifies the input suffix; formatName=ONSHAPE requests a translated
+native model. formatName=STEP requests STEP output, not native authoring geometry. Check translation DONE,
+result element types and actual parts; a BLOB or empty Part Studio is not a successful model import.
 Use the authenticated browser-session bridge for Onshape; never API keys or an expired saved session.
 Document creation, versions and deletion use onshape_native api_write/api_request through /api.
 Other bridge /api operations may be used when they work. On rejection, inspect and use a native tool;
@@ -98,6 +101,8 @@ and datasheet in components.<id>.params.cad_proxy; keep catalog model provenance
 Pull it normally; never generate proxy CAD locally. Estimated items do not stop engineering work:
 carry on, retain them visibly in release status until measured or replaced, and list them at the end.
 Verify geometry, regeneration and mates numerically and inspect shaded views before r3_cad_pull.
+An assembly_selection pull failure happens before geometry downloads: complete native occurrences and
+selectors, pin a new version and retry. A source import or export inspection is not an assembled pull.
 Qualify source solids, material density and pinned STEP/mesh exports before repeating them in an assembly.
 Use r3_cad_export format=step or gltf to inspect a source. Native export jobs persist under build/cad/native-exports;
 repeat the same R3 operation to resume a pending/interrupted job, never submit a duplicate after a timeout.

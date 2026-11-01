@@ -639,6 +639,35 @@ missing import filename/suffix from the local file, but you must still check the
 returned translation and element type: `DONE` with a BLOB is not a translated
 solid Part Studio. Inspect its parts before qualifying the import.
 
+For an import into editable native CAD, use `formatName: ONSHAPE`,
+`storeInDocument: true` and `translate: true` through the plugin's discovered
+upload/import operation. `encodedFilename` describes the input file;
+`formatName` selects the **output**, so `formatName: STEP` does not request an
+editable Onshape model. Record the returned translation ID, inspect that job
+until it completes, then inspect its `resultElementIds`, element types, actual
+parts and shaded views. Do not repeat an upload whose outcome is unknown.
+An empty parts list or missing expected bodies needs investigation of the source,
+import options or another real model; a `DONE` translation alone proves none of
+those geometry checks. Preserve the original downloaded file and provenance.
+
+### Distinguish assembly preparation from pull failures
+
+`cad_pull_missing` with `phase: assembly_selection` means the pinned assembly
+does not contain every described component, or occurrence selectors do not match.
+`matched_components` and `missing_components` identify the difference. This check
+runs **before any geometry download**. Complete and mate the occurrences in Onshape,
+verify their selectors, create a new version and pull again. Do not remove required
+components to get past this check. Imported Part Studio tabs are not automatically
+assembly instances; a populated document can still contain an empty assembly.
+
+`r3_cad_export` succeeding proves an individual source can be downloaded, not that
+the robot has been assembled or pulled. Only a successful `r3_cad_pull` installs
+`cad/pulled/`; until then the viewer and twin have no verified model. For a later
+download or geometry failure, use the returned native job/error and retained
+failed-pull artifacts to investigate that operation. Keep unrelated engineering
+moving while investigating one source. Separate an unfinished task from a
+demonstrated external constraint in checkpoint reports.
+
 Public discovery preserves usable candidates when another candidate fails.
 Read `complete` and `warnings` as well as `models`; an empty incomplete result is
 not evidence that no model exists. Rate-limited candidate reads stop without a
