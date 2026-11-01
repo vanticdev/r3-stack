@@ -281,8 +281,11 @@ def pull(project: Any, url: str = "", version_id: str = "", transport: Any = Non
 
 def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, Any]:
     cad = project.spec.cad.model_dump()
+    # An explicit target must not inherit a pin from another project default.
+    # target() still rejects explicitly conflicting URL/version arguments.
+    default_version = (cad.get("version_id") or "") if not url else ""
     url = url or cad.get("source", "") or cad.get("url", "")
-    pin = target(url, version_id or cad.get("version_id") or "")
+    pin = target(url, version_id or default_version)
     if transport is None:
         from .translation import project_export_cache
         transport = NativeCadTransport(export_jobs=project_export_cache(project.root))

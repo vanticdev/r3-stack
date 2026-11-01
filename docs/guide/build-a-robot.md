@@ -260,6 +260,13 @@ r3 cad pull --url https://cad.onshape.com/documents/D/w/W/e/A --version V
 r3 validate --stage assembly,model,cad,fabrication
 ```
 
+An explicit `/v/` URL selects its own immutable version; an explicit workspace
+URL requires `--version` (MCP: `version_id`). Stored `cad.source` and
+`cad.version_id` defaults are used when the URL argument is omitted. Explicit
+conflicting URL/version arguments remain errors. Pull records its actual pin in
+the immutable manifest and lock, without rewriting the authored source defaults;
+update those defaults through the spec tools when changing the default target.
+
 The MCP equivalent is `r3_cad_pull(url=..., version_id=...)`. `r3_run_stage("cad")`
 checks the current pulled copy; it never creates geometry or refreshes the native model.
 The pull downloads each exact part's STL in metres and STEP, reads native mate connectors,
@@ -672,6 +679,9 @@ Public discovery preserves usable candidates when another candidate fails.
 Read `complete` and `warnings` as well as `models`; an empty incomplete result is
 not evidence that no model exists. Rate-limited candidate reads stop without a
 retry and preserve the server deadline.
+Its limit applies to returned models, including when a matching document is a
+large library. Matching Part Studio names rank before unrelated tabs, using
+local metadata only. Relevance ranking does not qualify geometry or provenance.
 
 Cached native artifacts can be inspected in bulk without repeating API calls or
 paging thousands of individual faces. Use the public Python client in the R3

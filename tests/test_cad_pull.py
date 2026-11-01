@@ -199,6 +199,41 @@ def fake_transport(geometry, snapshot):
     return FakeTransport()
 
 
+def test_explicit_version_url_overrides_old_project_default(project, geometry, native_snapshot):
+    from r3_model.description import check_pulled
+    from r3_model.project import Project
+    from r3_onshape.pull import pull
+
+    spec_path = project.root / 'robot.yaml'
+    data = yaml.safe_load(spec_path.read_text())
+    data['cad']['version_id'] = 'previous-version'
+    spec_path.write_text(yaml.safe_dump(data))
+    project = Project.load(project.root)
+    result = pull(project, url='https://cad.onshape.com/documents/doc/v/version/e/assembly',
+                  transport=fake_transport(geometry, native_snapshot))
+    assert result['ok'], result
+    model = load_pulled(project.root)
+    assert model.version_id == 'version'
+    check_pulled(project.root, model)
+    # A command override does not rewrite the authored defaults.
+    assert Project.load(project.root).spec.cad.version_id == 'previous-version'
+
+
+@pytest.mark.parametrize('url,version,code', [
+    ('https://cad.onshape.com/documents/doc/v/version/e/assembly', 'different', 'cad_pull_target_invalid'),
+    ('https://cad.onshape.com/documents/doc/w/workspace/e/assembly', '', 'cad_pull_version_required'),
+])
+def test_explicit_targets_cannot_silently_inherit_or_conflict_with_pins(project, url, version, code):
+    from r3_onshape.pull import pull
+
+    class NoNetwork:
+        def assembly(self, url):
+            pytest.fail('Invalid target selection must fail before native reads')
+
+    result = pull(project, url=url, version_id=version, transport=NoNetwork())
+    assert not result['ok'] and result['code'] == code
+
+
 def test_complete_pull_refreshes_split_description_and_integrity(project, geometry, native_snapshot):
     from r3_model.description import check_pulled
     from r3_model.project import Project
