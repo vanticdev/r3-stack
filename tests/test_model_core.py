@@ -15,6 +15,13 @@ def test_units():
     assert to_si(3) == 3.0
 
 
+def test_millihenry_is_equivalent_to_microhenry_and_base_si():
+    assert to_si('1 mH') == pytest.approx(to_si('1000 uH'))
+    assert to_si('1 mH') == pytest.approx(to_si('0.001 H'))
+    with pytest.raises(ValueError, match='unknown unit'):
+        to_si('1 mh')
+
+
 def test_bench_graph_has_no_errors():
     project = Project.load(BENCH)
     assert project.graph.diagnostics == []

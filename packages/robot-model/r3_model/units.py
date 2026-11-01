@@ -23,7 +23,7 @@ _SCALE: dict[str, float] = {
     # electrical
     "V": 1.0, "mV": 1e-3, "A": 1.0, "mA": 1e-3, "uA": 1e-6,
     "ohm": 1.0, "mohm": 1e-3, "kohm": 1e3, "W": 1.0, "mW": 1e-3,
-    "Ah": 3600.0, "mAh": 3.6, "F": 1.0, "uF": 1e-6, "nF": 1e-9, "H": 1.0, "uH": 1e-6,
+    "Ah": 3600.0, "mAh": 3.6, "F": 1.0, "uF": 1e-6, "nF": 1e-9, "H": 1.0, "mH": 1e-3, "uH": 1e-6,
     # frequency
     "Hz": 1.0, "kHz": 1e3, "MHz": 1e6, "GHz": 1e9,
     # angle
