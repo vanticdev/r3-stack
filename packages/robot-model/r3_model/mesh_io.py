@@ -9,7 +9,7 @@ import trimesh
 class ExportMeshError(ValueError):
     """An unchanged exported body failed the mesh contract."""
 
-    def __init__(self, body: str, mesh: trimesh.Trimesh):
+    def __init__(self, body: str, mesh: trimesh.Trimesh) -> None:
         counts = np.bincount(mesh.edges_unique_inverse)
         self.details = {
             'body': str(body), 'face_count': int(len(mesh.faces)),
