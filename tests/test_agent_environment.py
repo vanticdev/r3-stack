@@ -159,3 +159,73 @@ def test_native_codex_accepts_generated_session_configuration(tmp_path):
     process = subprocess.run(["codex", "app-server", "--print-startup-config", *options], cwd=tmp_path,
                              capture_output=True, text=True, timeout=30)
     assert process.returncode == 0, process.stderr
+
+
+@pytest.mark.skipif(sys.platform != "darwin" or shutil.which("codex") is None,
+                    reason="native Codex instruction-loading regression requires macOS and the CLI")
+def test_native_codex_loads_instructions_with_the_session_profile(tmp_path):
+    """Configuration parsing alone misses the sandboxed self-helper startup."""
+    import json
+    import queue
+    import threading
+    import time
+    from r3_orchestrator.api import agents
+
+    root = tmp_path / "synthetic-project"
+    root.mkdir()
+    instructions = root / "AGENTS.md"
+    instructions.write_text("Unrelated synthetic instruction-loading fixture. No model task.\n")
+    config = {"mcpServers": {"r3": {"command": sys.executable, "args": [], "env": {}}}}
+    command = agents.codex_command(shutil.which("codex"), root, config)
+    options = [part for i, value in enumerate(command) if value == "-c"
+               and command[i + 1].startswith(("default_permissions=", "permissions.r3_session=", "approval_policy="))
+               for part in ("-c", command[i + 1])]
+    env = agents.session_environment(root, root / "build/agent/synthetic", {})
+    # No account MCP servers, auth files or persisted test conversations.
+    env["CODEX_HOME"] = str(root / "test-codex-home")
+    Path(env["CODEX_HOME"]).mkdir()
+    messages = queue.Queue()
+    with (root / "bootstrap.stderr").open("w+") as stderr:
+        process = subprocess.Popen([command[0], "app-server", *options], cwd=root, env=env,
+                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=stderr, text=True, bufsize=1)
+        def read():
+            for line in process.stdout:
+                try:
+                    messages.put(json.loads(line))
+                except ValueError:
+                    pass
+            messages.put({"ended": True})
+        threading.Thread(target=read, daemon=True).start()
+        def send(value):
+            process.stdin.write(json.dumps(value) + "\n")
+            process.stdin.flush()
+        def response(identifier):
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                value = messages.get(timeout=max(.01, deadline - time.monotonic()))
+                if value.get("id") == identifier:
+                    return value
+                if value.get("ended"):
+                    stderr.seek(0)
+                    pytest.fail("app-server exited: " + stderr.read()[-1000:])
+            pytest.fail("instruction bootstrap timed out")
+        try:
+            send({"method": "initialize", "id": 0, "params": {
+                "clientInfo": {"name": "r3_synthetic_probe", "version": "1"},
+                "capabilities": {"experimentalApi": True}}})
+            assert "error" not in response(0)
+            send({"method": "initialized", "params": {}})
+            send({"method": "thread/start", "id": 1, "params": {
+                "cwd": str(root), "permissions": "r3_session", "approvalPolicy": "never", "ephemeral": True}})
+            reply = response(1)
+            assert "error" not in reply, reply.get("error")
+            assert reply["result"]["thread"]["ephemeral"]
+            assert str(instructions) in reply["result"]["instructionSources"]
+            # Deliberately no turn/start: this tests startup, not a model answer.
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)

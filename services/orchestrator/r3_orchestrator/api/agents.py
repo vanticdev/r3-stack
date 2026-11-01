@@ -293,7 +293,8 @@ def _toml(value: Any) -> str:
     return json.dumps(value)
 
 
-def codex_permission_profile(project_root: Path, config: dict[str, Any] | None = None) -> dict[str, Any]:
+def codex_permission_profile(project_root: Path, config: dict[str, Any] | None = None, *,
+                             executable: str | None = None) -> dict[str, Any]:
     """Read the platform and runtime, not other projects or shared scratch trees.
 
     Keep the workspace profile's protections and the explicit project Git grant.
@@ -317,6 +318,10 @@ def codex_permission_profile(project_root: Path, config: dict[str, Any] | None =
             filesystem[str(path.resolve())] = "read"
     if brew := shutil.which("brew"):
         filesystem[str(Path(brew).parent.parent.resolve())] = "read"
+    # Codex re-executes itself to load instructions through the sandbox. Grant
+    # that resolved runtime file without opening account data.
+    if binary := (shutil.which(executable) if executable else shutil.which("codex")):
+        filesystem[str(Path(binary).resolve())] = "read"
     native = (config or {}).get("mcpServers", {}).get("onshape_native", {})
     runtime = native.get("env", {}).get("ONSHAPE_NATIVE_RUNTIME") or os.environ.get("ONSHAPE_NATIVE_RUNTIME")
     if runtime:
@@ -388,13 +393,17 @@ def codex_scope_overrides(project_root: Path, account_home: Path | None = None) 
 
 
 def codex_command(executable: str, project_root: Path, config: dict[str, Any], model: str | None = None) -> list[str]:
+    # The instruction loader re-executes this path inside the read sandbox.
+    # Resolve installation symlinks so it needs no account-directory traversal.
+    if located := shutil.which(executable):
+        executable = str(Path(located).resolve())
     allowed, gated = _tools()
     server = config["mcpServers"][MCP_SERVER]
     prefix = f"mcp_servers.{MCP_SERVER}"
     command = [executable, "exec", "--json", "--skip-git-repo-check", "--color", "never", "-C", str(project_root),
                "-c", 'approval_policy="never"',
                "-c", 'default_permissions="r3_session"',
-               "-c", f"permissions.r3_session={_toml(codex_permission_profile(project_root, config))}",
+               "-c", f"permissions.r3_session={_toml(codex_permission_profile(project_root, config, executable=executable))}",
                "-c", 'web_search="live"',
                "-c", f"developer_instructions={_toml(session_instructions())}",
                "-c", f"{prefix}.enabled=true",
