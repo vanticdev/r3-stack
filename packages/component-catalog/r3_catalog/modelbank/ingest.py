@@ -130,7 +130,7 @@ def _copy(path: Path, target: Path) -> Path:
 
 def ingest_onshape(query: str, transport: Any, limit: int = 10, *,
                    warnings: list[dict[str, Any]] | None = None) -> list[ModelEntry]:
-    """Search public documents only; only immutable versions become insertable models."""
+    """Return at most limit public, version-pinned models, ranked by Part Studio name."""
     if not query.strip() or not 1 <= limit <= 20:
         raise ValueError('Supply a public model query and limit between 1 and 20')
     response = transport.json('GET', '/documents', query={'q': query, 'filter': 4, 'limit': limit})
@@ -161,7 +161,17 @@ def ingest_onshape(query: str, transport: Any, limit: int = 10, *,
                                       sources=[Source(kind='onshape_public', url=f'https://cad.onshape.com/documents/{did}/v/{vid}/e/{eid}',
                                                       did=did, vid=vid, eid=eid)],
                                       searched_sources=[{'provider': 'onshape_public', 'query': query, 'date': timestamp()}]))
-    return entries
+    terms = re.findall(r'[^\W_]+', query.casefold())
+
+    def relevance(entry: ModelEntry) -> tuple[bool, int]:
+        # Document search can find a library with many unrelated tabs. Rank
+        # its element names before limiting models, without extra API reads.
+        name = entry.name.rsplit(' / ', 1)[-1]
+        words = re.findall(r'[^\W_]+', name.casefold())
+        exact = bool(terms) and ''.join(terms) == ''.join(words)
+        return exact, sum(term in words for term in terms)
+
+    return sorted(entries, key=relevance, reverse=True)[:limit]
 
 
 def public_onshape(query: str, limit: int = 10, *,

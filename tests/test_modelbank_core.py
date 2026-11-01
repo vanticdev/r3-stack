@@ -101,6 +101,26 @@ def test_onshape_search_requires_public_versions():
     assert models[0].sources[0].vid == 'v1'
 
 
+def test_public_discovery_limits_models_and_ranks_matching_tabs():
+    calls = []
+
+    class API:
+        def json(self, method, path, query=None):
+            calls.append(path)
+            if path == '/documents':
+                assert query['q'] == 'synthetic probe' and query['limit'] == 1
+                return {'items': [{'id': 'library', 'name': 'Public instrument library', 'isPublic': True}]}
+            if path.endswith('/versions'):
+                return [{'id': 'pin'}]
+            return [{'id': str(i), 'name': name, 'elementType': 'PARTSTUDIO'}
+                    for i, name in enumerate(['Housing', 'Lid', 'Synthetic-Probe', 'Probe fixture'])]
+
+    models = ingest_onshape('synthetic probe', API(), limit=1)
+    assert [model.name for model in models] == ['Public instrument library / Synthetic-Probe']
+    assert models[0].sources[0].vid == 'pin'
+    assert calls == ['/documents', '/documents/d/library/versions', '/documents/d/library/v/pin/elements']
+
+
 def test_direct_official_resource_is_ingestable_without_scraping():
     models = ingest_page('pololu', 'https://www.pololu.com/file/0J1733/d36v50fx-step-down-voltage-regulator.step', name='Regulator', pin=False)
     assert len(models) == 1 and models[0].sources[0].format == 'step'
