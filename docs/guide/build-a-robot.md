@@ -593,8 +593,12 @@ iteration. Conclude with completed integrated work or a demonstrated external co
 that cannot be resolved under the research, assumption and proxy policies above.
 
 If acquisition or geometry validation fails, `r3 cad pull` retains the unchanged
-STL/STEP downloads under `build/cad/failed-pulls/<attempt>/`. `failure.json` records
-the pin, file hashes and error. Inspect these files to diagnose the failure; they
+STL/STEP/glTF downloads under `build/cad/failed-pulls/<attempt>/`. `failure.json` records
+the pin, file hashes, error and diagnostic details. A glTF body failure reports
+finite-vertex, winding, watertight and positive-volume flags, plus counts of
+boundary edges and edges shared by more than two faces. The pull response's
+`component` and `mesh` fields identify the failed body and these topology results.
+Inspect these files to diagnose the failure; they
 are not a valid pull and cannot replace `cad/pulled/`. Repair CAD in Onshape and
 pull again. Mesh decoding joins only exactly identical coordinates, without
 rounding nearby vertices, filling holes or removing failing geometry.

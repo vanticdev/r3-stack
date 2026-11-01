@@ -261,7 +261,8 @@ def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_
         try:
             mesh = load_exported_mesh(directory / part.get("gltf", part["stl"]))
         except ValueError as error:
-            raise PullError("cad_pull_geometry_invalid", f"{name}: {error}") from error
+            raise PullError("cad_pull_geometry_invalid", f"{name}: {error}",
+                            {"component": name, "mesh": getattr(error, "details", {})}) from error
         if not len(mesh.faces) or not mesh.is_watertight or not np.isfinite(mesh.vertices).all() or mesh.volume <= 0:
             raise PullError("cad_pull_geometry_invalid", f"{name}: exported mesh is not a finite, closed positive-volume solid")
         # STEP remains the exact-geometry check. Its uniform-density integral
@@ -345,7 +346,8 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
                      for p in staging.rglob("*") if p.is_file()]
             (staging / "failure.json").write_text(json.dumps({
                 "validated": False, "source": pin, "files": files,
-                "error": {"code": getattr(error, "code", "cad_pull_failed"), "message": str(error)},
+                "error": {"code": getattr(error, "code", "cad_pull_failed"), "message": str(error),
+                          "details": getattr(error, "details", {})},
                 "note": "Diagnostic exports only; not an active CAD pull."}, indent=2) + "\n")
             staging.rename(failed)
             raise PullError(getattr(error, "code", "cad_pull_failed"),

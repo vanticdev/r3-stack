@@ -6,6 +6,24 @@ import numpy as np
 import trimesh
 
 
+class ExportMeshError(ValueError):
+    """An unchanged exported body failed the mesh contract."""
+
+    def __init__(self, body: str, mesh: trimesh.Trimesh):
+        counts = np.bincount(mesh.edges_unique_inverse)
+        self.details = {
+            'body': str(body), 'face_count': int(len(mesh.faces)),
+            'finite_vertices': bool(np.isfinite(mesh.vertices).all()),
+            'watertight': bool(mesh.is_watertight),
+            'winding_consistent': bool(mesh.is_winding_consistent),
+            'positive_volume': bool(mesh.volume > 0),
+            'boundary_edges': int((counts == 1).sum()),
+            'non_manifold_edges': int((counts > 2).sum()),
+        }
+        reasons = ', '.join(f'{key}={value}' for key, value in self.details.items() if key != 'body')
+        super().__init__(f'Exported glTF body {body!r} is not a finite, closed positive-volume solid; {reasons}')
+
+
 def load_exported_stl(path: str | Path) -> trimesh.Trimesh:
     """Join only identical STL vertices; leave every coordinate and facet intact.
 
@@ -56,7 +74,7 @@ def load_exported_mesh(path: str | Path) -> trimesh.Trimesh:
                                 faces=inverse[body.faces], process=False)
         if (not len(piece.faces) or not np.isfinite(piece.vertices).all()
                 or not piece.is_watertight or not piece.is_winding_consistent or piece.volume <= 0):
-            raise ValueError(f'Exported glTF body {node!r} is not a finite, closed positive-volume solid')
+            raise ExportMeshError(node, piece)
         pieces.append(piece)
     if not pieces or represented != set(scene.geometry):
         raise ValueError('Exported glTF contains missing or unreferenced body geometry')
