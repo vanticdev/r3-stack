@@ -7,6 +7,7 @@ Writes are submitted exactly once. Unknown outcomes require inspection.
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 import math
@@ -70,7 +71,8 @@ class NativeCadTransport:
 
     def _request(self, method: str, path: str, body: Any = None, query: dict | None = None,
                  timeout: float = 120) -> bytes:
-        if not (path.startswith("/native/api/v17/") or re.match(r"^/api/v[0-9]+/", path) or path.startswith("/local/") or path == "/command"):
+        cached_artifact = method == "GET" and re.fullmatch(r"/artifacts/[a-f0-9]{64}\.json", path)
+        if not (cached_artifact or path.startswith("/native/api/v17/") or re.match(r"^/api/v[0-9]+/", path) or path.startswith("/local/") or path == "/command"):
             raise PullError("cad_native_route_forbidden", "Only loopback browser API, native exports, local and editor routes are supported")
         if ".." in path or "?" in path or "#" in path:
             raise PullError("cad_native_route_forbidden", "Invalid native route")
@@ -164,13 +166,19 @@ class NativeCadTransport:
             raise PullError("cad_native_request_failed", str(result["error"]))
         return result
 
-    def artifact(self, handle: str) -> dict[str, Any]:
+    def artifact(self, handle: str) -> Any:
+        """Read a complete cached response through the authenticated companion.
+
+        An exact content-addressed handle grants no directory listing or access
+        to the companion filesystem. This makes bulk inspection available from
+        independent project sessions without repeating an Onshape request.
+        """
         if not re.fullmatch(r"[a-f0-9]{64}\.json", handle):
             raise PullError("cad_native_invalid", "Invalid native snapshot handle")
-        path = self.runtime / "artifacts" / handle
-        if not path.is_file():
-            raise PullError("cad_native_invalid", "Native snapshot is unavailable on this worker")
-        return json.loads(path.read_text())
+        raw = self._request("GET", "/artifacts/" + handle)
+        if hashlib.sha256(raw).hexdigest() != handle[:-5]:
+            raise PullError("cad_native_invalid", "Native snapshot checksum mismatch")
+        return json.loads(raw)
 
     def assembly(self, url: str) -> dict[str, Any]:
         from .rest_snapshot import assembly

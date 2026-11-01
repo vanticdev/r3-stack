@@ -705,7 +705,11 @@ large library. Matching Part Studio names rank before unrelated tabs, using
 local metadata only. Relevance ranking does not qualify geometry or provenance.
 
 Cached native artifacts can be inspected in bulk without repeating API calls or
-paging thousands of individual faces. Use the public Python client in the R3
+paging thousands of individual faces. The client retrieves only the exact returned
+content-addressed handle through the authenticated companion and checks its SHA-256.
+It needs no read access to the companion cache directory, and exposes no cache listing.
+The companion must advertise `artifact_download_v1` in its authenticated `/health`;
+update/restart it if that route is unavailable. Use the public Python client in the R3
 worker environment (no token handling or source-code discovery is needed):
 
 ```python
