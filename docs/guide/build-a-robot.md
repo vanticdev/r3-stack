@@ -332,9 +332,23 @@ voltage limits, protection and regulator margins. Model the actual board behavio
 maps in the catalog. Do not infer electrical connections from component proximity.
 
 Model each nonintegral cable half and splice as an explicit native part named `<harness>.<node>`.
-Add a mate connector named `mating` (or `origin`) at its electrical mating plane; for a splice it
-marks the sleeve centre and wire axis. Pull their real assembled poses. Routing keeps those
-physical parts fixed and optimizes only the conductors between them.
+Add a native mate connector at its electrical mating plane; for a splice it marks the
+sleeve centre and wire axis. Onshape REST commonly returns only its generated `featureId`
+and coordinate system, even when its feature has a human name. Select that existing frame
+with `mate_connector` on the harness connector or splice. For example, an unrelated fixture
+may declare `connectors: {A: {type: fixture-contact, mate_connector: F_native_port}}`.
+Record `feature.featureId` from the successful standard-feature creation response.
+Assembly reads with `includeMateConnectors: true` also expose each part's
+`mateConnectors` records, including `featureId` and `mateConnectorCS`, before a first pull.
+Use the actual returned ID, not a fabricated ID or a local frame matrix. The selector is
+scoped to the physical part `<harness>.<node>` and is recorded locally as an object reference.
+After pull, its available keys are in that part's read-only `pulled.mate_connectors` metadata.
+When the native response includes names, an actual `mating` or `origin` frame remains a
+legacy default. An explicit missing selector fails rather than falling back or guessing.
+Recreated native features need updated selectors and a fresh pinned pull. Do not query
+throttled feature lists merely to recover names. Pull real assembled poses; routing keeps
+those physical parts fixed and optimizes only the conductors between them. Integral leads
+belong to the component and cannot use a separate cable-half frame selector.
 
 Each harness declares connectors, wires, optional splices and routing constraints. Connector
 `mates` fields name exact component or harness endpoints. Wire `from` and `to` references

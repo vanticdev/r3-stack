@@ -219,6 +219,22 @@ def test_explicit_version_url_overrides_old_project_default(project, geometry, n
     assert Project.load(project.root).spec.cad.version_id == 'previous-version'
 
 
+def test_unnamed_native_connector_id_survives_pull_for_harness_selection(project, geometry, native_snapshot):
+    from r3_connectors.pins import native_mating_frame
+    from r3_onshape.pull import pull
+
+    connector = native_snapshot['definition']['parts'][0]['mateConnectors'][0]
+    connector.pop('name')
+    connector['featureId'] = 'F_synthetic_native_port'
+    connector['mateConnectorCS']['origin'] = [.001, .002, .003]
+    result = pull(project, transport=fake_transport(geometry, native_snapshot))
+    assert result['ok'], result
+    part = load_pulled(project.root).parts['body']
+    assert set(part.mate_connectors) == {'F_synthetic_native_port'}
+    frame = native_mating_frame(part, 'F_synthetic_native_port')
+    np.testing.assert_allclose(frame[:3, 3], [.001, .002, .003])
+
+
 @pytest.mark.parametrize('url,version,code', [
     ('https://cad.onshape.com/documents/doc/v/version/e/assembly', 'different', 'cad_pull_target_invalid'),
     ('https://cad.onshape.com/documents/doc/w/workspace/e/assembly', '', 'cad_pull_version_required'),

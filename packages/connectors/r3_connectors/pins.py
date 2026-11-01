@@ -28,7 +28,26 @@ from .frames import Frame, any_perpendicular
 
 if TYPE_CHECKING:  # pragma: no cover
     from r3_model.project import Project
+    from r3_model.pulled import PulledPart
     from r3_model.spec import HarnessConnector
+
+
+def native_mating_frame(part: "PulledPart", selector: str | None = None) -> np.ndarray:
+    """Select an existing pulled frame; never invent a pose or guess among IDs.
+
+    Names are optional in Onshape REST responses. Explicit selection therefore
+    uses the exact pulled key, commonly a generated native feature ID. Older
+    named mating/origin frames remain defaults only when no selector was given.
+    """
+    from r3_model.pulled import PullError
+
+    keys = (selector,) if selector is not None else ("mating", "origin")
+    for key in keys:
+        if key in part.mate_connectors:
+            return part.mate_connectors[key]
+    raise PullError("cad_pull_invalid",
+                    f"{part.name}: no selected native mating frame; set mate_connector to an existing pulled key",
+                    {"mate_connector": selector, "available_connectors": sorted(part.mate_connectors)})
 
 
 @dataclass(frozen=True)

@@ -16,6 +16,7 @@ import trimesh
 from r3_model.project import Project
 
 from .frames import Frame
+from .pins import native_mating_frame
 
 
 def _envelopes(project: Project) -> dict[str, tuple[np.ndarray, np.ndarray, str]]:
@@ -108,9 +109,7 @@ def connection_points(project: Project) -> dict[str, Any]:
         part = pulled.parts.get(ref)
         if part is None:
             raise PullError("cad_pull_missing", f"{ref}: cable half missing from native pull")
-        local = part.mate_connectors.get("mating", part.mate_connectors.get("origin"))
-        if local is None:
-            raise PullError("cad_pull_invalid", f"{ref}: missing native mating/origin connector")
+        local = native_mating_frame(part, conn.mate_connector)
         matrix = pulled.poses[ref] @ local
         frame = Frame(matrix[:3, :3], matrix[:3, 3])
         geometry = catalog.connector(conn.type).geometry

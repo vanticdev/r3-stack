@@ -46,7 +46,7 @@ from r3_model.spec import Harness
 
 from r3_connectors.frames import Frame
 from r3_connectors.pins import (PinEnd, mating_site_frame, floating_pair_frame, geometry_of, pigtail_ends,
-                                pin_end, wire_entry_depth)
+                                pin_end, wire_entry_depth, native_mating_frame)
 
 from .bodies import ROOT
 from .geometry import bundle_diameter, polyline_length, project_to_polyline, resample_polyline
@@ -104,6 +104,7 @@ class NodePoint:
     fan_length: float = 0.0  # arc length over which conductors converge from their pins into the bundle
     entry_radius: float = 0.0  # pin-row envelope reserved before other harnesses are routed
     native: bool = False  # physical hardware pose belongs to the pinned Onshape assembly
+    mate_connector: str | None = None  # exact pulled frame key, often a native feature ID
 
     @property
     def ref(self) -> str:
@@ -516,13 +517,15 @@ class HarnessRouter:
                     self.diagnostics.append(Diagnostic.error(
                         "wire_endpoint_unplaced", f"{ref} is not mated to a component or harness and has no position",
                         subjects=[harness.id, ref], data={"connector_type": conn.type}))
+                node.mate_connector = conn.mate_connector
                 nodes[name] = node
             for name, splice in harness.splices.items():
                 od = bundle_diameter(self._wire_od(a) for a in awgs.get(name, [])) if awgs.get(name) else 0.0
                 direction = np.asarray(splice.direction, float) if splice.direction is not None else None
                 if direction is not None:
                     direction /= np.linalg.norm(direction)
-                nodes[name] = NodePoint(harness.id, name, "splice", np.asarray(splice.position, dtype=float), direction, od=od)
+                nodes[name] = NodePoint(harness.id, name, "splice", np.asarray(splice.position, dtype=float), direction,
+                                        od=od, mate_connector=splice.mate_connector)
             for node in nodes.values():
                 self._native_node(node)
                 if node.kind == "connector":
@@ -546,13 +549,12 @@ class HarnessRouter:
     def _native_node(self, node: NodePoint) -> None:
         """Resolve physical cable hardware from its pulled mating frame.
 
-        Pin offsets remain electrical metadata. The native ``mating`` connector
-        (or explicit ``origin`` frame) locates those offsets on the actual part.
+        Pin offsets remain electrical metadata. The selected native frame
+        locates those offsets on the actual part.
         """
         if node.connector_type == "integral":
             return
         from r3_model.spec_files import validate_pulled_spec
-        from r3_model.pulled import PullError
 
         if not hasattr(self, "_native_model"):
             self._native_model = validate_pulled_spec(self.project.root)
@@ -560,9 +562,7 @@ class HarnessRouter:
         part = pulled.parts.get(node.ref)
         if part is None:
             return  # cable_obstacles reports absent physical hardware
-        local = part.mate_connectors.get("mating", part.mate_connectors.get("origin"))
-        if local is None:
-            raise PullError("cad_pull_invalid", f"{node.ref}: add a native mating connector named mating or origin")
+        local = native_mating_frame(part, node.mate_connector)
         matrix = pulled.poses[node.ref] @ local
         frame = Frame(matrix[:3, :3], matrix[:3, 3])
         node.native = True

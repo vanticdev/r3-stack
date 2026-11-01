@@ -299,6 +299,8 @@ class HarnessConnector(_Model):
     into (``<component>.<connector>``); omit for splices or loose ends."""
 
     type: str
+    mate_connector: str | None = Field(default=None, min_length=1,
+        description="Key of the pulled native mating frame; use its feature ID when Onshape omits names. No authored pose.")
     mates: str | None = Field(default=None, description="<component|harness>.<connector> this plugs into.")
     at: str | None = Field(default=None, description="Partial header mate: component pin receiving housing pin 1; row axis unchanged.")
     position: Vector | None = Field(default=None, description="Free-end position when not mated (robot frame).")
@@ -315,11 +317,15 @@ class HarnessConnector(_Model):
     def _check_site(self) -> "HarnessConnector":
         if self.at is not None and self.mates is None:
             raise ValueError("at requires mates")
+        if self.type == "integral" and self.mate_connector is not None:
+            raise ValueError("mate_connector selects a physical cable half, not an integral lead")
         return self
 
 
 class Splice(_Model):
     position: Vector
+    mate_connector: str | None = Field(default=None, min_length=1,
+        description="Key of the pulled native sleeve frame, including an Onshape feature ID.")
     direction: Vector | None = Field(default=None, min_length=3, max_length=3,
                                     description="Installed sleeve axis in the robot frame; omitted axes may be planned.")
 

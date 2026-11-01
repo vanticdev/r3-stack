@@ -32,7 +32,7 @@ from r3_model.project import Project
 from .display import display_paths, overlaps
 from .frames import Frame
 from .models import export_glb, glb_digest
-from .pins import component_connector_frame, instance_frame, mating_site_frame
+from .pins import component_connector_frame, instance_frame, mating_site_frame, native_mating_frame
 
 STAGE = "connectors"
 PIN_TOLERANCE = 1e-4  # wire endpoint to pin, m
@@ -164,9 +164,11 @@ class ConnectorStage:
             if part is None:
                 self.result.add(Diagnostic.error("cad_pull_missing", f"{ref}: cable half missing from native pull", subjects=[ref]))
                 return None, "unplaced"
-            local = part.mate_connectors.get("mating", part.mate_connectors.get("origin"))
-            if local is None:
-                self.result.add(Diagnostic.error("cad_pull_invalid", f"{ref}: missing native mating/origin connector", subjects=[ref]))
+            from r3_model.pulled import PullError
+            try:
+                local = native_mating_frame(part, conn.mate_connector)
+            except PullError as error:
+                self.result.add(Diagnostic.error(error.code, str(error), subjects=[ref], data=error.details))
                 return None, "unplaced"
             matrix = self.pulled.poses[ref] @ local
             frame = Frame(matrix[:3, :3], matrix[:3, 3])

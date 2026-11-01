@@ -117,6 +117,9 @@ Create or select an immutable Onshape version. robot.yaml is an index into parts
 Onshape-derived fields and cad/pulled files are read-only and refreshed only by pull. Fix CAD in Onshape,
 then pull again. Never author solids, dimensions, connector frames, poses or mates locally.
 Every viewer and simulation mesh must come from that verified pull. Use real MuJoCo, ngspice and Sionna.
+Onshape REST may omit mate-connector names. For physical cable halves and splices, set their
+mate_connector selector to the actual pulled/native feature key. Never invent IDs, author local
+frames or relabel detachable hardware as integral to bypass a missing native frame.
 Use gh and normal git for GitHub repository creation and pushing when the user explicitly requests them;
 that request supplies authorization. In this scaffolded project, commit and push work-in-progress
 frequently to its own requested repository, including honest failing validation evidence and TODOs.
