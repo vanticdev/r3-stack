@@ -42,6 +42,10 @@ class Rest:
     def api_request(self,method,path,query=None):
         self.calls.append((method,path));assert method=="GET" and "/features" not in path
         if "/versions/" in path:return {"microversion":"fixture-micro"}
+        if path.endswith('/massproperties'):
+            from native_mass_fixture import uniform_box
+            i=1 if "/v/pin1/" in path else 2
+            return {'bodies': {'body': uniform_box(1000*i)}}
         if "/parts/" in path:
             i=1 if "/v/pin1/" in path else 2
             return [{"partId":"body","name":f"coupon{i}","material":{"name":f"Synthetic{i}","density":1000*i}}]
@@ -51,7 +55,9 @@ def test_rest_snapshot_preserves_separate_native_source_revisions():
     rest=Rest();result=describe(assembly(rest,URL),target(URL),{})
     assert result["parts"]["coupon1"]["density"]==1000
     assert result["parts"]["coupon2"]["density"]==2000
-    assert len(rest.calls)==4
+    assert result["parts"]["coupon1"]["native_mass_properties"]["mass"][0]==pytest.approx(.006)
+    assert result["parts"]["coupon2"]["native_mass_properties"]["mass"][0]==pytest.approx(.012)
+    assert len(rest.calls)==6
 
 def test_unknown_source_revision_is_never_replaced_by_another():
     snapshot=data();snapshot["rows"][0]["reference"]["documentMicroversion"]="missing-micro"

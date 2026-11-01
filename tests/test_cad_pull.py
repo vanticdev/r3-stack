@@ -16,8 +16,10 @@ from r3_onshape.pull import describe, download, mass_properties, target
 
 @pytest.fixture
 def native_snapshot():
+    from native_mass_fixture import uniform_box
     cs = {'origin': [0, 0, 0], 'xAxis': [1, 0, 0], 'zAxis': [0, 0, 1]}
     part = {'documentId': 'doc', 'elementId': 'studio', 'partId': 'body', 'material': {'name': 'Synthetic material', 'density': 1000},
+            'native_mass_properties': uniform_box(),
             'mateConnectors': [{'name': 'origin', 'mateConnectorCS': cs}]}
     return {'microversion': 'revision', 'definition': {'parts': [part], 'rootAssembly': {'instances': [], 'features': []}},
             'rows': [{'kind': 'occurrence', 'instance_type': 'Part', 'occurrence_path': ['instance'], 'name': 'body',

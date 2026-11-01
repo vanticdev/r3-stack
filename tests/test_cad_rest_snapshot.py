@@ -30,6 +30,9 @@ class Rest:
         self.calls.append((method, path, query))
         assert method == 'GET' and not path.endswith('/features')
         if '/versions/' in path: return {'microversion':'micro'}
+        if path.endswith('/massproperties'):
+            from native_mass_fixture import uniform_box
+            return {'bodies': {'solid': uniform_box(1200)}}
         if '/parts/' in path: return [{'partId':'solid','name':'coupon','material':{'displayName':'Synthetic','density':1200}}]
         if path.endswith('/shadedviews'):
             out=io.BytesIO(); Image.new('RGB',(2,2)).save(out,format='PNG')
@@ -46,7 +49,7 @@ def test_rest_complete_pinned_snapshot_and_connectors():
     assert manifest['parts']['coupon']['density']==1200
     assert manifest['parts']['coupon']['onshape']['version_id']=='pin'
     assert np.array_equal(manifest['parts']['coupon']['mate_connectors']['connector'],np.eye(4))
-    assert len(rest.calls)==3
+    assert len(rest.calls)==4
     assert all('/v/pin/' in path or '/versions/pin' in path for _,path,_ in rest.calls)
 
 

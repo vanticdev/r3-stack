@@ -786,3 +786,18 @@ other entries and family metadata. If `catalog_entry_ambiguous` lists multiple
 project owners, resolve the duplicate definitions before updating; the tool
 refuses to choose or rewrite an arbitrary owner. Catalog owner lookup and writes
 remain confined to the project.
+
+### Native mass properties and overrides
+
+Author mass, center-of-mass and inertia changes in Onshape, then version and pull.
+Pull reads each unique source part's pinned `/partid/P/massproperties` through
+the browser-session REST bridge with `useMassPropertyOverrides=true`; the API
+default is false. Complete native mass is required for every constituent body.
+The pull preserves Onshape's calculated values and calculation bounds, using
+its center-of-mass inertia in the unchanged source axes. Missing, incomplete or
+invalid native properties identify the source occurrence before geometry exports.
+Fix them in Onshape; no local density-based replacement is used for physics.
+STEP still provides exact geometry verification and retained uniform-density
+integrals for inspection. Neither this read nor its validation authors geometry,
+and it adds no Part Studio feature-list calls. Repeated occurrences share one
+pinned mass read per unique source/version/configuration/part.

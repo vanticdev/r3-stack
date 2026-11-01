@@ -142,6 +142,7 @@ def describe(snapshot: dict[str, Any], pin: dict[str, str], selectors: dict[str,
                 raise PullError("cad_pull_incomplete", f"{name}: missing or duplicate native connector identity")
             connectors[connector_id] = _cs(item.get("mateConnectorCS") or item.get("coordinateSystem") or item)
         parts[name] = {"name": name, "stl": f"parts/{filename}.stl", "step": f"parts/{filename}.step", "sha256": {},
+                       "native_mass_properties": record.get("native_mass_properties"),
                        "material": name_material, "density": density, "mate_connectors": connectors,
                        "purchased": False, "onshape": {"document_id": key[0], "version_id": vid, "element_id": key[1],
                            "part_id": key[2], "occurrence_path": occurrence, "configuration": key[3]}}
@@ -234,6 +235,14 @@ def pull_lock(root: Path) -> Iterator[None]:
 def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_url: str) -> None:
     from r3_model.mesh_io import load_exported_mesh
 
+    from .native_mass import properties as native_properties
+    native = {}
+    for name, part in manifest["parts"].items():
+        try:
+            native[name] = native_properties(part.get("native_mass_properties"))
+        except PullError as error:
+            raise PullError(error.code, f"{name}: {error}",
+                            {**error.details, "component": name, "onshape": part["onshape"]}) from error
     (directory / "parts").mkdir()
     files: dict[tuple, bytes] = {}
     for name, part in manifest["parts"].items():
@@ -255,7 +264,10 @@ def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_
             raise PullError("cad_pull_geometry_invalid", f"{name}: {error}") from error
         if not len(mesh.faces) or not mesh.is_watertight or not np.isfinite(mesh.vertices).all() or mesh.volume <= 0:
             raise PullError("cad_pull_geometry_invalid", f"{name}: exported mesh is not a finite, closed positive-volume solid")
-        part.update(mass_properties(directory / part["step"], part["density"]))
+        # STEP remains the exact-geometry check. Its uniform-density integral
+        # must not overwrite mass/center/inertia assigned inside native CAD.
+        part["step_integrals"] = mass_properties(directory / part["step"], part["density"])
+        part.update(native[name])
     image, evidence = transport.capture(capture_url)
     revision = evidence.get("microversion")
     if not revision or revision != manifest["microversion"]:

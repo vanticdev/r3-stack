@@ -184,14 +184,14 @@ def test_rest_metadata_selects_body_preserving_export_without_feature_reads():
     original = rest.api_request
     def request(method, path, query=None):
         response = original(method, path, query)
-        if '/parts/' in path:
+        if '/parts/' in path and not path.endswith('/massproperties'):
             response[0]['bodyType'] = 'composite'
         return response
     rest.api_request = request
     manifest = describe(assembly(rest, URL), target(URL), {})
     assert manifest['parts']['coupon']['gltf'] == 'parts/coupon.gltf'
     assert manifest['parts']['coupon']['body_type'] == 'composite'
-    assert len(rest.calls) == 3 and not any('/features' in path for _, path, _ in rest.calls)
+    assert len(rest.calls) == 4 and not any('/features' in path for _, path, _ in rest.calls)
 
 
 def test_gltf_transport_uses_only_pinned_native_export(tmp_path):

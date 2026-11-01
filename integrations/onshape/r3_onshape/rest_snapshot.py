@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+from urllib.parse import quote
 from typing import Any
 
 from r3_model.pulled import PullError
@@ -31,7 +32,7 @@ def assembly(transport: Any, url: str) -> dict[str, Any]:
     occurrences = {tuple(o['path']): o for o in root.get('occurrences', [])}
     from .part_records import NativePartRecords
     parts = NativePartRecords(definition.get('parts', []))
-    rows, metadata = [], {}
+    rows, metadata, native_mass = [], {}, {}
 
     def visit(current: dict[str, Any], parent: list[str], ancestors: set[tuple]) -> None:
         if len(parent) > 100:
@@ -83,6 +84,20 @@ def assembly(transport: Any, url: str) -> dict[str, Any]:
                 if not value or value.get('isMesh'):
                     raise PullError('cad_pull_incomplete', f'Native solid part metadata missing for {path}')
                 ref['material'] = value.get('material')
+                source = (*cache, key[2])
+                if source not in native_mass:
+                    from .native_mass import selected_body
+                    response = transport.api_request('GET',
+                        f'/api/v9/parts/d/{key[0]}/v/{version_id}/e/{key[1]}/partid/{quote(key[2], safe="")}/massproperties',
+                        query={'configuration': key[3], 'useMassPropertyOverrides': True, 'inferMetadataOwner': False})
+                    try:
+                        native_mass[source] = selected_body(response, key[2])
+                    except PullError as error:
+                        raise PullError(error.code, f"{row['name'] or path}: {error}",
+                            {**error.details, 'occurrence_path': path, 'document_id': key[0],
+                             'version_id': version_id, 'element_id': key[1], 'part_id': key[2],
+                             'configuration': key[3]}) from error
+                ref['native_mass_properties'] = native_mass[source]
                 row['body_type'] = value.get('bodyType', 'solid')
                 row['name'] = row['name'] or value.get('name')
             else:
