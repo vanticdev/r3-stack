@@ -105,3 +105,15 @@ and the distinction between existing functionality and reserved folders.
 - Add type annotations to new Python interfaces and keep functions focused.
 - Prefer clear domain names over abbreviations, and document behavior that is
   not obvious from the code.
+
+## Autonomous integration loop: persistence (direct user instruction)
+
+For the autonomous R3 integration loop, keep working until the requested result
+is achieved or a genuine user-only blocker applies. Time constraints, long runs,
+and potentially erroneous wait estimates are not reasons to stop. Verify reported
+backoffs against actual response evidence and the transport implementation; do
+useful offline work while a confirmed remote restriction is active, then resume.
+The user authorizes editing onshape-native source when a generic platform fix
+needs it. Preserve unrelated plugin work and keep the loop's CAD, independence,
+security, validation and cleanup rules. Never claim success without evidence or
+weaken checks to finish.
