@@ -105,6 +105,9 @@ Terminal export failures need source investigation in Onshape; a composite group
 Do not edit the export cache. A single failed source export is not a recorded search miss for the proxy rule.
 Native editor commands may be unavailable on the current frontend. Use tested browser-session REST
 features, assemblies, parts, mates and mate connectors instead; log unavailable native-only operations.
+Material assignment also works through REST: read the part metadata's editable Material property ID,
+then POST its native material definition to /api/v9/metadata/d/D/w/W/e/E/p/P. The guide gives the payload.
+Verify parts and massproperties, then pin a new version. Native editor failure is not a material-assignment blocker.
 Create or select an immutable Onshape version. robot.yaml is an index into parts/, electrical/ and software/;
 Onshape-derived fields and cad/pulled files are read-only and refreshed only by pull. Fix CAD in Onshape,
 then pull again. Never author solids, dimensions, connector frames, poses or mates locally.

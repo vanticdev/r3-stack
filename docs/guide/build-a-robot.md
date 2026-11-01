@@ -193,6 +193,42 @@ motion limits. Use REST geometry/mass measurements and pinned `shadedviews` to i
 Native editor tools are optional when available. An image alone
 does not establish fit or interference clearance.
 
+### Assign native material through REST
+
+An unsupported native editor does not block material assignment. Use
+`onshape_native.api_request` through the browser-session bridge. Discover
+`getWMVEPMetadata` and `updateWVEPMetadata` with `api_catalog`; their `iden`
+path parameter is `p` for a part ID. Read the selected workspace part's metadata
+at `/api/v9/metadata/d/D/w/W/e/E/p/P`, find the property named `Material`, and
+retain its returned `propertyId` and `editable` flag. Never guess the property ID.
+
+For a custom material, POST to that same metadata endpoint with this native
+payload (Python notation below; the MCP tool accepts the equivalent JSON object):
+
+```python
+payload = {
+    "jsonType": "metadata-part", "partId": part_id,
+    "properties": [{"propertyId": material_property_id, "value": {
+        "id": project_material_id, "displayName": material_name,
+        "properties": [{"name": "DENS", "displayName": "Density",
+            "type": "REAL", "category": "Physical",
+            "value": density_kg_m3, "units": "kg/m^3"}]
+    }}]
+}
+```
+
+Choose the material identity and density from sourced engineering data; record
+their provenance and uncertainty in the project catalog. This sets density only,
+not strength, measured mass or a fabrication approval. For an existing Onshape
+library material, use its actual material definition instead of inventing one.
+Check the update's per-property status, then read `/api/v9/parts/d/D/w/W/e/E`
+and selected-part `/partid/P/massproperties` below that path. Verify the assigned
+material and `hasMass`, mass and volume. Apply the appropriate material to each
+physical body of an imported multi-material model; grouping it as a composite
+does not assign missing constituent materials. Create a new version after the
+changes and verify the pinned read before pulling. Never substitute local mass
+or density fields for native evidence.
+
 ## 5. Pull CAD and qualify fabricated parts
 
 Use `onshape_native.api_catalog` to discover `createDocument`, `createVersion` and
