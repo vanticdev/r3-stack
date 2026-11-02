@@ -1,3 +1,5 @@
+import type {} from "../src/viewer/performance.ts";
+import type {} from "three-mesh-bvh";
 import { expect, test } from "@playwright/test";
 
 for (const code of ["cad_pull_missing", "cad_pull_modified", "cad_pull_invalid"]) {
@@ -27,6 +29,7 @@ for (const code of ["cad_pull_missing", "cad_pull_modified", "cad_pull_invalid"]
 // A synthetic, closed 40 x 30 x 10 mm native STL. The graph also contains an
 // obsolete catalog box: a missing mesh must leave that body hidden.
 test("valid pulled STL renders while a stale catalog body stays hidden", async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem("r3.viewer.measure", "1"));
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   let fetched = 0;
@@ -59,5 +62,25 @@ test("valid pulled STL renders while a stale catalog body stays hidden", async (
   await expect(page.getByTestId("robot-viewer").locator("canvas")).toBeVisible();
   await expect.poll(() => fetched).toBeGreaterThan(0);
   await expect(page.getByText("1 of 2 parts have pulled meshes; missing parts are hidden", { exact: false })).toBeVisible();
+  await page.waitForFunction(() => {
+    const part = window.__r3Viewer?.state.scene.getObjectByName("coupon");
+    return part?.children.some((child) => child.type === "Mesh");
+  });
+  const point = await page.evaluate(() => {
+    const state = window.__r3Viewer!.state;
+    const part = state.scene.getObjectByName("coupon")!;
+    const mesh = part.children.find((child) => child.type === "Mesh") as import("three").Mesh;
+    if (!mesh.geometry.boundsTree) throw new Error("Worker picking tree is absent");
+    mesh.geometry.computeBoundingBox();
+    const center = mesh.geometry.boundingBox!.getCenter(mesh.position.clone()).applyMatrix4(mesh.matrixWorld).project(state.camera);
+    return { x: center.x, y: center.y };
+  });
+  const canvas = await page.locator("canvas").boundingBox();
+  await page.mouse.click(canvas!.x + (point.x + 1) * canvas!.width / 2, canvas!.y + (1 - point.y) * canvas!.height / 2);
+  await expect(page).toHaveURL(/sel=component%3Acoupon/);
+  await page.getByRole("button", { name: "X-ray", exact: true }).click();
+  await expect(page.getByRole("button", { name: "X-ray", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("slider", { name: "Exploded view" }).fill("0.5");
+  await page.getByRole("button", { name: "Fit", exact: true }).click();
   expect(errors).toEqual([]);
 });
