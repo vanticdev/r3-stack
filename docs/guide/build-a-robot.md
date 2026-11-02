@@ -852,7 +852,9 @@ Prototype collision geometry consumes the original native bodies rather than the
 coarser routing mesh. Open display surfaces use conservative convex hulls, reported
 as `joint_collision_estimated`; these hulls can fill cavities and do not qualify
 clearance or printability. They never replace or repair the pulled geometry. The
-complete assembly starts above the ground using its lowest native surface. Internal
+free assembly starts above the ground using its lowest native surface. Fixed mounts
+preserve their authored datum and the ordinary 0.5 mm scene offset; below-datum
+parts do not silently relocate a bench and its instruments. Internal
 contacts between rigidly retained bodies return when their last retention path
 releases; attachment strength and detachment checks remain active.
 That does not require stopping all modelling or prototype simulation. Do not

@@ -535,8 +535,10 @@ def test_unretained_payload_in_a_real_pocket(tmp_path, face, detaches):
     assert any(d.code=="part_detached" for d in v.joints.diagnostics)==detaches
 
 
-def test_moving_carrier_preserves_part_mass_com_and_inertia(tmp_path):
+@pytest.mark.parametrize('mobility', ['stationary', 'mobile'])
+def test_moving_carrier_preserves_part_mass_com_and_inertia(tmp_path, mobility):
     p=arm_project(tmp_path, nut=True)
+    p.spec.robot.mobility = mobility
     vm=build_assembly_model(p)
     m=mujoco.MjModel.from_xml_string(vm.xml);d=mujoco.MjData(m)
     mujoco.mj_forward(m,d)
@@ -549,7 +551,7 @@ def test_moving_carrier_preserves_part_mass_com_and_inertia(tmp_path):
         masses=m.body_mass[ids]
         com=np.average(d.xipos[ids],axis=0,weights=masses)
         assert masses.sum()==pytest.approx(part.mass,rel=1e-10)
-        lowest = min(item["bbox_min"][2] for item in parts.values())
+        lowest = min(item["bbox_min"][2] for item in parts.values()) if mobility == 'mobile' else 0.0
         np.testing.assert_allclose(com,part.com+[0,0,.0005-lowest],atol=1e-10)
         inertia=np.zeros((3,3))
         for bid in ids:

@@ -67,6 +67,22 @@ def test_real_mujoco_ground_supports_the_native_body(project, native_snapshot):
     assert np.linalg.norm(data.qvel) < .01
 
 
+@pytest.mark.parametrize('mount', ['auto', 'fixed'])
+def test_fixed_fixture_preserves_authored_native_datum(project, native_snapshot, mount):
+    current = install_open_display_mesh(project, native_snapshot)
+    current.spec.robot.mobility = 'stationary' if mount == 'auto' else 'mobile'
+    current.spec.simulation.base_mount = mount
+    assembly = build_assembly_model(current)
+    model = mujoco.MjModel.from_xml_string(assembly.xml)
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+    body = model.body('coupon').id
+    # The ordinary 0.5 mm scene offset remains; native below-datum geometry
+    # must not silently move a declared fixed mount or its instrumentation.
+    assert data.xpos[body, 2] == pytest.approx(.0005, abs=1e-12)
+    assert 'joint_fixture_weld' in assembly.xml
+
+
 def test_invalid_collision_mesh_cannot_silently_supply_no_geometry():
     from r3_wiring.mujoco_cables import convex_pieces
     with pytest.raises(ValueError, match='[Cc]ollision'):

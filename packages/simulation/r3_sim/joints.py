@@ -87,9 +87,11 @@ def separate_parts(
     props.clear()
     extras.clear()
     rotation = rpy_matrix([0, 0, initial_pose[2]])
-    # The native datum need not be the lowest surface (feet, for example,
-    # commonly extend below it). Ground the complete native geometry.
-    lowest = min(float(part['bbox_min'][2]) for part in cad_parts.values())
+    # A free assembly needs its lowest native surface above the ground. A
+    # fixed bench/fixture keeps its authored datum instead of being raised by
+    # an unrelated part below it (which would also relocate its instruments).
+    from .load_cases import is_mobile
+    lowest = min(float(part['bbox_min'][2]) for part in cad_parts.values()) if is_mobile(project) else 0.0
     shift = np.array([initial_pose[0], initial_pose[1], 0.0005 - lowest])
     carriers = {}
     fraction = float(project.catalog.joint_defaults["carrier_mass_fraction"].value)
