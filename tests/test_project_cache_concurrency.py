@@ -78,3 +78,14 @@ def test_include_alias_still_rejected(tmp_path):
         'first: {$include: original.yaml}\nsecond: {$include: alias.yaml}\n')
     with pytest.raises(spec_files.SpecError, match='already included'):
         spec_files.load_spec_files(tmp_path)
+
+
+def test_evicted_projects_do_not_retain_load_locks(tmp_path, monkeypatch):
+    monkeypatch.setattr(freshness, 'code_version', lambda: 'synthetic-code')
+    monkeypatch.setattr(freshness, 'input_files', lambda *args: [])
+    monkeypatch.setattr(freshness.Project, 'load', lambda root: SimpleNamespace(root=root))
+    cache = freshness.ProjectCache(size=2)
+    for i in range(20):
+        cache.load(tmp_path / str(i))
+    assert len(cache._entries) == len(cache._inputs) == 2
+    assert len(cache._loads) == 0

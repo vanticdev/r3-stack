@@ -335,3 +335,15 @@ def test_agent_records_cannot_escape_project_via_build_symlink(env, tmp_path):
     started = client.post(f"/api/projects/{PID}/agent", json={"prompt": "task", "provider": "codex"})
     assert started.json()['code'] == 'agent_resume_unavailable'
     assert not list(outside.iterdir())
+
+
+def test_tool_results_release_inputs_but_preserve_event_history(tmp_path, monkeypatch):
+    manager = AgentManager()
+    session = agent_runner.AgentSession('b' * 12, 'fixture', tmp_path, 'codex', None, 'task')
+    monkeypatch.setattr(manager, '_check_spec', lambda session: None)
+    manager._handle(session, 'tool_call', {'id': 'call', 'name': 'synthetic', 'input': {'large': 'x' * 10000}})
+    assert 'call' in session._calls
+    manager._handle(session, 'tool_result', {'id': 'call', 'ok': True})
+    assert session._calls == {}
+    assert session.events.since()[0]['input']['large'] == 'x' * 10000
+    assert session.events.since()[1]['name'] == 'synthetic'

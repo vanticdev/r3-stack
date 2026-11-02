@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
 import threading
 import time
 from typing import Any, AsyncIterator
@@ -26,7 +27,11 @@ POLL_S = 0.05
 
 
 class EventLog:
-    def __init__(self) -> None:
+    def __init__(self, memory_limit: int = 1024 * 1024) -> None:
+        self._memory_limit = memory_limit
+        self._bytes = 0
+        self._count = 0
+        self._disk: sqlite3.Connection | None = None
         self._events: list[dict[str, Any]] = []
         self._lock = threading.Lock()
         self._closed = False
@@ -35,8 +40,33 @@ class EventLog:
         with self._lock:
             if self._closed:
                 raise RuntimeError("event log is closed")
-            event = {"seq": len(self._events) + 1, "type": event_type, "time": time.time(), **payload}
-            self._events.append(event)
+            event = {"seq": self._count + 1, "type": event_type, "time": time.time(), **payload}
+            encoded = json.dumps(event, default=str)
+            if self._disk is None and self._bytes + len(encoded.encode()) > self._memory_limit:
+                # An empty filename creates a private on-disk database which SQLite
+                # deletes on close. Keep full replay without retaining transcripts
+                # in RAM for the lifetime of a long-running server.
+                disk = sqlite3.connect("", check_same_thread=False, isolation_level=None)
+                try:
+                    disk.execute("PRAGMA cache_size=-256")
+                    disk.execute("PRAGMA journal_mode=OFF")
+                    disk.execute("CREATE TABLE events (seq INTEGER PRIMARY KEY, payload TEXT)")
+                    disk.execute("BEGIN")
+                    disk.executemany("INSERT INTO events VALUES (?, ?)",
+                                     ((e["seq"], json.dumps(e, default=str)) for e in self._events))
+                    disk.commit()
+                except Exception:
+                    disk.close()
+                    raise
+                self._disk = disk
+                self._events.clear()
+                self._bytes = 0
+            if self._disk is None:
+                self._events.append(event)
+                self._bytes += len(encoded.encode())
+            else:
+                self._disk.execute("INSERT INTO events VALUES (?, ?)", (event["seq"], encoded))
+            self._count += 1
             return event
 
     def close(self) -> None:
@@ -47,12 +77,17 @@ class EventLog:
     def closed(self) -> bool:
         return self._closed
 
-    def since(self, after: int = 0) -> list[dict[str, Any]]:
+    def since(self, after: int = 0, limit: int | None = None) -> list[dict[str, Any]]:
         with self._lock:
-            return self._events[max(after, 0):]
+            after = max(after, 0)
+            if self._disk is not None:
+                rows = self._disk.execute("SELECT payload FROM events WHERE seq > ? ORDER BY seq LIMIT ?",
+                                          (after, limit if limit is not None else -1))
+                return [json.loads(row[0]) for row in rows]
+            return self._events[after:None if limit is None else after + limit]
 
     def __len__(self) -> int:
-        return len(self._events)
+        return self._count
 
 
 def format_sse(event: dict[str, Any]) -> bytes:
@@ -66,7 +101,7 @@ async def stream(log: EventLog, after: int = 0, is_disconnected: Any = None, hea
     quiet_since = time.monotonic()
     yield b"retry: 2000\n\n"
     while True:
-        events = log.since(cursor)
+        events = log.since(cursor, limit=128)
         for event in events:
             yield format_sse(event)
         cursor += len(events)
