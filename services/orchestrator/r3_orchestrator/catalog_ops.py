@@ -77,7 +77,7 @@ def put_entry(root: Path, kind: str, entry: dict[str, Any], dry_run: bool = Fals
     if root.resolve() not in path.resolve().parents:
         return {"ok": False, "code": "catalog_entry_invalid", "errors": ["catalog path escapes this project"]}
     payload = {"ok": True, "path": str(path.relative_to(root)), "id": str(key), "kind": kind,
-               "overrides_platform_entry": key in getattr(default_catalog(), collection), "dry_run": dry_run}
+               "overrides_platform_entry": key in getattr(default_catalog(resolve_models=False), collection), "dry_run": dry_run}
     if dry_run:
         return payload
     previous = path.read_bytes() if path.exists() else None

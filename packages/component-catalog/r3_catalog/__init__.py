@@ -67,9 +67,13 @@ def _component_entries(paths: list[Path], raw_by_id: dict[str, dict[str, Any]]) 
     return out
 
 
-def load_catalog(*extra_dirs: Path) -> Catalog:
+def load_catalog(*extra_dirs: Path, resolve_models: bool = True) -> Catalog:
     """Load the bundled catalog plus optional project-local catalog folders
-    (each may contain ``components/*.yaml``, ``connectors.yaml``, ``wires.yaml``)."""
+    (each may contain ``components/*.yaml``, ``connectors.yaml``, ``wires.yaml``).
+
+    Identity/metadata queries may omit bank resolution. Physical project loads
+    keep the default resolution and require explicit choices for ambiguous models.
+    """
     catalog = Catalog()
     raw_components: dict[str, dict[str, Any]] = {}
     for root in (DATA_DIR, *extra_dirs):
@@ -124,18 +128,19 @@ def load_catalog(*extra_dirs: Path) -> Catalog:
     resolve_patterns(catalog)
     # A dataset link is resolved through the existing typed ModelRef. No second
     # component schema or project configuration format is introduced.
-    from .modelbank import ModelBank
-    from .modelbank.catalog import resolve_model
-    bank = ModelBank(project=extra_dirs[-1].parent) if extra_dirs else ModelBank()
-    for component in catalog.components.values():
-        if not component.mechanical.fabricated and component.kind != "pcb":
-            component.model = resolve_model(component, bank)
+    if resolve_models:
+        from .modelbank import ModelBank
+        from .modelbank.catalog import resolve_model
+        bank = ModelBank(project=extra_dirs[-1].parent) if extra_dirs else ModelBank()
+        for component in catalog.components.values():
+            if not component.mechanical.fabricated and component.kind != "pcb":
+                component.model = resolve_model(component, bank)
     return catalog
 
 
-@lru_cache(maxsize=1)
-def default_catalog() -> Catalog:
-    return load_catalog()
+@lru_cache(maxsize=2)
+def default_catalog(*, resolve_models: bool = True) -> Catalog:
+    return load_catalog(resolve_models=resolve_models)
 
 
 __all__ = ["Catalog", "ComponentType", "ConnectionSite", "ConnectorGeometry", "ConnectorType", "FastenerType", "Material", "Printer", "PrintFit", "WireGauge", "default_catalog", "load_catalog"]
