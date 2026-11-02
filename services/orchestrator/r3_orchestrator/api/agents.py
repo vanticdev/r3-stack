@@ -405,14 +405,16 @@ def claude_settings(project_root: Path, config: dict[str, Any] | None = None, *,
     files = [*granted]
     directories = [platform, root, *runtime_read_paths(config, executable=executable)]
     home = Path.home().resolve()
+    # The CLI saves oversized tool results here and hands the session that path.
+    results = Path(os.environ.get("CLAUDE_CONFIG_DIR", home / ".claude")) / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(root))
     return {"permissions": {
-                "allow": [*(f"Read(/{path}/**)" for path in directories if path.is_dir()),
+                "allow": [*(f"Read(/{path}/**)" for path in [*directories, results] if path.is_dir() or path == results),
                           *(f"Read(/{path})" for path in [*files, *(p for p in directories if not p.is_dir())]),
                           f"Edit(/{root}/**)"],
                 "deny": [f"Read(/{path}/**)" for path in hidden]},
             "sandbox": {"enabled": True, "autoAllowBashIfSandboxed": True, "allowUnsandboxedCommands": False,
                         "filesystem": {"denyRead": [str(home), *map(str, hidden)],
-                                       "allowRead": [*map(str, directories), *map(str, files)],
+                                       "allowRead": [*map(str, directories), *map(str, files), str(results)],
                                        "allowWrite": [str(root)]},
                         "network": {"allowedDomains": ["*"], "allowLocalBinding": True},
                         # The sandbox refuses .git control files and the login keychain, which
