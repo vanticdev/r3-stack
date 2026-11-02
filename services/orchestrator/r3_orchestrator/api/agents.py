@@ -147,6 +147,15 @@ A pushed checkpoint is a recovery point, not a reason to end the session. Contin
 unassembled CAD, unconfigured wiring/power and firmware integration instead of handing back a TODO list.
 For an asynchronous import, inspect its status at sensible intervals while doing independent work;
 do not end merely because it is still ACTIVE. A recoverable tool error is another iteration.
+For unattended work without a user deadline, a long runtime, perceived time budget or uncertain wait
+estimate is not a stopping condition: checkpoint and continue. Scope each restriction to its exact
+operation. A held feature-list read does not prohibit guarded standard-feature writes, other working
+inspection routes, source research, material assignment, assembly, wiring or firmware work.
+An unavailable Docker daemon blocks container/target-build operations, not every firmware or twin task;
+use the documented host-process firmware path when supported, keeping the real firmware and all checks.
+Before concluding that a constraint blocks the whole project, identify the exact next operation that
+cannot run, the supported alternatives tried, and which remaining tasks truly depend on it. Continue
+independent unfinished work instead of treating one unavailable operation as a general stop.
 Only conclude after completing the requested integrated work or establishing an external blocker that
 cannot be settled under the granted assumptions, research and proxy rules. Report evidence honestly.
 Never weaken requirements, limits or checks. Iterate using diagnostics and r3_release_status.

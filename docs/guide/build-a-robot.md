@@ -425,7 +425,10 @@ must agree with the chosen computer and peripherals.
 Use `r3_hal` for hardware access. The same firmware can run against physical hardware or
 the twin. Simulation time advances through the HAL clock; avoid wall-clock sleeps in control
 loops. Configuration belongs in the project, rather than hardcoded component IDs or robot
-dimensions in platform code. Firmware can run as a host process or in a BLITZ-shaped container.
+dimensions in platform code. Firmware can run as a host process or in a BLITZ-shaped container. A missing Docker
+daemon blocks container and target-build operations; it does not prevent a supported
+host-process firmware run against the native twin. Keep the same real firmware, HAL
+bindings and checks, and report target-build qualification separately.
 
 ## 8. Define and run scenarios
 
@@ -593,6 +596,14 @@ For STEP imports use the uncompressed `.step`/`.stp` file, not a ZIP containing 
 The companion's chunked upload path transfers large files to the authenticated browser,
 which sends one normal Onshape multipart import. Inspect the result before another write.
 
+For an unattended build without a user deadline, a long runtime, perceived time budget
+or uncertain wait estimate is not a stopping condition. Checkpoint and continue. Scope
+operation failures narrowly: a held feature-list read does not prohibit other working
+inspection routes, guarded feature writes, material assignment, assembly, wiring or
+firmware work. Before reporting a project-wide external blocker, identify the exact
+unavailable operation, supported alternatives tried and the tasks that actually depend
+on it. Finish independent work while that constraint remains.
+
 A checkpoint is a recovery point, not the end of an implementation session. Keep working
 through unassembled parts, unconfigured harnesses/power and firmware integration. Check
 asynchronous imports at sensible intervals while doing independent work; an ACTIVE
@@ -754,6 +765,14 @@ parts and shaded views. Do not repeat an upload whose outcome is unknown.
 An empty parts list or missing expected bodies needs investigation of the source,
 import options or another real model; a `DONE` translation alone proves none of
 those geometry checks. Preserve the original downloaded file and provenance.
+
+Likewise, OCP `ReadFile`/`TransferRoots` success proves that STEP can be parsed,
+not that it contains valid closed positive-volume solids. Use the documented STEP
+reader below for source checks, and inspect the actual translated native bodies.
+A readable source with an empty or invalid native import is still unqualified.
+Do not infer that the whole CAD path is unavailable from one failed source. Local
+source inspection is research only; import, author and assemble the model in Onshape
+and use a verified pull for every viewer and twin model.
 
 ### Distinguish assembly preparation from pull failures
 
