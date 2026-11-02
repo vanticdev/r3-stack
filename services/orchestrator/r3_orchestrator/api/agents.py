@@ -77,7 +77,9 @@ Read r3_guide first. robot.yaml is the robot specification: change it through r3
 may be edited directly. Use r3_get_schema for typed authoring details, the catalog and sourcing tools for parts,
 r3_cad_export for pinned native source downloads, r3_cad_pull for pinned read-only CAD,
 r3_view_artifact to inspect images, and the pipeline tools to validate.
-Run native stages, scenarios and project test suites through R3 MCP tools in the worker environment.
+Run native stages, scenarios and project test suites in R3's worker environment using its MCP tools
+or the guide's queued HTTP worker jobs for long runs. A timed-out RPC may still be executing;
+inspect its actual state before retrying and never launch duplicate calculations.
 Keep downloads and temporary work in this session's TMPDIR, inside the project; never enumerate
 shared /tmp or /private/tmp, unrelated checkouts, other robot projects or previous transcripts.
 Use R3_PYTHON for Python helper commands so they use the platform's installed dependencies.

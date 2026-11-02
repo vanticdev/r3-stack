@@ -305,6 +305,19 @@ conflicting URL/version arguments remain errors. Pull records its actual pin in
 the immutable manifest and lock, without rewriting the authored source defaults;
 update those defaults through the spec tools when changing the default target.
 
+If the new native version removes obsolete occurrences, retain the old local
+descriptors until the replacement pull succeeds. Pass their explicit local IDs
+as `r3_cad_pull(..., remove_components=["obsolete-fixture"])`, or repeat
+`--remove-component ID` on the CLI. The pull still requires every unsuppressed
+native occurrence to have exactly one descriptor; retirement cannot hide CAD.
+It removes those index entries and refreshes native attachment mirrors in the
+same validated publication. Retired include files remain on disk for inspection.
+Update authored references to obsolete components through the spec tools first;
+retirement never deletes requirements, physical qualification or other references
+for you. A source conflict, invalid description or failed acquisition preserves
+the old complete pull and descriptions, including concurrent authored edits.
+Never clear `pulled` fields or edit immutable files to replace an inventory.
+
 The MCP equivalent is `r3_cad_pull(url=..., version_id=...)`. `r3_run_stage("cad")`
 checks the current pulled copy; it never creates geometry or refreshes the native model.
 The default exact-export pull downloads each part's STL in metres and STEP, reads native mate connectors,
@@ -509,6 +522,28 @@ in the coordinated twin. Estimated models and fallbacks remain visible in the ev
 Choose expectations that measure your task: position or joint motion, sensor behavior,
 retention, clearance, supply limits, fault response or other supported quantities. Add
 requirements as the project grows; do not weaken checks to fit a failing design.
+
+### Long-running validation jobs
+
+A long scenario can outlast one MCP call's deadline. When `r3 serve` is running,
+use its existing queued worker API instead of leaving progress behind that RPC:
+`POST http://127.0.0.1:8321/api/projects/PROJECT_ID/runs` with an R3 request such as
+`{"stages":["sim"],"scenarios":["YOUR_SCENARIO"]}`. Use only the current project's
+ID (also recorded in this execution's `build/agent/<session>/session.json`).
+The response returns `run_id`, `status_url` and `events_url`. Read the status URL
+at sensible intervals or follow the events URL for stage progress and final
+results. These are the same native pipeline stages in isolated worker processes;
+a project's queued runs are serialized. Do not also launch the same stage through
+MCP or the CLI while that worker is active. The normal final release still needs
+all applicable stages, mandatory load cases and complete scenario evidence.
+
+An RPC timeout does not prove its worker stopped or that a check passed. Preserve
+the inputs and inspect that execution's actual process/artifact state before a
+retry; do not start a duplicate calculation after an uncertain outcome. For a
+queued HTTP job, `POST /api/runs/RUN_ID/cancel` explicitly cancels that job; use
+its final state before starting a replacement. None of these operations changes
+CAD or relaxes a check. Keep long independent engineering moving while a known
+worker runs, and record what is still pending.
 
 ### Project-owned devices and tests
 

@@ -218,7 +218,7 @@ def cmd_cad_pull(args: argparse.Namespace) -> dict[str, Any]:
     from r3_onshape.pull import pull
 
     return pull(api.load_project(args.project), url=args.url, version_id=args.version_id,
-                mesh_source=args.mesh_source, tab_id=args.tab_id)
+                mesh_source=args.mesh_source, tab_id=args.tab_id, remove_components=args.remove_components)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -248,6 +248,8 @@ def build_parser() -> argparse.ArgumentParser:
     pull.add_argument("--mesh-source", choices=('export', 'viewer'), default='export',
                       help="viewer pulls a working native mesh model without STEP or export requests; qualification stays explicit.")
     pull.add_argument("--tab-id", type=int, default=None, help="Exact open Onshape editor tab for viewer meshes.")
+    pull.add_argument("--remove-component", dest="remove_components", action="append", default=None,
+                      help="Retire an obsolete local descriptor atomically with the complete native pull; repeat for each ID.")
     pull.set_defaults(func=cmd_cad_pull)
 
     sim = sub.add_parser("sim", parents=[common], help="Digital twin scenarios.")

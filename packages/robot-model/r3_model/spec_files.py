@@ -351,6 +351,11 @@ def _check_local_references(files: SpecFiles, spec: RobotSpec) -> None:
     for cid, component in spec.components.items():
         if component.purchased_unit:
             require(component.purchased_unit, spec.components, ("components", cid, "purchased_unit"))
+    for index, fastener in enumerate(spec.mechanical.fasteners):
+        if fastener.mate_connector is not None:
+            require(fastener.body, spec.components, ("mechanical", "fasteners", index, "body"))
+        if fastener.nut_body is not None:
+            require(fastener.nut_body, spec.components, ("mechanical", "fasteners", index, "nut_body"))
     for name in spec.cad.parts:
         require(name, spec.components, ("cad", "parts", name))
     for group, members in spec.cad.subassemblies.items():
@@ -483,7 +488,8 @@ def validate_pulled_spec(root: str | Path) -> PulledModel:
 
 
 def refresh_pulled_spec(root: str | Path, expected_sha256: str | None = None,
-                        *, manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+                        *, manifest: dict[str, Any] | None = None,
+                        remove_components: list[str] | None = None) -> dict[str, Any]:
     """Pull-only hook: mirror the verified immutable manifest into part files.
 
     Call after atomically publishing cad/pulled and pinning cad_pull in the lock.
@@ -499,13 +505,25 @@ def refresh_pulled_spec(root: str | Path, expected_sha256: str | None = None,
         if expected_sha256 is not None and files.sha256 != expected_sha256:
             raise files.error("spec_conflict", (), "description changed since read")
         pulled = load_pulled(root)
+        documents = {name: roundtrip(text) for name, text in files.texts.items()}
+        changed = set()
+        removed = set(remove_components or [])
+        if removed:
+            if removed - files.data["components"].keys() or removed & pulled.parts.keys():
+                raise PullError("cad_pull_remove_present", "Retired descriptors must be known locally and absent from the new complete native pull")
+            origin = files.origin(("components",))
+            document = documents[origin.file][1]
+            for key in origin.path:
+                document = document[key]
+            for name in removed:
+                del document[name]
+                del files.data["components"][name]
+            changed.add(origin.file)
         _check_pulled_instances(files, pulled)
         if manifest is not None and json.loads((root / "cad/pulled/pull.json").read_text()) != manifest:
             raise PullError("cad_pull_modified", "Refresh manifest differs from the pinned CAD pull")
         parts, attachments = _pulled_values(pulled, root)
         placements = _pulled_placements(files, pulled)
-        documents = {name: roundtrip(text) for name, text in files.texts.items()}
-        changed = set()
         for name in files.data["components"]:
             origin = files.origin(("components", name))
             document = documents[origin.file][1]
@@ -527,4 +545,4 @@ def refresh_pulled_spec(root: str | Path, expected_sha256: str | None = None,
         proposed = load_spec_files(root, updates)
         proposed.validate()
         atomic_write_files(root, updates)
-        return {"ok": True, "previous_sha256": files.sha256, "sha256": proposed.sha256, "files": sorted(changed)}
+        return {"ok": True, "previous_sha256": files.sha256, "sha256": proposed.sha256, "files": sorted(changed), "removed_components": sorted(removed)}

@@ -13,10 +13,12 @@ from .pulled import PullError, PulledModel
 from .spec_files import _pulled_values, refresh_pulled_spec, validate_pulled_spec
 
 
-def refresh_pulled(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+def refresh_pulled(root: Path, manifest: dict[str, Any], *, expected_sha256: str | None = None,
+                   remove_components: list[str] | None = None) -> dict[str, Any]:
     """Refresh part metadata and attachments from a published, pinned manifest."""
     root = Path(root).resolve()
-    return refresh_pulled_spec(root, manifest=manifest)
+    return refresh_pulled_spec(root, expected_sha256=expected_sha256, manifest=manifest,
+                               remove_components=remove_components)
 
 
 def check_pulled(root: Path, model: PulledModel) -> None:

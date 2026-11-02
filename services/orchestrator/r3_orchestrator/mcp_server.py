@@ -215,17 +215,20 @@ def r3_get_schema(domain: str = "robot") -> dict[str, Any]:
 
 @_tool(_EDIT)
 def r3_cad_pull(project: str = "", url: str = "", version_id: str = "",
-                mesh_source: Literal['export', 'viewer'] = 'export', tab_id: int | None = None) -> dict[str, Any]:
+                mesh_source: Literal['export', 'viewer'] = 'export', tab_id: int | None = None,
+                remove_components: list[str] | None = None) -> dict[str, Any]:
     """Pull the real Onshape assembly at an immutable version. mesh_source=viewer uses loaded native OBJ
     with native poses/mass for a working prototype, no STEP or exports; remaining qualification is explicit.
     mesh_source=export downloads selected-part STL/STEP through
     /native/api/v17, reads real mates/connectors/poses, preserves native mass properties, verifies exact STEP
     and exported meshes, and captures the native view. Replaces read-only cad/pulled and refreshes derived
-    part descriptions. Resume the same operation to inspect a saved export receipt; never generates CAD."""
+    part descriptions. remove_components explicitly retires obsolete local descriptors only as part of a
+    complete new pull; native occurrences cannot be omitted and source edits conflict atomically.
+    Resume the same operation to inspect a saved export receipt; never generates CAD."""
     from r3_onshape.pull import pull
 
     return _guard(lambda: pull(api.load_project(project or None), url=url, version_id=version_id,
-                              mesh_source=mesh_source, tab_id=tab_id))
+                              mesh_source=mesh_source, tab_id=tab_id, remove_components=remove_components))
 
 
 @_tool(_EDIT)
@@ -297,7 +300,8 @@ def r3_view_artifact(path: str, project: str = "") -> Any:
 
 @_tool(_DESIGN)
 def r3_run_scenario(scenario: str, project: str = "") -> dict[str, Any]:
-    """Run one digital-twin scenario (ids from r3_status summary.scenarios) and return its diagnostics."""
+    """Run one digital-twin scenario (ids from r3_status summary.scenarios) and return its diagnostics.
+    For jobs exceeding an RPC deadline, use the guide's queued HTTP worker API; never duplicate a timed-out active run."""
     return _guard(lambda: api.deploy_sim(project or None, [scenario]))
 
 

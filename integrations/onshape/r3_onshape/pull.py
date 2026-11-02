@@ -294,20 +294,26 @@ def _finish_download(transport: Any, manifest: dict[str, Any], directory: Path, 
 
 
 def pull(project: Any, url: str = "", version_id: str = "", transport: Any = None, *,
-         mesh_source: str = 'export', tab_id: int | None = None) -> dict[str, Any]:
+         mesh_source: str = 'export', tab_id: int | None = None,
+         remove_components: list[str] | None = None) -> dict[str, Any]:
     """Explicit refresh. Validation stages never contact or modify native CAD."""
     try:
         with pull_lock(project.root):
             if mesh_source not in ('export', 'viewer'):
                 raise PullError('cad_pull_invalid', 'Use mesh_source viewer or export')
-            return _pull(project, url, version_id, transport, mesh_source, tab_id)
+            if remove_components is not None and (not isinstance(remove_components, list) or
+                    any(not isinstance(name, str) or not name for name in remove_components) or
+                    len(set(remove_components)) != len(remove_components)):
+                raise PullError('cad_pull_invalid', 'remove_components must contain unique nonempty component IDs')
+            return _pull(project, url, version_id, transport, mesh_source, tab_id, remove_components or [])
     except (ValueError, FileNotFoundError, ImportError, RuntimeError) as error:
         fallback = "cad_native_unavailable" if isinstance(error, FileNotFoundError) else "cad_pull_failed"
         return {"ok": False, "code": getattr(error, "code", fallback), "message": str(error), **getattr(error, "details", {})}
 
 
 def _pull(project: Any, url: str, version_id: str, transport: Any,
-          mesh_source: str = 'export', tab_id: int | None = None) -> dict[str, Any]:
+          mesh_source: str = 'export', tab_id: int | None = None,
+          remove_components: list[str] | None = None) -> dict[str, Any]:
     cad = project.spec.cad.model_dump()
     # An explicit target must not inherit a pin from another project default.
     # target() still rejects explicitly conflicting URL/version arguments.
@@ -318,19 +324,34 @@ def _pull(project: Any, url: str, version_id: str, transport: Any,
         from .translation import project_export_cache
         transport = NativeCadTransport(export_jobs=project_export_cache(project.root),
                                        mesh_export=project.spec.cad.mesh_export, export_receipts=True)
+    removed = set(remove_components or [])
+    source_revision = None
+    components = project.spec.components
+    if removed:
+        from r3_model.spec_files import load_spec_files, spec_lock
+        with spec_lock(project.root, shared=True):
+            files = load_spec_files(project.root)
+            components = files.validate().components
+            source_revision = files.sha256
+        if removed - components.keys():
+            raise PullError("cad_pull_invalid", "Cannot retire unknown component IDs: " + ", ".join(sorted(removed - components.keys())))
+        components = {name: value for name, value in components.items() if name not in removed}
     # Spec-schema integration refreshes these selectors from the split part refs.
     selectors = {}
-    for name, descriptor in project.spec.components.items():
+    for name, descriptor in components.items():
         ref = getattr(descriptor, "onshape", None)
         path = getattr(ref, "occurrence_path", None)
         if path:
             selectors[name] = list(path)
     manifest = describe(transport.assembly(pin["url"]), pin, selectors)
     manifest["mesh_export"] = project.spec.cad.mesh_export.model_dump()
-    undeclared = set(manifest["parts"]) - set(project.spec.components)
+    if removed & manifest["parts"].keys():
+        raise PullError("cad_pull_remove_present", "Cannot retire components still present in the complete native mapping: " +
+                        ", ".join(sorted(removed & manifest["parts"].keys())))
+    undeclared = set(manifest["parts"]) - set(components)
     if undeclared:
         raise PullError("cad_pull_invalid", "Declare local component metadata and occurrence selectors before pulling: " + ", ".join(sorted(undeclared)))
-    missing = set(project.spec.components) - set(manifest["parts"])
+    missing = set(components) - set(manifest["parts"])
     if missing:
         raise PullError("cad_pull_missing", "Described components missing from CAD pull: " + ", ".join(sorted(missing)),
                         {"missing_components": sorted(missing),
@@ -341,7 +362,7 @@ def _pull(project: Any, url: str, version_id: str, transport: Any,
                                  "then create a new version and pull again. No geometry downloads were attempted. "
                                  "Keep the declared design requirements; inspection exports are not a verified pull."})
     for name, part in manifest["parts"].items():
-        component = project.spec.components.get(name)
+        component = components.get(name)
         selection = getattr(component, "onshape", None)
         if selection and selection.configuration and selection.configuration != part["onshape"]["configuration"]:
             raise PullError("cad_pull_selection_invalid", f"{name}: configured native occurrence differs from the requested selector; configure the assembly in Onshape")
@@ -383,7 +404,11 @@ def _pull(project: Any, url: str, version_id: str, transport: Any,
             staging.rename(destination)
             project.write_lock("cad_pull", {"document_id": pin["document_id"], "version_id": pin["version_id"],
                                "manifest_sha256": checksum, "revision": pin["version_id"]})
-            refresh_pulled(project.root, manifest)
+            if removed:
+                refresh_pulled(project.root, manifest, expected_sha256=source_revision,
+                               remove_components=sorted(removed))
+            else:
+                refresh_pulled(project.root, manifest)
         except Exception:
             # Restore the last complete local snapshot on description/schema failures.
             # Native CAD is never touched by rollback.
@@ -410,6 +435,6 @@ def _pull(project: Any, url: str, version_id: str, transport: Any,
             shutil.rmtree(staging)
     return {"ok": True, "document_id": pin["document_id"], "version_id": pin["version_id"],
             "manifest_sha256": checksum, "parts": len(manifest["parts"]), "mates": len(manifest["mates"]),
-            "manifest": "cad/pulled/pull.json",
+            "manifest": "cad/pulled/pull.json", "removed_components": sorted(removed),
             "geometry_qualification": manifest.get('geometry_qualification', 'exported_solid'),
             "qualification_note": manifest.get('qualification_note', '')}

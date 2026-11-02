@@ -94,7 +94,7 @@ def test_missing_native_seat_never_uses_a_default_frame(project):
         assert error.value.code == 'cad_native_connector_missing'
 
 
-def test_legacy_fastener_still_requires_position_and_nonzero_axis():
+def test_legacy_fastener_still_requires_position():
     with pytest.raises(ValueError):
         Fastener.model_validate({'id':'fixture','type':'shcs-m3'})
     legacy = Fastener.model_validate({'id':'fixture','type':'shcs-m3','position':[1,2,3]})
@@ -212,3 +212,9 @@ def test_native_fastener_cannot_glue_an_unmated_part(tmp_path):
     actual=pulled_connections(Project.load(p.root))
     assert any(d.code=='cad_fastener_attachment_missing' for d in actual.diagnostics)
     assert not any(c.kind=='screw' and 'part' in (c.a,c.b) for c in actual.connections)
+
+
+def test_native_fastener_cannot_name_itself_as_its_nut():
+    with pytest.raises(ValueError,match='different native components'):
+        Fastener.model_validate({'id':'fixture','type':'shcs-m3','body':'coupon',
+                                 'mate_connector':'seat','nut':'nut-m3-nyloc','nut_body':'coupon','grip':.01})

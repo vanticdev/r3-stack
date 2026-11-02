@@ -274,6 +274,8 @@ class Fastener(_Model):
             object.__setattr__(self, "axis", [0.0, 0.0, -1.0])
         if self.nut_body and not self.nut:
             raise ValueError("nut_body requires the nut catalog rating")
+        if self.nut_body and self.nut_body == self.part:
+            raise ValueError("fastener and nut must name different native components")
         return self
 
     @property
