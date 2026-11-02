@@ -130,7 +130,8 @@ def _weights(path: np.ndarray, shared: np.ndarray) -> tuple[np.ndarray, np.ndarr
     return weight, source
 
 
-def _separate(paths: dict[str, np.ndarray], wires: dict[str, Any], diameters: dict[str, float]) -> bool:
+def _separate(paths: dict[str, np.ndarray], wires: dict[str, Any], diameters: dict[str, float], *,
+              layout: str = "auto") -> bool:
     """One pass: spread every group of conductors that still coincide. Returns True if anything moved."""
     by_harness: dict[str, list[str]] = {}
     for wire_id, path in paths.items():
@@ -214,7 +215,7 @@ def _separate(paths: dict[str, np.ndarray], wires: dict[str, Any], diameters: di
             n0, b0 = _frame_at(normals, binormals, min(first_param.values()))
             local = np.column_stack([spread @ n0, spread @ b0])
             connectors = {(wires[m].get("ends") or [None])[0] and (wires[m]["ends"][0] or {}).get("connector") for m in group}
-            ribbon = len(group) <= 6 and len(connectors) == 1 and None not in connectors
+            ribbon = layout == "flat" or (len(group) <= 6 and len(connectors) == 1 and None not in connectors)
             if ribbon:
                 order = sorted(range(len(group)), key=lambda i: local[i, 0])
                 slots_sorted = _flat([diameters.get(group[i], 1e-3) for i in order])
@@ -278,12 +279,17 @@ def _separate(paths: dict[str, np.ndarray], wires: dict[str, Any], diameters: di
     return moved
 
 
-def display_paths(routes: dict[str, Any], diameters: dict[str, float]) -> dict[str, np.ndarray]:
-    """Per-wire display polylines (robot frame, m). ``diameters``: wire id -> outer diameter."""
+def display_paths(routes: dict[str, Any], diameters: dict[str, float], *, layout: str = "auto") -> dict[str, np.ndarray]:
+    """Per-wire display polylines in metres; ``flat`` makes touching, side-by-side leads.
+
+    These are inspection paths, not a replacement for physical routing checks.
+    """
+    if layout not in ("auto", "flat"):
+        raise ValueError("Unknown conductor display layout")
     wires = routes.get("wires", {})
     paths = {wire_id: np.asarray(wire["path"], dtype=float) for wire_id, wire in wires.items() if wire.get("path")}
     for _ in range(MAX_PASSES):
-        if not _separate(paths, wires, diameters):
+        if not _separate(paths, wires, diameters, layout=layout):
             break
     return paths
 

@@ -517,6 +517,7 @@ export interface SlackSim {
 export interface WiringResponse {
   routes: RoutesJson | null;
   routing_detail: RoutingDetail | null;
+  conductor_display?: { layout: "bonded_flat"; qualification: "display_only"; source_sha256: string; paths: Record<string, Vec3[]> } | null;
   bom: Record<string, string | number>[] | null;
   bom_url?: string | null;
   clearances: {

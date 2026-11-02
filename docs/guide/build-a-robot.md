@@ -498,6 +498,14 @@ Failed searches remain explicit `wire_route_failed` errors. Their serialized
 and routed-harness renders; they do not count as completed routes in the viewer.
 The remaining computed paths and their engineering checks still run.
 
+The viewer separates coincident conductors into touching side-by-side rows,
+using their recorded insulation diameters. Pins stay fixed and individual
+conductors fan into the shared run. This display comes from the current routing
+response, so stale connector output cannot replace a newer routed path. It does
+not change the checked centreline, cut lengths or physics. A physically bonded
+flat lead needs its full width and bond assumptions qualified before fabrication;
+the old round-bundle envelope does not qualify that wider layout.
+
 Run `r3 validate --stage connectors,wiring,electrical`. Inspect pin maps, conductor exits,
 route witnesses, bend radii, dynamic clearances, supported spans, cut lengths, ampacity,
 voltage drop, fuse coordination, thermal results and runtime assumptions. The manufacturing

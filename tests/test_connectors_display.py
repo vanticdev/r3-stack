@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import math
+import json
 
 import numpy as np
 
@@ -86,3 +87,39 @@ def test_conductors_already_apart_are_untouched() -> None:
     shown = display_paths(routes, {k: OD for k in routes["wires"]})
     for wire_id, wire in routes["wires"].items():
         assert np.allclose(shown[wire_id], wire["path"])
+
+
+def test_flat_joined_display_touches_side_by_side_and_keeps_exact_pins():
+    routes = _routes([0, 1, 2], [8, 7, 6])
+    for i, wire in enumerate(routes['wires'].values()):
+        wire['ends'][0]['connector'] = f'independent_terminal_{i}'
+    original = json.dumps(routes, sort_keys=True)
+    diameters = {name: OD for name in routes['wires']}
+    shown = display_paths(routes, diameters, layout='flat')
+    cross_section = np.array([shown[name][wire['fanout'][0] + 20]
+                              for name, wire in routes['wires'].items()])
+    distances = sorted(np.linalg.norm(a - b) for a, b in itertools.combinations(cross_section, 2))
+    np.testing.assert_allclose(distances, [OD, OD, 2 * OD], rtol=0, atol=1e-12)
+    assert np.linalg.norm(np.cross(cross_section[1] - cross_section[0], cross_section[2] - cross_section[0])) < 1e-15
+    for name, wire in routes['wires'].items():
+        np.testing.assert_array_equal(shown[name][[0, -1]], np.asarray(wire['path'])[[0, -1]])
+    assert json.dumps(routes, sort_keys=True) == original
+
+
+def test_current_route_response_builds_fresh_flat_display_without_qualifying_it():
+    from r3_orchestrator.api.wire_display import conductor_display
+    routes = _routes([0, 1, 2], [8, 7, 6])
+    detail = {'wires': {name: {'od': OD} for name in routes['wires']}}
+    first = conductor_display(routes, detail)
+    assert first['layout'] == 'bonded_flat' and first['qualification'] == 'display_only'
+    assert len(first['paths']) == 3
+    routes['wires']['W0']['path'][0][0] -= .001
+    second = conductor_display(routes, detail)
+    assert second['source_sha256'] != first['source_sha256']
+    assert second['paths']['W0'][0] == routes['wires']['W0']['path'][0]
+    detail['wires']['W0']['od'] = OD * 1.1
+    assert conductor_display(routes, detail)['source_sha256'] != second['source_sha256']
+    routes['wires']['W1']['failed'] = True
+    del detail['wires']['W2']['od']
+    del routes['wires']['W2']['od']
+    assert set(conductor_display(routes, detail)['paths']) == {'W0'}

@@ -9,7 +9,7 @@ import {
 } from "./domain.ts";
 import { formatTarget, formatValue, itemUnit } from "./release.ts";
 import { initialHandles, routePatch } from "./routeEdit.ts";
-import { awgRadius, buildScene, resolveSubjects, wireColor, withConnectorDisplayPaths } from "./scene.ts";
+import { awgRadius, buildScene, resolveSubjects, wireColor, withConnectorDisplayPaths, withRoutedConductorPaths } from "./scene.ts";
 import { fmt, quantity, vector } from "./units.ts";
 
 const diag = (over: Partial<Diagnostic>): Diagnostic => ({ code: "x", severity: "info", message: "", subjects: [], data: {}, stage: "model", ...over });
@@ -192,6 +192,19 @@ describe("scene", () => {
     const legacy = { wires: { W1: { ...entry, failed: undefined } } } as unknown as RoutesJson;
     const detail = { wires: { W1: { failed: true } } } as unknown as RoutingDetail;
     expect(buildScene({ graph, routes: legacy, routingDetail: detail }).wires[0]!.routed).toBe(false);
+  });
+
+  it("uses fresh individual conductor paths while keeping pins and conductor radius", () => {
+    const source: Vec3[] = [[0, 0, 0], [.03, 0, 0], [.07, 0, 0], [.1, 0, 0]];
+    const separate: Vec3[] = [[0, 0, 0], [.03, .002, 0], [.07, .002, 0], [.1, 0, 0]];
+    const routes = { wires: { W1: { harness: "esc_power", awg: 12, path: source, routed_length: .1 } } } as unknown as RoutesJson;
+    const scene = buildScene({ graph, routes });
+    const shown = withRoutedConductorPaths(scene.wires, { W1: separate });
+    expect(shown[0]!.path).toEqual(separate);
+    expect(shown[0]!.radius).toBe(scene.wires[0]!.radius);
+    expect(scene.wires[0]!.path).toEqual(source);
+    const unrouted = buildScene({ graph, routes: null });
+    expect(withRoutedConductorPaths(unrouted.wires, { W1: separate })[0]).toBe(unrouted.wires[0]);
   });
 });
 
