@@ -907,3 +907,20 @@ elements and companion restarts. A subsequent local hold is HTTP 409 with explic
 it before recording another submission. Ordinary conflicts remain unknown outcomes.
 Do not bypass a hold through a different download alias. Existing complete pinned
 files remain usable, and no account-wide scope or reset is inferred.
+
+
+R3 pull and inspection exports save a client receipt before an asynchronous native
+submission. With the updated companion (`export_receipts_v1` in `/health`), rerunning
+the **same R3 operation** after a lost reply reads its saved receipt and, when needed,
+inspects that job's unique native completion notification. It never creates another
+export for an unknown outcome. Missing, mismatched or unrelated receipts remain
+explicitly unresolved; retain the files and retry the same read later. A confirmed
+HTTP rejection retains its original backoff and requires a later explicit attempt.
+Do not hand-edit export state or bypass it with a different alias. No downloaded
+file becomes the robot model until the usual pinned pull and geometry checks pass.
+
+The low-level `NativeCadTransport` keeps its legacy no-replay default. Standalone
+clients needing receipt recovery can use `export_receipts=True` with a persistent
+`export_jobs` directory and the updated companion. Normal R3 pull/export tools
+select this mode automatically; the Agent-tab agent need not construct receipt
+headers or write protocol files.

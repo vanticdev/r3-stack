@@ -302,7 +302,7 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
     if transport is None:
         from .translation import project_export_cache
         transport = NativeCadTransport(export_jobs=project_export_cache(project.root),
-                                       mesh_export=project.spec.cad.mesh_export)
+                                       mesh_export=project.spec.cad.mesh_export, export_receipts=True)
     # Spec-schema integration refreshes these selectors from the split part refs.
     selectors = {}
     for name, descriptor in project.spec.components.items():

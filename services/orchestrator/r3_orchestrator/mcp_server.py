@@ -216,8 +216,9 @@ def r3_get_schema(domain: str = "robot") -> dict[str, Any]:
 @_tool(_EDIT)
 def r3_cad_pull(project: str = "", url: str = "", version_id: str = "") -> dict[str, Any]:
     """Pull the real Onshape assembly at an immutable version. Downloads selected-part STL/STEP through
-    /native/api/v17, reads real mates/connectors/poses, computes mass from geometry/material and captures
-    the viewport. Replaces read-only cad/pulled and refreshes derived part descriptions. Never generates CAD."""
+    /native/api/v17, reads real mates/connectors/poses, preserves native mass properties, verifies exact STEP
+    and exported meshes, and captures the native view. Replaces read-only cad/pulled and refreshes derived
+    part descriptions. Resume the same operation to inspect a saved export receipt; never generates CAD."""
     from r3_onshape.pull import pull
 
     return _guard(lambda: pull(api.load_project(project or None), url=url, version_id=version_id))

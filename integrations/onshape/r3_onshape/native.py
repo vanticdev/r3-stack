@@ -71,12 +71,13 @@ class NativeCadTransport:
     """Authenticated loopback client; unsupported operations fail closed."""
 
     def __init__(self, runtime: Path | None = None, *, export_jobs: Path | None = None,
-                 mesh_export: CadMeshExport | None = None) -> None:
+                 mesh_export: CadMeshExport | None = None, export_receipts: bool = False) -> None:
         self._mesh_export = CadMeshExport.model_validate(mesh_export or {})
         bridge = NativeBridgeTransport(runtime)
         self.base, self.runtime = bridge.base, bridge.runtime
         self._headers = bridge._headers()
         self.export_jobs = export_jobs
+        self.export_receipts = export_receipts
         self._opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect())
         if urlsplit(self.base).hostname not in ("127.0.0.1", "localhost", "::1"):
             raise PullError("cad_native_unavailable", "onshape-native must use a loopback companion")
@@ -93,7 +94,7 @@ class NativeCadTransport:
             raise NativeRateLimitError.from_evidence(evidence["message"], evidence["details"])
 
     def _request(self, method: str, path: str, body: Any = None, query: dict | None = None,
-                 timeout: float = 120) -> bytes:
+                 timeout: float = 120, *, receipt_id: str | None = None) -> bytes:
         cached_artifact = method == "GET" and re.fullmatch(r"/artifacts/[a-f0-9]{64}\.json", path)
         if not (cached_artifact or path.startswith("/native/api/v17/") or re.match(r"^/api/v[0-9]+/", path) or path.startswith("/local/") or path == "/command"):
             raise PullError("cad_native_route_forbidden", "Only loopback browser API, native exports, local and editor routes are supported")
@@ -109,6 +110,10 @@ class NativeCadTransport:
         url = self.base + path + ("?" + urlencode(query) if query else "")
         raw = json.dumps(body, allow_nan=False).encode() if body is not None else None
         headers = {**self._headers, "Content-Type": "application/json"}
+        if receipt_id is not None:
+            if method != "POST" or not path.startswith("/native/api/v17/") or not re.fullmatch(r"[a-f0-9]{32}", receipt_id):
+                raise PullError("cad_native_route_forbidden", "Export receipts require a native POST and an exact client receipt ID")
+            headers["X-Onshape-Native-Receipt"] = receipt_id
         for _ in range(4):
             request_resource = urlsplit(url).path
             self.check_backoff(method, request_resource)
@@ -156,6 +161,12 @@ class NativeCadTransport:
                             authentication_required = True
                         if isinstance(payload.get("translationId"), str):
                             details["translation_id"] = payload["translationId"]
+                        nested = payload.get("translation")
+                        if (isinstance(nested, dict) and isinstance(nested.get("id"), str) and nested["id"]
+                                and nested.get("requestState") in {"ACTIVE", "DONE", "FAILED"}
+                                and nested["id"] == payload.get("translationId", nested["id"])):
+                            details["translation_id"] = nested["id"]
+                            details["translation"] = nested
                         if isinstance(payload.get("id"), str) and "requestState" in payload:
                             details["translation"] = payload
                 except ValueError:

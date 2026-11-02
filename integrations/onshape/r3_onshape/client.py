@@ -303,7 +303,7 @@ def default_transport():
         raise ValueError("Public Onshape transports are unavailable; use onshape-native /native exports and editor/local tools")
     from .native import NativeCadTransport
     try:
-        return NativeCadTransport()
+        return NativeCadTransport(export_receipts=True)
     except FileNotFoundError:
         return None
 

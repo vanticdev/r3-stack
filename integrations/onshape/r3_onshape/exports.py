@@ -31,7 +31,7 @@ def export_part(project: Any, url: str, part_id: str, format: str = "step",
     if root not in build.parents or build not in folder.parents:
         raise PullError("cad_export_invalid", "Inspection exports must stay inside this project's build directory")
     from .translation import project_export_cache
-    native = transport if transport is not None else NativeCadTransport(export_jobs=project_export_cache(root), mesh_export=settings)
+    native = transport if transport is not None else NativeCadTransport(export_jobs=project_export_cache(root), mesh_export=settings, export_receipts=True)
     data = getattr(native, format)(pin["document_id"], pin["version_id"], pin["element_id"],
                                    part_id, pin["configuration"])
     if not data:

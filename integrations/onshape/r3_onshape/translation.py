@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import tempfile
 import time
+import uuid
 from typing import Any, Iterator
 from urllib.parse import quote
 
@@ -121,10 +122,14 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
                 if not expired:
                     raise PullError(previous['code'], previous['message'], previous['details'])
 
-        def native_request(method: str, resource: str, payload: Any = None) -> bytes:
+        def native_request(method: str, resource: str, payload: Any = None, *, query: dict | None = None,
+                           receipt_id: str | None = None) -> bytes:
             check_previous_backoff()
+            options = {"query": query} if query else {}
+            if receipt_id is not None:
+                options["receipt_id"] = receipt_id
             try:
-                data = client._request(method, resource, payload) if payload is not None else client._request(method, resource)
+                data = client._request(method, resource, payload, **options) if payload is not None else client._request(method, resource, **options)
             except PullError as error:
                 error.details.update(export_request=request, export_state=str(path) if path else None)
                 if state.get('job'):
@@ -136,7 +141,46 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
             state.pop('last_error', None)
             return data
 
+        receipt_request = {'method': 'POST', 'path': endpoint.removeprefix('/native'), 'body': body}
+        receipt_digest = hashlib.sha256(json.dumps(receipt_request, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()).hexdigest()
         job = state.get('job')
+        if not job and state['phase'] in {'submitting', 'unknown'} and state.get('submission_receipt'):
+            receipt = state['submission_receipt']
+            if (not isinstance(receipt, dict) or not isinstance(receipt.get('id'), str)
+                    or len(receipt['id']) != 32 or any(c not in '0123456789abcdef' for c in receipt['id'])
+                    or receipt.get('request_sha256') != receipt_digest):
+                raise PullError('cad_native_export_receipt_invalid', 'Saved client receipt differs from this pinned request')
+            try:
+                recovered = response(native_request('GET', '/native/api/v17/exportreceipts/' + receipt['id']))
+            except PullError as error:
+                raise PullError('cad_native_export_unknown',
+                    'The saved client receipt could not be inspected. Preserve it and retry this read later; do not recreate the export.',
+                    {**error.details, 'receipt_id': receipt['id'], 'export_state': str(path) if path else None}) from error
+            if recovered.get('receiptId') != receipt['id'] or recovered.get('request_sha256') != receipt_digest:
+                raise PullError('cad_native_export_receipt_invalid', 'Companion receipt belongs to a different pinned request')
+            job = recovered.get('translation')
+            if not isinstance(job, dict) or not isinstance(job.get('id'), str) or not job['id']:
+                raise PullError('cad_native_export_receipt_invalid', 'Companion receipt has no saved translation identity')
+            rejection = job.get('rejection') or {}
+            if isinstance(rejection, dict) and rejection.get('http_status') in {400, 401, 403, 404, 405, 422, 429}:
+                state['phase'] = 'rejected'
+                details = {'receipt_id': receipt['id'], 'http_status': 200, 'original_http_status': rejection['http_status'],
+                           'request_sent': False, 'bridge_request_sent': True, 'submission_rejected': True,
+                           'export_state': str(path) if path else None}
+                if rejection['http_status'] == 429:
+                    from .backoff import bridge_evidence
+                    evidence = bridge_evidence({'code': 'onshape_native_resource_backoff_active',
+                        'request_sent': False, 'upstream_backoff': rejection})
+                    details.update(evidence or {'resume_at': None})
+                    error = PullError('cad_native_backoff_active', 'Saved receipt confirms the original rate rejection; retain its deadline.', details)
+                    state['last_error'] = {'code': error.code, 'message': str(error), 'details': details,
+                                           'http_status': 200, 'resume_at': details.get('resume_at')}
+                else:
+                    error = PullError('cad_native_export_rejected', 'Saved receipt confirms a rejected export; inspect its original failure.', details)
+                _save(path, state)
+                raise error
+            state.update(phase='submitted', job=job)
+            _save(path, state)
         if not job:
             if state['phase'] in {'submitting', 'unknown'}:
                 raise PullError('cad_native_export_unknown',
@@ -146,10 +190,16 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
             if callable(check_backoff):
                 check_backoff('POST', endpoint)
             check_previous_backoff()
+            receipt_id = None
+            if getattr(client, 'export_receipts', False) is True and path is not None:
+                if prior := state.get('submission_receipt'):
+                    state.setdefault('previous_receipts', []).append(prior)
+                receipt_id = uuid.uuid4().hex
+                state['submission_receipt'] = {'id': receipt_id, 'request_sha256': receipt_digest}
             state['phase'] = 'submitting'
             _save(path, state)  # survive provider/worker loss before receiving the ID
             try:
-                job = response(native_request('POST', endpoint, body))
+                job = response(native_request('POST', endpoint, body, receipt_id=receipt_id))
             except PullError as error:
                 error.details.update(export_request=request, export_state=str(path) if path else None)
                 # A definite HTTP rejection created no export. Everything else
@@ -160,7 +210,7 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
                 known = error.details.get('translation')
                 if not known and error.details.get('translation_id'):
                     known = {'id': error.details['translation_id'], 'requestState': 'ACTIVE'}
-                if isinstance(known, dict) and isinstance(known.get('id'), str):
+                if isinstance(known, dict) and isinstance(known.get('id'), str) and known['id']:
                     state.update(phase='submitted', job=known)
                 state['error'] = {'code': error.code, 'message': str(error), **error.details}
                 _save(path, state)
@@ -175,6 +225,17 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
             raise PullError('cad_native_export_cache_invalid', 'Cached native job has no valid translation ID')
         details = {'translation_id': job['id'], 'format': body['formatName'], 'export_request': request,
                    'export_state': str(path) if path else None}
+        if job.get('submissionOutcome') == 'unknown':
+            inspected = response(native_request('GET', '/native/api/v17/translations/' + quote(job['id'], safe=''),
+                                                query={'inspectUnknown': 'true'}))
+            if inspected.get('id') != job['id']:
+                raise PullError('cad_native_response_invalid', 'Native receipt inspection returned another translation ID', details)
+            job = inspected
+            state['job'] = job
+            _save(path, state)
+            if job.get('submissionOutcome') == 'unknown':
+                raise PullError('cad_native_export_unresolved',
+                    'No matching native completion was found for this saved receipt. Retry the same R3 operation later to inspect it; never resubmit it.', details)
         deadline = time.monotonic() + 1800
         while job.get('requestState') not in {'DONE', 'FAILED'}:
             if time.monotonic() > deadline:
