@@ -285,7 +285,11 @@ Record created IDs. To trash a run's document, verify its name and folder first,
 session. No geometry export uses this route. `r3 cad pull` consumes the selected version;
 it deliberately does not create or modify the design or document.
 
-Create or select an immutable Onshape version, then pull the assembly:
+Use `r3_cad_preview` to inspect an unfinished native assembly on the project’s 3D page.
+For a working mesh prototype without STEP, follow the loaded-viewer path under
+[Pinned source exports and cached geometry inspection](#pinned-source-exports-and-cached-geometry-inspection).
+
+For the exact-export path, create or select an immutable Onshape version, then pull the assembly:
 
 ```sh
 r3 cad pull --url https://cad.onshape.com/documents/D/v/V/e/A
@@ -303,7 +307,7 @@ update those defaults through the spec tools when changing the default target.
 
 The MCP equivalent is `r3_cad_pull(url=..., version_id=...)`. `r3_run_stage("cad")`
 checks the current pulled copy; it never creates geometry or refreshes the native model.
-The pull downloads each exact part's STL in metres and STEP, reads native mate connectors,
+The default exact-export pull downloads each part's STL in metres and STEP, reads native mate connectors,
 mates, joint axes/limits and solved poses, computes volume/mass/centre of mass/inertia with
 Open CASCADE plus the assigned material density, and captures pinned REST shaded-view evidence. A
 missing material, unresolved occurrence, unsupported constraint or missing geometry is an
@@ -339,8 +343,11 @@ the companion to expose `/native` routes. Unsupported operations fail with a cle
 The desktop native integration needs its signed-in browser/companion on the worker;
 a server must provide that native session or consume an already pulled copy.
 
-All checks and consumers use the pull: fit/interference/thread checks read STEP with OCP;
-wiring, simulation, viewer and fabrication read STL. No checks or tolerances are relaxed.
+All physical consumers use the pull. In the exact-export path, fit/interference/thread
+checks read STEP with OCP; wiring, simulation, viewer and fabrication read the exported
+meshes. The loaded-viewer prototype path uses unchanged native OBJ bodies and native
+physics instead, with unsupported analytic checks explicitly pending. It does not
+require STEP for rendering or prototype simulation. No numeric tolerances are relaxed.
 For native Composite Parts, the pull also downloads glTF and uses its separate native
 Body nodes for mesh consumers. STL triangle soup loses body ownership at coincident
 edges; do not union or reshape an otherwise valid purchased assembly merely to make
@@ -348,8 +355,10 @@ that soup manifold. R3 preserves every glTF facet and joins exact coordinates on
 within each native body. Every body must still be finite, closed, consistently wound
 and positive-volume. STEP verification likewise preserves its distinct native solids.
 The original STL remains pinned for inspection, and glTF is pinned with its own SHA-256;
-neither file may be edited. Unsupported or failed glTF exports remain errors, with no
-public export or local geometry fallback. Only files exported from Onshape count as the model.
+neither file may be edited. Unsupported or failed glTF exports remain errors in this
+exact-export path, with no public export or local geometry fallback. An explicit
+loaded-viewer pull is a separate prototype acquisition mode. Only unchanged geometry
+files retrieved from Onshape count as the model.
 Do not enable `exportCompositeConstituentsWithOriginalBodyIds` for glTF: the native
 exporter collapses composite Body groups with that option. R3 uses the default
 native grouping and does not reconstruct missing ownership from face data.
@@ -883,10 +892,13 @@ its native assembly transform is separate. Retrieve its exact `artifact` bytes
 using `NativeCadTransport().artifact_bytes(handle)` and its provenance JSON using
 `artifact(provenance_handle)`. Save inspection files under the project's `build/`
 instead of reading the companion's private cache. A hash mismatch fails.
-These are render meshes, explicitly `exact_cad: false` and
-`closed_solid_verified: false`; display quality may vary. They do not replace
-STEP, establish printability, install `cad/pulled/` or qualify the viewer/twin
-model. Keep using `r3_cad_pull` and all existing exact-geometry and mesh checks.
+These inspection files are render meshes, explicitly `exact_cad: false` and
+`closed_solid_verified: false`; display quality may vary. An individual download
+does not establish printability or install `cad/pulled/`. Use `r3_cad_preview` for
+the project inspection view, and `r3_cad_pull(mesh_source="viewer", ...)` for a
+pinned working mesh model with native physics. That pull validates its native
+assembly, provenance and meshes and keeps unsupported analytic qualification
+pending. The default exact-export pull remains available when its exports work.
 Only geometry retrieved from Onshape is model evidence; never author or repair
 geometry locally to turn an inspection file into a passing pull.
 

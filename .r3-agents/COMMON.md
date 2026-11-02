@@ -60,8 +60,13 @@ the Onshape UI. Feature Studios, custom features, FeatureScript evaluation and a
 generated `.fs` source are forbidden. `integrations/onshape/r3_onshape/policy.py`
 enforces this in the R3 client, `tests/test_cad_policy.py` tests it, and
 `.claude/settings.json` denies the onshape-native `evaluate` tool. Do not work
-around it. Verification reads pinned STEP with OCP and pulled STL meshes. Browser-session REST
-reads may be used when they work; they never replace exported files as the model. R3 never generates
+around it. The exact-export path verifies pinned STEP with OCP and native exported meshes.
+For a working prototype, the build guide also documents `r3_cad_preview` and
+`r3_cad_pull(mesh_source="viewer")`: unchanged native OBJ bodies, placements and
+mass properties support rendering and real prototype physics without STEP.
+Unsupported analytic qualification remains explicitly pending; numeric checks
+are not weakened. Browser-session REST reads supply native metadata, never locally
+reconstructed geometry. Only unchanged geometry files retrieved from Onshape count as the model. R3 never generates
 parts or assemblies from YAML. Native connector frames, mates and poses are pulled evidence.
 
 ## Tool-use policy (user directive): use every tool the way a human engineer would
