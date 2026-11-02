@@ -148,3 +148,63 @@ def test_unknown_reset_is_scoped_without_inventing_a_deadline(tmp_path, monkeypa
     assert 'preserve fresh revision guards' in instruction
     claude = agents.claude_command('claude', tmp_path/'config.json')
     assert 'no reported reset deadline' in claude[claude.index('--append-system-prompt')+1]
+
+
+def test_claude_session_shares_the_codex_read_boundary(tmp_path, monkeypatch):
+    monkeypatch.setenv('HOME', str(tmp_path))
+    project = tmp_path/'projects'/'robot'
+    project.mkdir(parents=True)
+    photo = tmp_path/'attachments'/'reference.jpg'
+    photo.parent.mkdir()
+    photo.write_bytes(b'image')
+    settings = agents.claude_settings(project, {}, granted=[photo])
+    platform = Path(agents.__file__).resolve().parents[4]
+    allow, deny = settings['permissions']['allow'], settings['permissions']['deny']
+    assert f'Read(/{project.resolve()}/**)' in allow and f'Read(/{platform}/**)' in allow
+    assert f'Read(/{photo.resolve()})' in allow
+    assert [rule for rule in allow if rule.startswith('Edit')] == [f'Edit(/{project.resolve()}/**)']
+    assert f'Read(/{platform}/.git/**)' in deny
+    filesystem = settings['sandbox']['filesystem']
+    assert filesystem['allowWrite'] == [str(project.resolve())]
+    assert str(tmp_path.resolve()) in filesystem['denyRead'] and str(photo.resolve()) in filesystem['allowRead']
+    assert settings['sandbox']['allowUnsandboxedCommands'] is False
+
+
+def test_claude_settings_hide_sibling_projects_but_not_the_session_project():
+    platform = Path(agents.__file__).resolve().parents[4]
+    examples = platform/'examples'/'robots'
+    sibling = examples/'zz-synthetic-sibling'
+    project = examples/'zz-synthetic-project'
+    sibling.mkdir(parents=True, exist_ok=True)
+    project.mkdir(exist_ok=True)
+    try:
+        deny = agents.claude_settings(project, {})['permissions']['deny']
+        assert f'Read(/{sibling}/**)' in deny and f'Read(/{project}/**)' not in deny
+    finally:
+        sibling.rmdir()
+        project.rmdir()
+
+
+def test_prompt_named_files_grant_exactly_those_existing_files(tmp_path):
+    photo = tmp_path/'reference image.jpg'
+    photo.write_bytes(b'image')
+    plain = tmp_path/'reference.jpg'
+    plain.write_bytes(b'image')
+    prompt = f'See {plain}. Then `{plain}` again, not {tmp_path} and not {tmp_path}/missing.png.'
+    assert agents.prompt_files(prompt) == [plain.resolve()]
+    assert agents.prompt_files('use /etc/not-a-real-file and foo/bar.jpg') == []
+
+
+def test_prompt_named_files_reach_the_codex_profile_and_tool_scope(tmp_path, monkeypatch):
+    from r3_model.read_scope import LocalReadScope
+    conf = config(tmp_path, monkeypatch)
+    photo = tmp_path/'outside'/'reference.jpg'
+    photo.parent.mkdir()
+    photo.write_bytes(b'image')
+    profile = agents.codex_permission_profile(tmp_path/'project', conf, granted=[photo.resolve()])
+    assert profile['filesystem'][str(photo.resolve())] == 'read'
+    assert str(photo.parent.resolve()) not in profile['filesystem']
+    (tmp_path/'project').mkdir()
+    scoped = agents.mcp_config(tmp_path/'project', 'python', [photo.resolve()])
+    scope = LocalReadScope.from_json(scoped['mcpServers']['r3']['env']['R3_LOCAL_READ_SCOPE'])
+    assert scope.check(photo) == photo.resolve()

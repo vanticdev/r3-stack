@@ -25,6 +25,10 @@ normal git and the R3 MCP tools. The user message is passed unchanged. Use
 typed authoring reference, including field descriptions and nested definitions
 (also `connector` and `wire` for project catalog additions).
 Use these tools and this guide; reading platform source is not required.
+A Claude Code session has the same abilities: Bash, file edits, web tools, gh and the R3 and
+onshape-native tools. Its file tools and sandboxed shell read this project, the R3 platform and
+any file the user's prompt names by absolute path, and write only this project. In its shell,
+TMPDIR is the CLI's own directory; keep temporary work in `$TEMP`, inside this project.
 The session exposes R3 and onshape-native tools directly and excludes unrelated account
 plugins and skills. Use its browser-session REST feature tools for CAD; no other project context is needed.
 Temporary work belongs in the session's `TMPDIR`, under this project's `build/agent/`.

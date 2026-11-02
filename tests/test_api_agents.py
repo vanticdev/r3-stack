@@ -86,7 +86,15 @@ def test_claude_session_streams_transcript_runs_and_spec_diff(env):
     allowed = argv[argv.index("--allowedTools") + 1:argv.index("--disallowedTools")]
     denied = argv[argv.index("--disallowedTools") + 1:]
     denied = denied[:denied.index("--model")] if "--model" in denied else denied
-    assert "mcp__r3__r3_patch_spec" in allowed and "Read" in allowed and "Bash" not in allowed and "Edit" not in allowed
+    assert "mcp__r3__r3_patch_spec" in allowed and {"Bash", "WebFetch", "WebSearch"} <= set(allowed)
+    # File access is granted only by the path-scoped rules in the session settings.
+    assert not {"Read", "Glob", "Grep", "Edit", "Write"} & set(allowed)
+    assert {"Read", "Bash", "Edit", "Write", "WebFetch"} <= set(argv[argv.index("--tools") + 1].split(","))
+    settings = json.loads(open(argv[argv.index("--settings") + 1]).read())
+    assert f"Edit(/{root.resolve()}/**)" in settings["permissions"]["allow"]
+    assert f"Read(/{root.resolve()}/**)" in settings["permissions"]["allow"]
+    assert settings["sandbox"]["enabled"] is True and settings["sandbox"]["allowUnsandboxedCommands"] is False
+    assert "--setting-sources" in argv and "--disable-slash-commands" in argv
     assert {f"mcp__r3__{t}" for t in GATED} <= set(denied)
     assert not {f"mcp__r3__{t}" for t in GATED} & set(allowed)
     assert "mcp__onshape_native__native_write" in allowed
