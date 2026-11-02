@@ -502,6 +502,16 @@ def _split(piece: Any, depth: int, out: list[tuple[np.ndarray, bool]]) -> None:
             _split(half, depth + 1, out)
 
 
+def _hull_only(vertices: np.ndarray) -> tuple[tuple[np.ndarray, ...], int]:
+    """A mesh's conservative hull, or nothing when it encloses no volume."""
+    import manifold3d
+
+    hull = manifold3d.Manifold.hull_points(np.asarray(vertices, dtype=float))
+    if hull.is_empty() or hull.volume() <= 1e-12:
+        return (), 0
+    return (hull.to_mesh().vert_properties[:, :3].astype(float),), 1
+
+
 # Both the rigid-part builder and cable builder request the same assembly.
 # Keep a bounded working set large enough to reuse ordinary multipart models.
 @functools.lru_cache(maxsize=256)
@@ -509,7 +519,12 @@ def _convex_pieces_cached(key: str, vertices_bytes: bytes, faces_bytes: bytes) -
     vertices = np.frombuffer(vertices_bytes, dtype=float).reshape(-1, 3)
     faces = np.frombuffer(faces_bytes, dtype=np.int64).reshape(-1, 3)
     out: list[tuple[np.ndarray, bool]] = []
-    _split(_manifold(vertices, faces), 0, out)
+    solid = _manifold(vertices, faces)
+    if solid.is_empty():
+        # An open display mesh has no solid to split. Without this it would
+        # silently have no collision geometry and pass through the ground.
+        return _hull_only(vertices)
+    _split(solid, 0, out)
     return tuple(v for v, _ in out), sum(1 for _, convex in out if not convex)
 
 
@@ -518,8 +533,8 @@ def convex_pieces(vertices: np.ndarray, faces: np.ndarray) -> tuple[list[np.ndar
     splits (manifold3d), choosing the split with the least hull waste, until every
     piece has volume / hull volume >= CONVEX_TOLERANCE. CAD parts here are
     boards with components and plates, which split exactly; pieces that do not
-    converge in 6 levels keep their hull (conservative). Returns (vertex clouds,
-    number of hull-only pieces)."""
+    converge in 6 levels, and open meshes with no solid to split, keep their hull
+    (conservative). Returns (vertex clouds, number of hull-only pieces)."""
     vertices = np.ascontiguousarray(vertices, dtype=float)
     faces = np.ascontiguousarray(faces, dtype=np.int64)
     key = hashlib.sha1(vertices.tobytes() + faces.tobytes()).hexdigest()
