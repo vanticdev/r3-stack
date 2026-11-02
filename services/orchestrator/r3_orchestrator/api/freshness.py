@@ -100,14 +100,17 @@ class CodeGuard:
                        {"changed": changed, "loaded_version": self.version, "current_version": code_version()})
 
 
-def input_files(root: Path) -> list[Path]:
+def input_files(root: Path, known: list[Path] | None = None) -> list[Path]:
     """Every file ``Project.load`` reads for the project at ``root``."""
     from r3_catalog import DATA_DIR
 
     from r3_model.spec_files import load_spec_files, spec_lock
 
-    with spec_lock(root, shared=True):
-        files = [root / name for name in load_spec_files(root).texts]
+    if known is None:
+        with spec_lock(root, shared=True):
+            files = [root / name for name in load_spec_files(root).texts]
+    else:
+        files = list(known)
     files.append(root / "r3.lock.yaml")
     for catalog in (root / "catalog", Path(DATA_DIR)):
         if catalog.is_dir():
@@ -130,6 +133,8 @@ class ProjectCache:
     def __init__(self, size: int = 16) -> None:
         self.size = size
         self._entries: OrderedDict[Path, tuple[tuple[str, str], Project]] = OrderedDict()
+        self._inputs: dict[Path, list[Path]] = {}
+        self._loads: dict[Path, threading.Lock] = {}
         self._lock = threading.Lock()
 
     def key(self, root: Path) -> tuple[str, str]:
@@ -137,23 +142,45 @@ class ProjectCache:
 
     def load(self, root: str | Path) -> Project:
         root = Path(root).resolve()
-        key = self.key(root)
+        with self._lock:
+            loading = self._loads.setdefault(root, threading.Lock())
+        # A page requests several domains at once. Resolve a cold project once,
+        # rather than parsing the same include graph in every request thread.
+        with loading:
+            return self._load(root)
+
+    def _load(self, root: Path) -> Project:
+        version = code_version()
         with self._lock:
             hit = self._entries.get(root)
-            if hit is not None and hit[0] == key:
-                self._entries.move_to_end(root)
+            known = self._inputs.get(root)
+        if hit is not None:
+            files = input_files(root, known)
+            key = (version, version_of(_stamps(files, str)))
+            if hit[0] == key:
+                with self._lock:
+                    if root in self._entries:
+                        self._entries.move_to_end(root)
                 return hit[1]
+        # An include file changed: rediscover the graph before replacing the
+        # cache. Catalog directories are rescanned even on a hit, so additions
+        # and removals still invalidate it without parsing unchanged YAML.
+        files = input_files(root)
+        key = (version, version_of(_stamps(files, str)))
         project = Project.load(root)
         with self._lock:
             self._entries[root] = (key, project)
+            self._inputs[root] = files
             self._entries.move_to_end(root)
             while len(self._entries) > self.size:
-                self._entries.popitem(last=False)
+                removed, _ = self._entries.popitem(last=False)
+                self._inputs.pop(removed, None)
         return project
 
     def clear(self) -> None:
         with self._lock:
             self._entries.clear()
+            self._inputs.clear()
 
 
 PROJECTS = ProjectCache()
