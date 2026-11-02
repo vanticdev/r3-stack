@@ -75,7 +75,7 @@ export function SoftwarePage() {
       {(s) => (
         <div className="page">
           <div className="readiness"><NetlistMatch project={project.data} bindings={s.bindings} /></div>
-          <Card title="Where each software binding goes" subtitle="Device pin first, then the Pi header pin that drives it" flush>
+          <Card collapsed title="Where each software binding goes" subtitle="Device pin first, then the Pi header pin that drives it" flush>
             <div className="list binding-list" data-testid="binding-map">
               {s.bindings.map((b) => <BindingRow key={b.handle} b={b} />)}
             </div>
@@ -121,7 +121,7 @@ function Modules({ modules, project, deployLog }: { modules: SoftwareResponse["m
   const repo = project?.links.github ?? null;
   const branch = project?.git?.branch ?? "main";
   return (
-    <Card title="Firmware module">
+    <Card collapsed title="Firmware module">
       {modules.length ? (
         <div className="stack" style={{ gap: 14 }}>
           {modules.map((m) => {
@@ -176,7 +176,7 @@ function FirmwareLogs({ pid, logs }: { pid: string; logs: SoftwareResponse["firm
     requestAnimationFrame(() => box.current?.querySelector(`[data-line="${index}"]`)?.scrollIntoView({ block: "center" }));
   };
   return (
-    <Card title="Simulation firmware log" flush
+    <Card collapsed title="Simulation firmware log" flush
           subtitle={chosen ? <>The real controller against the virtual hardware, scenario {partLabel(chosen.scenario)}{last?.stale ? " · previous run, inputs changed" : ""}</> : "No simulation run yet"}>
       <div className="log-toolbar">
         {logs.length > 1 && <select value={chosen?.scenario} onChange={(e) => setScenario(e.target.value)} aria-label="Scenario">{logs.map((l) => <option key={l.scenario} value={l.scenario}>{partLabel(l.scenario)}</option>)}</select>}

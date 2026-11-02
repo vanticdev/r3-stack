@@ -783,3 +783,43 @@ tr.mismatch td { background: var(--critical-bg); }
 :root[data-theme="light"] { --line-strong: #807f79; }
 
 .model-bank > .row > input { width: auto; flex: 1; }
+
+/* Progressive disclosure: default screens show the task, details open on request. */
+.disclosure > summary, .nav-more > summary { cursor: pointer; padding: 14px 18px; color: var(--text-primary); font-weight: 500; }
+.disclosure:not([open]) { align-self: start; }
+.disclosure[open] > summary { border-bottom: 1px solid var(--line); }
+.disclosure > .card-body { display: grid; gap: 16px; }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.nav-more { width: 100%; }
+.nav-more > summary { padding: 12px; color: var(--text-secondary); font-size: 12px; }
+.page { gap: 24px; }
+.content:not(.flush) { padding: 32px; }
+.project-row { padding: 24px; }
+.project-row > details { grid-column: 1 / -1; }
+.overview-model { position: relative; height: 360px; display: flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.overview-model > a { position: absolute; bottom: 16px; right: 16px; }
+.overview-model .viewer-toolbar { display: none; }
+.workspace:not(:has(.inspector)) { grid-template-columns: minmax(0, 1fr); }
+.harness-layout { grid-template-columns: minmax(0, 1fr); }
+.harness-list { max-width: 100%; }
+.diagnostics-workspace.show-issues { grid-template-columns: minmax(0, 1fr); }
+.diagnostics-workspace.show-issues .diag-view { display: none; }
+.diagnostics-workspace.show-3d { grid-template-columns: minmax(320px, 36%) minmax(0, 1fr); }
+.diag-pane .stage-group { padding: 20px 24px; }
+.agent-page { grid-template-columns: minmax(0, 1fr); }
+.agent-history { border: 0; max-height: 260px; }
+.agent-history > summary { padding: 12px; cursor: pointer; }
+.agent-split.with-changes { grid-template-columns: minmax(0, 1fr); }
+.agent-split.show-chat .agent-changes, .agent-split .splitter { display: none; }
+.agent-split.show-changes .agent-chat { display: none; }
+.model-bank-columns { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 720px) {
+ .content:not(.flush) { padding: 16px; }
+ .diagnostics-workspace.show-3d { grid-template-columns: minmax(0, 1fr); }
+}
+
+.overview-model > .viewer { flex: 1; min-width: 0; }
+.agent-session > .tabs, .diagnostics-workspace > .tabs { display: flex; }
+.scenario-picker > summary { cursor: pointer; padding: 8px 0; }
+
+#operating-point > .grid { grid-template-columns: minmax(0, 1fr); }

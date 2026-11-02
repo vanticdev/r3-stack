@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "react-router-dom";
 
@@ -60,6 +60,7 @@ function ModelRevision({ pid }: { pid: string }) {
 
 export function ThreeDPage() {
   const { pid = "" } = useParams();
+  const [inspect, setInspect] = useState(false);
   const { data, isPending, error, cad } = useRobotScene(pid);
   const client = useQueryClient();
   const preview = useMutation({ mutationFn: () => api.refreshCadPreview(pid),
@@ -90,13 +91,14 @@ export function ThreeDPage() {
                    selectedInterference={interference}
                    onInterference={(i) => { const o = data.interference[i]!; selectInterference(i, [o.a, o.b]); }}
                    toolbarExtra={<>
+                     <button onClick={() => { if (inspect || selection || interference !== null) { setInspect(false); select(null); selectInterference(null); } else setInspect(true); }} aria-expanded={!!(inspect || selection || interference !== null)}>Inspect model</button>
                      {focus.length > 0 && <div className="group"><button onClick={() => { setFocus([]); selectInterference(null); }}>Clear highlight</button></div>}
                      {cad?.authority?.code === 'cad_mesh_prototype'
                        ? <span className="viewer-badge outdated">Onshape mesh prototype · qualification pending</span>
                        : <ModelRevision pid={pid} />}
                    </>} />
-      <Inspector data={data} selection={selection} interference={interference} onSelect={select}
-                 onClear={() => { select(null); if (interference !== null) selectInterference(null); }} />
+      {(inspect || selection || interference !== null) && <Inspector data={data} selection={selection} interference={interference} onSelect={select}
+                 onClear={() => { select(null); if (interference !== null) selectInterference(null); setInspect(false); }} />}
     </div>
   );
 }

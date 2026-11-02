@@ -275,7 +275,7 @@ export function AgentPage() {
 
   return (
     <div className={`agent-page${past.length || thread.length ? "" : " no-history"}`}>
-      {(past.length > 0 || thread.length > 0) && <aside className="agent-history" aria-label="Agent history">
+      {(past.length > 0 || thread.length > 0) && <details className="agent-history" aria-label="Agent history"><summary>Earlier conversations</summary>
         <button className="small" onClick={() => { setThread([]); setPrompt(""); }} disabled={running}><Icon name="plus" size={12} />New task</button>
         <div className="list">
           {past.map((s) => (
@@ -288,16 +288,16 @@ export function AgentPage() {
           ))}
           {!past.length && <span className="muted small" style={{ padding: "6px 2px" }}>No earlier tasks.</span>}
         </div>
-      </aside>}
+      </details>}
 
       {!thread.length ? (
         <div className="agent-start">
           <h1>What should change?</h1>
-          <p className="secondary">Describe a robot change. The agent edits the robot description and runs the checks.</p>
+          <Details summary="How it works">Describe a robot change. The agent edits the robot description and runs the checks.</Details>
           {composer}
           {error ? <ErrorBox error={error} /> : null}
           {suggestions.length > 0 && (
-            <div className="suggestions">
+            <details className="suggestions"><summary>Suggested fixes</summary>
               <span className="muted small">Suggestions from current errors</span>
               {suggestions.map((d, i) => (
                 <button key={i} className="ghost small suggestion" onClick={() => setPrompt(`Fix this ${d.stage} error: ${diagnosticHeadline(d)}${d.hint ? ` (${d.hint})` : ""}`)}>
@@ -305,7 +305,7 @@ export function AgentPage() {
                 </button>
               ))}
               <Link className="small" to={`/p/${encodeURIComponent(pid)}/diagnostics`}>All diagnostics</Link>
-            </div>
+            </details>
           )}
         </div>
       ) : (

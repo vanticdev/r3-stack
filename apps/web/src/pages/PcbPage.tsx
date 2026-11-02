@@ -102,7 +102,7 @@ function Board({ pid, board, boards, onBoard, diagnostics }: { pid: string; boar
       )}
 
       <div className="grid cols-2" style={{ alignItems: "start" }}>
-        <Card title="Checks" subtitle={json?.outline ? `Board ${fmt(json.outline.width, "m")} × ${fmt(json.outline.height, "m")}` : undefined}>
+        <Card collapsed title="Checks" subtitle={json?.outline ? `Board ${fmt(json.outline.width, "m")} × ${fmt(json.outline.height, "m")}` : undefined}>
           <div className="check-list" data-testid="pcb-checks">
             <CheckRow outcome={checkOutcome(board.erc)} title="Schematic rules (ERC)"
                       result={board.erc?.errors === null || board.erc?.errors === undefined ? "Not run" : board.erc.errors === 0 ? `Passed${board.erc.warnings ? ` · ${plural(board.erc.warnings, "warning")}` : ""}` : `${plural(board.erc.errors, "error")}`} />
@@ -125,11 +125,11 @@ function Board({ pid, board, boards, onBoard, diagnostics }: { pid: string; boar
       </div>
 
       <div className="grid cols-2" style={{ alignItems: "start" }}>
-        <Card title="Diagnostics" subtitle={own.length ? `${countsText({ error: blockers.length, warning: own.filter((d) => d.severity === "warning").length })}` : undefined}>
+        <Card collapsed title="Diagnostics" subtitle={own.length ? `${countsText({ error: blockers.length, warning: own.filter((d) => d.severity === "warning").length })}` : undefined}>
           <DiagnosticList items={own.slice().sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "error" ? -1 : b.severity === "error" ? 1 : a.severity === "warning" ? -1 : 1))}
                           empty={stage?.status === "missing" ? "Not built yet." : "No diagnostics for this board."} />
         </Card>
-        <Card title="Connector pin → net" subtitle="Board netlist against the catalog entry; mismatches first" flush>
+        <Card collapsed title="Connector pin → net" subtitle="Board netlist against the catalog entry; mismatches first" flush>
           {pinMap.length ? (
             <div className="table-wrap" style={{ maxHeight: 460 }}>
               <table data-testid="pin-map">
@@ -150,7 +150,7 @@ function Board({ pid, board, boards, onBoard, diagnostics }: { pid: string; boar
         </Card>
       </div>
 
-      <Card title="Bill of materials" flush>{board.bom?.length ? <BomTable rows={board.bom} /> : <div style={{ padding: 14 }} className="muted">No BOM yet.</div>}</Card>
+      <Card collapsed title="Bill of materials" flush>{board.bom?.length ? <BomTable rows={board.bom} /> : <div style={{ padding: 14 }} className="muted">No BOM yet.</div>}</Card>
       {board.files.length > 0 && (
         <Details summary={`Files (${board.files.length})`}>
           <div className="file-list">

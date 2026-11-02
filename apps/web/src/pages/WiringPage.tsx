@@ -10,7 +10,7 @@ import { Icon } from "../components/icons.tsx";
 import { TimeChart } from "../components/TimeChart.tsx";
 import { Timeline } from "../components/Timeline.tsx";
 import { BomTable } from "../components/BomTable.tsx";
-import { Card, Empty, ErrorBox, Gallery, RatioBar, Segmented, StaleNotice } from "../components/ui.tsx";
+import { Details, Card, Empty, ErrorBox, Gallery, RatioBar, Segmented, StaleNotice } from "../components/ui.tsx";
 import { wireRows, type WireRow } from "../lib/domain.ts";
 import { diagnosticFacts, diagnosticHeadline, partLabel, plural } from "../lib/labels.ts";
 import { initialHandles, routePatch } from "../lib/routeEdit.ts";
@@ -148,14 +148,14 @@ export function WiringPage() {
       <div className="readiness">
         <div className="summary-line">
           <span className="lead">{harnesses.length} harnesses · {rows.length} wires</span>
-          <span className="secondary">{fmt(totalCut, "m")} total cut length · clearance to moving parts required ≥ {fmt(required, "m")}</span>
+          <Details summary="Measurements"><span>{fmt(totalCut, "m")} total cut length · clearance to moving parts required ≥ {fmt(required, "m")}</span></Details>
         </div>
         {stage?.stale && <StaleNotice what="Wiring results" since={stage.started_at} onRerun={() => void start({ stages: ["wiring"] })} rerunLabel="Rerun wiring" busy={!!active} />}
         {worst ? (
           <div className="failing-row">
             <Icon name="x" size={13} />
-            <span><strong>{stage?.stale ? "Previous run, worst failure: " : "Worst failure: "}{diagnosticHeadline(worst)}</strong>
-              {diagnosticFacts(worst).time !== null && <span className="muted"> · at {diagnosticFacts(worst).time!.toFixed(3)} s</span>}</span>
+            <Details summary={`${errorCount} wiring errors`}><span><strong>{stage?.stale ? "Previous run, worst failure: " : "Worst failure: "}{diagnosticHeadline(worst)}</strong>
+              {diagnosticFacts(worst).time !== null && <span className="muted"> · at {diagnosticFacts(worst).time!.toFixed(3)} s</span>}</span></Details>
             <button className="small" onClick={locateWorst}><Icon name="target" size={12} />Locate interference</button>
             <Link className="button small" to={`/p/${encodeURIComponent(pid)}/diagnostics?stage=wiring`}>View {plural(errorCount, "error")}</Link>
           </div>
@@ -163,7 +163,7 @@ export function WiringPage() {
       </div>
 
       <div className="harness-layout">
-        <Card title="Harnesses" flush className="harness-list">
+        <Card collapsed title="Harnesses" flush className="harness-list">
           <div className="list" data-testid="harness-list">
             {harnesses.map((h) => (
               <button key={h.id} className={`list-row${harness === h.id ? " selected" : ""}`} onClick={() => choose(harness === h.id ? null : h.id)} aria-pressed={harness === h.id}>
@@ -239,6 +239,8 @@ export function WiringPage() {
         </Card>
       </div>
 
+      <details className="disclosure">
+        <summary>Wire data</summary>
       <Card flush title={
         <div className="row">
           <Segmented label="Wiring tables" value={tab} onChange={setTab}
@@ -286,6 +288,7 @@ export function WiringPage() {
         {tab === "motion" && <CableMotionPanel pid={pid} required={required} />}
         {tab === "images" && <div style={{ padding: 12 }}><Gallery images={wiring?.images ?? []} /></div>}
       </Card>
+      </details>
     </div>
   );
 }

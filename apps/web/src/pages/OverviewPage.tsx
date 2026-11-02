@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api/client.ts";
@@ -12,6 +13,8 @@ import { partLabel, stageLabel, stagePage } from "../lib/labels.ts";
 import { groupRelease, isOutdated, itemLabel, itemNote, itemOutcome, itemResult, itemScenario, releaseSummary } from "../lib/release.ts";
 import { projectStatus } from "../lib/status.ts";
 import { useProjectRuns } from "../state/runs.tsx";
+
+const OverviewModel = lazy(() => import("../viewer/DiagnosticScene.tsx"));
 
 /** Technical identity of an item's evidence: ids, checks, artifacts and input hashes, all copyable. */
 function EvidenceDetails({ pid, item }: { pid: string; item: ReleaseItem }) {
@@ -67,22 +70,23 @@ function ItemRow({ pid, item, label, onRerun, busy, children }: {
 
 function Readiness({ p }: { p: ProjectDetail }) {
   const summary = releaseSummary(p.release.counts, p.release.fabrication_ready);
-  const failing = p.release.items.filter((i) => i.status === "failed" && i.kind !== "stage");
+  const failing = p.release.items.filter((i) => i.status === "failed");
   return (
     <div className="readiness" data-testid="release-gate">
       <div className="summary-line">
         <span className="lead">{summary.headline}</span>
-        <span className="secondary">{summary.parts.join(" · ")}</span>
+        <Details summary="Readiness details"><span>{summary.parts.join(" · ")}</span></Details>
       </div>
+      {failing.length > 3 && <Link to={`/p/${encodeURIComponent(p.id)}/diagnostics`}>All {failing.length} blocking requirements</Link>}
       {failing.length > 0 && (
         <div className="failing">
-          {failing.map((item) => {
+          {failing.slice(0, 3).map((item) => {
             const { value, target } = itemResult(item);
             const stage = item.evidence[0]?.stage;
             return (
               <div key={item.id} className="failing-row">
                 <Icon name="x" size={13} />
-                <span><strong>{itemLabel(item)}: {value}</strong>, required {target}{itemNote(item) ? <Markdown inline className="muted">{` · ${itemNote(item)}`}</Markdown> : null}</span>
+                <span><strong>{itemLabel(item)}: {value}</strong><Details summary="Evidence">Required {target}{itemNote(item) ? <Markdown>{itemNote(item)}</Markdown> : null}</Details></span>
                 {stage && <Link to={`/p/${encodeURIComponent(p.id)}/${stagePage(stage)}`}>Open {stageLabel(stage)}</Link>}
               </div>
             );
@@ -111,9 +115,10 @@ export function OverviewPage() {
           <div className="page">
             <Readiness p={p} />
 
+            <div className="overview-model"><Suspense fallback={<div className="skeleton" style={{ height: 360 }} />}><OverviewModel pid={pid} highlight={[]} markers={[]} /></Suspense><Link className="button" to={`/p/${encodeURIComponent(pid)}/3d`}>Explore model</Link></div>
             <div className="grid side">
               <div className="stack" style={{ gap: 16, alignContent: "start" }}>
-                <Card title="Requirements" flush>
+                <Card collapsed title="Requirements" flush>
                   <div className="check-list padded" data-testid="evidence-matrix">
                     {groups.requirements.map(({ item, related }) => (
                       <ItemRow key={item.id} pid={pid} item={item} onRerun={rerun} busy={busy}>
@@ -129,7 +134,7 @@ export function OverviewPage() {
                   </div>
                 </Card>
                 {groups.scenarios.length > 0 && (
-                  <Card title="Scenario expectations" flush>
+                  <Card collapsed title="Scenario expectations" flush>
                     <div className="check-list padded">
                       {groups.scenarios.map(({ scenario, items }) => (
                         <div key={scenario} className="scenario-group">
@@ -146,7 +151,7 @@ export function OverviewPage() {
               </div>
 
               <div className="stack" style={{ gap: 16, alignContent: "start" }}>
-                <Card title="Pipeline">
+                <Card collapsed title="Pipeline">
                   {/* A problem that affects most stages is stated once; narrower ones sit next to the stage they limit. */}
                   {causes.filter((c) => c.stages.length > 2).map((c) => (
                     <div key={c.missing} className="stale-notice" style={{ marginBottom: 8 }}>
@@ -174,7 +179,7 @@ function ProjectFacts({ p }: { p: ProjectDetail }) {
   const s = p.summary;
   const links: [string, string | null | undefined][] = [["Onshape document", p.links.onshape], ["GitHub repository", p.links.github], ["HTML report", p.report_url]];
   return (
-    <Card title="Project">
+    <Card collapsed title="Project">
       <div className="stack">
         {p.robot.description && <Markdown className="secondary small">{p.robot.description}</Markdown>}
         <dl className="kv">

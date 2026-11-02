@@ -9,9 +9,12 @@ import { Markdown } from "./Markdown.tsx";
 import { Icon, type IconName } from "./icons.tsx";
 import { ProjectLoadError } from "./ProjectLoadError.tsx";
 
-export function Card({ title, subtitle, actions, children, flush, className = "" }: {
-  title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; flush?: boolean; className?: string;
+export function Card({ title, subtitle, actions, children, flush, collapsed = false, className = "" }: {
+  title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode; flush?: boolean; collapsed?: boolean; className?: string;
 }) {
+  if (collapsed) return <details className={`card disclosure ${className}`}><summary>{title ?? "Details"}</summary>
+    <div className="card-body">{subtitle && <p className="muted small">{subtitle}</p>}{actions}{children}</div>
+  </details>;
   return (
     <section className={`card ${className}`}>
       {(title || actions) && (
@@ -226,7 +229,7 @@ export function StaleNotice({ what, since, onRerun, rerunLabel, busy, children }
   return (
     <div className="stale-notice" role="status">
       <Icon name="clock" size={14} />
-      <span><strong>{what} are out of date.</strong> They were computed from earlier inputs{since ? ` (${timeAgo(since)})` : ""}; robot.yaml or a pinned revision has changed since.{children}</span>
+      <span><strong>{what} are out of date.</strong><Details summary="Why">They were computed from earlier inputs{since ? ` (${timeAgo(since)})` : ""}; robot.yaml or a pinned revision has changed since.</Details>{children}</span>
       {onRerun && <button className="small" onClick={onRerun} disabled={busy}><Icon name="refresh" size={12} />{rerunLabel ?? "Rerun"}</button>}
     </div>
   );

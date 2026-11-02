@@ -46,13 +46,14 @@ function ProjectNav({ pid }: { pid: string }) {
   return (
     <nav className="nav-section nav" aria-label="Project">
       <h3>Project</h3>
-      {PROJECT_NAV.map((item) => (
+      {PROJECT_NAV.filter((item) => ["overview", "3d", "diagnostics", "agent"].includes(item.to)).map((item) => (
         <NavLink key={item.to} to={`/p/${encodeURIComponent(pid)}/${item.to}`}>
           <Icon name={item.icon} />
           {item.label}
           {item.to === "diagnostics" && !!counts.error && <span className="badge critical" title={`${counts.error} errors`}>{counts.error}</span>}
         </NavLink>
       ))}
+      <details className="nav-more"><summary>Build &amp; test</summary>{PROJECT_NAV.filter((item) => !["overview", "3d", "diagnostics", "agent"].includes(item.to)).map((item) => <NavLink key={item.to} to={`/p/${encodeURIComponent(pid)}/${item.to}`}><Icon name={item.icon} />{item.label}</NavLink>)}</details>
     </nav>
   );
 }
@@ -74,8 +75,8 @@ export function AppShell() {
           </NavLink>
           <nav className="nav-section nav" aria-label="Workspace">
             <NavLink to="/" end className={() => (location.pathname === "/" ? "active" : "")}><Icon name="folder" />Projects</NavLink>
-            <NavLink to="/models"><Icon name="cube" />Model bank</NavLink>
-            <NavLink to="/environment"><Icon name="stethoscope" />Environment</NavLink>
+            <details className="nav-more"><summary>Workspace tools</summary><NavLink to="/models"><Icon name="cube" />Model bank</NavLink>
+            <NavLink to="/environment"><Icon name="stethoscope" />Environment</NavLink></details>
           </nav>
           {pid && <ProjectNav pid={pid} />}
           <div className="sidebar-foot">
@@ -206,6 +207,7 @@ export function StageList({ pid, stages, onRerun, busy, onNavigate, extra, count
 
 function revisionRows(p: ProjectDetail): [string, string | null | undefined][] {
   return [
+    ["Version", p.robot.version],
     ["robot.yaml", p.fingerprint.robot_yaml_sha256],
     ["Git commit", p.git?.commit ?? p.fingerprint.git_commit],
     ["Git branch", p.git?.branch],
@@ -223,12 +225,13 @@ function StatusSummary({ project, runningStage, onRerun, busy }: {
       <span className={`status-pill ${status.tone}`} data-testid="status-summary">
         <span className="dot" />
         <strong>{status.headline}</strong>
-        {status.parts.map((p) => <span key={p} className="part">· {p}</span>)}
+
         <Icon name="chevron" size={12} className={open ? "flip" : ""} />
       </span>
     )}>
       {(close) => (
         <div className="stack status-panel">
+          <span className="secondary">{status.parts.join(" · ")}</span>
           <StageList pid={project.id} stages={status.stages} onRerun={(s) => { onRerun(s); }} busy={busy} onNavigate={close} />
           <Details summary="Revision details" rows={revisionRows(project)} />
         </div>
@@ -256,7 +259,7 @@ export function ProjectLayout() {
         <MenuButton />
         <div className="title">
           <h1 className="ellipsis">{p?.robot.name ?? pid}</h1>
-          <span className="meta ellipsis">{p?.robot.version ? `v${p.robot.version}` : ""}{p?.git?.branch ? ` · ${p.git.branch}` : ""}</span>
+
         </div>
         {p && <StatusSummary project={p} runningStage={active?.stage ?? null} onRerun={(s) => run([s])} busy={!!active || starting} />}
         <div className="spacer" />

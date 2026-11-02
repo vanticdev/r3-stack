@@ -208,8 +208,8 @@ export function ElectricalPage() {
             {stage?.stale && <StaleNotice what="Electrical results" since={stage.started_at} onRerun={() => void start({ stages: ["electrical"] })} rerunLabel="Rerun electrical" busy={!!active} />}
 
             <section className="stack" style={{ gap: 12 }}>
-              <div className="section-title"><h2>Worst cases across all battery states</h2></div>
-              <Card>
+              <div className="summary-line"><span className="lead">{failures.length + otherErrors.length ? `${failures.length + otherErrors.length} electrical problems` : "No electrical limits exceeded"}</span></div>
+              <Card collapsed title="Findings and checks">
                 <div className="check-list" data-testid="electrical-findings">
                   {failures.map((f) => (
                     <CheckRow key={f.title} outcome="failed" title={f.title} result={f.detail}
@@ -225,8 +225,8 @@ export function ElectricalPage() {
                 )}
               </Card>
               <div className="grid cols-2">
-                <Card title="Wire current vs ampacity" subtitle="Bar: worst continuous current · dashed: burst · tick: rating" flush><RatingTable rows={e.wires} label="Wire" /></Card>
-                <Card title="Connector contacts vs rating" subtitle="Worst continuous current per contact · dashed: burst vs burst rating" flush><RatingTable rows={e.connectors} label="Contact" /></Card>
+                <Card collapsed title="Wire current vs ampacity" subtitle="Bar: worst continuous current · dashed: burst · tick: rating" flush><RatingTable rows={e.wires} label="Wire" /></Card>
+                <Card collapsed title="Connector contacts vs rating" subtitle="Worst continuous current per contact · dashed: burst vs burst rating" flush><RatingTable rows={e.connectors} label="Contact" /></Card>
               </div>
             </section>
 
@@ -248,7 +248,7 @@ export function ElectricalPage() {
                     {node && <NodeDetail id={node} graph={graph} point={selected} tree={tree} />}
                   </div>
                 </Card>
-                <Card title={`Calculated rail voltages · ${stateName(current, soc)}`} subtitle="Click a rail for its pins" flush>
+                <Card collapsed title={`Calculated rail voltages · ${stateName(current, soc)}`} subtitle="Click a rail for its pins" flush>
                   <div className="table-wrap">
                     <table data-testid="rail-table">
                       <thead><tr><th>Rail</th><th className="num">Nominal</th><th className="num">Tolerance</th>{rows.map((r) => <th key={r.id} className="num">{pointName(r)}</th>)}</tr></thead>
@@ -287,7 +287,7 @@ export function ElectricalPage() {
                 </Card>
               </div>
 
-              <Card title={`Operating points · ${stateName(current, soc)}`} subtitle="Click a row to show it in the power tree" flush>
+              <Card collapsed title={`Operating points · ${stateName(current, soc)}`} subtitle="Click a row to show it in the power tree" flush>
                 <div className="table-wrap">
                   <table data-testid="operating-points">
                     <thead><tr><th>Point</th><th className="num">Battery</th><th className="num">Battery current</th><th className="num">Motor current</th>
@@ -316,10 +316,10 @@ export function ElectricalPage() {
             </section>
 
             <div className="grid cols-2">
-              <Card title="Battery voltage over the discharge" subtitle={e.runtime ? `${fmt(e.runtime.capacity_ah, "")} Ah · software cutoff ${fmt(e.runtime.cutoff_voltage, "V")}` : ""}>
+              <Card collapsed title="Battery voltage over the discharge" subtitle={e.runtime ? `${fmt(e.runtime.capacity_ah, "")} Ah · software cutoff ${fmt(e.runtime.cutoff_voltage, "V")}` : ""}>
                 {e.runtime?.curve?.length ? <RuntimeChart curve={e.runtime.curve} /> : <span className="muted">No runtime curve.</span>}
               </Card>
-              <Card title="Plots"><Gallery images={e.images} /></Card>
+              <Card collapsed title="Plots"><Gallery images={e.images} /></Card>
             </div>
             <Details summary="How these values are calculated">
               <span className="small">Static operating points of the DC network with routed wire lengths, cross-checked in ngspice. Runtime integrates the duty-cycle mix over the battery's discharge curve.

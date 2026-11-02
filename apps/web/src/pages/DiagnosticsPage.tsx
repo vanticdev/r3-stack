@@ -73,7 +73,7 @@ export function DiagnosticsPage() {
   const { start, active } = useProjectRuns(pid);
   const [params, setParams] = useSearchParams();
   const stageFilter = params.get("stage") ?? "";
-  const [severity, setSeverity] = useState("");
+  const [severity, setSeverity] = useState("error");
   const [text, setText] = useState("");
   const [selected, setSelected] = useState<Diagnostic | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -89,7 +89,7 @@ export function DiagnosticsPage() {
   }, [selected]);
   const stages = project.data?.stages ?? [];
   const toggle = (key: string) => setCollapsed((c) => { const n = new Set(c); if (n.has(key)) n.delete(key); else n.add(key); return n; });
-  const counts = { error: filtered.filter((d) => d.severity === "error").length, warning: filtered.filter((d) => d.severity === "warning").length };
+  const counts = { error: all.filter((d) => d.severity === "error").length, warning: all.filter((d) => d.severity === "warning").length };
 
   if (error) return <div style={{ padding: 20 }}><ErrorBox error={error} /></div>;
   return (
@@ -103,7 +103,7 @@ export function DiagnosticsPage() {
           </div>
           <div className="row">
             <select value={severity} onChange={(e) => setSeverity(e.target.value)} aria-label="Severity filter">
-              <option value="">All severities</option><option value="error">Errors</option><option value="warning">Warnings</option><option value="info">Info</option>
+              <option value="">All severities</option><option value="error">Errors</option><option value="warning">Warnings ({counts.warning})</option><option value="info">Info ({all.filter(d => d.severity === "info").length})</option>
             </select>
             <input type="search" placeholder="Search part, cable or message" value={text} onChange={(e) => setText(e.target.value)} style={{ flex: 1 }} aria-label="Search diagnostics" />
           </div>
@@ -126,13 +126,13 @@ export function DiagnosticsPage() {
               </div>
               {row?.stale && (
                 <div className="stale-notice">
-                  <Icon name="clock" size={14} /><span><strong>{stageLabel(g.stage)} results are out of date.</strong> They predate the current robot.yaml.</span>
+                  <Icon name="clock" size={14} /><span><strong>Outdated results</strong><Details summary="Why">They predate the current robot.yaml.</Details></span>
                   <button className="small" disabled={!!active} onClick={() => void start({ stages: [g.stage] })}>Rerun {stageLabel(g.stage)}</button>
                 </div>
               )}
               {g.types.map((t) => {
                 const key = `${g.stage}|${t.type}`;
-                const open = !collapsed.has(key);
+                const open = collapsed.has(key);
                 return (
                   <div key={key} className="type-group">
                     <button className="type-head" aria-expanded={open} onClick={() => toggle(key)}>

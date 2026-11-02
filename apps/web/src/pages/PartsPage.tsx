@@ -67,7 +67,7 @@ export function PartsPage() {
       <div className="page-head">
         <div>
           <h1>Parts</h1>
-          <p>Track owned parts and what remains to buy. R3 finds parts for sourcing slots and pins your choice in <code>r3.lock.yaml</code>.</p>
+          <details><summary>About parts</summary><p>Track owned parts and what remains to buy. R3 finds parts for sourcing slots and pins your choice in <code>r3.lock.yaml</code>.</p></details>
         </div>
       </div>
       <QueryView query={slots} height={300}>
@@ -84,7 +84,7 @@ export function PartsPage() {
                     {data.slots.map((s) => <SlotRow key={s.slot} slot={s} active={s.slot === slot.slot} onSelect={() => setSelected(s.slot)} />)}
                   </div>
                 </Card>
-                <Card title="Providers" subtitle="Keys come from the server environment">
+                <Card collapsed title="Providers" subtitle="Keys come from the server environment">
                   <div className="stack" style={{ gap: 4 }}>
                     {data.providers.map((p) => (
                       <div key={p.id} className="stack small" style={{ gap: 2 }} title={p.reason || p.title}>
@@ -349,8 +349,8 @@ function CandidateDetail({ entry, candidate }: { entry: RankedCandidate; candida
 
 export function PurchaseParts({ purchases }: { purchases: PurchaseSummary }) {
   return <Card title="Parts" subtitle={`To buy: ${Object.entries(purchases.to_buy_totals).map(([currency, total]) => `${total.toFixed(2)} ${currency}`).join(" · ") || "No priced parts"}${purchases.unpriced_to_buy ? ` · ${purchases.unpriced_to_buy} unpriced` : ""}`}>
-    <table><thead><tr><th>Component</th><th>Status</th><th className="num">To buy</th></tr></thead><tbody>
+    <details><summary>Owned parts and shopping list</summary><table><thead><tr><th>Component</th><th>Status</th><th className="num">To buy</th></tr></thead><tbody>
       {purchases.lines.map((part) => <tr key={part.component}><td title={part.note}>{part.component}<div className="muted small">{part.type}</div></td><td><Chip tone={part.owned ? "info" : part.status === "sourced" ? "good" : "muted"}>{part.owned ? "Owned" : part.status === "sourced" ? "Sourced" : "To buy"}</Chip></td><td className="num">{part.owned ? "—" : part.purchase_cost === null ? "Unpriced" : `${part.purchase_cost.toFixed(2)} ${part.currency}`}</td></tr>)}
-    </tbody></table>
+    </tbody></table></details>
   </Card>;
 }
