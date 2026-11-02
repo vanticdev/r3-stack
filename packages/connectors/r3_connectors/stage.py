@@ -28,6 +28,7 @@ import trimesh
 
 from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
+from r3_model.mesh_io import load_exported_mesh
 
 from .display import display_paths, overlaps
 from .frames import Frame
@@ -107,14 +108,16 @@ class ConnectorStage:
             part = self.pulled.parts.get(cid)
             if part is None:
                 continue
-            scene = trimesh.load(part.stl, force="scene")
+            scene = trimesh.Scene(load_exported_mesh(part.mesh))
             self.component_scenes[cid] = scene
             path = self.out / "models" / "components" / f"{hashlib.sha256(cid.encode()).hexdigest()}.glb"
             export_glb(scene, path)
             pose = self.pulled.poses[cid]
             self.data["components"][cid] = {"type": comp.type, "kind": self.catalog.component(comp.type).kind,
                 "name": cid, "source": "pulled", "frame": Frame(pose[:3, :3], pose[:3, 3]).to_json(),
-                "glb": str(path.relative_to(self.out)), "glb_sha256": glb_digest(path)}
+                "glb": str(path.relative_to(self.out)), "glb_sha256": glb_digest(path),
+                "geometry_qualification": part.geometry_qualification,
+                "source_sha256": part.sha256[part.mesh.suffix.lower().lstrip(".")]}
 
     def _bindings(self) -> dict[str, list[str]]:
         out: dict[str, list[str]] = {}
@@ -322,9 +325,9 @@ class ConnectorStage:
             cid = info.get("component") if info["owner"] == "component" else ref
             if cid in self.pulled.parts:
                 part = self.pulled.parts[cid]
-                scene = trimesh.load(part.stl, force="scene")
+                scene = trimesh.Scene(load_exported_mesh(part.mesh))
                 transform = self.pulled.poses[cid]
-                source = f"pulled/{cid} (SHA-256 {part.sha256['stl']})"
+                source = f"pulled/{cid} (SHA-256 {part.sha256[part.mesh.suffix.lower().lstrip('.')]})"
             # Cache owner meshes separately from connector instances: two ports
             # on the same component have different placed supplemental models.
             bodies = []
@@ -568,6 +571,12 @@ def run(project: Project, render: bool = True) -> StageResult:
         result.add(Diagnostic.error(error.code, str(error)))
         return result
     stage = ConnectorStage(project, result)
+    estimated = [name for name, part in stage.pulled.parts.items()
+                 if part.geometry_qualification == "display_mesh"]
+    if estimated:
+        result.add(Diagnostic.warning("cad_geometry_estimated",
+            "Native display meshes support prototype connector checks; geometry qualification remains pending",
+            subjects=estimated, data={"parts": len(estimated)}))
     try:
         stage.run(render)
     except PullError as error:
