@@ -1427,6 +1427,13 @@ def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str,
     requirement = float(project.spec.requirements.min_wire_clearance_moving)
     before = {w: r.path.copy() for w, r in routing.wires.items()}
     plans, diagnostics, moved = [], [], {}
+    for harness in project.spec.electrical.harnesses:
+        for wire in harness.wires:
+            if wire.id not in routing.wires:
+                diagnostics.append(Diagnostic.error(
+                    "wire_route_failed", f"{harness.id}: {wire.id} has no routed conductor geometry",
+                    subjects=[harness.id, wire.id],
+                    hint="Resolve the terminal geometry or routing failure, then route this conductor again."))
     stats: dict[str, Any] = {}
     occupied: list[tuple[np.ndarray, float, set[str]]] = []
     for group in _groups(project, routing):
@@ -1456,7 +1463,10 @@ def plan_routing(project: Any, router: Any, routing: Any, *, supports: dict[str,
         _apply(project, routing, plan, moved)
         for harness in group:
             for wire_id in routing.harnesses[harness].wires:
-                for pts, radius in router._occupied_runs(routing.wires[wire_id]):
+                wire = routing.wires.get(wire_id)
+                if wire is None or wire.failed:
+                    continue  # Failed/missing paths remain errors, never physical occupancy.
+                for pts, radius in router._occupied_runs(wire):
                     occupied.append((pts, radius, categories))
         for v in plan.violations:
             diagnostics.append(Diagnostic.error(

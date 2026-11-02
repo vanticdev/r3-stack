@@ -818,6 +818,10 @@ class HarnessRouter:
             a, b = (nodes[key[0]], nodes[key[1]])
             if a.lead_end is None or b.lead_end is None:
                 failed.add(key)
+                self.diagnostics.append(Diagnostic.error(
+                    "wire_route_failed", f"{harness.id}: terminal lead geometry unavailable for {key[0]} -> {key[1]}",
+                    subjects=[harness.id] + [w.id for w in branches[key]],
+                    hint="Resolve the native terminal frame before routing this branch."))
                 continue
             r = branch_od(branches[key]) / 2
             ctx = self.context(r, keep_away)
