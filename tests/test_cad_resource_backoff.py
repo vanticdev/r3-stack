@@ -234,3 +234,74 @@ def test_redirect_429_is_recorded_for_the_actual_download_resource(tmp_path):
         restarted._request('GET', target)
     assert repeated.value.details['request_sent'] is False
     restarted._opener.open.assert_not_called()
+
+
+def test_bridge_alias_hold_is_known_unsent_and_resumes_after_original_deadline(tmp_path, monkeypatch):
+    from datetime import timezone
+    from r3_onshape import translation
+    from r3_onshape import backoff
+    now = datetime.now(timezone.utc)
+    resume = now + timedelta(seconds=120)
+    observation = {'code':'onshape_native_resource_backoff_active', 'message':'UI resource is held',
+        'request_sent':False, 'upstream_backoff':{'schema':'onshape/ui-resource-backoff@1', 'http_status':429,
+            'method':'POST', 'resource':'/api/documents/d/doc/v/version/translate',
+            'retry_after':'120', 'resume_at':resume.isoformat(), 'observed_at':now.isoformat()}}
+    headers = Message()
+    native = client(tmp_path)
+    native._opener = Mock()
+    native._opener.open.side_effect = HTTPError('http://127.0.0.1:8766'+PATH,409,'held',headers,
+        io.BytesIO(json.dumps(observation).encode()))
+    with pytest.raises(PullError) as first:
+        native.step('doc','version','studio','part')
+    assert first.value.code == 'cad_native_backoff_active'
+    assert first.value.details['http_status']==409 and first.value.details['original_http_status']==429
+    assert first.value.details['request_sent'] is False and first.value.details['bridge_request_sent'] is True
+    assert first.value.details['resume_at']==resume.isoformat()
+    state, = (tmp_path/'jobs').glob('*/job.json')
+    assert json.loads(state.read_text())['phase']=='rejected'
+    native._opener.open.reset_mock()
+    save = translation._save
+    def fail_if_submission_is_recorded(path, value):
+        if value['phase'] == 'submitting':
+            raise SystemExit('A known unsent hold must precede submission intent')
+        save(path, value)
+    monkeypatch.setattr(translation, '_save', fail_if_submission_is_recorded)
+    with pytest.raises(PullError) as held:
+        native.step('doc','version','studio','part')
+    monkeypatch.setattr(translation, '_save', save)
+    native._opener.open.assert_not_called()
+    assert held.value.details['resume_at']==resume.isoformat()
+    after=resume+timedelta(seconds=1)
+    class After(datetime):
+        @classmethod
+        def now(cls,tz=None):return after
+    monkeypatch.setattr(translation,'datetime',After)
+    monkeypatch.setattr(backoff,'datetime',After)
+    native._opener.open.side_effect=[reply(payload()),reply(b'unchanged native STEP')]
+    assert native.step('doc','version','studio','part')==b'unchanged native STEP'
+    assert native._opener.open.call_count==2
+
+
+def test_arbitrary_http_409_cannot_claim_known_unsent_export(tmp_path):
+    native=client(tmp_path)
+    native._opener=Mock()
+    native._opener.open.side_effect=HTTPError('http://127.0.0.1:8766'+PATH,409,'conflict',Message(),
+        io.BytesIO(b'{"message":"conflict"}'))
+    with pytest.raises(PullError):native.step('doc','version','studio','part')
+    state,=(tmp_path/'jobs').glob('*/job.json')
+    assert json.loads(state.read_text())['phase']=='unknown'
+
+
+@pytest.mark.parametrize('change',[{'request_sent':True},{'upstream_backoff':{}},
+    {'upstream_backoff':{'schema':'onshape/ui-resource-backoff@1','http_status':429,'method':'POST',
+        'resource':'/api/documents/d/doc/v/version/translate','resume_at':'2026-11-03T12:00:00'}}])
+def test_invalid_bridge_hold_cannot_prove_an_export_was_not_sent(tmp_path,change):
+    value={'code':'onshape_native_resource_backoff_active','request_sent':False,**change}
+    native=client(tmp_path)
+    native._opener=Mock()
+    native._opener.open.side_effect=HTTPError('http://127.0.0.1:8766'+PATH,409,'conflict',Message(),
+        io.BytesIO(json.dumps(value).encode()))
+    with pytest.raises(PullError) as caught:native.step('doc','version','studio','part')
+    assert caught.value.code!='cad_native_backoff_active'
+    state,=(tmp_path/'jobs').glob('*/job.json')
+    assert json.loads(state.read_text())['phase']=='unknown'

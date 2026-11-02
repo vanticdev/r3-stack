@@ -897,3 +897,13 @@ Execution metadata and events are saved in the project's `build/agent/` so a ser
 restart does not discard its history. Fix platform failures, then retry the failed
 operation in the existing conversation; a failed check alone does not justify
 wiping the project or discarding the agent's work.
+
+
+Download compatibility routes can map to the same internal Onshape UI operation.
+The companion retains an actual 429 by that upstream method/path across formats,
+elements and companion restarts. A subsequent local hold is HTTP 409 with explicit
+`request_sent: false` and the original `upstream_backoff`; it is not another Onshape
+429 and must not restart its wait. R3 preserves this known unsent outcome and checks
+it before recording another submission. Ordinary conflicts remain unknown outcomes.
+Do not bypass a hold through a different download alias. Existing complete pinned
+files remain usable, and no account-wide scope or reset is inferred.

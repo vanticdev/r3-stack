@@ -109,9 +109,10 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
                                 {'export_request': request, 'export_state': str(path) if path else None})
             return value
 
-        def native_request(method: str, resource: str, payload: Any = None) -> bytes:
+        def check_previous_backoff() -> None:
             previous = state.get('last_error') or {}
-            if previous.get('http_status') == 429:
+            if (previous.get('http_status') == 429 or previous.get('code') == 'cad_native_backoff_active'
+                    and previous.get('details', {}).get('request_sent') is False):
                 try:
                     resume = datetime.fromisoformat(previous['resume_at'])
                     expired = resume.tzinfo is not None and datetime.now(timezone.utc) >= resume
@@ -119,6 +120,9 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
                     expired = False
                 if not expired:
                     raise PullError(previous['code'], previous['message'], previous['details'])
+
+        def native_request(method: str, resource: str, payload: Any = None) -> bytes:
+            check_previous_backoff()
             try:
                 data = client._request(method, resource, payload) if payload is not None else client._request(method, resource)
             except PullError as error:
@@ -141,6 +145,7 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
             check_backoff = getattr(client, 'check_backoff', None)
             if callable(check_backoff):
                 check_backoff('POST', endpoint)
+            check_previous_backoff()
             state['phase'] = 'submitting'
             _save(path, state)  # survive provider/worker loss before receiving the ID
             try:
@@ -150,7 +155,8 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
                 # A definite HTTP rejection created no export. Everything else
                 # may have reached the server and must never be replayed.
                 status = error.details.get('http_status')
-                state['phase'] = 'rejected' if status in {400, 401, 403, 404, 405, 422, 429} else 'unknown'
+                known_unsent = error.code == 'cad_native_backoff_active' and error.details.get('request_sent') is False
+                state['phase'] = 'rejected' if known_unsent or status in {400, 401, 403, 404, 405, 422, 429} else 'unknown'
                 known = error.details.get('translation')
                 if not known and error.details.get('translation_id'):
                     known = {'id': error.details['translation_id'], 'requestState': 'ACTIVE'}

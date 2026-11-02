@@ -101,3 +101,24 @@ def operator_active(method: str, resource: str) -> dict[str, Any] | None:
     except (KeyError, ValueError, TypeError) as error:
         raise PullError('cad_native_backoff_invalid', 'Invalid operator transport backoff context') from error
     return None
+
+
+def bridge_evidence(payload: Any) -> dict[str, Any] | None:
+    """Recognize a companion's explicit unsent rejection, not arbitrary HTTP conflicts."""
+    if (not isinstance(payload, dict) or payload.get('code') != 'onshape_native_resource_backoff_active'
+            or payload.get('request_sent') is not False):
+        return None
+    value = payload.get('upstream_backoff')
+    if (not isinstance(value, dict) or value.get('schema') != 'onshape/ui-resource-backoff@1'
+            or value.get('http_status') != 429 or value.get('method') not in {'GET', 'POST'}
+            or not isinstance(value.get('resource'), str) or not value['resource'].startswith('/api/')):
+        return None
+    try:
+        raw = value.get('resume_at')
+        if raw is not None and datetime.fromisoformat(raw).tzinfo is None:
+            return None
+    except (TypeError, ValueError):
+        return None
+    return {'request_sent': False, 'bridge_request_sent': True, 'onshape_request_sent': False,
+            'original_http_status': 429, 'upstream_method': value['method'], 'upstream_resource': value['resource'],
+            **{key: value.get(key) for key in ('resume_at', 'observed_at', 'retry_after', 'retry_after_seconds')}}

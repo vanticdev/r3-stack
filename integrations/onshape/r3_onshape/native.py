@@ -143,9 +143,13 @@ class NativeCadTransport:
                 detail = raw_error[:600]
                 details: dict[str, Any] = {"http_status": error.code, "method": method, "resource": path}
                 authentication_required = False
+                bridge_backoff = None
                 try:
                     payload = json.loads(raw_error)
                     if isinstance(payload, dict):
+                        if error.code == 409 and request_resource.startswith("/native/api/v17/"):
+                            from .backoff import bridge_evidence
+                            bridge_backoff = bridge_evidence(payload)
                         if (error.code == 401 and payload.get("status") == 401
                                 and payload.get("message") == "Unauthenticated API request"
                                 and path.startswith(("/api/", "/native/api/v17/"))):
@@ -156,6 +160,11 @@ class NativeCadTransport:
                             details["translation"] = payload
                 except ValueError:
                     pass
+                if bridge_backoff is not None:
+                    raise PullError("cad_native_backoff_active",
+                        "The native companion retained an upstream UI export hold; no Onshape request was sent. "
+                        "Honor its original deadline without replaying the export through another alias.",
+                        {**details, **bridge_backoff}) from None
                 if authentication_required:
                     raise PullError("cad_native_authentication_required",
                         f"Native {method} {path}: HTTP 401: {detail}; "
