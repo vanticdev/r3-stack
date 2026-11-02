@@ -34,8 +34,10 @@ from __future__ import annotations
 
 import heapq
 import math
+import os
 from collections import deque
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -80,6 +82,7 @@ class RouterOptions:
     relax_spacing: float = 0.002
     relax_iterations: int = 60
     fillet_min_angle: float = math.radians(8.0)  # smaller turns are measured, not filleted
+    cache: bool = True  # reuse verified numeric work; all engineering checks still run
     plan: bool = True  # run the curvature-constrained planner on the routed bundles (r3_wiring.planner)
 
 
@@ -244,7 +247,10 @@ class HarnessRouter:
         self.opt = options or RouterOptions()
         self.grid = VoxelGrid.around(obstacles, self.opt.voxel)
         keep = {c for h in self.spec.electrical.harnesses for c in h.route.keep_away}
-        self.fields: Fields = compute_fields(self.grid, obstacles, keep)
+        from .cache import NumericCache
+        self.cache = NumericCache(Path(os.environ.get('R3_WIRING_CACHE_DIR') or
+                                       project.build_dir('wiring') / 'cache')) if self.opt.cache else None
+        self.fields: Fields = compute_fields(self.grid, obstacles, keep, cache=self.cache)
         self.component_fields = self.fields
         self._cable_fields: dict[tuple, np.ndarray] = {}
         self.c_req = float(self.spec.requirements.min_wire_clearance_moving)
@@ -361,6 +367,7 @@ class HarnessRouter:
         stats = {"voxel": self.opt.voxel, "grid_shape": list(self.grid.shape), "voxels": self.grid.size,
                  "astar_expansions": self.expansions, "relaxed_segments_reverted": self.relax_reverted,
                  "route_order": [h.id for h in order], "cable_body_obstacles": len(self.obstacles.cable_bodies)}
+        stats['cache'] = dict(self.cache.stats) if self.cache is not None else {'disabled': 1}
         result = RoutingResult(wires, harnesses, nodes, floating, self.holes, self.diagnostics, self.grid, stats)
         if self.opt.plan:
             result.planning = plan_routing(self.project, self, result, obstacles=self.obstacles)
@@ -715,6 +722,31 @@ class HarnessRouter:
     # --------------------------------------------------------------- search
     def _astar(self, start: int, goal: int, ctx: _Context, blocked: bytearray, used: bytearray,
                start_dir: np.ndarray | None, goal_dir: np.ndarray | None) -> list[int] | None:
+        key = None
+        if self.cache is not None and self.cache.enabled:
+            key = self.cache.key('search', self.grid.origin, self.grid.shape,
+                                 (start, goal, self.opt.voxel, self.opt.bundle_discount,
+                                  self.opt.existing_hole_cost, self.opt.bend_weight, self.opt.max_expansions),
+                                 np.asarray(ctx.cost), ctx.zone, np.asarray(ctx.zone_cost), self.hole_mask,
+                                 blocked, used, start_dir, goal_dir, np.asarray(self.offsets),
+                                 np.asarray(self.steps), np.asarray(self.bend), np.asarray(self.dirs))
+            saved = self.cache.get('search', key, size=None, dtype=np.int64)
+            if saved is not None:
+                if not len(saved):
+                    return None
+                if (len(saved) <= self.grid.size and saved[0] == start and saved[-1] == goal
+                        and np.all(saved >= 0) and np.all(saved < self.grid.size)
+                        and not any(blocked[int(v)] for v in saved[1:])):
+                    coordinates = np.column_stack(np.unravel_index(saved, self.grid.shape))
+                    if np.all(np.max(np.abs(np.diff(coordinates, axis=0)), axis=1) == 1):
+                        return saved.tolist()
+        path = self._astar_uncached(start, goal, ctx, blocked, used, start_dir, goal_dir)
+        if key is not None:
+            self.cache.put(key, np.asarray(path or [], dtype=np.int64))
+        return path
+
+    def _astar_uncached(self, start: int, goal: int, ctx: _Context, blocked: bytearray, used: bytearray,
+                        start_dir: np.ndarray | None, goal_dir: np.ndarray | None) -> list[int] | None:
         offsets, steps, pure, bend = self.offsets, self.steps, self.pure, self.bend
         cost, zone, zone_cost, hole = ctx.cost, ctx.zone, ctx.zone_cost, self.hole_mask
         ci, cj, ck = self._ci, self._cj, self._ck

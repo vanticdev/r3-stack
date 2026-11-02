@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from .cache import NumericCache, shape_identity
 from .obstacles import ObstacleSet
 
 FIELD_CUTOFF = 0.05  # fields are clamped here; no cost term reaches further
@@ -97,7 +98,8 @@ class Fields:
     by_component: dict[str, np.ndarray] = field(default_factory=dict)  # raw swept sdf of ``keep`` components
 
 
-def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet, keep: set[str] | frozenset[str] = frozenset()) -> Fields:
+def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet, keep: set[str] | frozenset[str] = frozenset(),
+                   *, cache: NumericCache | None = None) -> Fields:
     """All fields in one pass over the obstacles; the raw (swept) field of every component in
     ``keep`` is kept as well, so per-harness keep-away fields need no second SDF evaluation."""
     points = grid.centers()
@@ -111,7 +113,13 @@ def compute_fields(grid: VoxelGrid, obstacles: ObstacleSet, keep: set[str] | fro
     plates = []
     by_component: dict[str, np.ndarray] = {}
     for obstacle in obstacles.obstacles:
-        raw = obstacle.swept.sdf_bounded(points, FIELD_CUTOFF)
+        identity = shape_identity(obstacle.swept) if cache is not None and cache.enabled else None
+        key = cache.key('field', identity, grid.origin, grid.shape, grid.voxel, FIELD_CUTOFF) if identity else None
+        raw = cache.get('field', key, size=n, dtype=np.float64) if key is not None else None
+        if raw is None:
+            raw = obstacle.swept.sdf_bounded(points, FIELD_CUTOFF)
+            if key is not None:
+                cache.put(key, raw)
         if obstacle.component in keep and obstacle.component not in by_component:
             by_component[obstacle.component] = raw
         if obstacle.moving:

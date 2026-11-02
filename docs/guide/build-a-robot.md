@@ -475,6 +475,18 @@ Catalog connector positions remain unqualified research metadata before a pull; 
 cannot replace an absent native frame in a pulled design. Missing mappings are reported
 with the available native keys. Changing CAD or references makes older evidence stale.
 
+Wiring keeps a bounded numeric work cache under `build/wiring/cache/` (512 MiB,
+4,096 entries). Unchanged obstacle distance fields and A* searches can be reused
+across reruns. Keys include exact geometry and poses, swept motion, grid settings,
+search costs, occupied space, terminal directions, search limits and calculation
+code/library versions. Altered entries fail checksum/array validation and recompute.
+Native pull validation and all clearance, bend, support, cable physics and release
+checks still run. Cache files are derived work, never CAD or qualification evidence.
+Routing statistics report cache hits and misses. `RouterOptions(cache=False)` bypasses
+reuse; `R3_WIRING_CACHE_DIR` can explicitly select a shared cache for frozen validation
+copies of the same project. Keep each long validation on one immutable input revision;
+caching does not make results current after the description or CAD changes.
+
 Run `r3 validate --stage connectors,wiring,electrical`. Inspect pin maps, conductor exits,
 route witnesses, bend radii, dynamic clearances, supported spans, cut lengths, ampacity,
 voltage drop, fuse coordination, thermal results and runtime assumptions. The manufacturing
