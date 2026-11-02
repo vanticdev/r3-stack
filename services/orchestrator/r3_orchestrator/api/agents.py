@@ -262,7 +262,19 @@ def mcp_config(project_root: Path, python: str = sys.executable) -> dict[str, An
     servers = {MCP_SERVER: {"command": python, "args": ["-m", "r3_orchestrator.mcp_server"],
                            "env": {"R3_PROJECT": str(project_root), "PYTHONPATH": r3_pythonpath()}}}
     native = native_mcp_config()
+    backoffs = os.environ.get("R3_ONSHAPE_BACKOFFS")
+    if backoffs is not None:
+        # MCP clients need explicit environment entries; hidden instructions
+        # alone cannot enforce the same observed transport restrictions.
+        servers[MCP_SERVER]["env"]["R3_ONSHAPE_BACKOFFS"] = backoffs
     if native:
+        native = {**native, "env": dict(native.get("env", {}))}
+        if backoffs is not None:
+            existing = json.loads(native["env"].get("ONSHAPE_NATIVE_BACKOFFS", "[]"))
+            supplied = json.loads(backoffs)
+            if not isinstance(existing, list) or not isinstance(supplied, list):
+                raise ValueError("Native and R3 transport backoffs must be lists")
+            native["env"]["ONSHAPE_NATIVE_BACKOFFS"] = json.dumps(existing + supplied)
         servers["onshape_native"] = native
         # Give the R3 pull process the same bridge runtime as the editor server.
         runtime = native.get("env", {}).get("ONSHAPE_NATIVE_RUNTIME")

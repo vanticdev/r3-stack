@@ -138,6 +138,9 @@ def translated_file(client: Any, endpoint: str, body: dict[str, Any]) -> bytes:
                 raise PullError('cad_native_export_unknown',
                     'Previous export submission has unknown outcome; inspect it before another submission',
                     {'export_request': request, 'export_state': str(path)})
+            check_backoff = getattr(client, 'check_backoff', None)
+            if callable(check_backoff):
+                check_backoff('POST', endpoint)
             state['phase'] = 'submitting'
             _save(path, state)  # survive provider/worker loss before receiving the ID
             try:

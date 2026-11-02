@@ -42,6 +42,7 @@ class NativeRateLimitError(PullError):
         if remaining is not None:
             details["rate_limit_remaining"] = remaining
         now = datetime.now(timezone.utc)
+        details["observed_at"] = now.isoformat()
         try:
             if retry_after is not None:
                 if re.fullmatch(r"[0-9]+", retry_after):
@@ -58,6 +59,14 @@ class NativeRateLimitError(PullError):
                          "Do not retry this resource before the reported reset; continue independent offline work.", details)
 
 
+    @classmethod
+    def from_evidence(cls, message: str, details: dict[str, Any]) -> "NativeRateLimitError":
+        """Restore the original deadline; never rebase Retry-After on a later call."""
+        error = cls.__new__(cls)
+        PullError.__init__(error, "cad_native_rate_limited", message, dict(details))
+        return error
+
+
 class NativeCadTransport:
     """Authenticated loopback client; unsupported operations fail closed."""
 
@@ -72,6 +81,17 @@ class NativeCadTransport:
         if urlsplit(self.base).hostname not in ("127.0.0.1", "localhost", "::1"):
             raise PullError("cad_native_unavailable", "onshape-native must use a loopback companion")
 
+    def check_backoff(self, method: str, path: str) -> None:
+        from .backoff import active, operator_active
+        configured = operator_active(method, path)
+        if configured is not None:
+            until = configured['resume_at'] or 'an operator-confirmed reset (none reported)'
+            raise PullError("cad_native_backoff_active",
+                f"Known transport hold for {method} {configured['hold_resource']} until {until}; no request sent", configured)
+        evidence = active(getattr(self, "export_jobs", None), method, path)
+        if evidence is not None:
+            raise NativeRateLimitError.from_evidence(evidence["message"], evidence["details"])
+
     def _request(self, method: str, path: str, body: Any = None, query: dict | None = None,
                  timeout: float = 120) -> bytes:
         cached_artifact = method == "GET" and re.fullmatch(r"/artifacts/[a-f0-9]{64}\.json", path)
@@ -85,10 +105,13 @@ class NativeCadTransport:
             if (re.search(r"/(stl|gltf|parasolid|externaldata|foreigndata|translate|exportinternal)(/|$)", path)
                     or ("/translations" in path and any(part in path for part in ("/partstudios/", "/assemblies/")))):
                 raise PullError("cad_native_route_forbidden", "Geometry exports require /native/api/v17")
+        self.check_backoff(method, path)
         url = self.base + path + ("?" + urlencode(query) if query else "")
         raw = json.dumps(body, allow_nan=False).encode() if body is not None else None
         headers = {**self._headers, "Content-Type": "application/json"}
         for _ in range(4):
+            request_resource = urlsplit(url).path
+            self.check_backoff(method, request_resource)
             request = urllib.request.Request(url, data=raw, method=method, headers=headers)
             try:
                 with self._opener.open(request, timeout=timeout) as response:
@@ -107,9 +130,15 @@ class NativeCadTransport:
                 if error.code == 429:
                     # Keep bounded upstream evidence so callers can distinguish
                     # the server's explanation from our computed resume time.
-                    raise NativeRateLimitError(error.headers.get("Retry-After"), method, path,
+                    limited = NativeRateLimitError(error.headers.get("Retry-After"), method, request_resource,
                         response_excerpt=error.read(601).decode(errors="replace"),
-                        remaining=error.headers.get("X-RateLimit-Remaining")) from None
+                        remaining=error.headers.get("X-RateLimit-Remaining"))
+                    from .backoff import remember
+                    try:
+                        remember(getattr(self, "export_jobs", None), method, request_resource, str(limited), limited.details)
+                    except (OSError, PullError) as storage_error:
+                        limited.details["backoff_persistence_error"] = str(storage_error)
+                    raise limited from None
                 raw_error = error.read().decode(errors="replace")
                 detail = raw_error[:600]
                 details: dict[str, Any] = {"http_status": error.code, "method": method, "resource": path}

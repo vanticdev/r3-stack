@@ -638,6 +638,16 @@ the server supplies a valid header (seconds or an HTTP date). Missing/invalid
 headers remain explicit; no reset time is guessed. Continue independent offline
 engineering and retain the quota observation in the project report.
 
+Native holds are retained by exact HTTP method and resource path in the shared
+project export cache, independently of a job's format and selected part. Changing
+those options cannot authorize another request to that same held endpoint.
+Completed pinned files remain readable without contacting Onshape. A later explicit
+call after the recorded deadline can resume an existing job or submit a definitively
+rejected request once; an unknown submission outcome is never replayed. Locally
+blocked calls retain the original deadline and report `request_sent: false`.
+Unknown reset times stay unknown. Never edit or delete job/backoff evidence to
+force a request; continue permitted work and preserve actual response metadata.
+
 For an unattended long build, keep the same session alive through a finite server
 backoff: checkpoint, do independent work, then use bounded local sleeps and resume
 after the deadline. Do not poll the throttled API or discard the unfinished build
