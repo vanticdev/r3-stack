@@ -23,6 +23,7 @@ import threading
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any
+from weakref import WeakValueDictionary
 
 from r3_model.project import Project
 
@@ -136,7 +137,7 @@ class ProjectCache:
         self.resolve_cad = resolve_cad
         self._entries: OrderedDict[Path, tuple[tuple[str, str], Project]] = OrderedDict()
         self._inputs: dict[Path, list[Path]] = {}
-        self._loads: dict[Path, threading.Lock] = {}
+        self._loads: WeakValueDictionary[Path, threading.Lock] = WeakValueDictionary()
         self._lock = threading.Lock()
 
     def key(self, root: Path) -> tuple[str, str]:

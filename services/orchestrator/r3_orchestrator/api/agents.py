@@ -1007,7 +1007,7 @@ class AgentManager:
             return
         if kind == "tool_result":
             parsed = payload.pop("_payload", None)
-            call = session._calls.get(str(payload.get("id")), {})
+            call = session._calls.pop(str(payload.get("id")), {})
             payload["name"] = payload.get("name") or call.get("name")
             self._emit(session, "tool_result", **payload)
             if call.get("name") in RUN_TOOLS:
@@ -1040,6 +1040,7 @@ class AgentManager:
             pass
 
     def _finish(self, session: AgentSession, status: str, error: str | None = None) -> None:
+        session._calls.clear()
         session.status = status
         session.error = error
         session.finished_at = time.time()
