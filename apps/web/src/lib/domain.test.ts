@@ -99,7 +99,7 @@ describe("pcb", () => {
       { J_BATT: { "1": "VBAT", "2": "VBAT" }, J_GPIO: { "12": "PI_ESC_PWM" }, J_RX: { "1": "5V" } },
     );
     expect(rows.map((r) => `${r.connector}.${r.pin}:${r.match ? "ok" : "x"}`)).toEqual([
-      "J_BATT.1:ok", "J_BATT.2:x", "J_GPIO.12:ok", "J_GPIO.13:ok", "J_RX.1:x",
+      "J_BATT.1:ok", "J_BATT.2:x", "J_GPIO.12:ok", "J_GPIO.13:x", "J_RX.1:x",
     ]);
     expect(rows.find((r) => r.connector === "J_RX")).toMatchObject({ boardNet: null, catalogPin: "5V" });
   });

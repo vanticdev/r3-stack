@@ -478,7 +478,7 @@ export function pcbPinMap(connectors: Record<string, Record<string, string>> | n
     return pins.map((pin) => {
       const boardNet = board[pin] ?? null;
       const catalogPin = expected[pin] ?? null;
-      return { connector, pin, boardNet, catalogPin, match: catalogPin === null || boardNet === catalogPin || boardNet?.endsWith(`.${catalogPin}`) === true };
+      return { connector, pin, boardNet, catalogPin, match: catalogPin !== null && boardNet === catalogPin };
     });
   });
 }

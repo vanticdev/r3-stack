@@ -18,21 +18,62 @@ Reference: Karlsson et al., *Automatic cable harness layout routing in a
 customizable 3D environment*, DOI 10.1016/j.cad.2023.103671.
 Accessible manuscript: https://arxiv.org/html/2311.09061v1
 
-Implemented subset: weighted total cable edge cost plus union edge cost
-(equations 1–2), and iterative single-cable rerouting (algorithms 2–3).
-Each cable is removed from occupancy before computing its marginal shortest
-path. Only strict global improvements are accepted. Two deterministic initial
-orders, bounded single-edge-exclusion seeds and multiple bundle weights produce
-deduplicated nondominated candidates. The edge-exclusion seeds are an adaptation,
-not the paper's alpha-shortest-path initializer.
-The sweep budget and convergence flag make bounded termination explicit.
+## Algorithms
 
-This is not the complete paper implementation: joint branch-point optimization,
-alpha-shortest-path initialization, Lagrangian subgradient search, certified dual
-bounds and the industrial benchmarks are not implemented. Graph topology search
-is separate from the production voxel router; it does not automatically import
-its candidate paths into the physical planner. Do not describe its costs as
-physical metres unless all edge costs are actual lengths. Do not treat its
-candidates as clearance/bend/capacity/dynamic certification.
+The implementation uses the published paper's weighted cable/union-edge objective
+(equations 1–2), iterative marginal-cost cable rerouting (algorithms 2–3), and
+joint branch-point moves (section 3.1). Branch moves sum shortest-distance fields
+from the fixed incident ends, then use multi-source Dijkstra to choose both ends
+of a shared bundle and its connecting path. Every proposal is reconstructed into
+complete cables and accepted only if simple, permitted and strictly better under
+the actual union-edge objective. Overlapping arms cannot manufacture an improvement.
 
-Run targeted tests: `.venv/bin/python -m pytest tests/test_wiring_topology.py`.
+Alpha-bounded loopless paths seed two stable cable orders (section 3.3). We use
+Yen's graph k-shortest-path enumeration rather than the geometric path-diversity
+generator cited by the paper. Paths meet the alpha cost bound, but are not claimed
+to be spatially diverse. Projected Lagrangian subgradient search (algorithm 4)
+adds primal seeds and lower bounds, with nonnegative edge multipliers projected
+onto sum(lambda)=w_B*c. Step sizes use the best available primal bound; stagnation
+reduces the step scale. Budgets and convergence status are explicit.
+
+Each candidate exposes cable and union-edge costs, objective improvement history,
+shared edges and convergence status. The result also records all searches and
+per-weight lower/upper bounds and relative gaps. Bounds apply only to the supplied
+graph, never to the whole continuous design space or physical safety. No industrial
+benchmark or performance equivalence to the authors' C++ implementation is claimed.
+
+## Robot geometry integration
+
+`HarnessRouter` invokes `topology_geometry.optimize_voxel_routes` after finding
+initial voxel paths and before `_sequence` constructs bundle segments. It derives
+a finite graph from the CAD distance fields in a corridor around those paths.
+Costs combine environmental preferences, step length and plate-crossing costs.
+Per-branch blocked masks preserve clearance and nonincident connector exclusions;
+plate crossings obey their axis restrictions, and diagonal edges use a conservative
+supercover rule. The chosen candidate feeds existing fan-out construction, smoothing,
+numerical planning, supports, cut-length generation and physical/dynamic validation.
+Branches retain conductor multiplicity in the cable-length objective.
+
+The software selects a balanced candidate; no LLM supplies its path points. The
+existing web wiring-stage action and `r3_route_wires` both run this pipeline.
+Evidence is saved in `build/wiring/topology.json`, `routing_detail.json`, and stage
+result metrics, alongside the usual `routes.json` consumed by the viewer.
+
+Default refinement budget: 6000 graph vertices, 2-voxel corridor margin, 3 alpha
+paths, 5 dual iterations, 5 HRH sweeps, bundle weights 0.25 and 0.65. The standalone
+graph tool defaults to 7 paths, 40 dual iterations and 30 sweeps. This bounds resource
+use and does not imply convergence or global optimality. `RouterOptions.topology`,
+`topology_max_nodes` and `topology_margin` control production refinement.
+
+Ordered authored waypoints stay fixed in the original routing path and are listed
+as excluded from automatic topology refinement. With fewer than two eligible
+branches refinement is unnecessary. If the graph budget is exceeded or no candidate
+is found, the router preserves initial paths and emits an explicit warning. All
+physical checks still apply. A skipped refinement must not be presented as an
+optimized topology. Independent-lane routing remains a separate constrained mode.
+
+Run targeted tests:
+`.venv/bin/python -m pytest tests/test_wiring_topology.py tests/test_wiring_topology_geometry.py`.
+Tests compare lower bounds with exhaustive optima, exercise joint moves that escape
+single-cable local minima, verify repeatability, and check obstacle/terminal,
+waypoint and budget handling.

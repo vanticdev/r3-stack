@@ -107,6 +107,10 @@ def place(fp, placement, origin, report):
         if not anchors:
             return
         pads = {p.GetNumber(): p for p in fp.Pads()}
+        missing = [n for n, _xy in anchors if n not in pads]
+        if missing:
+            report["errors"].append("%s: anchor pads missing %s" % (fp.GetReference(), missing))
+            return
         first, (tx, ty) = anchors[0]
         p0 = pads[first].GetPosition()
         shift = pt(origin, (tx, ty)) - p0
@@ -118,6 +122,9 @@ def place(fp, placement, origin, report):
     fp.SetOrientationDegrees(best[1])
     fp.SetPosition(best[2])
     report["anchored"][fp.GetReference()] = {"rotation": best[1], "error_mm": round(best[0], 4)}
+    if best[0] > 0.01:
+        report["errors"].append("%s: pad anchors cannot be satisfied (total error %.4f mm)" %
+                                (fp.GetReference(), best[0]))
 
 
 def add_footprints(board, plan, nets, report):
@@ -173,6 +180,17 @@ def resolve(board, origin, point):
 def add_copper(board, plan, nets, report):
     origin = plan["origin"]
     for track in plan["tracks"]:
+        invalid = False
+        for point in track["points"]:
+            if isinstance(point, str):
+                ref, number = point.split(".", 1)
+                fp = board.FindFootprintByReference(ref)
+                pads = [p for p in fp.Pads() if p.GetNumber() == number] if fp else []
+                if not pads or any(p.GetNetname() != track["net"] for p in pads):
+                    report["errors"].append("%s: track endpoint %s has a missing or different pad net" % (track["net"], point))
+                    invalid = True
+        if invalid:
+            continue
         layer = board.GetLayerID(track["layer"])
         points = [resolve(board, origin, p) for p in track["points"]]
         for a, b in zip(points, points[1:]):

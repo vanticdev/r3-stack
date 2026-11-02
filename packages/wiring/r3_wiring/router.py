@@ -59,6 +59,9 @@ from .terminations import (body_width, exit_offset, mated_pair_length, terminati
 
 @dataclass
 class RouterOptions:
+    topology: bool = True  # graph topology optimization before physical planning
+    topology_max_nodes: int = 6000
+    topology_margin: int = 2
     voxel: float = 0.003
     surface_weight: float = 0.6
     surface_band: float = 0.012
@@ -254,6 +257,7 @@ class HarnessRouter:
         self._keep_away_cache: dict[tuple, np.ndarray] = {}
         self.expansions = 0
         self.relax_reverted = 0
+        self.topology_stats: dict[str, Any] = {}
         self._build_moves()
         shape = self.grid.shape
         flat = np.arange(self.grid.size)
@@ -357,7 +361,8 @@ class HarnessRouter:
         self._size_holes(wires)
         stats = {"voxel": self.opt.voxel, "grid_shape": list(self.grid.shape), "voxels": self.grid.size,
                  "astar_expansions": self.expansions, "relaxed_segments_reverted": self.relax_reverted,
-                 "route_order": [h.id for h in order], "cable_body_obstacles": len(self.obstacles.cable_bodies)}
+                 "route_order": [h.id for h in order], "cable_body_obstacles": len(self.obstacles.cable_bodies),
+                 "topology": self.topology_stats}
         result = RoutingResult(wires, harnesses, nodes, floating, self.holes, self.diagnostics, self.grid, stats)
         if self.opt.plan:
             result.planning = plan_routing(self.project, self, result, obstacles=self.obstacles)
@@ -857,6 +862,7 @@ class HarnessRouter:
         used = bytearray(self.grid.size)
         positions: dict[Any, np.ndarray] = {}
         sequences: dict[tuple[str, str], list] = {}
+        topology_jobs: dict[tuple[str, str], dict] = {}
         failed: set[tuple[str, str]] = set()
         harness_holes: set[int] = set()
         vias = [np.asarray(v, dtype=float) for v in harness.route.via]
@@ -943,8 +949,26 @@ class HarnessRouter:
                 continue
             for v in voxels:
                 used[v] = 1
-            sequences[key] = self._sequence(harness.id, key, a, b, voxels, ctx, positions, harness_holes,
-                                            via_voxels=stops[1:-1])
+            topology_jobs[key] = {'path': voxels, 'context': ctx, 'blocked': bytearray(blocked),
+                                  'stops': stops, 'count': len(branches[key])}
+
+        if self.opt.topology:
+            from .topology_geometry import optimize_voxel_routes
+
+            topology_jobs, stats = optimize_voxel_routes(self, topology_jobs,
+                                                         margin=self.opt.topology_margin,
+                                                         max_nodes=self.opt.topology_max_nodes)
+            self.topology_stats[harness.id] = stats
+            if stats['status'] in ('budget_exceeded', 'no_candidate'):
+                self.diagnostics.append(Diagnostic.warning(
+                    'topology_refinement_unavailable',
+                    f'{harness.id}: topology refinement {stats["status"]}; using initial voxel routes',
+                    subjects=[harness.id], data={k: v for k, v in stats.items() if k != 'candidates'},
+                    hint='Inspect the search budget or geometry; physical validation still applies.'))
+        for key, job in topology_jobs.items():
+            a, b = nodes[key[0]], nodes[key[1]]
+            sequences[key] = self._sequence(harness.id, key, a, b, job['path'], job['context'], positions,
+                                            harness_holes, via_voxels=job['stops'][1:-1])
 
         # ---- bundle graph and segments
         adjacency: dict[Any, set] = {}

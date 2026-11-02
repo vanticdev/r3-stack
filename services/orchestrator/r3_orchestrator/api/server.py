@@ -67,6 +67,10 @@ class SpecPatchRequest(BaseModel):
     dry_run: bool = False
 
 
+class CircuitRequest(BaseModel):
+    circuit: dict[str, Any] = Field(description="Explicit linear circuit model; never inferred from the PCB image.")
+
+
 class RunRequest(BaseModel):
     stages: list[str] | None = Field(None, description="Stages to run in pipeline order (default: all). The report always runs.")
     scenario: str | None = Field(None, description="Restrict the sim stage to one scenario.")
@@ -429,6 +433,10 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
     async def get_diagnostics(pid: str, stage: str | None = None, severity: Literal["error", "warning", "info"] | None = None,
                               subject: str | None = None) -> dict[str, Any]:
         return await call(views.diagnostics_view, project(pid), stage, severity, subject)
+
+    @app.post('/api/projects/{pid}/circuit', tags=['domains'], responses=ERRORS)
+    async def analyze_circuit(pid: str, body: CircuitRequest) -> dict[str, Any]:
+        return raise_for(await call(api.analyze_circuit, project(pid).root, body.circuit))
 
     @app.get("/api/projects/{pid}/artifacts/{path:path}", tags=["domains"], responses=ERRORS,
              summary="A file under build/ (path-traversal safe); a directory lists its files")

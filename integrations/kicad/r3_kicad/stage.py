@@ -39,6 +39,7 @@ from .netlist import compare, read_netlist
 from .notes import design_notes
 from .regulators import BuckDesign, BuckBoostDesign
 from .spice import power_subcircuit
+from .validation import board_netlist_checks
 
 STAGE = "pcb"
 DT_SIGNAL = 10.0
@@ -117,6 +118,13 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
         result.add(Diagnostic.error("pcb_intent_missing", str(error), subjects=[board.component]))
         return
     intent: BoardIntent = module.build()
+    problems = intent.validate()
+    if problems:
+        result.add(Diagnostic.error('pcb_intent_invalid', f'{name}: board intent needs correction before generation.',
+            subjects=[name, board.component], data={'subsystem': 'pcb.intent', 'errors': problems,
+                'cause_id': f'{name}:intent', 'cause_status': 'confirmed', 'file': str(source / 'board.py')},
+            hint='; '.join(problems)))
+        return
     _automation(source, result, name, cli)
     sch, pcb = source / f"{name}.kicad_sch", source / f"{name}.kicad_pcb"
     if not sch.exists() or not pcb.exists():
@@ -146,6 +154,13 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
     for problem in compare(intent.nets(), netlist):
         result.add(Diagnostic.error("pcb_netlist_mismatch", problem, subjects=[name]))
     board_file = read_board(out / "kicad" / pcb.name, out)
+    result.extend(board_netlist_checks(board_file, netlist, name))
+    if board_file.unsupported:
+        result.add(Diagnostic.error('pcb_geometry_unsupported',
+            f'{name}: board contains copper geometry missing from the readback model.', subjects=[name],
+            data={'subsystem': 'pcb.geometry', 'objects': board_file.unsupported,
+                  'cause_id': f'{name}:readback', 'cause_status': 'confirmed'},
+            hint='Extend the geometry contract for these objects before relying on derived trace checks. KiCad DRC is still required.'))
     component = project.spec.components.get(board.component)
     try:
         ctype = project.catalog.component(component.type) if component else None
@@ -184,6 +199,7 @@ def _run_board(project, board, cli: KicadCli | None, result: StageResult) -> Non
     files["design_notes"] = _rel(project, source / "design-notes.md")
     board_json = {
         "board": name,
+        "inputs": project.fingerprint(),
         "component": board.component,
         "catalog_type": intent.catalog_type,
         "outline": {"width": round(board_file.size[0] / 1000, 6), "height": round(board_file.size[1] / 1000, 6),
@@ -332,20 +348,23 @@ def _kicad_outputs(project, cli: KicadCli, name: str, sch: Path, pcb: Path, out:
             shutil.copy2(src, work / src.name)
     wsch, wpcb = work / sch.name, work / pcb.name
     erc: dict[str, Any] = {"errors": None}
-    cli.erc(wsch, out / "erc.json")
-    if (out / "erc.json").exists():
+    (out / "erc.json").unlink(missing_ok=True)
+    erc_run = cli.erc(wsch, out / "erc.json")
+    if erc_run.ok and (out / "erc.json").exists():
         erc = {**report_counts(out / "erc.json"), "report": _rel(project, out / "erc.json")}
         files["erc_report"] = erc["report"]
         if erc["errors"]:
             result.add(Diagnostic.error("kicad_erc_errors", f"{name}: KiCad ERC reports {erc['errors']} errors", subjects=[name],
-                                        data={"errors": erc["errors"]},
+                                        data={"errors": erc["errors"], "subsystem": "pcb.erc", "file": erc['report'],
+                                              "violations": report_items(out / 'erc.json')},
                                     hint="; ".join(i.get("description", "") for i in report_items(out / "erc.json")
                                                    if i.get("severity") == "error")[:500]))
     else:
         result.add(Diagnostic.error("kicad_erc_failed", "kicad-cli sch erc produced no report", subjects=[name]))
     drc: dict[str, Any] = {"errors": None}
-    cli.drc(wpcb, out / "drc.json")
-    if (out / "drc.json").exists():
+    (out / "drc.json").unlink(missing_ok=True)
+    drc_run = cli.drc(wpcb, out / "drc.json")
+    if drc_run.ok and (out / "drc.json").exists():
         drc = {**report_counts(out / "drc.json"), "report": _rel(project, out / "drc.json")}
         files["drc_report"] = drc["report"]
         if drc["errors"] or drc.get("unconnected"):
@@ -353,7 +372,9 @@ def _kicad_outputs(project, cli: KicadCli, name: str, sch: Path, pcb: Path, out:
                      if i.get("severity") == "error"][:15]
             result.add(Diagnostic.error("kicad_drc_errors", f"{name}: KiCad DRC reports {drc['errors']} errors, "
                                         f"{drc.get('unconnected')} unconnected", subjects=[name],
-                                        data={"errors": drc["errors"], "unconnected": drc.get("unconnected")},
+                                        data={"errors": drc["errors"], "unconnected": drc.get("unconnected"),
+                                              "subsystem": "pcb.drc", "file": drc['report'],
+                                              "violations": report_items(out / 'drc.json')},
                                         hint="; ".join(items)[:800]))
     else:
         result.add(Diagnostic.error("kicad_drc_failed", "kicad-cli pcb drc produced no report", subjects=[name]))
@@ -390,6 +411,7 @@ def _kicad_outputs(project, cli: KicadCli, name: str, sch: Path, pcb: Path, out:
         files["board_step"] = _rel(project, out / "board.step")
     for side in ("top", "bottom"):
         target = out / f"render_{side}.png"
+        target.unlink(missing_ok=True)
         if cli.render(wpcb, target, side).ok and target.exists():
             renders[f"render_{side}"] = _rel(project, target)
             result.artifact(renders[f"render_{side}"], "render_png", f"KiCad 3D render ({side})")
@@ -398,6 +420,7 @@ def _kicad_outputs(project, cli: KicadCli, name: str, sch: Path, pcb: Path, out:
     for side, layers, mirror in (("top", "F.Cu,F.Mask,F.Silkscreen,Edge.Cuts", False),
                                  ("bottom", "B.Cu,B.Mask,B.Silkscreen,Edge.Cuts", True)):
         target = out / f"copper_{side}.svg"
+        target.unlink(missing_ok=True)
         if cli.pcb_svg(wpcb, target, layers, mirror).ok:
             renders[f"copper_{side}"] = _rel(project, target)
     (out / "kicad-cli.log").write_text("\n\n".join(f"$ {' '.join(r.command)}\n[{r.returncode}]\n{r.stdout}\n{r.stderr}"

@@ -128,8 +128,10 @@ def r3_route_wires(project: str = "") -> dict[str, Any]:
 
 
 @_tool(_DESIGN)
-def r3_route_topologies(edges: list[dict[str, Any]], cables: list[dict[str, str]],
-                       bundle_weights: list[float] | None = None, max_sweeps: int = 30) -> dict[str, Any]:
+def r3_route_topologies(edges: list[dict[str, Any]], cables: list[dict[str, Any]],
+                       bundle_weights: list[float] | None = None, max_sweeps: int = 30,
+                       alpha: float = 1.2, alternative_paths: int = 7,
+                       dual_iterations: int = 40) -> dict[str, Any]:
     """Explore deterministic harness topologies on an already collision-pruned graph.
 
     Edges: {from, to, cost}, undirected positive environmental costs. Cables:
@@ -140,7 +142,9 @@ def r3_route_topologies(edges: list[dict[str, Any]], cables: list[dict[str, str]
     from r3_wiring.topology import route_topologies
 
     try:
-        return {"ok": True, **route_topologies(edges, cables, bundle_weights, max_sweeps)}
+        return {"ok": True, **route_topologies(edges, cables, bundle_weights, max_sweeps,
+                                               alpha=alpha, alternative_paths=alternative_paths,
+                                               dual_iterations=dual_iterations)}
     except (ValueError, KeyError, TypeError) as error:
         return {"ok": False, "code": "routing_input_invalid", "message": str(error)}
 
@@ -149,6 +153,20 @@ def r3_route_topologies(edges: list[dict[str, Any]], cables: list[dict[str, str]
 def r3_get_diagnostics(project: str = "", stage: str = "", severity: str = "", subject: str = "") -> dict[str, Any]:
     """Stored diagnostics from the last run, filtered by stage, severity (error|warning|info) and/or subject id."""
     return _guard(lambda: api.stored_diagnostics(project or None, stage or None, severity or None, subject or None))
+
+
+@_tool(_DESIGN)
+def r3_analyze_circuit(circuit: dict[str, Any], project: str = '') -> dict[str, Any]:
+    """Run an explicit linear lumped circuit in dc, ac or transient mode.
+
+    Elements: id, kind R/C/L/V/I, positive/negative node IDs, value in SI.
+    Ground must be 0. Sources optionally have ac_magnitude/ac_phase_deg or
+    step={initial,final,delay}. AC needs frequencies in Hz. Transient uses dt
+    and stop in seconds and DC initialization. Returns residuals, conditioning,
+    voltage/current series, limitations and an artifact. No PCB extraction,
+    nonlinear semiconductor, thermal or electromagnetic analysis is implied.
+    """
+    return _guard(lambda: api.analyze_circuit(project or None, circuit))
 
 
 @_tool(_READ)

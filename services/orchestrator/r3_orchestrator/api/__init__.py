@@ -104,6 +104,28 @@ def run_stage(project_path: str | Path | None, stage: str, scenarios: list[str] 
     return payload
 
 
+def analyze_circuit(project_path: str | Path | None, circuit: dict[str, Any]) -> dict[str, Any]:
+    """Analyze only an explicitly supplied circuit; never infer models from PCB visuals."""
+    import hashlib
+    import time
+    import uuid
+    from r3_kicad.circuit import analyze_circuit as solve
+
+    project = load_project(project_path)
+    result = solve(circuit)
+    try:
+        canonical = json.dumps(circuit, sort_keys=True, allow_nan=False)
+    except (ValueError, TypeError):
+        return {'ok': False, 'code': 'circuit_request_invalid', 'message': 'Circuit input must contain finite JSON values.'}
+    identity = hashlib.sha256(canonical.encode()).hexdigest()
+    run_id = uuid.uuid4().hex[:12]
+    filename = f'{identity[:16]}-{run_id}.json'
+    artifact = f'circuit/{filename}'
+    result.update(inputs=project.fingerprint(), request_sha256=identity, run_id=run_id, created_at=time.time(), artifact=artifact)
+    project.build_dir('circuit').joinpath(filename).write_text(json.dumps({'request': circuit, 'result': result}, indent=2))
+    return result
+
+
 def stored_diagnostics(project_path: str | Path | None = None, stage: str | None = None, severity: str | None = None,
                        subject: str | None = None) -> dict[str, Any]:
     project = load_project(project_path)
@@ -113,6 +135,8 @@ def stored_diagnostics(project_path: str | Path | None = None, stage: str | None
                    if (not severity or d.severity.value == severity) and (not subject or subject in d.subjects)]
     payload = _results_payload(project, selected)
     payload["diagnostics"] = [_diag(d) for d in diagnostics]
+    from r3_model.work_units import debug_work_units
+    payload['work_units'] = debug_work_units(payload['diagnostics'])
     payload["counts"] = stage_runner.counts(diagnostics)
     return payload
 
@@ -134,7 +158,9 @@ def diagnose(project_path: str | Path | None = None, include_warnings: bool = Tr
     rank = {"error": 0, "warning": 1, "info": 2}
     ordered = sorted(groups.items(), key=lambda kv: (min(rank[e["severity"]] for e in kv[1]), -len(kv[1]), kv[0]))
     errors = sum(1 for entries in groups.values() for e in entries if e["severity"] == "error")
+    from r3_model.work_units import debug_work_units
     return {"ok": errors == 0, "project": str(project.root), "errors": errors,
+            "work_units": debug_work_units([d for entries in groups.values() for d in entries]),
             "subjects": [{"subject": subject, "diagnostics": sorted(entries, key=lambda e: rank[e["severity"]])}
                          for subject, entries in ordered]}
 

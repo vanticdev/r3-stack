@@ -17,7 +17,8 @@ export function DiagnosticList({ items, onFocus, selected, empty = "No diagnosti
           <div className="stack" style={{ gap: 3, minWidth: 0 }}>
             <Markdown className="msg">{diagnosticHeadline(d)}</Markdown>
             {d.hint && <Markdown className="hint">{`Fix: ${d.hint}`}</Markdown>}
-            <Details rows={[["Code", d.code], ["Stage", d.stage], ["Subjects", d.subjects.join(", ")]]} />
+            <Details rows={[["Code", d.code], ["Stage", d.stage], ["Subjects", d.subjects.join(", ")],
+              ["Technical evidence", JSON.stringify(d.data, null, 2)]]} />
           </div>
         </div>
       ))}

@@ -95,5 +95,9 @@ class StageResult(BaseModel):
         return [d for d in self.diagnostics if d.severity is Severity.ERROR]
 
     def write(self, path: Path) -> None:
+        from .work_units import debug_work_units
+
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.model_dump(mode="json"), indent=2))
+        payload = self.model_dump(mode='json')
+        payload['work_units'] = debug_work_units(payload['diagnostics'])
+        path.write_text(json.dumps(payload, indent=2))

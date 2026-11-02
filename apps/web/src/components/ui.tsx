@@ -83,6 +83,7 @@ export function ErrorBox({ error }: { error: unknown }) {
         ? <ProjectLoadError error={{ code: api.code, message: api.message, data: api.data }} />
         : <Markdown>{api ? api.message : String((error as Error)?.message ?? error)}</Markdown>}
       {api && <div className="small"><code>{api.code}</code>{api.status ? ` · HTTP ${api.status}` : ""}</div>}
+      {api && Object.keys(api.data).length > 0 && <Details summary="Technical evidence" rows={[["Details", JSON.stringify(api.data, null, 2)]]} />}
     </div>
   );
 }

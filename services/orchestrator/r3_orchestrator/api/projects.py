@@ -361,6 +361,7 @@ def pcb_view(ref: ProjectRef) -> dict[str, Any]:
         # Catalog connector pin number -> component pin name, to compare with board.json's pin -> net map.
         catalog_pins = {conn: dict(instance.pins) for conn, instance in (catalog_entry.connectors.items() if catalog_entry else [])}
         boards.append({"board": name, "component": board.component, "spec": board.model_dump(mode="json"), "board_json": data,
+                       "evidence_current": bool(data and data.get("inputs") == project.fingerprint()),
                        "renders": _urls(ref.id, [f for f in files if f.lower().endswith(IMAGE_SUFFIXES)]),
                        "erc": (data or {}).get("erc"), "drc": (data or {}).get("drc"),
                        "connectors": (data or {}).get("connectors"), "catalog_connectors": catalog_pins,

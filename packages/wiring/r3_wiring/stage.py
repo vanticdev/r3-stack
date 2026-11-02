@@ -265,6 +265,9 @@ def run_stage(project: Project, options: RouterOptions | None = None, drive_prof
     release = release_status(project, result.diagnostics)
     _apply_release(routes, release)
     (out / "routes.json").write_text(json.dumps(routes, indent=1))
+    _dump(out / "topology.json", routing.stats.get("topology", {}))
+    result.artifact("wiring/topology.json", "json", "Geometry-derived topology candidates, selected costs, "
+                    "graph-scoped dual bounds and search budget/exclusion status")
     result.artifact("wiring/routes.json", "json", "Routed wire paths, harness bundles, ties and clearances (contract), "
                                                   "per-wire/harness validity, supports, cut lengths, installed ampacity")
     detail = detail_json(routing)

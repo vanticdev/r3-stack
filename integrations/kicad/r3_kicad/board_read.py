@@ -75,10 +75,11 @@ class BoardFile:
     segments: list[Segment] = field(default_factory=list)
     vias: list[BoardVia] = field(default_factory=list)
     zones: list[ZoneFill] = field(default_factory=list)
+    unsupported: list[dict] = field(default_factory=list)
 
 
 def parse_dump(data: dict) -> BoardFile:
-    out = BoardFile(size=tuple(data["size"]))  # type: ignore[arg-type]
+    out = BoardFile(size=tuple(data["size"]), unsupported=data.get("unsupported", []))  # type: ignore[arg-type]
     for fp in data["footprints"]:
         out.footprints.append(BoardFootprint(fp["ref"], fp["lib_id"], *fp["position"], fp["rotation"], fp["layer"]))
     for pad in data["pads"]:

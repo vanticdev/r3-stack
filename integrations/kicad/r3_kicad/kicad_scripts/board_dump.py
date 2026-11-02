@@ -32,7 +32,7 @@ def main(argv):
         return [mm(p.x - x0), mm(p.y - y0)]
 
     out = {"size": [mm(width), mm(height)], "origin_page": [mm(x0), mm(y0)],
-           "footprints": [], "pads": [], "tracks": [], "vias": [], "zones": []}
+           "footprints": [], "pads": [], "tracks": [], "vias": [], "zones": [], "unsupported": []}
     for fp in board.GetFootprints():
         ref = fp.GetReference()
         out["footprints"].append({"ref": ref, "lib_id": fp.GetFPIDAsString(), "position": loc(fp.GetPosition()),
@@ -53,6 +53,9 @@ def main(argv):
             out["tracks"].append({"net": item.GetNetname(), "layer": board.GetLayerName(item.GetLayer()),
                                   "width": mm(item.GetWidth()), "start": loc(item.GetStart()),
                                   "end": loc(item.GetEnd()), "locked": item.IsLocked()})
+        else:
+            out["unsupported"].append({"kind": item.GetClass(), "net": item.GetNetname(),
+                                       "reason": "not represented by the straight-segment readback contract"})
     for zone in board.Zones():
         for layer in zone.GetLayerSet().CuStack():
             poly = zone.GetFilledPolysList(layer)

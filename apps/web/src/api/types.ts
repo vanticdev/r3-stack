@@ -618,6 +618,7 @@ export interface PcbCheck {
   source?: string;
 }
 export interface PcbBoard {
+  evidence_current?: boolean;
   board: string;
   component: string;
   spec: Record<string, unknown>;

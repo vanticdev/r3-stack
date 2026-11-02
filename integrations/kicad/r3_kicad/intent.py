@@ -10,6 +10,7 @@ KiCad file format. All lengths are millimetres in KiCad's frame (x right, y down
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from typing import Literal
 
 from .regulators import BuckDesign, BuckBoostDesign
@@ -200,7 +201,7 @@ class BoardIntent:
         return (ox + hx * 1000, oy - hy * 1000)
 
     def validate(self) -> list[str]:
-        """Structural problems in the intent itself (duplicate refs, single-pin nets)."""
+        """Reject ambiguous placement/connectivity before any KiCad files are written."""
         problems = []
         refs = [p.ref for p in self.parts]
         problems += [f"duplicate reference {r}" for r in sorted({r for r in refs if refs.count(r) > 1})]
@@ -211,4 +212,37 @@ class BoardIntent:
             overlap = set(part.pins) & set(part.no_connect)
             if overlap:
                 problems.append(f"{part.ref} pins {sorted(overlap)} are both connected and no-connect")
+            if not part.lib_id.startswith("power:") and part.pcb is None:
+                problems.append(f"{part.ref}: footprint placement is missing; assign board-local millimetres")
+            if part.pcb is not None:
+                p = part.pcb
+                if p.side not in ("F", "B"):
+                    problems.append(f"{part.ref}: placement side must be F or B")
+                if not all(math.isfinite(v) for v in (p.x, p.y, p.rotation)):
+                    problems.append(f"{part.ref}: placement coordinates and rotation must be finite")
+                elif not (0 <= p.x <= self.width and 0 <= p.y <= self.height):
+                    problems.append(f"{part.ref}: placement origin is outside the board outline")
+                for pin, xy in p.anchors:
+                    if len(xy) != 2 or not all(math.isfinite(v) for v in xy):
+                        problems.append(f"{part.ref}.{pin}: pad anchor must contain two finite millimetre coordinates")
+        if not all(math.isfinite(v) and v > 0 for v in (self.width, self.height, self.thickness, self.copper_oz)):
+            problems.append("board dimensions, thickness and copper weight must be positive and finite")
+        if not math.isfinite(self.corner_radius) or not 0 <= self.corner_radius <= min(self.width, self.height) / 2:
+            problems.append("corner radius must fit inside the board")
+        member_net = {f"{part.ref}.{pin}": net for part in self.parts for pin, net in part.pins.items()}
+        for track in self.power_tracks:
+            if not math.isfinite(track.width) or track.width <= 0 or track.width < self.rules.get("min_track_width", 0):
+                problems.append(f"{track.net}: track width must be positive and meet the minimum track width")
+            if len(track.points) < 2:
+                problems.append(f"{track.net}: track needs at least two points")
+            for point in track.points:
+                if isinstance(point, str):
+                    if member_net.get(point) != track.net:
+                        problems.append(f"{track.net}: track pad {point} belongs to {member_net.get(point)!r}, not this net")
+                elif len(point) != 2 or not all(math.isfinite(v) for v in point):
+                    problems.append(f"{track.net}: track points must be finite board-local millimetre pairs")
+        for via in self.vias:
+            if (not all(math.isfinite(v) for v in (via.x, via.y, via.diameter, via.drill))
+                    or not 0 < via.drill < via.diameter or not 0 <= via.x <= self.width or not 0 <= via.y <= self.height):
+                problems.append(f"{via.net}: invalid via position, diameter or drill")
         return problems

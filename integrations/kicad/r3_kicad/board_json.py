@@ -181,7 +181,7 @@ def catalog_check(component_id: str, catalog_component, connectors: dict[str, di
             if not parts:
                 diags.append(Diagnostic.error("board_catalog_mismatch", f"internal link {link.a}-{link.b} ({link.kind}) has no part",
                                               subjects=[component_id, link.a, link.b], data={"kind": "internal_link"}))
-            elif abs(_value(parts[0].value) - float(link.value)) > 0.01 * float(link.value):
+            elif not math.isfinite(_value(parts[0].value)) or abs(_value(parts[0].value) - float(link.value)) > 0.01 * float(link.value):
                 diags.append(Diagnostic.error("board_catalog_mismatch", f"{parts[0].ref} is {parts[0].value}, catalog {link.value}",
                                               subjects=[component_id, parts[0].ref],
                                               data={"kind": "internal_link_value", "board": _value(parts[0].value),
@@ -191,7 +191,15 @@ def catalog_check(component_id: str, catalog_component, connectors: dict[str, di
 
 def _value(text: str) -> float:
     scale = {"m": 1e-3, "k": 1e3, "M": 1e6, "u": 1e-6, "n": 1e-9, "p": 1e-12}
-    token = text.split()[0]
+    tokens = text.split()
+    if not tokens:
+        return float('nan')
+    token = tokens[0]
+    embedded = re.fullmatch(r'(\d+)([RrKkMmGg])(\d+)', token)
+    if embedded:
+        a, suffix, b = embedded.groups()
+        return float(f'{a}.{b}') * {'R': 1, 'r': 1, 'k': 1e3, 'K': 1e3, 'M': 1e6,
+                                   'm': 1e-3, 'G': 1e9, 'g': 1e9}[suffix]
     try:
         return float(token[:-1]) * scale[token[-1]] if token[-1] in scale else float(token)
     except (ValueError, KeyError):

@@ -8,6 +8,7 @@ import { DiagnosticList } from "../components/DiagnosticList.tsx";
 import { Icon } from "../components/icons.tsx";
 import { Card, CheckRow, Details, Empty, QueryView, Segmented, StaleNotice, type CheckOutcome } from "../components/ui.tsx";
 import { pcbPinMap } from "../lib/domain.ts";
+import { pcbRender } from "../lib/pcb.ts";
 import { diagnosticHeadline, plural } from "../lib/labels.ts";
 import { countsText } from "../lib/status.ts";
 import { fmt, timeAgo } from "../lib/units.ts";
@@ -28,8 +29,14 @@ export function PcbPage() {
   );
 }
 
-function checkOutcome(check: PcbCheck | null): CheckOutcome {
-  return check?.errors === null || check?.errors === undefined ? "not_run" : check.errors === 0 ? "passed" : "failed";
+function checkOutcome(check: PcbCheck | null, allowPass: boolean): CheckOutcome {
+  return check?.errors === null || check?.errors === undefined ? "not_run" : check.errors > 0 ? "failed" : allowPass ? "passed" : "not_run";
+}
+
+function checkText(check: PcbCheck | null, allowPass: boolean): string {
+  if (check?.errors === null || check?.errors === undefined) return "Not verified";
+  if (check.errors > 0) return plural(check.errors, "error");
+  return allowPass ? `Passed${check.warnings ? ` · ${plural(check.warnings, "warning")}` : ""}` : "Not verified";
 }
 
 function stageStatusText(stage: StageRow | undefined): string {
@@ -42,18 +49,23 @@ function Board({ pid, board, boards, onBoard, diagnostics }: { pid: string; boar
   const project = useProject(pid);
   const { start, active } = useProjectRuns(pid);
   const stage = project.data?.stages.find((s) => s.stage === "pcb");
+  const [view, setView] = useState<"3d" | "copper">("3d");
   const sides = useMemo(() => {
-    const find = (re: RegExp) => board.renders.find((r) => re.test(r.name));
-    return [["top", find(/render.*top|top/i)], ["bottom", find(/render.*bottom|bottom/i)]]
+    const find = (side: "top" | "bottom") => pcbRender(board.renders, view, side);
+    return [["top", find("top")], ["bottom", find("bottom")]]
       .filter((x): x is [string, NonNullable<ReturnType<typeof find>>] => !!x[1]);
-  }, [board]);
+  }, [board, view]);
   const [side, setSide] = useState<string>("top");
-  const render = sides.find(([s]) => s === side)?.[1] ?? sides[0]?.[1] ?? board.renders[0];
+  const render = sides.find(([s]) => s === side)?.[1] ?? sides[0]?.[1];
   const pinMap = useMemo(() => pcbPinMap(board.connectors, board.catalog_connectors), [board]);
   const mismatches = pinMap.filter((p) => !p.match);
   const json = board.board_json;
   const drc = board.drc as (PcbCheck & { unconnected?: number }) | null;
-  const unrouted = (json?.validation as { unrouted_connections?: number } | undefined)?.unrouted_connections ?? drc?.unconnected ?? null;
+  const current = board.evidence_current === true && !stage?.stale;
+  const trusted = current && stage?.status === "ok";
+  const erc = current ? board.erc : null;
+  const checkedDrc = current ? board.drc : null;
+  const unrouted = current ? (json?.validation as { unrouted_connections?: number } | undefined)?.unrouted_connections ?? drc?.unconnected ?? null : null;
   const own = diagnostics.filter((d) => d.subjects.includes(board.board) || d.subjects.includes(board.component));
   const blockers = own.filter((d) => d.severity === "error");
   const buildLog = board.files.find((f) => /\.log$/.test(f.path));
@@ -74,7 +86,7 @@ function Board({ pid, board, boards, onBoard, diagnostics }: { pid: string; boar
           {outdated && <span className="tag outdated"><Icon name="clock" size={11} />Outdated · inputs changed</span>}
           <span className="spacer" style={{ flex: 1 }} />
           {buildLog && <a className="button" href={buildLog.url} target="_blank" rel="noreferrer">View build log</a>}
-          {board.gerbers_url && <a className="button" href={board.gerbers_url} download><Icon name="download" size={14} />Fabrication files</a>}
+          {board.gerbers_url && <a className="button" href={board.gerbers_url} download><Icon name="download" size={14} />{trusted ? "Fabrication files" : "Unverified fabrication files"}</a>}
           <button className="primary" onClick={build} disabled={busy}>{json ? "Rebuild PCB" : "Build PCB"}</button>
         </div>
         {blockers.length > 0 && (
@@ -104,14 +116,13 @@ function Board({ pid, board, boards, onBoard, diagnostics }: { pid: string; boar
       <div className="grid cols-2" style={{ alignItems: "start" }}>
         <Card title="Checks" subtitle={json?.outline ? `Board ${fmt(json.outline.width, "m")} × ${fmt(json.outline.height, "m")}` : undefined}>
           <div className="check-list" data-testid="pcb-checks">
-            <CheckRow outcome={checkOutcome(board.erc)} title="Schematic rules (ERC)"
-                      result={board.erc?.errors === null || board.erc?.errors === undefined ? "Not run" : board.erc.errors === 0 ? `Passed${board.erc.warnings ? ` · ${plural(board.erc.warnings, "warning")}` : ""}` : `${plural(board.erc.errors, "error")}`} />
-            <CheckRow outcome={checkOutcome(board.drc)} title="Board design rules (DRC)"
-                      result={board.drc?.errors === null || board.drc?.errors === undefined ? "Not run" : board.drc.errors === 0 ? `Passed${board.drc.warnings ? ` · ${plural(board.drc.warnings, "warning")}` : ""}` : `${plural(board.drc.errors, "error")}`} />
-            <CheckRow outcome={unrouted === null ? "not_run" : unrouted === 0 ? "passed" : "failed"} title="Routing"
-                      result={unrouted === null ? "Not run" : unrouted === 0 ? "All connections routed" : `${plural(unrouted, "connection")} unrouted`} />
-            <CheckRow outcome={!pinMap.length ? "not_run" : mismatches.length ? "failed" : "passed"} title="Connector pins match the catalog"
-                      result={!pinMap.length ? "No pins available" : mismatches.length ? `${plural(mismatches.length, "pin")} differ of ${pinMap.length}` : `All ${pinMap.length} pins match`}>
+            {!trusted && <span className="small muted">Checks are unverified for the current build. Rebuild successfully before relying on old results.</span>}
+            <CheckRow outcome={checkOutcome(erc, trusted)} title="Schematic rules (ERC)" result={checkText(erc, trusted)} />
+            <CheckRow outcome={checkOutcome(checkedDrc, trusted)} title="Board design rules (DRC)" result={checkText(checkedDrc, trusted)} />
+            <CheckRow outcome={unrouted === null ? "not_run" : unrouted > 0 ? "failed" : trusted ? "passed" : "not_run"} title="Routing"
+                      result={unrouted === null || (unrouted === 0 && !trusted) ? "Not verified" : unrouted === 0 ? "All connections routed" : `${plural(unrouted, "connection")} unrouted`} />
+            <CheckRow outcome={!current || !pinMap.length ? "not_run" : mismatches.length ? "failed" : trusted ? "passed" : "not_run"} title="Connector pins match the catalog"
+                      result={!trusted ? "Not verified for this build" : !pinMap.length ? "No pins available" : mismatches.length ? `${plural(mismatches.length, "pin")} differ of ${pinMap.length}` : `All ${pinMap.length} pins match`}>
               {mismatches.slice(0, 6).map((p) => (
                 <span key={`${p.connector}.${p.pin}`}>{p.connector} pin {p.pin}: board net <strong>{p.boardNet ?? "unconnected"}</strong>, catalog expects <strong>{p.catalogPin ?? "unassigned"}</strong></span>
               ))}
@@ -119,7 +130,10 @@ function Board({ pid, board, boards, onBoard, diagnostics }: { pid: string; boar
             {outdated && <span className="small muted">These checks ran on earlier inputs.</span>}
           </div>
         </Card>
-        <Card title="Board render" actions={sides.length > 1 && <Segmented label="Side" value={side} onChange={setSide} options={sides.map(([s]) => ({ value: s, label: s === "top" ? "Top" : "Bottom" }))} />}>
+        <Card title={view === "3d" ? "3D board render" : "Copper layers"} actions={<>
+          <Segmented label="Board view" value={view} onChange={setView} options={[{ value: "3d", label: "3D" }, { value: "copper", label: "Copper" }]} />
+          {sides.length > 1 && <Segmented label="Side" value={side} onChange={setSide} options={sides.map(([s]) => ({ value: s, label: s === "top" ? "Top" : "Bottom" }))} />}
+        </>}>
           {render ? <img src={render.url} alt={`${board.board} ${render.name}`} className="board-render" /> : <span className="muted">No render yet (the PCB stage writes render_top.png and render_bottom.png).</span>}
         </Card>
       </div>

@@ -91,6 +91,10 @@ Pending measurements block final qualification, not other independent work: carr
 assumptions through design, firmware and simulation, complete what can be completed, and list the measurements.
 Missing catalog entries, models or devices are research and project-authoring tasks using the documented tools.
 Never weaken requirements, limits or checks. Iterate using diagnostics and r3_release_status.
+Use diagnostic work_units to investigate explicit shared causes together; context-only groups are not proven causes.
+For an explicitly declared linear lumped circuit, r3_analyze_circuit provides DC/AC/transient evidence.
+It does not extract a PCB circuit, support nonlinear devices or certify manufactured connectivity; use ngspice
+and native KiCad checks for their respective supported models and geometry.
 For wiring, declare connections and constraints, then call r3_route_wires: software computes the paths.
 Do not manually author wire waypoints to imitate a router. r3_route_topologies explores graph-level
 alternatives only; its candidates require geometry, bend, clearance and dynamic validation.

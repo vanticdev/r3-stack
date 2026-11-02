@@ -86,6 +86,21 @@ def test_doctor_includes_agent_clis(client):
     assert all(a["detail"] for a in body["agents"])
 
 
+def test_explicit_circuit_endpoint_keeps_physics_scope_and_evidence(client):
+    payload = {'elements': [{'id': 'V1', 'kind': 'V', 'positive': 'a', 'negative': '0', 'value': 3},
+                            {'id': 'R1', 'kind': 'R', 'positive': 'a', 'negative': '0', 'value': 1000}]}
+    response = client.post('/api/projects/bench/circuit', json={'circuit': payload})
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result['node_voltage_v']['a'] == [3]
+    assert result['model'] == 'explicit_linear_lumped' and result['limitations']
+    assert client.get('/api/projects/bench/artifacts/' + result['artifact']).status_code == 200
+    bad = client.post('/api/projects/bench/circuit', json={'circuit': {'elements': [
+        {'id': 'D1', 'kind': 'diode', 'positive': 'a', 'negative': '0', 'value': .7}]}})
+    assert bad.status_code == 400
+    assert bad.json()['code'] == 'circuit_model_invalid'
+
+
 def test_unknown_routes_and_web_fallback(client, tmp_path):
     error(client.get("/api/nope"), 404, "not_found")
     assert "web app is not built" in client.get("/").text

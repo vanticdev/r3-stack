@@ -25,6 +25,7 @@ import importlib.util
 import json
 import sys
 import time
+import traceback
 from pathlib import Path
 from typing import Any, Callable
 
@@ -37,7 +38,7 @@ from .pcb import build_plan, ground_plan, run_plan
 from .schematic import write_schematic
 
 STEPS = ("schematic", "erc", "netlist", "board", "route", "pour", "drc")
-FLOW_VERSION = "2-headless"
+FLOW_VERSION = "3-validated-headless"
 PACKAGE = Path(__file__).parent
 
 
@@ -99,6 +100,9 @@ class Flow:
         self.source = Path(source).resolve()
         self.module = load_intent_module(self.source)
         self.intent: BoardIntent = self.module.build()
+        problems = self.intent.validate()
+        if problems:
+            raise FlowError("invalid board intent: " + "; ".join(problems))
         self.name = self.intent.name
         self.sch = self.source / f"{self.name}.kicad_sch"
         self.pcb = self.source / f"{self.name}.kicad_pcb"
@@ -121,6 +125,10 @@ class Flow:
         self.log(f"== {name}")
         try:
             result = fn()
+        except Exception as error:
+            self.record['steps'].setdefault(name, {})['error'] = {
+                'type': type(error).__name__, 'message': str(error), 'traceback': traceback.format_exc()}
+            raise
         finally:
             self.record["steps"].setdefault(name, {})["seconds"] = round(time.time() - t0, 1)
             self._save_record()
@@ -141,7 +149,10 @@ class Flow:
 
     def erc(self) -> Any:
         out = self.work / "erc.json"
-        self.cli.erc(self.sch, out)
+        out.unlink(missing_ok=True)
+        run = self.cli.erc(self.sch, out)
+        if not run.ok or not out.exists():
+            raise FlowError('ERC did not complete: ' + run.stderr[-1000:])
         counts = report_counts(out)
         if counts["errors"]:
             items = [i.get("description") for i in report_items(out) if i.get("severity") == "error"]
@@ -197,13 +208,13 @@ class Flow:
             result = self._route_rounds()
             result["attempt"] = attempt
             tries.append(result)
-            if min(t["unconnected_after_routing"] for t in tries) == result["unconnected_after_routing"]:
+            if min(t["routing_score"] for t in tries) == result["routing_score"]:
                 chosen.write_bytes(self.pcb.read_bytes())
-            if result["unconnected_after_routing"] == 0:
+            if result["unconnected_after_routing"] == 0 and result['routing_score'][0] == 0:
                 break
             self.log(f"   attempt {attempt} left {result['unconnected_after_routing']} unconnected; starting over")
         self.pcb.write_bytes(chosen.read_bytes())
-        best = min(tries, key=lambda t: t["unconnected_after_routing"])
+        best = min(tries, key=lambda t: t["routing_score"])
         return {**best, "attempts": len(tries),
                 "attempt_results": [t["unconnected_after_routing"] for t in tries]}
 
@@ -218,6 +229,7 @@ class Flow:
         best = self.work / f"{self.name}-best.kicad_pcb"
         rounds: list[dict[str, Any]] = []
         best_open: int | None = None
+        best_score = None
         stalled = 0
         for index in range(1, max_rounds + 1):
             exported = freerouting.export_dsn(self.pcb, dsn)
@@ -231,20 +243,29 @@ class Flow:
             if not imported.ok:
                 raise FlowError("Specctra session import failed: " + imported.output[-500:])
             check = self.work / f"route-{index}-drc.json"
-            self.cli.drc(self.pcb, check, parity=False, refill=False)
+            check.unlink(missing_ok=True)
+            check_run = self.cli.drc(self.pcb, check, parity=False, refill=False)
+            if not check_run.ok or not check.exists():
+                raise FlowError('Routing DRC failed to execute: ' + check_run.stderr[-1000:])
             open_items = _open_signal_items(check)
+            report = json.loads(check.read_text())
+            copper_errors = sum(1 for v in report.get('violations', [])
+                                if v.get('severity') == 'error' and not v.get('excluded'))
+            score = (copper_errors, open_items)
             open_nets = sorted(_open_nets(check) - {"/GND"})
             entry: dict[str, Any] = {"round": index, "freerouting_unrouted": freerouting.unrouted(routed.output),
                                      "kicad_unconnected": report_counts(check).get("unconnected", 0),
                                      "signal_unconnected": open_items, "open_nets": open_nets}
+            entry['routing_score'] = score
             rounds.append(entry)
             self.log(f"   round {index}: {open_items} signal connections open {open_nets}")
-            if best_open is None or open_items < best_open:
+            if best_score is None or score < best_score:
+                best_score = score
                 best_open, stalled = open_items, 0
                 best.write_bytes(self.pcb.read_bytes())
             else:
                 stalled += 1
-            if open_items == 0 or stalled >= patience:
+            if (open_items == 0 and copper_errors == 0) or stalled >= patience:
                 break
             if stalled and open_nets:
                 freerouting.unroute(self.pcb, set(open_nets))
@@ -252,6 +273,7 @@ class Flow:
         self.pcb.write_bytes(best.read_bytes())
         return {"freerouting": router.version if router else None, "java": router.java_version if router else None,
                 "max_passes": self.passes, "rounds": rounds, "unconnected_after_routing": best_open,
+                "routing_score": best_score,
                 "note": "signal connections only; ground is completed by the pours"}
 
     def pour(self) -> Any:
@@ -264,10 +286,15 @@ class Flow:
 
     def drc(self) -> Any:
         out = self.work / "drc.json"
-        self.cli.drc(self.pcb, out, refill=True)
+        out.unlink(missing_ok=True)
+        run = self.cli.drc(self.pcb, out, refill=True)
+        if not run.ok or not out.exists():
+            raise FlowError("DRC did not complete successfully: " + run.stderr[-1000:])
         counts = report_counts(out)
         counts["items"] = [f"{i.get('type')}: {i.get('description')}" for i in report_items(out)
                            if i.get("severity") == "error"][:30]
+        if counts["errors"] or counts.get("unconnected") or counts.get("parity"):
+            raise FlowError(f"DRC failed: {counts}; see {out}")
         return counts
 
     def run(self, start: str = "schematic", stop: str = "drc", *, watch_interval: float = .25) -> dict[str, Any]:
