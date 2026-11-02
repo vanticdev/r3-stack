@@ -58,7 +58,7 @@ test("reply to a reopened execution shows its latest recorded changes", async ({
   await page.route("**/api/projects/*/agent", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({ json: [{ session_id: parent, project: "synthetic", provider: "codex", model: "synthetic-model",
-        prompt: "Retained task", status: "completed", created_at: 1, finished_at: 2, result: "Checkpoint", error: null, returncode: 0, events: 1 }] });
+        prompt: "Retained task\n", status: "completed", created_at: 1, finished_at: 2, result: "Checkpoint", error: null, returncode: 0, events: 1 }] });
     } else {
       submitted.push(route.request().postDataJSON() as Record<string, unknown>);
       await route.fulfill({ json: { session_id: child } });
@@ -72,7 +72,9 @@ test("reply to a reopened execution shows its latest recorded changes", async ({
     await route.fulfill({ contentType: "text/event-stream", body: events.map(e => `data: ${JSON.stringify(e)}\n\n`).join("") });
   });
   await page.goto("/#/p/synthetic/agent");
-  await page.getByLabel("Agent history").getByRole("button", { name: /Retained task/ }).click();
+  const retained = page.getByLabel("Agent history").getByRole("button", { name: /Retained task/ });
+  await expect(retained).toBeVisible();
+  await retained.click();
   await page.getByLabel("Prompt").fill("Retry the operation");
   await page.getByRole("button", { name: "Reply", exact: true }).click();
   await expect.poll(() => submitted.length).toBe(1);

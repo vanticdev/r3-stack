@@ -281,7 +281,7 @@ export function AgentPage() {
           {past.map((s) => (
             <button key={s.session_id} className={`list-row${thread[0]?.id === s.session_id ? " selected" : ""}`} onClick={() => open(s)}>
               <span className="stack" style={{ gap: 0, minWidth: 0 }}>
-                <span className="ellipsis">{s.prompt.split("\n").pop()}</span>
+                <span className="ellipsis">{s.prompt.trimEnd().split("\n").pop()}</span>
                 <span className="muted small">{s.status} · {timeAgo(s.created_at)}</span>
               </span>
             </button>
