@@ -744,3 +744,28 @@ tr.mismatch td { background: var(--critical-bg); }
 .override input { margin-top: 3px; }
 .deploy-action { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 @media (max-width: 900px) { .choices.two { grid-template-columns: minmax(0, 1fr); } }
+
+/* Light workbench: readable measurements and quiet, rectilinear chrome.
+   Dark-theme surfaces and viewer rendering remain independently defined. */
+:root[data-theme="light"] {
+  --text-muted: #62615c;
+  --accent: #b94308;
+  --focus: #195fae;
+  --good: #237023;
+  --critical: #b52b2b;
+  --radius: 3px;
+}
+:root[data-theme="light"] h1 { font-size: 21px; letter-spacing: -0.025em; }
+:root[data-theme="light"] .card-head h2 { font-size: 14px; letter-spacing: 0; }
+:root[data-theme="light"] .card-head { background: var(--surface-2); }
+:root[data-theme="light"] .readiness { border-width: 0 0 1px; border-radius: 0; padding: 12px 0; background: transparent; }
+:root[data-theme="light"] .readiness .lead { font-size: 20px; font-weight: 650; }
+:root[data-theme="light"] .chip { border-radius: 3px; }
+:root[data-theme="light"] .chip.muted { background: transparent; }
+:root[data-theme="light"] .tag.outdated { background: transparent; border-left: 2px solid #946000; border-radius: 0; }
+:root[data-theme="light"] .nav a { border-radius: 2px; }
+:root[data-theme="light"] .nav a.active { box-shadow: inset 2px 0 var(--text-primary); }
+:root[data-theme="light"] :is(button, .button, select, textarea, .segmented) { border-radius: 3px; }
+:root[data-theme="light"] .segmented button { border-radius: 0; }
+:root[data-theme="light"] :is(.chip.warning svg, .check-row.warning > .mark, .diag.warning .sev, .diag-row.warning .sev, .fw-line.warning .lvl) { color: #805200; }
+:root[data-theme="light"] .quiet-check { opacity: 1; }
