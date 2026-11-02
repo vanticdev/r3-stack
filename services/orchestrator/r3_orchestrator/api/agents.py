@@ -6,7 +6,10 @@ directory:
 
 * Claude Code: ``claude -p --output-format stream-json --verbose
   --mcp-config <session>/.mcp.json --strict-mcp-config --permission-mode default
-  --allowedTools <ungated R3 tools, Read, Glob, Grep> --disallowedTools <gated R3 tools>``
+  --settings <session>/claude-settings.json --setting-sources project --disable-slash-commands
+  --allowedTools <ungated R3 and native tools, shell and web> --disallowedTools <gated R3 tools>``
+  The settings file scopes file tools and sandboxes the shell to the same project
+  and platform boundary as the Codex profile, with networking enabled.
 * Codex: ``codex exec --json --skip-git-repo-check -C <project>
   -c approval_policy="never" -c default_permissions="r3_session"
   -c permissions.r3_session=... -c mcp_servers.r3.{command,args,env,disabled_tools}=...``
@@ -64,8 +67,11 @@ from r3_model.spec_files import SpecFiles, load_spec_files, spec_lock
 
 PROVIDERS = ("claude", "codex")
 MCP_SERVER = "r3"
-#: Built-in Claude Code tools a headless session may use without asking (read-only).
-CLAUDE_READ_TOOLS = ("Read", "Glob", "Grep")
+#: Built-in Claude Code tools a headless session may use. claude_settings() scopes file access.
+CLAUDE_TOOLS = ("Read", "Glob", "Grep", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch",
+                "TodoWrite", "ToolSearch", "Monitor")
+#: Tools approved unconditionally: the sandbox confines the shell, and web tools are read-only.
+CLAUDE_APPROVED_TOOLS = ("Bash", "WebFetch", "WebSearch", "TodoWrite", "ToolSearch", "Monitor")
 #: Tools that start pipeline work inside the MCP server.
 RUN_TOOLS = ("r3_validate", "r3_run_stage", "r3_run_scenario", "r3_run_project_tests")
 MAX_CONTENT = 20_000  # characters of a tool result kept in an event
@@ -171,6 +177,12 @@ Never weaken requirements, limits or checks. Iterate using diagnostics and r3_re
 Finish with stage and scenario results, remaining diagnostics, assumptions and required measurements."""
 
 
+#: The Claude Code sandbox replaces TMPDIR in its shell. TEMP keeps the session's project-local value.
+CLAUDE_INSTRUCTIONS = """
+In this Claude Code shell, TMPDIR is the CLI's own directory: keep downloads and temporary work in $TEMP.
+git and gh run outside the shell sandbox for .git and keychain access; use them only on this project."""
+
+
 def session_instructions() -> str:
     """Carry operator transport context without changing the user prompt."""
     instruction = SYSTEM_PROMPT
@@ -266,14 +278,24 @@ def native_mcp_config() -> dict[str, Any] | None:
     return None
 
 
-def mcp_config(project_root: Path, python: str = sys.executable) -> dict[str, Any]:
+def prompt_files(prompt: str) -> list[Path]:
+    """Existing files the user named by absolute path; naming one grants reading exactly that file."""
+    found = []
+    for token in re.findall(r"(?:^|(?<=\s))[`'\"(<]?((?:/|~/)[^\s`'\")>]+)", prompt):
+        path = Path(token.rstrip(".,;:")).expanduser()
+        if path.is_file() and path.resolve() not in found:
+            found.append(path.resolve())
+    return found
+
+
+def mcp_config(project_root: Path, python: str = sys.executable, granted: Iterable[Path] = ()) -> dict[str, Any]:
     """R3 plus the installed native editor server, bound to this project."""
     from r3_model.read_scope import LocalReadScope, ReadRule
 
     platform = Path(__file__).resolve().parents[4]
     read_scope = LocalReadScope((ReadRule(platform, "read"),
         ReadRule(platform / "examples" / "robots", "deny"), ReadRule(platform / ".git", "deny"),
-        ReadRule(project_root.resolve(), "read"))).to_json()
+        ReadRule(project_root.resolve(), "read"), *(ReadRule(path, "read") for path in granted))).to_json()
     servers = {MCP_SERVER: {"command": python, "args": ["-m", "r3_orchestrator.mcp_server"],
                            "env": {"R3_PROJECT": str(project_root), "PYTHONPATH": r3_pythonpath(),
                                    "R3_LOCAL_READ_SCOPE": read_scope}}}
@@ -306,12 +328,17 @@ def _tools() -> tuple[list[str], list[str]]:
     return mcp_server.ungated_tools(), mcp_server.gated_tools()
 
 
-def claude_command(executable: str, config_path: Path, model: str | None = None) -> list[str]:
+def claude_command(executable: str, config_path: Path, model: str | None = None,
+                   settings_path: Path | None = None) -> list[str]:
     allowed, gated = _tools()
     command = [executable, "-p", "--output-format", "stream-json", "--verbose",
                "--mcp-config", str(config_path), "--strict-mcp-config", "--permission-mode", "default",
-               "--append-system-prompt", session_instructions(),
-               "--allowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in allowed], *CLAUDE_READ_TOOLS,
+               # Account settings, skills and plugins stay out; authentication is unaffected.
+               "--setting-sources", "project", "--disable-slash-commands",
+               *(["--settings", str(settings_path)] if settings_path else []),
+               "--append-system-prompt", session_instructions() + CLAUDE_INSTRUCTIONS,
+               "--tools", ",".join(CLAUDE_TOOLS),
+               "--allowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in allowed], *CLAUDE_APPROVED_TOOLS,
                "--disallowedTools", *[f"mcp__{MCP_SERVER}__{t}" for t in gated],
                "mcp__onshape_native__evaluate", "mcp__onshape_native__feature_studio"]
     # An explicit allowlist keeps discovery/modeling available under strict MCP config.
@@ -331,8 +358,71 @@ def _toml(value: Any) -> str:
     return json.dumps(value)
 
 
+def runtime_read_paths(config: dict[str, Any] | None = None, *, executable: str | None = None) -> list[Path]:
+    """Toolchain, shell initialization and Git authentication files a session shell needs.
+
+    These are runtime inputs. They do not grant access to arbitrary home or
+    workspace directories.
+    """
+    home = Path.home()
+    paths = [Path(sys.prefix).resolve(), Path(sys.base_prefix).resolve()]
+    for path in (home / ".gitconfig", home / ".config" / "gh", home / ".config" / "git", home / ".ssh",
+                 home / ".zshenv", home / ".zprofile", home / ".zshrc", home / ".profile",
+                 home / ".bash_profile", home / ".bashrc", home / ".pyenv", home / ".cargo",
+                 home / ".rustup", home / ".rbenv", home / ".nvm", home / "Applications",
+                 home / "Library" / "Keychains"):
+        if path.exists():
+            paths.append(path.resolve())
+    if brew := shutil.which("brew"):
+        paths.append(Path(brew).parent.parent.resolve())
+    # Provider CLIs re-execute themselves inside their sandbox. Grant that
+    # resolved runtime file without opening account data.
+    if executable and (binary := shutil.which(executable)):
+        paths.append(Path(binary).resolve())
+    native = (config or {}).get("mcpServers", {}).get("onshape_native", {})
+    runtime = native.get("env", {}).get("ONSHAPE_NATIVE_RUNTIME") or os.environ.get("ONSHAPE_NATIVE_RUNTIME")
+    if runtime:
+        paths.append(Path(runtime).expanduser().resolve() / "bridge.json")
+    return paths
+
+
+def claude_settings(project_root: Path, config: dict[str, Any] | None = None, *, executable: str | None = None,
+                    granted: Iterable[Path] = ()) -> dict[str, Any]:
+    """Confine a Claude Code session to the boundary of ``codex_permission_profile``.
+
+    Path-scoped allow rules are the only file-tool grants, and the OS sandbox
+    applies the same reads and project-only writes to the shell, with no
+    unsandboxed escape. Differences: the CLI needs its own /tmp state, so the
+    shell can read /tmp, and git and gh are excluded from the sandbox.
+    See https://code.claude.com/docs/en/sandboxing.
+    """
+    platform = Path(__file__).resolve().parents[4]
+    root = project_root.resolve()
+    examples = platform / "examples" / "robots"
+    # Deny rules outrank allow rules, so a project inside the examples directory
+    # cannot be reopened by specificity: name the other projects instead.
+    hidden = [platform / ".git", *(sorted(p for p in examples.iterdir() if p != root) if examples.is_dir() else [])]
+    files = [*granted]
+    directories = [platform, root, *runtime_read_paths(config, executable=executable)]
+    home = Path.home().resolve()
+    return {"permissions": {
+                "allow": [*(f"Read(/{path}/**)" for path in directories if path.is_dir()),
+                          *(f"Read(/{path})" for path in [*files, *(p for p in directories if not p.is_dir())]),
+                          f"Edit(/{root}/**)"],
+                "deny": [f"Read(/{path}/**)" for path in hidden]},
+            "sandbox": {"enabled": True, "autoAllowBashIfSandboxed": True, "allowUnsandboxedCommands": False,
+                        "filesystem": {"denyRead": [str(home), *map(str, hidden)],
+                                       "allowRead": [*map(str, directories), *map(str, files)],
+                                       "allowWrite": [str(root)]},
+                        "network": {"allowedDomains": ["*"], "allowLocalBinding": True},
+                        # The sandbox refuses .git control files and the login keychain, which
+                        # requested publication needs. These two run outside it, which is the
+                        # counterpart of Codex's .git grant and keychain read.
+                        "excludedCommands": ["git *", "gh *"]}}
+
+
 def codex_permission_profile(project_root: Path, config: dict[str, Any] | None = None, *,
-                             executable: str | None = None) -> dict[str, Any]:
+                             executable: str | None = None, granted: Iterable[Path] = ()) -> dict[str, Any]:
     """Read the platform and runtime, not other projects or shared scratch trees.
 
     Keep the workspace profile's protections and the explicit project Git grant.
@@ -340,30 +430,12 @@ def codex_permission_profile(project_root: Path, config: dict[str, Any] | None =
     otherwise denied examples directory. See https://learn.chatgpt.com/docs/permissions.
     """
     platform = Path(__file__).resolve().parents[4]
-    home = Path.home()
     filesystem = {":root": "deny", ":minimal": "read", ":slash_tmp": "deny",
                   str(platform): "read", str(platform / "examples" / "robots"): "deny",
-                  str(platform / ".git"): "deny", str(project_root.resolve() / ".git"): "write",
-                  str(Path(sys.prefix).resolve()): "read", str(Path(sys.base_prefix).resolve()): "read"}
-    # Toolchains, shell initialization and normal Git authentication are runtime
-    # inputs. They do not grant access to arbitrary home/workspace directories.
-    for path in (home / ".gitconfig", home / ".config" / "gh", home / ".config" / "git", home / ".ssh",
-                 home / ".zshenv", home / ".zprofile", home / ".zshrc", home / ".profile",
-                 home / ".bash_profile", home / ".bashrc", home / ".pyenv", home / ".cargo",
-                 home / ".rustup", home / ".rbenv", home / ".nvm", home / "Applications",
-                 home / "Library" / "Keychains"):
-        if path.exists():
-            filesystem[str(path.resolve())] = "read"
-    if brew := shutil.which("brew"):
-        filesystem[str(Path(brew).parent.parent.resolve())] = "read"
-    # Codex re-executes itself to load instructions through the sandbox. Grant
-    # that resolved runtime file without opening account data.
-    if binary := (shutil.which(executable) if executable else shutil.which("codex")):
-        filesystem[str(Path(binary).resolve())] = "read"
-    native = (config or {}).get("mcpServers", {}).get("onshape_native", {})
-    runtime = native.get("env", {}).get("ONSHAPE_NATIVE_RUNTIME") or os.environ.get("ONSHAPE_NATIVE_RUNTIME")
-    if runtime:
-        filesystem[str(Path(runtime).expanduser().resolve() / "bridge.json")] = "read"
+                  str(platform / ".git"): "deny", str(project_root.resolve() / ".git"): "write"}
+    # A bare provider name still resolves; an absent CLI grants nothing.
+    for path in (*runtime_read_paths(config, executable=executable or "codex"), *granted):
+        filesystem[str(path)] = "read"
     return {"extends": ":workspace", "filesystem": filesystem, "network": {"enabled": True}}
 
 
@@ -378,7 +450,8 @@ def session_environment(project_root: Path, session_directory: Path, config: dic
     env = {**os.environ, **(extra_env or {}), "R3_PROJECT": str(root), "R3_PYTHON": sys.executable,
            "PYTHONPATH": r3_pythonpath(),
            "MCP_TOOL_TIMEOUT": str(MCP_TOOL_TIMEOUT_S * 1000), "MCP_TIMEOUT": "120000",
-           "TMPDIR": str(scratch), "TMP": str(scratch), "TEMP": str(scratch),
+           "BASH_MAX_TIMEOUT_MS": str(MCP_TOOL_TIMEOUT_S * 1000), "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+           "TMPDIR": str(scratch), "TMP": str(scratch), "TEMP": str(scratch), "CLAUDE_CODE_TMPDIR": str(scratch),
            "XDG_CACHE_HOME": str(cache), "UV_CACHE_DIR": str(cache / "uv"),
            "PIP_CACHE_DIR": str(cache / "pip"), "MPLCONFIGDIR": str(cache / "matplotlib"),
            "npm_config_cache": str(cache / "npm"), "R3_MODEL_CACHE": str(cache / "models")}
@@ -431,7 +504,7 @@ def codex_scope_overrides(project_root: Path, account_home: Path | None = None) 
 
 
 def codex_command(executable: str, project_root: Path, config: dict[str, Any], model: str | None = None,
-                  resume_id: str | None = None) -> list[str]:
+                  resume_id: str | None = None, granted: Iterable[Path] = ()) -> list[str]:
     # The instruction loader re-executes this path inside the read sandbox.
     # Resolve installation symlinks so it needs no account-directory traversal.
     if located := shutil.which(executable):
@@ -442,7 +515,7 @@ def codex_command(executable: str, project_root: Path, config: dict[str, Any], m
     command = [executable, "exec", "--json", "--skip-git-repo-check", "--color", "never", "-C", str(project_root),
                "-c", 'approval_policy="never"',
                "-c", 'default_permissions="r3_session"',
-               "-c", f"permissions.r3_session={_toml(codex_permission_profile(project_root, config, executable=executable))}",
+               "-c", f"permissions.r3_session={_toml(codex_permission_profile(project_root, config, executable=executable, granted=granted))}",
                "-c", 'web_search="live"',
                "-c", f"developer_instructions={_toml(session_instructions())}",
                "-c", f"{prefix}.enabled=true",
@@ -779,7 +852,13 @@ class AgentManager:
         if session.directory.resolve() != session.directory:
             raise ApiError("agent_resume_unavailable", "Agent records must stay in the project without symlink traversal.")
         session.directory.mkdir(parents=True, exist_ok=True)
-        config = mcp_config(Path(root), self.python)
+        # A Reply keeps the file grants of the conversation it continues.
+        prompts, ancestor = [prompt], previous
+        while ancestor is not None:
+            prompts.append(ancestor.prompt)
+            ancestor = self.get(ancestor.resume_session_id) if ancestor.resume_session_id else None
+        granted = prompt_files("\n".join(prompts))
+        config = mcp_config(Path(root), self.python, granted)
         if native := config["mcpServers"].get("onshape_native"):
             # The provider otherwise hides native MCP stderr/exit evidence
             # behind a generic "Transport closed" result. Keep it per-session.
@@ -790,12 +869,14 @@ class AgentManager:
         config_path = session.directory / ".mcp.json"
         config_path.write_text(json.dumps(config, indent=2))
         if provider == "claude":
-            session.command = claude_command(info["path"], config_path, model)
+            settings_path = session.directory / "claude-settings.json"
+            settings_path.write_text(json.dumps(claude_settings(Path(root), config, executable=info["path"], granted=granted), indent=2))
+            session.command = claude_command(info["path"], config_path, model, settings_path)
             if previous:
                 session.command += ["--resume", previous.provider_session_id]
             stdin = prompt
         else:
-            session.command = codex_command(info["path"], Path(root), config, model, session.provider_session_id if previous else None)
+            session.command = codex_command(info["path"], Path(root), config, model, session.provider_session_id if previous else None, granted)
             stdin = prompt
         session._spec_start = session._spec_last = _description(Path(root))
         env = session_environment(Path(root), session.directory, config, self.extra_env)
