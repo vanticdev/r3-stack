@@ -93,6 +93,24 @@ and `external(name)` use ngspice's public circuit language. Read real output wit
 `Solution.v(node, reference)`, `i(source)`, `get(vector)` and `reduced(vector, kind)`.
 Keep physical assumptions/provenance visible; do not replace the circuit solver.
 
+### Standalone native circuit experiments
+
+Use `from r3_sim.electrical.bench import Bench` to exercise project electrical
+models without an assembled robot. Construct `Bench([model], cards)` with native
+ngspice source/load cards. `bench.operating_point({model.id: inputs})` solves the
+static circuit and calls `begin_step(None, inputs, time)`: apply the supplied
+controls, but do not advance timers or integrated state. A project state dictionary
+alone does not update ngspice control sources; `begin_step` must copy its current
+inputs into `self.controls`.
+
+`bench.step(dt, {model.id: inputs})` runs the native transient and the model's
+step lifecycle. It starts a transient deck if needed; switching from a static
+solve starts that transient from the model's initialized state. Choose a timestep
+and duration appropriate to the phenomenon, check native solved outputs, and
+retain the original acceptance limits when fixing a test setup. Call
+`bench.close()` in `finally` to release the native engine. These experiments
+qualify device behavior; complete assembled twin scenarios still qualify the robot.
+
 ## Tests and scenarios
 
 Run `tests/test_*.py` with `r3_run_project_tests`, and native scenarios with
