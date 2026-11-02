@@ -351,7 +351,14 @@ def run(project: Project) -> StageResult:
         parts.append(process_part(project, part, printer, cases, cad_parts, out_dir, result))
     fastener_diagnostics, fastener_records = checks.fastener_checks(project, printed, {})
     result.extend(fastener_diagnostics)
-    hole_diagnostics, hole_records = checks.hole_clearance_checks(project, printed)
+    try:
+        hole_diagnostics, hole_records = checks.hole_clearance_checks(project, printed)
+    except PullError as error:
+        if error.code != "cad_analytic_geometry_pending":
+            raise
+        # Mesh printability still runs on a prototype pull; bore fit stays unverified.
+        hole_diagnostics, hole_records = [Diagnostic.warning("cad_geometry_estimated", str(error), subjects=sorted(printed))], {}
+    result.metrics["hole_clearance_verified"] = "cad_geometry_estimated" not in {d.code for d in hole_diagnostics}
     result.extend(hole_diagnostics)
     placed: dict[str, tuple[str, Any, str, list[float]]] = {}
     for entry in parts:

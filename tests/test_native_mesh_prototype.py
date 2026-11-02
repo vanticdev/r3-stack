@@ -121,6 +121,35 @@ def test_inconsistent_native_evidence_never_installs(project, native_snapshot, c
     assert native.exports == 0
 
 
+def test_fabrication_stage_finishes_with_bore_fit_visibly_unverified(project, native_snapshot, monkeypatch):
+    from r3_fab import checks, stage
+    from r3_model.pulled import PullError
+
+    install(project, native_snapshot)
+    def pending(*_):
+        raise PullError('cad_analytic_geometry_pending', 'no analytic faces in this synthetic mesh pull')
+    monkeypatch.setattr(checks, 'hole_clearance_checks', pending)
+    monkeypatch.setattr(stage, 'select_parts', lambda project, result: {'body': object()})
+    monkeypatch.setattr(stage, 'process_part', lambda *_: {'component': 'body'})
+    result = stage.run(project)
+    assert result.metrics['hole_clearance_verified'] is False
+    assert any(d.code == 'cad_geometry_estimated' and d.subjects == ['body'] for d in result.diagnostics)
+
+
+def test_fabrication_stage_does_not_swallow_other_pull_errors(project, native_snapshot, monkeypatch):
+    from r3_fab import checks, stage
+    from r3_model.pulled import PullError
+
+    install(project, native_snapshot)
+    def broken(*_):
+        raise PullError('cad_pull_invalid', 'a real geometry failure')
+    monkeypatch.setattr(checks, 'hole_clearance_checks', broken)
+    monkeypatch.setattr(stage, 'select_parts', lambda project, result: {'body': object()})
+    monkeypatch.setattr(stage, 'process_part', lambda *_: {'component': 'body'})
+    with pytest.raises(PullError, match='a real geometry failure'):
+        stage.run(project)
+
+
 def test_analytic_checks_remain_pending_and_release_is_not_fabrication_ready(project, native_snapshot):
     install(project, native_snapshot)
     from r3_onshape.step_geometry import geometry_from_pulled
