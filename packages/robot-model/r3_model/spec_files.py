@@ -123,7 +123,7 @@ def _leaves(value: Any, path: SpecPath = ()) -> Iterator[tuple[SpecPath, Any]]:
         yield path, value
 
 
-class _DescriptionLoader(yaml.SafeLoader):
+class _DescriptionLoader(getattr(yaml, "CSafeLoader", yaml.SafeLoader)):
     """Accept the scientific floats emitted by the YAML 1.2 round-trip writer."""
 
 

@@ -6,6 +6,10 @@ pinned part-local inputs remain untouched. Every projection validates the pull.
 from __future__ import annotations
 
 import hashlib
+from collections import OrderedDict
+from dataclasses import dataclass
+from pathlib import Path
+import threading
 from typing import Any
 import numpy as np
 
@@ -34,6 +38,56 @@ def require_mass(pulled: PulledModel) -> None:
             raise PullError("cad_pull_invalid", f"{name}: inertia must be positive definite and satisfy the principal-moment triangle inequality")
 
 
+@dataclass(frozen=True)
+class _Projection:
+    path: Path
+    sha256: str
+    lo: tuple[float, ...]
+    hi: tuple[float, ...]
+    triangles: int
+
+
+# Cache only small derived metadata, not native meshes. Each caller first
+# validates every pinned input and local mirror. A hit also hashes the derived
+# file, so deleting/editing build artifacts never changes geometry authority.
+_PROJECTIONS: OrderedDict[tuple[str, str], _Projection] = OrderedDict()
+_PROJECTION_LOCK = threading.RLock()
+_PROJECTION_LIMIT = 1024
+
+
+def _projection(pulled: PulledModel, name: str, out: Path) -> _Projection:
+    part, pose = pulled.parts[name], pulled.poses[name]
+    digest = part.sha256['obj' if part.obj else 'gltf' if part.gltf else 'stl']
+    key = hashlib.sha256((name + digest + repr(pose.tolist())).encode()).hexdigest()
+    path = out / f"{key}.stl"
+    cache_key = (str(out.resolve()), key)
+    # Concurrent model/CAD requests share a conversion instead of each parsing
+    # and sorting the same large native OBJ. Other checks still read native data.
+    with _PROJECTION_LOCK:
+        cached = _PROJECTIONS.get(cache_key)
+        if cached is not None:
+            try:
+                with path.open('rb') as stream:
+                    matches = hashlib.file_digest(stream, 'sha256').hexdigest() == cached.sha256
+            except OSError:
+                matches = False
+            if matches:
+                _PROJECTIONS.move_to_end(cache_key)
+                return cached
+        mesh = world_mesh(pulled, name)
+        content = mesh.export(file_type='stl')
+        if not path.exists() or path.read_bytes() != content:
+            path.write_bytes(content)
+        bounds = mesh.bounds
+        result = _Projection(path, hashlib.sha256(content).hexdigest(),
+                             tuple(bounds[0]), tuple(bounds[1]), len(mesh.faces))
+        _PROJECTIONS[cache_key] = result
+        _PROJECTIONS.move_to_end(cache_key)
+        while len(_PROJECTIONS) > _PROJECTION_LIMIT:
+            _PROJECTIONS.popitem(last=False)
+        return result
+
+
 def cad_view(project: Any, *, mass_required: bool = False) -> dict[str, Any]:
     pulled = load_pulled(project.root)
     if mass_required:
@@ -44,23 +98,17 @@ def cad_view(project: Any, *, mass_required: bool = False) -> dict[str, Any]:
     out = project.build_dir("cad/pulled-meshes")
     parts = {}
     for name, part in pulled.parts.items():
-        mesh = world_mesh(pulled, name)
+        projection = _projection(pulled, name, out)
         pose = pulled.poses[name]
-        # Hash identity and transform, never place an arbitrary part name in a path.
-        key = hashlib.sha256((name + part.sha256['obj' if part.obj else 'gltf' if part.gltf else 'stl'] + repr(pose.tolist())).encode()).hexdigest()
-        path = out / f"{key}.stl"
-        content = mesh.export(file_type="stl")
-        if not path.exists() or path.read_bytes() != content:
-            path.write_bytes(content)
         inertia = pose[:3, :3] @ np.asarray(part.inertia).reshape(3, 3) @ pose[:3, :3].T if part.inertia is not None else None
         parts[name] = {
-            "part_name": name, "mesh": str(path.relative_to(project.build_dir("cad"))),
-            "mesh_sha256": hashlib.sha256(content).hexdigest(), "geometry_source": "pulled",
+            "part_name": name, "mesh": str(projection.path.relative_to(project.build_dir("cad"))),
+            "mesh_sha256": projection.sha256, "geometry_source": "pulled",
             "mass": part.mass, "mass_status": "pulled", "material": part.material,
             "com": (pose[:3, :3] @ part.com + pose[:3, 3]).tolist() if part.com is not None else None,
             "inertia": [float(inertia[i, j]) for i, j in [(0, 0), (1, 1), (2, 2), (0, 1), (0, 2), (1, 2)]] if inertia is not None else None,
-            "bbox_min": mesh.bounds[0].tolist(), "bbox_max": mesh.bounds[1].tolist(),
-            "mesh_triangles": len(mesh.faces), "purchased": part.purchased,
+            "bbox_min": list(projection.lo), "bbox_max": list(projection.hi),
+            "mesh_triangles": projection.triangles, "purchased": part.purchased,
             "geometry_qualification": part.geometry_qualification,
             "volume": part.native_volume,
         }
