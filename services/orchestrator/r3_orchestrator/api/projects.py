@@ -181,8 +181,9 @@ def summary_entry(ref: ProjectRef, runs: Any = None) -> dict[str, Any]:
     """One row of ``GET /api/projects``. Unloadable projects are listed with ``error``."""
     entry: dict[str, Any] = {"id": ref.id, "path": str(ref.root), "projects_root": str(ref.projects_root)}
     try:
-        project = load(ref)
-    except ApiError as error:  # list it anyway so the UI can show the problem
+        project = freshness.SUMMARIES.load(ref.root)
+    except Exception as cause:  # list it anyway so the UI can show the problem
+        error = project_load_error(cause, ref.root / "robot.yaml", {"project": ref.id})
         return {**entry, "name": ref.id, "description": "", "version": "", "error": error.message, "error_detail": error.body(),
                 "last_run": None}
     fingerprint = project.fingerprint()
@@ -206,7 +207,7 @@ def summary_entry(ref: ProjectRef, runs: Any = None) -> dict[str, Any]:
 
 def detail(ref: ProjectRef) -> dict[str, Any]:
     project = load(ref)
-    payload = api.status(ref.root)
+    payload = api.status(ref.root, project=project)
     fingerprint = payload["inputs"]
     results = {name: _stage_block(project, ref.id, name, fingerprint) for name in stage_runner.ALL_STAGES}
     report = _read_json(ref.root / "build" / "report" / "summary.json")
@@ -231,8 +232,8 @@ def _github_url(remote: str | None) -> str | None:
     return f"https://github.com/{match.group(1)}" if match else remote
 
 
-def spec_document(ref: ProjectRef) -> dict[str, Any]:
-    spec = raise_for(spec_ops.get_spec(ref.root))
+def spec_document(ref: ProjectRef, sources: bool = True) -> dict[str, Any]:
+    spec = raise_for(spec_ops.get_spec(ref.root, sources=sources))
     return {**spec, "yaml": spec["files"]["robot.yaml"]["yaml"]}
 
 
@@ -634,7 +635,7 @@ def _body_frames(xml: Path, snapshot_t: Any, snapshot_qpos: Any, hz: float, cabl
 
 
 def diagnostics_view(ref: ProjectRef, stage: str | None = None, severity: str | None = None, subject: str | None = None) -> dict[str, Any]:
-    payload = api.stored_diagnostics(ref.root, stage, severity, subject)
+    payload = api.stored_diagnostics(ref.root, stage, severity, subject, project=load(ref))
     groups: dict[str, dict[str, int]] = {}
     for d in payload["diagnostics"]:
         groups.setdefault(d["stage"] or "general", {"error": 0, "warning": 0, "info": 0})[d["severity"]] += 1

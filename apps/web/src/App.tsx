@@ -10,13 +10,13 @@ import { SoftwarePage } from "./pages/SoftwarePage.tsx";
 import { PartsPage } from "./pages/PartsPage.tsx";
 import { AgentPage } from "./pages/AgentPage.tsx";
 import { DeployPage } from "./pages/DeployPage.tsx";
+import { DiagnosticsPage } from "./pages/DiagnosticsPage.tsx";
 import { EnvironmentPage } from "./pages/EnvironmentPage.tsx";
 
 // three.js pages load on demand so the project list and tables paint without the 3D bundle.
 const ModelBankPage = lazy(() => import("./pages/ModelBankPage.tsx").then((m) => ({ default: m.ModelBankPage })));
 const ThreeDPage = lazy(() => import("./pages/ThreeDPage.tsx").then((m) => ({ default: m.ThreeDPage })));
 const WiringPage = lazy(() => import("./pages/WiringPage.tsx").then((m) => ({ default: m.WiringPage })));
-const DiagnosticsPage = lazy(() => import("./pages/DiagnosticsPage.tsx").then((m) => ({ default: m.DiagnosticsPage })));
 const SimulationPage = lazy(() => import("./pages/SimulationPage.tsx").then((m) => ({ default: m.SimulationPage })));
 
 const fallback = <div className="skeleton" style={{ margin: 20, height: 400 }} />;
