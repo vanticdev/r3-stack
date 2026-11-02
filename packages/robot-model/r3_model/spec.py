@@ -229,9 +229,11 @@ class Transmission(_Model):
 
 class Fastener(_Model):
     """One purchased fastener (screw, ball stud, stacking standoff, or a nut on a
-    male thread) placed in the robot frame.
+    male thread). Native occurrences select ``body`` and ``mate_connector``;
+    their head seat and insertion axis are derived from the pinned CAD frame.
+    ``nut_body`` selects the existing nut occurrence independently of its catalog rating.
 
-    ``position`` is the head seat point (underside of the head, or the bearing
+    Legacy ``position`` is the head seat point (underside of the head, or the bearing
     face of a nut) and ``axis`` the insertion direction (head toward tip).
     ``clamps`` lists the clamped parts in stack order, head side first;
     ``thread_into`` is the part with the tapped hole (or, for a nut type, the
@@ -244,8 +246,9 @@ class Fastener(_Model):
     id: str
     type: str = Field(description="Catalog fastener id (fasteners.yaml).")
     length: Quantity | None = Field(default=None, description="Nominal length (screws, studs); a catalog standard length.")
-    position: Vector
-    axis: Vector = Field(default_factory=lambda: [0.0, 0.0, -1.0])
+    position: Vector | None = Field(default=None, description="Legacy analysis seat point. For native CAD select body and mate_connector instead; the pull derives this value.")
+    axis: Vector | None = Field(default=None, description="Legacy insertion direction (defaults to -z). With a native mate_connector, its +z is the head-to-tip insertion axis.")
+    mate_connector: str | None = Field(default=None, min_length=1, description="Existing pulled mate-connector key on body, authored at the head/bearing seat with +z along insertion. No local position or axis may accompany this selector.")
     clamps: list[str] = Field(default_factory=list, description="Clamped parts in stack order, head side first.")
     thread_into: str | None = Field(default=None, description="Part with the tapped hole (or male thread for nuts).")
     nut: str | None = Field(default=None, description="Catalog nut id when the fastener ends in a nut.")
@@ -256,6 +259,22 @@ class Fastener(_Model):
     body: str | None = Field(default=None, description="Component that is this fastener (a kingpin screw, ball stud, stacking "
                                                        "standoff or nut modeled as an assembly object); default: its own part.")
     join: str | None = Field(default=None, description="Assembly join this fastener was derived from.")
+    nut_body: str | None = Field(default=None, min_length=1, description="Existing native nut component when nut names its catalog rating; no nut geometry is generated.")
+
+    @model_validator(mode="after")
+    def _placement_source(self) -> "Fastener":
+        if self.mate_connector is not None:
+            if not self.body:
+                raise ValueError("a native fastener mate_connector requires its body component")
+            if self.position is not None or self.axis is not None:
+                raise ValueError("native fastener position and axis come only from the pulled mate connector")
+        elif self.position is None:
+            raise ValueError("fastener requires a position or a native body and mate_connector")
+        elif self.axis is None:
+            object.__setattr__(self, "axis", [0.0, 0.0, -1.0])
+        if self.nut_body and not self.nut:
+            raise ValueError("nut_body requires the nut catalog rating")
+        return self
 
     @property
     def part(self) -> str:
@@ -263,7 +282,7 @@ class Fastener(_Model):
 
     @property
     def nut_part(self) -> str | None:
-        return f"nut:{self.id}" if self.nut else None
+        return (self.nut_body or f"nut:{self.id}") if self.nut else None
 
 
 InterfaceKind = Literal["revolute_fit", "press_fit", "drive_flat", "ball_joint", "spline", "adhesive", "strap",
@@ -841,7 +860,11 @@ class RobotSpec(_Model):
                 raise ValueError(f"fastener {fastener.id!r} cannot both thread into a part and end in a nut")
             if fastener.nut is not None and fastener.grip is None:
                 raise ValueError(f"fastener {fastener.id!r} ends in a nut and needs its grip length")
-            if sum(c * c for c in fastener.axis) < 1e-12:
+            if fastener.mate_connector is not None and fastener.body not in ids:
+                raise ValueError(f"fastener {fastener.id!r} references unknown native body {fastener.body!r}")
+            if fastener.nut_body is not None and fastener.nut_body not in ids:
+                raise ValueError(f"fastener {fastener.id!r} references unknown native nut {fastener.nut_body!r}")
+            if fastener.axis is not None and sum(c * c for c in fastener.axis) < 1e-12:
                 raise ValueError(f"fastener {fastener.id!r} has a zero axis")
         interfaces = {i.id: i for i in mech.interfaces}
         for interface in mech.interfaces:

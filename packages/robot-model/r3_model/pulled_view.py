@@ -88,8 +88,35 @@ def _projection(pulled: PulledModel, name: str, out: Path) -> _Projection:
         return result
 
 
+def resolve_native_fasteners(project: Any, pulled: PulledModel) -> dict[str, dict[str, Any]]:
+    """Read seat and insertion axis from native datums; never move any CAD body."""
+    frames = {}
+    for fastener in project.spec.mechanical.fasteners:
+        if fastener.mate_connector is None:
+            continue
+        body, selector = fastener.body, fastener.mate_connector
+        if body not in pulled.parts:
+            raise PullError("cad_pull_missing", f"Fastener {fastener.id}: native body {body!r} is absent from the pull")
+        part = pulled.parts[body]
+        if selector not in part.mate_connectors:
+            raise PullError("cad_native_connector_missing",
+                f"Fastener {fastener.id}: select an existing seating mate connector on {body}",
+                {"component": body, "mate_connector": selector,
+                 "available_connectors": sorted(part.mate_connectors)})
+        if fastener.nut_part is not None and fastener.nut_part not in pulled.parts:
+            raise PullError("cad_pull_missing", f"Fastener {fastener.id}: native nut {fastener.nut_part!r} is absent from the pull")
+        frame = pulled.poses[body] @ part.mate_connectors[selector]
+        # Derived runtime fields must not become authored YAML values.
+        object.__setattr__(fastener, "position", frame[:3, 3].tolist())
+        object.__setattr__(fastener, "axis", frame[:3, 2].tolist())
+        frames[fastener.id] = {"source": "pulled", "body": body, "mate_connector": selector,
+            "document_id": pulled.document_id, "version_id": pulled.version_id, "matrix": frame.tolist()}
+    return frames
+
+
 def cad_view(project: Any, *, mass_required: bool = False) -> dict[str, Any]:
     pulled = load_pulled(project.root)
+    resolve_native_fasteners(project, pulled)
     if mass_required:
         require_mass(pulled)
     missing = set(project.spec.components) - pulled.parts.keys()
@@ -133,6 +160,7 @@ def apply_pulled(project: Any, pulled: PulledModel | None = None):
     source_joints = {joint.id: joint for joint in project.spec.mechanical.joints}
     qualification = {item.id: item for item in project.spec.mechanical.interfaces}
     result = AssemblyResult(root=root, poses=dict(pulled.poses))
+    result.fastener_frames = resolve_native_fasteners(project, pulled)
     if root:
         result.root_pose = pulled.poses[root]
     for name, pose in pulled.poses.items():

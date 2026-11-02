@@ -519,6 +519,7 @@ class AssemblyResult:
     diagnostics: list[Diagnostic] = field(default_factory=list)
     interfaces: dict[str, ResolvedInterface] = field(default_factory=dict)
     root_pose: np.ndarray = field(default_factory=lambda: np.eye(4))
+    fastener_frames: dict[str, dict[str, Any]] = field(default_factory=dict)
     matches: dict[str, "PatternMatch"] = field(default_factory=dict)  # join id -> matched hole pairs
     valid: dict[str, tuple[ResolvedInterface, ResolvedInterface]] = field(default_factory=dict)
 
@@ -547,6 +548,7 @@ class AssemblyResult:
                       for obj, pose in self.poses.items()},
             "tree": [{"join": e.join.join_id, "parent": e.parent, "child": e.child, "reversed": e.reversed} for e in self.tree],
             "joins": self.joins,
+            "fastener_frames": self.fastener_frames,
             "loops": self.loops,
             "joints": [joint.model_dump(mode="json") for joint in self.joints],
             "interfaces": {ref: {"kind": iface.kind, "frame": (self.poses[iface.obj] @ iface.frame).tolist()}

@@ -384,6 +384,25 @@ of physical parts. Never author replacement joint origins, axes or placements:
 those remain native pulled evidence. Any geometric measurement used by a check
 must come from the native model or a recorded physical measurement.
 
+For each existing native fastener, declare its catalog `type`, actual component
+`body` and `mate_connector` (a key from that body's `pulled.mate_connectors`).
+Author that connector in Onshape at the underside/bearing seat, with its +z axis
+pointing along insertion from head toward tip. Omit local `position` and `axis`;
+R3 composes the unchanged native body pose and connector frame. A missing body
+or connector fails instead of using a default. `fastener_frames` in the assembly
+artifact records the resulting native frame. A fresh pull updates it; no CAD
+body moves and no derived coordinates are written into the authored description.
+
+Declare the real clamped stack, thread target or catalog nut, length/grip,
+assembly torque and locking process independently using their sourced data and
+labelled assumptions. `nut_body` names the actual native nut component when its
+name differs from `nut:<fastener-id>`; `nut` remains the catalog rating identity.
+These selectors create no hardware. Existing fit, engagement, preload,
+pull-through, loosening and load checks remain enabled. Physics retains each
+qualified bolt-to-stack load path even when the native mate tree uses a different
+edge order. Unknown/zero capacities never qualify another mate; moving joints
+still require their own retention evidence.
+
 Capacity coefficients under an interface's `params.physics` require
 `{value, status, source}`; anonymous numbers cannot qualify a connection.
 Conservative estimates stay labelled and cannot become measured evidence.
