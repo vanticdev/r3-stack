@@ -533,9 +533,10 @@ requirements as the project grows; do not weaken checks to fit a failing design.
 
 A long scenario can outlast one MCP call's deadline. When `r3 serve` is running,
 use its existing queued worker API instead of leaving progress behind that RPC:
-`POST http://127.0.0.1:8321/api/projects/PROJECT_ID/runs` with an R3 request such as
+`POST $R3_SERVER_URL/api/projects/PROJECT_ID/runs` with an R3 request such as
 `{"stages":["sim"],"scenarios":["YOUR_SCENARIO"]}`. Use only the current project's
-ID (also recorded in this execution's `build/agent/<session>/session.json`).
+ID (also recorded in this execution's `build/agent/<session>/session.json`). An Agent-tab
+session has `R3_SERVER_URL` set to the server that started it; never use another server's port.
 The response returns `run_id`, `status_url` and `events_url`. Read the status URL
 at sensible intervals or follow the events URL for stage progress and final
 results. These are the same native pipeline stages in isolated worker processes;

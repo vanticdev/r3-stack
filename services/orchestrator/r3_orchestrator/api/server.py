@@ -729,6 +729,8 @@ def serve(host: str = "127.0.0.1", port: int = 8321, projects_roots: list[str] |
     worker rebuilds the app with ``app_from_environment``, so the options travel as environment variables."""
     import uvicorn
 
+    # Agent sessions inherit this, so they queue runs on their own server.
+    os.environ["R3_SERVER_URL"] = f"http://{host}:{port}"
     roots = projects_roots or _env_roots()
     if not reload:
         app = create_app(roots, web_dist)

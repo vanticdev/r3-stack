@@ -212,3 +212,10 @@ def test_prompt_named_files_reach_the_codex_profile_and_tool_scope(tmp_path, mon
     scoped = agents.mcp_config(tmp_path/'project', 'python', [photo.resolve()])
     scope = LocalReadScope.from_json(scoped['mcpServers']['r3']['env']['R3_LOCAL_READ_SCOPE'])
     assert scope.check(photo) == photo.resolve()
+
+
+def test_session_is_told_its_own_server(monkeypatch):
+    monkeypatch.delenv('R3_SERVER_URL', raising=False)
+    assert 'R3 server is' not in agents.session_instructions()
+    monkeypatch.setenv('R3_SERVER_URL', 'http://127.0.0.1:9000')
+    assert "This project's R3 server is http://127.0.0.1:9000" in agents.session_instructions()

@@ -187,6 +187,8 @@ commands without pipes, && or ;. Use them only on this project."""
 def session_instructions() -> str:
     """Carry operator transport context without changing the user prompt."""
     instruction = SYSTEM_PROMPT
+    if server := os.environ.get("R3_SERVER_URL"):
+        instruction += f"\nThis project's R3 server is {server}; use only it for queued worker jobs."
     backoffs = json.loads(os.environ.get("R3_ONSHAPE_BACKOFFS", "[]"))
     if not isinstance(backoffs, list):
         raise ValueError("Onshape backoffs must be a list")
