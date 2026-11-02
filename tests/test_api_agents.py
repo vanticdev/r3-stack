@@ -57,11 +57,14 @@ def test_native_mcp_failure_evidence_is_project_local_and_keeps_launcher(env, mo
     sid = started.json()["session_id"]
     sse(client, started.json()["events_url"])
     directory = root / "build/agent" / sid
-    native = json.loads((directory / ".mcp.json").read_text())["mcpServers"]["onshape_native"]
+    config = json.loads((directory / ".mcp.json").read_text())["mcpServers"]
+    native = config["onshape_native"]
     assert native["args"][0].endswith("r3_orchestrator/mcp_process.py")
     assert native["args"][1:3] == ["--directory", str(directory / "mcp/onshape_native")]
     assert native["args"][3:] == ["--", original["command"], *original["args"]]
-    assert native["env"] == original["env"]
+    assert native["env"] == {**original["env"],
+        "ONSHAPE_NATIVE_UPLOAD_SCOPE": config["r3"]["env"]["R3_LOCAL_READ_SCOPE"]}
+    assert original["env"] == {"ONSHAPE_NATIVE_RUNTIME": str(root / "native-runtime")}
 
 
 def test_claude_session_streams_transcript_runs_and_spec_diff(env):

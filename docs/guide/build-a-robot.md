@@ -595,6 +595,9 @@ fabrication release or permission to deploy hardware.
 For STEP imports use the uncompressed `.step`/`.stp` file, not a ZIP containing STEP.
 The companion's chunked upload path transfers large files to the authenticated browser,
 which sends one normal Onshape multipart import. Inspect the result before another write.
+Agent-tab file uploads and local model-source URLs follow the session's project and R3
+read boundary, including the exclusion of other robot projects. Keep downloaded source
+files in this session's `TMPDIR`; a symlink does not grant access to an outside file.
 
 For an unattended build without a user deadline, a long runtime, perceived time budget
 or uncertain wait estimate is not a stopping condition. Checkpoint and continue. Scope

@@ -260,8 +260,15 @@ def native_mcp_config() -> dict[str, Any] | None:
 
 def mcp_config(project_root: Path, python: str = sys.executable) -> dict[str, Any]:
     """R3 plus the installed native editor server, bound to this project."""
+    from r3_model.read_scope import LocalReadScope, ReadRule
+
+    platform = Path(__file__).resolve().parents[4]
+    read_scope = LocalReadScope((ReadRule(platform, "read"),
+        ReadRule(platform / "examples" / "robots", "deny"), ReadRule(platform / ".git", "deny"),
+        ReadRule(project_root.resolve(), "read"))).to_json()
     servers = {MCP_SERVER: {"command": python, "args": ["-m", "r3_orchestrator.mcp_server"],
-                           "env": {"R3_PROJECT": str(project_root), "PYTHONPATH": r3_pythonpath()}}}
+                           "env": {"R3_PROJECT": str(project_root), "PYTHONPATH": r3_pythonpath(),
+                                   "R3_LOCAL_READ_SCOPE": read_scope}}}
     native = native_mcp_config()
     backoffs = os.environ.get("R3_ONSHAPE_BACKOFFS")
     if backoffs is not None:
@@ -270,6 +277,7 @@ def mcp_config(project_root: Path, python: str = sys.executable) -> dict[str, An
         servers[MCP_SERVER]["env"]["R3_ONSHAPE_BACKOFFS"] = backoffs
     if native:
         native = {**native, "env": dict(native.get("env", {}))}
+        native["env"]["ONSHAPE_NATIVE_UPLOAD_SCOPE"] = read_scope
         if backoffs is not None:
             existing = json.loads(native["env"].get("ONSHAPE_NATIVE_BACKOFFS", "[]"))
             supplied = json.loads(backoffs)

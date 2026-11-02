@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 import tempfile
 import urllib.request
+from urllib.parse import urlsplit
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +29,14 @@ def checksum(path: Path) -> str:
 
 
 def download(url: str, target: Path) -> Path:
+    parsed = urlsplit(url)
+    if parsed.scheme == 'file' and 'R3_LOCAL_READ_SCOPE' in os.environ:
+        from r3_model.read_scope import local_source
+
+        if parsed.netloc not in ('', 'localhost'):
+            raise ValueError('local model source must use a local file URL')
+        source = local_source(Path(urllib.request.url2pathname(parsed.path)))
+        url = source.as_uri()
     request = urllib.request.Request(url, headers={'User-Agent': 'R3-modelbank/1.0'})
     with urllib.request.urlopen(request, timeout=60) as response, target.open('wb') as out:
         size = 0
