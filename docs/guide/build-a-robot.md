@@ -767,8 +767,9 @@ import options or another real model; a `DONE` translation alone proves none of
 those geometry checks. Preserve the original downloaded file and provenance.
 
 Likewise, OCP `ReadFile`/`TransferRoots` success proves that STEP can be parsed,
-not that it contains valid closed positive-volume solids. Use the documented STEP
-reader below for source checks, and inspect the actual translated native bodies.
+not that it contains valid closed positive-volume solids. Use
+`r3_onshape.step_geometry.part_from_step` for source checks, and inspect the actual
+translated native bodies.
 A readable source with an empty or invalid native import is still unqualified.
 Do not infer that the whole CAD path is unavailable from one failed source. Local
 source inspection is research only; import, author and assemble the model in Onshape
