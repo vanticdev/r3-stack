@@ -83,11 +83,27 @@ class ObstacleSet:
             if exclude and obstacle.component in exclude:
                 continue
             shape = obstacle.swept if swept else obstacle.shape
-            value = shape.sdf_bounded(points, cutoff) - (obstacle.keepout if keepout else 0.0)
-            better = value < best
+            margin = obstacle.keepout if keepout else 0.0
+            # Outside an enclosing AABB, no surface can be closer than the
+            # box. Skip only queries that cannot improve the current minimum;
+            # inside points still need the real signed-distance calculation.
+            lo, hi = shape.aabb()
+            outside = np.maximum(np.maximum(lo - points, points - hi), 0.0)
+            bound = np.minimum(np.linalg.norm(outside, axis=1), cutoff) - margin
+            inside = np.all((points >= lo) & (points <= hi), axis=1)
+            # Conservative roundoff allowance affects pruning only: candidates
+            # near a tie are evaluated with the original, unchanged SDF.
+            rounding = 32 * np.finfo(float).eps * (1 + np.max(np.abs(points), axis=1)
+                                                   + np.max(np.abs(lo)) + np.max(np.abs(hi)))
+            candidates = np.flatnonzero(inside | (bound <= best + rounding))
+            if not len(candidates):
+                continue
+            value = shape.sdf_bounded(points[candidates], cutoff) - margin
+            better = value < best[candidates]
             if better.any():
-                best[better] = value[better]
-                for k in np.nonzero(better)[0]:
+                indices = candidates[better]
+                best[indices] = value[better]
+                for k in indices:
                     which[k] = obstacle.component
         return best, which
 
