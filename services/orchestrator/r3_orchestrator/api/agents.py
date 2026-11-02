@@ -105,6 +105,12 @@ and datasheet in components.<id>.params.cad_proxy; keep catalog model provenance
 Pull it normally; never generate proxy CAD locally. Estimated items do not stop engineering work:
 carry on, retain them visibly in release status until measured or replaced, and list them at the end.
 Verify geometry, regeneration and mates numerically and inspect shaded views before r3_cad_pull.
+Prioritize a complete working native assembly before secondary refinements. If exact exports are held,
+use r3_cad_preview and r3_cad_pull(mesh_source="viewer") with the open workspace and a fresh version.
+Native meshes, placements and mass properties can support a working prototype without STEP.
+Keep remaining analytic/manufacturing qualification explicit; never claim unperformed checks passed.
+If an implementation approach needs two hours or more, abandon that approach and work around it;
+agent runtime is excluded. Continue the same project rather than starting over.
 An assembly_selection pull failure happens before geometry downloads: complete native occurrences and
 selectors, pin a new version and retry. A source import or export inspection is not an assembled pull.
 Qualify source solids, material density and pinned STEP/mesh exports before repeating them in an assembly.

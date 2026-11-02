@@ -214,12 +214,15 @@ def process_part(project: Project, part: PrintedPart, printer: Any, cases: list[
         return entry
     mesh = geometry.mesh
     entry["geometry_source"] = geometry.source
-    if geometry.source not in {"pulled_stl", "pulled_gltf"}:
+    if geometry.source not in {"pulled_stl", "pulled_gltf", "pulled_obj"}:
         message = f"{cid}: fabrication requires a verified pulled native mesh, got {geometry.source}"
         result.add(Diagnostic.error("print_geometry_untrusted", message, subjects=[cid],
                                     data={"source": geometry.source}, hint="Repair CAD in Onshape and pull again."))
         entry["error"] = message
         return entry
+    if geometry.source == 'pulled_obj':
+        result.add(Diagnostic.warning('cad_geometry_estimated',
+            f'{cid}: printability checks use the native mesh; analytic bore/interface qualification is pending', subjects=[cid]))
     for note in geometry.notes:
         result.assume("fabrication", f"{cid}: {note}")
     nozzle_mm = (printer.nozzle if printer else 0.0004) * 1e3

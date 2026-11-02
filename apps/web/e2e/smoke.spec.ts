@@ -61,7 +61,7 @@ async function fullShot(page: Page, name: string, flush: boolean) {
     .main, .content:not(.flush) { overflow: visible !important; }` });
   await page.waitForTimeout(250);
   await page.screenshot({ path: path.join(shots, `${name}.png`), fullPage: !flush });
-  await style?.evaluate((el) => el.remove());
+  await style?.evaluate((el) => el.parentNode?.removeChild(el));
 }
 
 async function viewerReady(page: Page) {

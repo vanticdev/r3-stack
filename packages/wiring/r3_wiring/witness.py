@@ -445,11 +445,21 @@ def audit_cad(project: Project, obstacles: ObstacleSet) -> tuple[list[Diagnostic
     from r3_model.pulled_view import cad_view
     from r3_onshape.step_geometry import load_geometry
     cad = cad_view(project)
-    exact = load_geometry(project.root)
-    for name, geometry in exact.parts.items():
-        cad["parts"][name].update(volume=geometry.manifold().volume(), bbox_min=geometry.lo.tolist(), bbox_max=geometry.hi.tolist())
+    from r3_model.pulled import PullError
+    pending = False
+    try:
+        exact = load_geometry(project.root)
+        for name, geometry in exact.parts.items():
+            cad["parts"][name].update(volume=geometry.manifold().volume(), bbox_min=geometry.lo.tolist(), bbox_max=geometry.hi.tolist())
+    except PullError as error:
+        if error.code != 'cad_analytic_geometry_pending':
+            raise
+        pending = True  # Native volume and the unchanged mesh bounds remain available.
     parts = cad.get("parts", {}) if isinstance(cad, dict) else {}
     diagnostics: list[Diagnostic] = []
+    if pending:
+        diagnostics.append(Diagnostic.warning('cad_geometry_estimated',
+            'Routing uses native viewer tessellation and native mass-property volume; analytic surface qualification is pending'))
     table: dict[str, Any] = {}
     for obstacle in obstacles.obstacles:
         if obstacle.source != "pulled_stl" or not isinstance(obstacle.shape, MeshShape):

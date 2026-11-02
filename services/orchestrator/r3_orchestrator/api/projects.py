@@ -287,7 +287,9 @@ def cad_view(ref: ProjectRef) -> dict[str, Any]:
     from r3_model.pulled import PullError
     try:
         model = pulled_view(project)
-        authority = {"ready": True, "code": "cad_pulled", "message": "Pinned pulled CAD"}
+        prototype = any(p.get('geometry_qualification') == 'display_mesh' for p in model['parts'].values())
+        authority = {"ready": True, "code": "cad_mesh_prototype" if prototype else "cad_pulled",
+                     "message": "Onshape mesh prototype · geometry qualification pending" if prototype else "Pinned pulled CAD"}
     except PullError as error:
         model = None
         authority = {"ready": False, "code": error.code, "message": str(error)}
@@ -303,7 +305,17 @@ def cad_view(ref: ProjectRef) -> dict[str, Any]:
         urls["document"] = urls["document"] or f"https://cad.onshape.com/documents/{did}/w/{wid}"
         if source.get("element_id"):
             urls["part_studio"] = f"https://cad.onshape.com/documents/{did}/w/{wid}/e/{source['element_id']}"
+    from r3_onshape.viewer_mesh import cached
+    try:
+        preview = cached(project)
+        if preview:
+            preview = {**preview, 'parts': [{**item, 'mesh_url': artifact_url(ref.id, 'cad/viewer-mesh/' + item['mesh'])}
+                                           for item in preview['parts']]}
+        preview_error = None
+    except (PullError, ValueError, OSError) as error:
+        preview, preview_error = None, str(error)
     return {"authority": authority, "cad_model": model, "meshes": meshes, "onshape": {**urls, "lock": lock},
+            "preview": preview, "preview_error": preview_error,
             "views": _urls(ref.id, _files(build, "cad", IMAGE_SUFFIXES)),
             "result": _stage_block(project, ref.id, "cad", project.fingerprint()),
             "missing": [] if model else ["cad_model"]}

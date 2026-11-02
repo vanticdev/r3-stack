@@ -47,7 +47,7 @@ def cad_view(project: Any, *, mass_required: bool = False) -> dict[str, Any]:
         mesh = world_mesh(pulled, name)
         pose = pulled.poses[name]
         # Hash identity and transform, never place an arbitrary part name in a path.
-        key = hashlib.sha256((name + part.sha256['gltf' if part.gltf else 'stl'] + repr(pose.tolist())).encode()).hexdigest()
+        key = hashlib.sha256((name + part.sha256['obj' if part.obj else 'gltf' if part.gltf else 'stl'] + repr(pose.tolist())).encode()).hexdigest()
         path = out / f"{key}.stl"
         content = mesh.export(file_type="stl")
         if not path.exists() or path.read_bytes() != content:
@@ -61,6 +61,8 @@ def cad_view(project: Any, *, mass_required: bool = False) -> dict[str, Any]:
             "inertia": [float(inertia[i, j]) for i, j in [(0, 0), (1, 1), (2, 2), (0, 1), (0, 2), (1, 2)]] if inertia is not None else None,
             "bbox_min": mesh.bounds[0].tolist(), "bbox_max": mesh.bounds[1].tolist(),
             "mesh_triangles": len(mesh.faces), "purchased": part.purchased,
+            "geometry_qualification": part.geometry_qualification,
+            "volume": part.native_volume,
         }
     return {"source": {"provider": "pulled", "document_id": pulled.document_id, "version_id": pulled.version_id},
             "parts": parts, "inputs": project.fingerprint()}

@@ -146,7 +146,7 @@ class PulledOnshapeReference(_Model):
 
 
 class PulledPartSpec(_Model):
-    """Read-only mirror of r3/pull@1, refreshed only by refresh_pulled_spec.
+    """Read-only mirror of native solid/mesh pulls, refreshed only by refresh_pulled_spec.
 
     Frames are 4x4 rigid transforms in metres, not authored poses. Geometry
     consumers must still verify the pinned manifest with load_pulled().
@@ -156,10 +156,12 @@ class PulledPartSpec(_Model):
     onshape: PulledOnshapeReference
     document_id: str
     version_id: str
-    stl: str
+    stl: str | None = None
     gltf: str | None = None
-    step: str
-    sha256: dict[Literal["stl", "step", "gltf"], str]
+    step: str | None = None
+    obj: str | None = None
+    geometry_qualification: Literal['exported_solid', 'display_mesh'] = 'exported_solid'
+    sha256: dict[Literal["stl", "step", "gltf", "obj", "provenance"], str]
     mate_connectors: dict[str, list[list[float]]]
     pose: list[list[float]]
     mass: float | None = None

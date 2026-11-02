@@ -109,14 +109,19 @@ and the distinction between existing functionality and reserved folders.
 ## Autonomous integration loop: persistence (direct user instruction)
 
 For the autonomous R3 integration loop, keep working until the requested result
-is achieved or a genuine user-only blocker applies. Time constraints, long runs,
-and potentially erroneous wait estimates are not reasons to stop. Verify reported
-backoffs against actual response evidence and the transport implementation; do
-useful offline work while a confirmed remote restriction is active, then resume.
+is achieved or a genuine user-only blocker applies. Latest user override: if an
+approach requires two hours or more of implementation work, abandon that approach
+immediately and find a workaround. Agent runtime is excluded. Major roadblocks
+must not prevent a working prototype: prefer native meshes and native placements
+and physics when exact exports are unavailable; keep unperformed qualification
+visible. STEP is not intrinsically required for rendering or simulation.
+Verify reported backoffs against actual response evidence and the transport
+implementation; do useful independent work while a confirmed restriction is active.
 The user authorizes editing onshape-native source when a generic platform fix
 needs it. Preserve unrelated plugin work and keep the loop's CAD, independence,
-security, validation and cleanup rules. Never claim success without evidence or
-weaken checks to finish.
+security, validation and cleanup rules. Preserve and steer the same project and
+agent conversation on failures. Do not fabricate CAD, weaken numeric limits or
+present deferred checks as passed. Prioritize a working model before refinement.
 
 For integration-loop failures, retain the project and provider conversation.
 Diagnose and fix the generic cause, then steer the same agent to retry. Do not

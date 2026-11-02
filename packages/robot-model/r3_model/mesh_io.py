@@ -51,6 +51,8 @@ def load_exported_mesh(path: str | Path) -> trimesh.Trimesh:
     path = Path(path)
     if path.suffix.lower() == '.stl':
         return load_exported_stl(path)
+    if path.suffix.lower() == '.obj':
+        return load_viewer_obj(path)
     if path.suffix.lower() != '.gltf':
         raise ValueError('Expected an exported STL or self-contained glTF file')
     document = json.loads(path.read_text())
@@ -81,3 +83,34 @@ def load_exported_mesh(path: str | Path) -> trimesh.Trimesh:
     # concatenate preserves separate vertex indices across bodies. No welding,
     # hole filling, face removal, winding changes or local re-tessellation.
     return trimesh.util.concatenate(pieces)
+
+
+def load_viewer_obj(path: str | Path) -> trimesh.Trimesh:
+    """Read unchanged native display bodies; report topology without repairing it.
+
+    Only the numeric OBJ subset emitted by Onshape Native is accepted. No
+    materials, external files, command directives or texture requests are read.
+    Separate native bodies retain separate vertex indices at coincident edges.
+    """
+    path = Path(path)
+    for line in path.read_text().splitlines():
+        row = line.strip()
+        if row and not row.startswith('#') and row.split()[0] not in {'v', 'f', 'o', 'g'}:
+            raise ValueError('Native viewer OBJ must not reference external resources or unsupported directives')
+    scene = trimesh.load_scene(path, file_type='obj', process=False, group_material=False,
+                               maintain_order=True, skip_materials=True, split_objects=True)
+    pieces, qualities = [], []
+    for name, body in scene.geometry.items():
+        if not isinstance(body, trimesh.Trimesh) or not len(body.faces) or not np.isfinite(body.vertices).all():
+            raise ValueError('Native viewer OBJ has no finite triangles')
+        vertices, inverse = np.unique(body.vertices, axis=0, return_inverse=True)
+        piece = trimesh.Trimesh(vertices=vertices, faces=inverse[body.faces], process=False)
+        qualities.append({'body': name, 'watertight': bool(piece.is_watertight),
+                          'winding_consistent': bool(piece.is_winding_consistent),
+                          'positive_volume': bool(piece.volume > 0)})
+        pieces.append(piece)
+    if not pieces:
+        raise ValueError('Native viewer OBJ contains no mesh bodies')
+    mesh = trimesh.util.concatenate(pieces)
+    mesh.metadata.update(geometry_qualification='display_mesh', bodies=qualities)
+    return mesh

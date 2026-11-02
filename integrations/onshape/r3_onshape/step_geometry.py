@@ -136,6 +136,9 @@ def _part_from_shape(name: str, shape: Any, pose: np.ndarray | None = None) -> P
 
 
 def geometry_from_pulled(pulled: PulledModel) -> GeometryModel:
+    if any(part.step is None for part in pulled.parts.values()):
+        raise PullError('cad_analytic_geometry_pending',
+            'Native meshes are available; analytic face qualification is not yet available for this mesh prototype')
     return GeometryModel({name: part_from_step(name, part.step, pulled.poses[name])
                           for name, part in pulled.parts.items()},
                          microversion=pulled.version_id, source="pulled_step")
@@ -188,6 +191,16 @@ def verify_pulled(project: Project, result: StageResult, pulled: PulledModel | N
         pulled = pulled or load_pulled(project.root)
         assembly = apply_pulled(project, pulled)
         result.extend(assembly.diagnostics)
+        if any(part.step is None for part in pulled.parts.values()):
+            result.add(Diagnostic.warning('cad_geometry_estimated',
+                'Native mesh model is available; analytic fit and CAD motion qualification remain pending'))
+            result.metrics.update(pulled_parts=len(pulled.parts), pulled_mates=len(pulled.mates),
+                                  interference_verified=False)
+            payload = cad_view(project)
+            payload.update(geometry_qualification='display_mesh',
+                           fit={'verified': False, 'status': 'not_run'},
+                           motion={'verified': False, 'status': 'not_run'}, assembly=assembly.to_json())
+            return payload
         model = geometry_from_pulled(pulled)
         materials = {name: part.material or "" for name, part in pulled.parts.items()}
         fit = FitChecker(project, model, materials, result).run()

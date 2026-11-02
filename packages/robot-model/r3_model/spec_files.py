@@ -388,14 +388,19 @@ def _pulled_values(model: PulledModel, root: Path) -> tuple[dict[str, Any], list
                    "element_id": None, "part_id": None, "occurrence_path": [], "configuration": ""}
         onshape.update(metadata.get("onshape") or {})
         parts[name] = {"owner": "onshape-pull", "onshape": onshape, "document_id": model.document_id,
-            "version_id": model.version_id, "stl": part.stl.relative_to(root / "cad/pulled").as_posix(),
-            "step": part.step.relative_to(root / "cad/pulled").as_posix(), "sha256": part.sha256,
+            "version_id": model.version_id, "sha256": part.sha256,
             "mate_connectors": {key: frame.tolist() for key, frame in part.mate_connectors.items()},
             "pose": model.poses[name].tolist(), "mass": part.mass, "com": part.com,
             "inertia": part.inertia, "material": part.material, "density": metadata.get("density"),
             "volume": metadata.get("volume"), "purchased": part.purchased}
         if part.gltf is not None:
             parts[name]["gltf"] = part.gltf.relative_to(root / "cad/pulled").as_posix()
+        for kind in ('stl', 'step', 'obj'):
+            path = getattr(part, kind)
+            if path is not None:
+                parts[name][kind] = path.relative_to(root / 'cad/pulled').as_posix()
+        if part.obj is not None:
+            parts[name]['geometry_qualification'] = part.geometry_qualification
     native_mates = {item["id"]: item for item in manifest["mates"]}
     attachments = [{"owner": "onshape-pull", "feature": native_mates[mate.id].get("feature"), "id": mate.id, "kind": mate.kind,
                     "a": list(mate.a), "b": list(mate.b), "axis": mate.axis, "limits": mate.limits} for mate in model.mates]

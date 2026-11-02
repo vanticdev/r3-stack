@@ -3,7 +3,8 @@
 ``cad/pulled/pull.json`` has schema ``r3/pull@1``, document_id, version_id,
 parts, mates and poses. Parts are keyed by instance name and contain stl/step
 paths relative to cad/pulled, plus gltf for native composite parts; sha256 pins
-every downloaded file. The glTF retains native body topology; STL is retained
+every downloaded file. ``r3/pull-mesh@1`` instead pins native viewer OBJ and its
+provenance, explicitly retaining pending geometry qualification. The glTF/OBJ retain native body topology; STL is retained
 unchanged for inspection. Other fields include mass (kg), com (m),
 inertia (nine row-major kg m² values), material, mate_connectors (4x4 local
 frames), and purchased. Poses are solved 4x4 assembly transforms in metres.
@@ -25,6 +26,7 @@ import numpy as np
 import yaml
 
 SCHEMA = "r3/pull@1"
+MESH_SCHEMA = "r3/pull-mesh@1"
 
 
 class PullError(ValueError):
@@ -39,8 +41,8 @@ class PullError(ValueError):
 @dataclass(frozen=True)
 class PulledPart:
     name: str
-    stl: Path
-    step: Path
+    stl: Path | None
+    step: Path | None
     sha256: dict[str, str]
     mass: float | None
     com: list[float] | None
@@ -49,11 +51,17 @@ class PulledPart:
     mate_connectors: dict[str, np.ndarray]
     purchased: bool
     gltf: Path | None = None
+    obj: Path | None = None
+    geometry_qualification: str = "exported_solid"
+    native_volume: float | None = None
 
     @property
     def mesh(self) -> Path:
-        """Native body-preserving mesh for composites; STL for ordinary solids."""
-        return self.gltf if self.gltf is not None else self.stl
+        """Unchanged native OBJ/glTF bodies, or STL for ordinary exported solids."""
+        path = self.obj or self.gltf or self.stl
+        if path is None:
+            raise PullError("cad_pull_invalid", "Pulled part has no native mesh")
+        return path
 
 
 @dataclass(frozen=True)
@@ -125,7 +133,7 @@ def load_pulled(project_root: Path) -> PulledModel:
             raise PullError("cad_pull_modified", "CAD manifest has no pinned checksum in r3.lock.yaml; pull again")
         _file(folder, "pull.json", expected, "manifest")
         data = json.loads(manifest.read_text())
-        if data["schema"] != SCHEMA or not data["document_id"] or not data["version_id"]:
+        if data["schema"] not in (SCHEMA, MESH_SCHEMA) or not data["document_id"] or not data["version_id"]:
             raise PullError("cad_pull_invalid", "CAD requires a pinned Onshape document and version")
         if not data["parts"]:
             raise PullError("cad_pull_invalid", "Pulled CAD contains no parts")
@@ -138,20 +146,42 @@ def load_pulled(project_root: Path) -> PulledModel:
             if not name or item.get("name", name) != name:
                 raise PullError("cad_pull_invalid", f"Invalid part identity {name!r}")
             hashes = item["sha256"]
-            if set(hashes) not in ({"stl", "step"}, {"stl", "step", "gltf"}) or not all(isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdef" for c in v) for v in hashes.values()):
-                raise PullError("cad_pull_invalid", f"{name}: expected STL and STEP SHA-256 hashes")
-            if ("gltf" in item) != ("gltf" in hashes) or item.get("body_type") == "composite" and "gltf" not in hashes:
+            mesh_mode = data['schema'] == MESH_SCHEMA
+            valid_hashes = ({'obj', 'provenance'},) if mesh_mode else ({'stl', 'step'}, {'stl', 'step', 'gltf'})
+            if set(hashes) not in valid_hashes or not all(isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdef" for c in v) for v in hashes.values()):
+                raise PullError("cad_pull_invalid", f"{name}: expected pinned native geometry and provenance hashes")
+            if not mesh_mode and (("gltf" in item) != ("gltf" in hashes) or item.get("body_type") == "composite" and "gltf" not in hashes):
                 raise PullError("cad_pull_invalid", f"{name}: composite CAD requires a pinned native glTF mesh")
+            if mesh_mode:
+                if item.get('geometry_qualification') != 'display_mesh' or not data.get('microversion'):
+                    raise PullError('cad_pull_invalid', f'{name}: native viewer qualification and revision are required')
+                proof = json.loads(_file(folder, item['provenance'], hashes['provenance'], name).read_text())
+                if (proof.get('microversion') != data['microversion'] or
+                        proof.get('mesh_artifact') != hashes['obj'] + '.obj'):
+                    raise PullError('cad_pull_invalid', f'{name}: viewer provenance differs from its native revision or mesh')
+                reference = item['onshape']
+                source = proof.get('part') or {}
+                if (source.get('body_id') != reference['part_id'] or
+                        not source.get('full_element_id', '').startswith(reference['element_id'] + '-') or
+                        source.get('occurrence_path') != '/'.join(reference['occurrence_path']) or
+                        not np.allclose(np.asarray(proof['occurrence_transform']).reshape(4, 4, order='F'),
+                                        data['poses'][name], atol=1e-9, rtol=0)):
+                    raise PullError('cad_pull_invalid', f'{name}: viewer identity or placement differs from its pinned native reference')
+                volume = item.get('volume')
+                if not isinstance(volume, (int, float)) or not np.isfinite(volume) or volume <= 0:
+                    raise PullError('cad_pull_invalid', f'{name}: native volume must be finite and positive')
             if type(item["purchased"]) is not bool:
                 raise PullError("cad_pull_invalid", f"{name}: purchased must be a boolean")
             mass = item.get("mass")
             if mass is not None and (not np.isfinite(mass) or mass <= 0):
                 raise PullError("cad_pull_invalid", f"{name}: mass must be finite and positive")
-            parts[name] = PulledPart(name, _file(folder, item["stl"], hashes["stl"], name),
-                _file(folder, item["step"], hashes["step"], name), dict(hashes), mass,
+            parts[name] = PulledPart(name, _file(folder, item["stl"], hashes["stl"], name) if not mesh_mode else None,
+                _file(folder, item["step"], hashes["step"], name) if not mesh_mode else None, dict(hashes), mass,
                 _numbers(item.get("com"), 3, f"{name}.com"), _numbers(item.get("inertia"), 9, f"{name}.inertia"),
                 item.get("material"), {key: _frame(frame, f"{name}.{key}") for key, frame in item["mate_connectors"].items()},
-                item["purchased"], _file(folder, item["gltf"], hashes["gltf"], name) if "gltf" in hashes else None)
+                item["purchased"], _file(folder, item["gltf"], hashes["gltf"], name) if "gltf" in hashes else None,
+                _file(folder, item['obj'], hashes['obj'], name) if mesh_mode else None,
+                'display_mesh' if mesh_mode else 'exported_solid', item.get('volume'))
         poses = {name: _frame(frame, f"pose {name}") for name, frame in data["poses"].items()}
         if set(poses) != set(parts):
             raise PullError("cad_pull_invalid", "Every pulled part must have exactly one solved assembly pose")

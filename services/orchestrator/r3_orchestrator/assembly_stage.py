@@ -80,7 +80,14 @@ def run(project: Project) -> StageResult:
     try:
         assembly = apply_pulled(project, load_pulled(project.root))
         result.extend(assembly.diagnostics)
-        interference = check_exact_interference(project, result)
+        try:
+            interference = check_exact_interference(project, result)
+        except PullError as error:
+            if error.code != 'cad_analytic_geometry_pending':
+                raise
+            interference = []
+            result.add(Diagnostic.warning('cad_geometry_estimated', str(error)))
+            result.metrics['interference_verified'] = False
         # Catalog-only cap dimensions cannot establish a physical cap fit.
         for join in (project.spec.assembly.joins if project.spec.assembly else []):
             for end in (join.a, join.b):
@@ -95,11 +102,13 @@ def run(project: Project) -> StageResult:
         result.duration_s = time.time() - start
         return result
     payload = assembly.to_json()
-    payload.update(interference=interference, interference_method="pulled_step",
+    payload.update(interference=interference, interference_method="pending" if result.metrics.get('interference_verified') is False else "pulled_step",
                    inputs=project.fingerprint(), diagnostics=[d.model_dump(mode="json") for d in result.diagnostics])
     (project.build_dir("model") / "assembly.json").write_text(json.dumps(payload, indent=2, default=float))
-    result.artifact("model/assembly.json", "json", "Pulled poses, mate closure residuals and STEP fit/interference")
+    result.artifact("model/assembly.json", "json", "Pulled poses, mate closure residuals and geometry qualification status")
     result.metrics.update(objects=len(assembly.poses), joins=len(assembly.joins), loop_closures=len(assembly.loops))
-    result.assume("mechanical", "Onshape solved poses are authoritative; fastened mate frames are checked for closure. Fit checks use pulled STEP faces and solids.")
+    result.assume("mechanical", "Onshape solved poses are authoritative; fastened mate frames are checked for closure. " +
+                  ("Analytic fit qualification remains pending for this mesh prototype." if result.metrics.get('interference_verified') is False
+                   else "Fit checks use pulled STEP faces and solids."))
     result.duration_s = time.time() - start
     return result

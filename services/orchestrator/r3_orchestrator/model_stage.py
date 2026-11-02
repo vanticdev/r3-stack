@@ -560,7 +560,15 @@ class ModelChecker:
 
     def check_interference(self, solids: dict[str, Solid]) -> list[dict[str, Any]]:
         from .assembly_stage import check_exact_interference
-        return check_exact_interference(self.project, self.result)
+        from r3_model.pulled import PullError
+        try:
+            return check_exact_interference(self.project, self.result)
+        except PullError as error:
+            if error.code != 'cad_analytic_geometry_pending':
+                raise
+            self.result.add(Diagnostic.warning('cad_geometry_estimated', str(error)))
+            self.result.metrics['interference_verified'] = False
+            return []
 
     def check_mass(self) -> dict[str, Any]:
         from r3_model.pulled_view import cad_view

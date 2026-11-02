@@ -95,6 +95,12 @@ class SourcingSearchRequest(BaseModel):
     offline: bool = Field(False, description="Use only cached responses (no network).")
 
 
+class ViewerPreviewRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    url: str = ''
+    tab_id: int | None = None
+
+
 class SourcingChooseRequest(BaseModel):
     candidate: str | int = Field(description="Rank in the last search (1-based) or a candidate id.")
     allow_rejected: bool = Field(False, description="Pin even if the candidate fails a hard requirement.")
@@ -433,6 +439,18 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
                            cables: bool = Query(True, description="Include cable polylines per frame.")) -> dict[str, Any]:
         return await call(views.sim_detail, project(pid), scenario, hz, cables)
 
+    @app.post('/api/projects/{pid}/cad/preview', tags=['domains'], responses=ERRORS,
+              summary='Inspect loaded Onshape OBJ meshes without a translation or qualified pull')
+    async def refresh_cad_preview(pid: str, body: ViewerPreviewRequest) -> dict[str, Any]:
+        from r3_onshape.viewer_mesh import capture
+        from r3_model.pulled import PullError
+        ref = project(pid)
+        try:
+            await call(capture, views.load(ref), body.url, body.tab_id)
+        except PullError as error:
+            raise ApiError(error.code, str(error), error.details) from error
+        return await call(views.cad_view, ref)
+
     @app.get("/api/projects/{pid}/diagnostics", tags=["domains"], responses=ERRORS)
     async def get_diagnostics(pid: str, stage: str | None = None, severity: Literal["error", "warning", "info"] | None = None,
                               subject: str | None = None) -> dict[str, Any]:
@@ -452,7 +470,7 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
             raise ApiError("artifact_missing", f"build/{path} does not exist", {"path": path})
         media = {".json": "application/json", ".log": "text/plain", ".cir": "text/plain", ".csv": "text/csv",
                  ".xml": "application/xml", ".stl": "model/stl", ".glb": "model/gltf-binary", ".mp4": "video/mp4",
-                 ".html": "text/html", ".npz": "application/octet-stream"}.get(target.suffix.lower())
+                 ".html": "text/html", ".npz": "application/octet-stream", ".obj": "model/obj"}.get(target.suffix.lower())
         return FileResponse(target, media_type=media)
 
     # -------------------------------------------------------------- runs

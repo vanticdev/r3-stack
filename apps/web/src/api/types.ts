@@ -451,6 +451,16 @@ export interface CadPart {
   mass_status?: string;
 }
 export interface CadResponse {
+  preview?: {
+    url: string;
+    microversion: string;
+    captured_at: string;
+    qualification: "display_mesh";
+    total: number;
+    unavailable: { name?: string; part_index: number }[];
+    parts: { name: string; part_index: number; mesh_url: string; pose: number[][] }[];
+  } | null;
+  preview_error?: string | null;
   authority?: { ready: boolean; code: string; message: string; hint?: string; subjects?: string[] };
   cad_model: {
     source?: { provider?: string; url?: string; document_id?: string; [key: string]: unknown };

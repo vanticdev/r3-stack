@@ -198,6 +198,10 @@ def build_assembly_model(
     mass_source = {}
     diagnostics = []
     assumptions = []
+    if any(part.get('geometry_qualification') == 'display_mesh' for part in cad_parts.values()):
+        diagnostics.append(Diagnostic.warning('cad_geometry_estimated',
+            'Prototype physics uses unchanged Onshape viewer meshes and native mass properties; geometric qualification remains pending'))
+        assumptions.append(('mechanical', 'Native viewer tessellation is prototype collision geometry, not a fabrication qualification.'))
     for cid in spec.components:
         part_props[cid] = cad_mass_properties(cad_parts[cid])
         mass_source[cid] = cad_parts[cid].get("mass_status", "cad")

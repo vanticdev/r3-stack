@@ -447,11 +447,17 @@ def _integrity_items(ctx: _Context) -> list[Item]:
     from r3_model.spec_files import validate_pulled_spec
 
     try:
-        validate_pulled_spec(ctx.project.root)
+        pulled = validate_pulled_spec(ctx.project.root)
     except PullError as error:
         return [Item("stage.cad.integrity", "stage", "cad", 0,
                      evidence=[Evidence("cad", error.code, False, inputs=ctx.current,
                                         artifact="cad/pulled/pull.json", detail=str(error))], message=str(error))]
+    pending = [name for name, part in pulled.parts.items() if part.geometry_qualification == 'display_mesh']
+    if pending:
+        return [Item('stage.cad.geometry_qualification', 'stage', 'cad', 'qualified geometry',
+                     evidence=[Evidence('cad', 'native_mesh_qualification', None, value=pending,
+                        inputs=ctx.current, artifact='cad/pulled/pull.json', estimated=True,
+                        detail='Working native mesh model; remaining geometric qualification has not been performed')])]
     return []
 
 

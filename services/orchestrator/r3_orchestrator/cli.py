@@ -217,7 +217,8 @@ PRINTERS: dict[str, Callable[[dict[str, Any]], None]] = {"status": _print_status
 def cmd_cad_pull(args: argparse.Namespace) -> dict[str, Any]:
     from r3_onshape.pull import pull
 
-    return pull(api.load_project(args.project), url=args.url, version_id=args.version_id)
+    return pull(api.load_project(args.project), url=args.url, version_id=args.version_id,
+                mesh_source=args.mesh_source, tab_id=args.tab_id)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -244,6 +245,9 @@ def build_parser() -> argparse.ArgumentParser:
     pull = cadsub.add_parser("pull", parents=[common], help="Pull read-only STL/STEP, mates, material and viewport evidence.")
     pull.add_argument("--url", default="", help="Onshape assembly /v URL, or /w URL with --version.")
     pull.add_argument("--version", dest="version_id", default="", help="Immutable Onshape version id.")
+    pull.add_argument("--mesh-source", choices=('export', 'viewer'), default='export',
+                      help="viewer pulls a working native mesh model without STEP or export requests; qualification stays explicit.")
+    pull.add_argument("--tab-id", type=int, default=None, help="Exact open Onshape editor tab for viewer meshes.")
     pull.set_defaults(func=cmd_cad_pull)
 
     sim = sub.add_parser("sim", parents=[common], help="Digital twin scenarios.")

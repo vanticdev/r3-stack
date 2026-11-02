@@ -214,14 +214,18 @@ def r3_get_schema(domain: str = "robot") -> dict[str, Any]:
 
 
 @_tool(_EDIT)
-def r3_cad_pull(project: str = "", url: str = "", version_id: str = "") -> dict[str, Any]:
-    """Pull the real Onshape assembly at an immutable version. Downloads selected-part STL/STEP through
+def r3_cad_pull(project: str = "", url: str = "", version_id: str = "",
+                mesh_source: Literal['export', 'viewer'] = 'export', tab_id: int | None = None) -> dict[str, Any]:
+    """Pull the real Onshape assembly at an immutable version. mesh_source=viewer uses loaded native OBJ
+    with native poses/mass for a working prototype, no STEP or exports; remaining qualification is explicit.
+    mesh_source=export downloads selected-part STL/STEP through
     /native/api/v17, reads real mates/connectors/poses, preserves native mass properties, verifies exact STEP
     and exported meshes, and captures the native view. Replaces read-only cad/pulled and refreshes derived
     part descriptions. Resume the same operation to inspect a saved export receipt; never generates CAD."""
     from r3_onshape.pull import pull
 
-    return _guard(lambda: pull(api.load_project(project or None), url=url, version_id=version_id))
+    return _guard(lambda: pull(api.load_project(project or None), url=url, version_id=version_id,
+                              mesh_source=mesh_source, tab_id=tab_id))
 
 
 @_tool(_EDIT)
@@ -242,6 +246,20 @@ def r3_onshape_native(operation: str, arguments: dict[str, Any]) -> dict[str, An
     except (PullError, FileNotFoundError) as error:
         return {"ok": False, "code": getattr(error, "code", "cad_native_unavailable"),
                 "message": str(error), **getattr(error, "details", {})}
+
+
+@_tool(_DESIGN)
+def r3_cad_preview(project: str = '', url: str = '', tab_id: int | None = None) -> dict[str, Any]:
+    """Show an unfinished native assembly in the project 3D page, without STEP or exports.
+    Reads loaded OBJ bodies, revision and native transforms into an inspection cache.
+    This does not fabricate CAD, install a complete pull or certify manufacturing.
+    Use the exact open workspace URL and tab. Refresh after native CAD edits."""
+    from r3_onshape.viewer_mesh import capture
+    from r3_model.pulled import PullError
+    try:
+        return _guard(lambda: capture(api.load_project(project or None), url, tab_id))
+    except PullError as error:
+        return {'ok': False, 'code': error.code, 'message': str(error), **error.details}
 
 
 @_tool(_DESIGN)

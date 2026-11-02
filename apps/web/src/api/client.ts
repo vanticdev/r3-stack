@@ -96,6 +96,7 @@ export const api = {
   catalog: (pid: string, signal?: AbortSignal) => request<CatalogResponse>("GET", `${project(pid)}/catalog`, undefined, signal),
   model: (pid: string, signal?: AbortSignal) => request<ModelResponse>("GET", `${project(pid)}/model`, undefined, signal),
   cad: (pid: string, signal?: AbortSignal) => request<CadResponse>("GET", `${project(pid)}/cad`, undefined, signal),
+  refreshCadPreview: (pid: string) => request<CadResponse>("POST", `${project(pid)}/cad/preview`, {}),
   wiring: (pid: string, signal?: AbortSignal) => request<WiringResponse>("GET", `${project(pid)}/wiring`, undefined, signal),
   electrical: (pid: string, signal?: AbortSignal) => request<ElectricalResponse>("GET", `${project(pid)}/electrical`, undefined, signal),
   pcb: (pid: string, signal?: AbortSignal) => request<PcbResponse>("GET", `${project(pid)}/pcb`, undefined, signal),

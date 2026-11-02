@@ -38,6 +38,9 @@ def build_geometry(project: Any, cid: str) -> PartGeometry:
     if not isinstance(mesh, trimesh.Trimesh) or not mesh.is_volume:
         raise PullError("cad_pull_invalid", f"{cid}: pulled mesh is not a closed positive-volume mesh")
     mesh.apply_scale(MM)
+    if part.step is None:
+        return PartGeometry(mesh=mesh, source='pulled_obj',
+            notes=['Pinned native viewer mesh; analytic bore/interface qualification remains pending.'])
     # Holes are measured from STEP, never synthesized from catalog interfaces.
     exact = part_from_step(cid, part.step)
     holes = [{"interface": face.id, "kind": "bore", "d_mm": 2 * face.radius * MM,

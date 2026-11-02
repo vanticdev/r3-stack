@@ -701,6 +701,37 @@ remain separate `components` and `connectors` collections.
 
 ### Pinned source exports and cached geometry inspection
 
+Build a complete working native assembly before polishing secondary details.
+STEP is an optional exact-geometry acquisition path, not a prerequisite for
+seeing the model or running prototype physics. When exports are unavailable,
+use the loaded Onshape viewer path:
+
+1. Call `r3_cad_preview(url=workspace_url, tab_id=editor_tab_id)` to show the
+   actual current assembly on the project's 3D page, including partial builds.
+   Refresh after native edits. Missing loaded occurrences remain listed.
+2. Once every described occurrence is assembled, create a version normally and
+   call `r3_cad_pull(url=workspace_url, version_id=version_id,
+   mesh_source="viewer", tab_id=editor_tab_id)`. The CLI equivalent is
+   `r3 cad pull --url WORKSPACE_URL --version VERSION --mesh-source viewer --tab-id TAB`.
+3. Run the model, wiring, electrical and simulation work. Native placements,
+   mates, material, mass, centre of mass and inertia remain required. No geometry
+   is generated locally. OBJ bodies and bytes are retained with their revision,
+   provenance and SHA-256; these requests submit no translation or export.
+
+This is a working mesh model, clearly labelled in the viewer and release status.
+Mesh printability, native mate closure and physics checks still apply. Render
+meshes may have open seams or insufficient detail; those results are reported,
+not repaired or silently treated as closed solids. Analytic surface/interface
+qualification stays explicitly pending where its supporting data is unavailable.
+That does not require stopping all modelling or prototype simulation. Do not
+claim a fabrication release from a display mesh. Higher precision exports or
+verified native analytic data can later complete the remaining qualification.
+
+For unattended work, abandon an implementation approach requiring two hours or
+more and find a practical alternative; agent runtime is excluded. Keep the same
+project and conversation. Choose sensible labelled assumptions, prioritize the
+complete working prototype and preserve an honest list of remaining checks.
+
 Use `r3_cad_export(url=..., part_id=..., format="step")` to download one part from
 an immutable Onshape Part Studio version. A workspace URL also needs
 `version_id`. `format="stl"` downloads the native mesh in metres;

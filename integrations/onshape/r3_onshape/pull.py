@@ -232,7 +232,14 @@ def pull_lock(root: Path) -> Iterator[None]:
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_url: str) -> None:
+def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_url: str, *,
+             mesh_source: str = 'export', project: Any = None, tab_id: int | None = None,
+             viewer_url: str = '') -> None:
+    if mesh_source == 'viewer':
+        from .viewer_pull import download as viewer_download
+        viewer_download(project, transport, manifest, directory, tab_id, viewer_url)
+        _finish_download(transport, manifest, directory, capture_url)
+        return
     from r3_model.mesh_io import load_exported_mesh
 
     from .native_mass import properties as native_properties
@@ -269,6 +276,10 @@ def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_
         # must not overwrite mass/center/inertia assigned inside native CAD.
         part["step_integrals"] = mass_properties(directory / part["step"], part["density"])
         part.update(native[name])
+    _finish_download(transport, manifest, directory, capture_url)
+
+
+def _finish_download(transport: Any, manifest: dict[str, Any], directory: Path, capture_url: str) -> None:
     image, evidence = transport.capture(capture_url)
     revision = evidence.get("microversion")
     if not revision or revision != manifest["microversion"]:
@@ -282,17 +293,21 @@ def download(transport: Any, manifest: dict[str, Any], directory: Path, capture_
             path.chmod(0o444)
 
 
-def pull(project: Any, url: str = "", version_id: str = "", transport: Any = None) -> dict[str, Any]:
+def pull(project: Any, url: str = "", version_id: str = "", transport: Any = None, *,
+         mesh_source: str = 'export', tab_id: int | None = None) -> dict[str, Any]:
     """Explicit refresh. Validation stages never contact or modify native CAD."""
     try:
         with pull_lock(project.root):
-            return _pull(project, url, version_id, transport)
+            if mesh_source not in ('export', 'viewer'):
+                raise PullError('cad_pull_invalid', 'Use mesh_source viewer or export')
+            return _pull(project, url, version_id, transport, mesh_source, tab_id)
     except (ValueError, FileNotFoundError, ImportError, RuntimeError) as error:
         fallback = "cad_native_unavailable" if isinstance(error, FileNotFoundError) else "cad_pull_failed"
         return {"ok": False, "code": getattr(error, "code", fallback), "message": str(error), **getattr(error, "details", {})}
 
 
-def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, Any]:
+def _pull(project: Any, url: str, version_id: str, transport: Any,
+          mesh_source: str = 'export', tab_id: int | None = None) -> dict[str, Any]:
     cad = project.spec.cad.model_dump()
     # An explicit target must not inherit a pin from another project default.
     # target() still rejects explicitly conflicting URL/version arguments.
@@ -338,7 +353,8 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
     destination = folder / "pulled"
     try:
         try:
-            download(transport, manifest, staging, pin["url"])
+            download(transport, manifest, staging, pin["url"], mesh_source=mesh_source,
+                     project=project, tab_id=tab_id, viewer_url=url if '/w/' in url else '')
         except Exception as error:
             # Preserve unchanged exports for diagnosis, never install failed CAD.
             failed = project.root / "build" / "cad" / "failed-pulls" / staging.name.removeprefix(".pull-")
@@ -394,4 +410,6 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
             shutil.rmtree(staging)
     return {"ok": True, "document_id": pin["document_id"], "version_id": pin["version_id"],
             "manifest_sha256": checksum, "parts": len(manifest["parts"]), "mates": len(manifest["mates"]),
-            "manifest": "cad/pulled/pull.json"}
+            "manifest": "cad/pulled/pull.json",
+            "geometry_qualification": manifest.get('geometry_qualification', 'exported_solid'),
+            "qualification_note": manifest.get('qualification_note', '')}

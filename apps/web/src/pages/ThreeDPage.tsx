@@ -1,7 +1,10 @@
 import { useMemo } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { useProject } from "../api/hooks.ts";
+import { api } from "../api/client.ts";
+import { NativeMeshPreview } from "../viewer/NativeMeshPreview.tsx";
 import { Icon } from "../components/icons.tsx";
 import { Empty, ErrorBox } from "../components/ui.tsx";
 import { timeAgo } from "../lib/units.ts";
@@ -57,9 +60,20 @@ function ModelRevision({ pid }: { pid: string }) {
 
 export function ThreeDPage() {
   const { pid = "" } = useParams();
-  const { data, isPending, error } = useRobotScene(pid);
+  const { data, isPending, error, cad } = useRobotScene(pid);
+  const client = useQueryClient();
+  const preview = useMutation({ mutationFn: () => api.refreshCadPreview(pid),
+    onSuccess: () => client.invalidateQueries({ queryKey: ["project", pid] }) });
   const { selection, focus, interference, select, setFocus, selectInterference } = useSelectionParams();
-  if (error) return <div style={{ padding: 20 }}><ErrorBox error={error} /></div>;
+  if (error) return <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
+    <div style={{ padding: 16 }}><ErrorBox error={error} />
+      <button disabled={preview.isPending} onClick={() => void preview.mutate()}>
+        {preview.isPending ? "Reading loaded Onshape geometry…" : cad?.preview ? "Refresh Onshape preview" : "Load Onshape preview"}
+      </button>
+      {(preview.error || cad?.preview_error) && <ErrorBox error={preview.error ?? new Error(cad?.preview_error ?? "")} />}
+    </div>
+    {cad?.preview && <NativeMeshPreview data={cad.preview} />}
+  </div>;
   if (isPending || !data) return <div className="skeleton" style={{ margin: 20, flex: 1 }} />;
   if (!data.components.length) return <Empty title="No compiled model">Run the 3D model stage.</Empty>;
   return (
@@ -69,7 +83,9 @@ export function ThreeDPage() {
                    onInterference={(i) => { const o = data.interference[i]!; selectInterference(i, [o.a, o.b]); }}
                    toolbarExtra={<>
                      {focus.length > 0 && <div className="group"><button onClick={() => { setFocus([]); selectInterference(null); }}>Clear highlight</button></div>}
-                     <ModelRevision pid={pid} />
+                     {cad?.authority?.code === 'cad_mesh_prototype'
+                       ? <span className="viewer-badge outdated">Onshape mesh prototype · qualification pending</span>
+                       : <ModelRevision pid={pid} />}
                    </>} />
       <Inspector data={data} selection={selection} interference={interference} onSelect={select}
                  onClear={() => { select(null); if (interference !== null) selectInterference(null); }} />
