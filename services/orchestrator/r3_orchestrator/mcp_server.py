@@ -115,6 +115,36 @@ def r3_connection_points(project: str = "", component: str = "", free_only: bool
     return _guard(lambda: api.connection_points(project or None, component, free_only, fits_type))
 
 
+@_tool(_DESIGN)
+def r3_route_wires(project: str = "") -> dict[str, Any]:
+    """Automatically route project wires with the deterministic software router.
+
+    Declare electrical connections, component geometry and constraints in robot.yaml;
+    do not invent per-wire paths. Runs the wiring stage's voxel search, numerical
+    planning, clearance checks and dynamic validation. Inspect returned diagnostics;
+    generated paths in wiring/routes.json are not safe merely because routing completed.
+    """
+    return _guard(lambda: api.run_stage(project or None, "wiring"))
+
+
+@_tool(_DESIGN)
+def r3_route_topologies(edges: list[dict[str, Any]], cables: list[dict[str, str]],
+                       bundle_weights: list[float] | None = None, max_sweeps: int = 30) -> dict[str, Any]:
+    """Explore deterministic harness topologies on an already collision-pruned graph.
+
+    Edges: {from, to, cost}, undirected positive environmental costs. Cables:
+    {id, from, to}, node IDs. Returns nondominated cable-cost/bundle-cost candidates.
+    For actual robot geometry use r3_route_wires; this graph tool is topology only,
+    does not write project paths, and does not certify physical feasibility.
+    """
+    from r3_wiring.topology import route_topologies
+
+    try:
+        return {"ok": True, **route_topologies(edges, cables, bundle_weights, max_sweeps)}
+    except (ValueError, KeyError, TypeError) as error:
+        return {"ok": False, "code": "routing_input_invalid", "message": str(error)}
+
+
 @_tool(_READ)
 def r3_get_diagnostics(project: str = "", stage: str = "", severity: str = "", subject: str = "") -> dict[str, Any]:
     """Stored diagnostics from the last run, filtered by stage, severity (error|warning|info) and/or subject id."""

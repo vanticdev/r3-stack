@@ -65,7 +65,7 @@ MCP_SERVER = "r3"
 #: Built-in Claude Code tools a headless session may use without asking (read-only).
 CLAUDE_READ_TOOLS = ("Read", "Glob", "Grep")
 #: Tools that start pipeline work inside the MCP server.
-RUN_TOOLS = ("r3_validate", "r3_run_stage", "r3_run_scenario", "r3_run_project_tests")
+RUN_TOOLS = ("r3_validate", "r3_run_stage", "r3_run_scenario", "r3_run_project_tests", "r3_route_wires")
 MAX_CONTENT = 20_000  # characters of a tool result kept in an event
 MCP_TOOL_TIMEOUT_S = 3600  # a full validation with every scenario takes many minutes
 
@@ -91,6 +91,9 @@ Pending measurements block final qualification, not other independent work: carr
 assumptions through design, firmware and simulation, complete what can be completed, and list the measurements.
 Missing catalog entries, models or devices are research and project-authoring tasks using the documented tools.
 Never weaken requirements, limits or checks. Iterate using diagnostics and r3_release_status.
+For wiring, declare connections and constraints, then call r3_route_wires: software computes the paths.
+Do not manually author wire waypoints to imitate a router. r3_route_topologies explores graph-level
+alternatives only; its candidates require geometry, bend, clearance and dynamic validation.
 Finish with stage and scenario results, remaining diagnostics, assumptions and required measurements."""
 
 
@@ -527,6 +530,8 @@ class AgentManager:
                 scenarios = arguments.get("scenarios") or ([arguments["scenario"]] if arguments.get("scenario") else None)
                 if payload.get("name") == "r3_run_project_tests":
                     stages = ["tests"]
+                if payload.get("name") == "r3_route_wires":
+                    stages = ["wiring"]
                 self._emit(session, "run_started", tool_call_id=payload.get("id"), tool=payload.get("name"),
                            stages=stages if payload.get("name") != "r3_run_scenario" else ["sim"], scenarios=scenarios)
             return
