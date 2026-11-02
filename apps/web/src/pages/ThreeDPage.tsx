@@ -65,8 +65,16 @@ export function ThreeDPage() {
   const preview = useMutation({ mutationFn: () => api.refreshCadPreview(pid),
     onSuccess: () => client.invalidateQueries({ queryKey: ["project", pid] }) });
   const { selection, focus, interference, select, setFocus, selectInterference } = useSelectionParams();
+  const inspectionOnly = cad?.preview && cad.authority?.code === "cad_pull_missing"
+    && error instanceof Error && error.message === cad.authority.message;
   if (error) return <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
-    <div style={{ padding: 16 }}><ErrorBox error={error} />
+    <div style={{ padding: 16 }}>
+      {inspectionOnly ? <div className="stale-notice neutral" role="status" data-testid="native-preview-state">
+        <Icon name="info" size={16} /><span>
+          Inspection preview is visible. Pull the completed assembly to run simulation.
+          <br /><span className="small secondary">{cad.authority?.message}</span>
+        </span>
+      </div> : <ErrorBox error={error} />}
       <button disabled={preview.isPending} onClick={() => void preview.mutate()}>
         {preview.isPending ? "Reading loaded Onshape geometry…" : cad?.preview ? "Refresh Onshape preview" : "Load Onshape preview"}
       </button>

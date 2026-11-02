@@ -41,6 +41,9 @@ test("loaded Onshape OBJ renders while the qualified model stays unavailable", a
   await expect(page.getByTestId("native-mesh-preview").locator("canvas")).toBeVisible();
   await expect.poll(() => fetched).toBeGreaterThan(0);
   await expect(page.getByText("1 of 2 occurrences loaded")).toBeVisible();
+  await expect(page.getByTestId("native-preview-state")).toHaveAttribute("role", "status");
+  await expect(page.getByTestId("native-preview-state")).toContainText("Pull the completed assembly to run simulation");
+  await expect(page.getByRole("alert")).toHaveCount(0);
   await expect(page.getByText("Full qualified pull is pending", { exact: true })).toBeVisible();
   await expect(page.getByTestId("robot-viewer")).toHaveCount(0);
   // A mounted canvas and a fetched file are insufficient: verify actual mesh
@@ -63,5 +66,14 @@ test("loaded Onshape OBJ renders while the qualified model stays unavailable", a
     }, Array.from(png));
   }).toBeGreaterThan(200);
   await page.screenshot({ path: "test-results/screenshots/native-mesh-preview.png", fullPage: true });
+  expect(errors).toEqual([]);
+  // A real model/API failure must remain an error even with a cached preview.
+  await page.route("**/api/projects/mesh-inspection/model", (route) => route.fulfill({
+    status: 500, json: { code: "synthetic_model_failure", message: "Synthetic model read failed" },
+  }));
+  await page.reload();
+  await expect(page.getByRole("alert").getByText("Synthetic model read failed", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("native-preview-state")).toHaveCount(0);
+  await expect(page.getByTestId("native-mesh-preview")).toBeVisible();
   expect(errors).toEqual([]);
 });
