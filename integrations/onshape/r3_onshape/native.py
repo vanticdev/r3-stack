@@ -95,7 +95,7 @@ class NativeCadTransport:
 
     def _request(self, method: str, path: str, body: Any = None, query: dict | None = None,
                  timeout: float = 120, *, receipt_id: str | None = None) -> bytes:
-        cached_artifact = method == "GET" and re.fullmatch(r"/artifacts/[a-f0-9]{64}\.json", path)
+        cached_artifact = method == "GET" and re.fullmatch(r"/artifacts/[a-f0-9]{64}\.(?:json|obj)", path)
         if not (cached_artifact or path.startswith("/native/api/v17/") or re.match(r"^/api/v[0-9]+/", path) or path.startswith("/local/") or path == "/command"):
             raise PullError("cad_native_route_forbidden", "Only loopback browser API, native exports, local and editor routes are supported")
         if ".." in path or "?" in path or "#" in path:
@@ -210,7 +210,7 @@ class NativeCadTransport:
         allowed = {"resolve_target", "search_commands", "browse_commands", "document_tree", "element_tree",
                    "document_history", "document_edit", "sidebar_edit", "display_state", "set_visibility",
                    "mate_animation", "view_control", "capture_viewport", "assembly_transform", "native_measure",
-                   "assembly_feature", "open_document", "editor_tab", "artifact_page", "api_catalog"}
+                   "assembly_feature", "open_document", "editor_tab", "artifact_page", "api_catalog", "viewer_mesh"}
         if tool not in allowed:
             raise PullError("cad_native_route_forbidden", f"Unsupported local operation {tool!r}")
         from .policy import check_request
@@ -243,10 +243,20 @@ class NativeCadTransport:
         """
         if not re.fullmatch(r"[a-f0-9]{64}\.json", handle):
             raise PullError("cad_native_invalid", "Invalid native snapshot handle")
+        return json.loads(self.artifact_bytes(handle))
+
+    def artifact_bytes(self, handle: str) -> bytes:
+        """Retrieve exact cached JSON/OBJ bytes, never a filesystem path or listing.
+
+        Viewer OBJ files are unqualified display tessellation. Reading them does
+        not install a pull, reconstruct solids or change engineering checks.
+        """
+        if not re.fullmatch(r"[a-f0-9]{64}\.(?:json|obj)", handle):
+            raise PullError("cad_native_invalid", "Invalid native artifact handle")
         raw = self._request("GET", "/artifacts/" + handle)
-        if hashlib.sha256(raw).hexdigest() != handle[:-5]:
-            raise PullError("cad_native_invalid", "Native snapshot checksum mismatch")
-        return json.loads(raw)
+        if hashlib.sha256(raw).hexdigest() != handle.split(".")[0]:
+            raise PullError("cad_native_invalid", "Native artifact checksum mismatch")
+        return raw
 
     def assembly(self, url: str) -> dict[str, Any]:
         from .rest_snapshot import assembly

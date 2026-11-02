@@ -829,6 +829,24 @@ artifact = NativeCadTransport().artifact("<64-hex artifact id>.json")
 # Do not construct model geometry from those faces.
 ```
 
+For an already-open workspace, Onshape Native also offers `viewer_mesh` to
+inspect loaded display geometry without requesting an export or translation.
+Call `r3_onshape_native(operation="viewer_mesh", arguments={"url": workspace_url,
+"action": "list", "tab_id": editor_tab_id})`; choose a `part_index` from that
+fresh list, then call the same operation with `action="download"`, its `snapshot`
+and that index. Refresh the list after CAD edits; stale revisions are refused.
+The returned OBJ keeps separate bodies in metres and part-local coordinates;
+its native assembly transform is separate. Retrieve its exact `artifact` bytes
+using `NativeCadTransport().artifact_bytes(handle)` and its provenance JSON using
+`artifact(provenance_handle)`. Save inspection files under the project's `build/`
+instead of reading the companion's private cache. A hash mismatch fails.
+These are render meshes, explicitly `exact_cad: false` and
+`closed_solid_verified: false`; display quality may vary. They do not replace
+STEP, establish printability, install `cad/pulled/` or qualify the viewer/twin
+model. Keep using `r3_cad_pull` and all existing exact-geometry and mesh checks.
+Only geometry retrieved from Onshape is model evidence; never author or repair
+geometry locally to turn an inspection file into a passing pull.
+
 For a saved shaded-view response, decode its image unchanged to a PNG under
 `build/`, then open it with `r3_view_artifact`:
 
