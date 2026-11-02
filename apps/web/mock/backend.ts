@@ -33,9 +33,10 @@ export function backendMiddleware(options: BackendOptions): Connect.NextHandleFu
   let live = false;
   let announced: boolean | null = null;
 
-  async function useProxy(): Promise<boolean> {
+  async function useProxy(write = false): Promise<boolean> {
     if (options.mode !== "auto") return options.mode === "proxy";
-    if (Date.now() - checked > 2000) {
+    // A stale negative read probe must not route a recovered backend's writes to the read-only mock.
+    if (Date.now() - checked > 2000 || (write && !live)) {
       live = await reachable(target);
       checked = Date.now();
       if (announced !== live) {
@@ -50,7 +51,8 @@ export function backendMiddleware(options: BackendOptions): Connect.NextHandleFu
     if (!req.url?.startsWith("/api")) return next();
     // Hold the body until we know where it goes; otherwise it may end before it can be piped upstream.
     req.pause();
-    void useProxy().then((proxy) => {
+    const write = !["GET", "HEAD", "OPTIONS"].includes(req.method ?? "GET");
+    void useProxy(write).then((proxy) => {
       if (!proxy) { req.resume(); return mock(req, res, next); }
       const upstream = http.request(
         { host: target.hostname, port: target.port || 80, method: req.method, path: req.url, headers: { ...req.headers, host: target.host } },
