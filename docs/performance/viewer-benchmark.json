@@ -1,0 +1,129 @@
+[
+  {
+    "page": "3d",
+    "before": {
+      "first_geometry_s": 5.91,
+      "all_parts_s": 12.46,
+      "fps": 50.2,
+      "frame_p95_ms": 33.4,
+      "interaction_long_task_max_ms": 117,
+      "load_long_task_max_ms": 729,
+      "heap_mb": 457,
+      "draw_calls": 1138,
+      "render_triangles": 4027059,
+      "artifact_body_bytes": 27799588,
+      "hover_playback_part_render_invocations": 6300,
+      "selection": {
+        "before": {
+          "parts": 7350,
+          "viewers": 14
+        },
+        "after": {
+          "parts": 9450,
+          "viewers": 18
+        },
+        "longTasks": [
+          {
+            "start": 19860.799999952316,
+            "duration": 114
+          },
+          {
+            "start": 20022.799999952316,
+            "duration": 65
+          }
+        ]
+      }
+    },
+    "after": {
+      "first_geometry_s": 5.19,
+      "all_parts_s": 12.15,
+      "fps": 59.8,
+      "frame_p95_ms": 16.8,
+      "interaction_long_task_max_ms": 0,
+      "load_long_task_max_ms": 550,
+      "heap_mb": 294,
+      "draw_calls": 613,
+      "render_triangles": 1956045,
+      "artifact_body_bytes": 27799589,
+      "hover_playback_part_render_invocations": 0,
+      "selection": {
+        "before": {
+          "parts": 1050,
+          "viewers": 18
+        },
+        "after": {
+          "parts": 1052,
+          "viewers": 22
+        },
+        "longTasks": [
+          {
+            "start": 18716.19999998808,
+            "duration": 91
+          }
+        ]
+      }
+    }
+  },
+  {
+    "page": "wiring",
+    "before": {
+      "first_geometry_s": 5.84,
+      "all_parts_s": 6.15,
+      "fps": 48.5,
+      "frame_p95_ms": 33.4,
+      "interaction_long_task_max_ms": 83,
+      "load_long_task_max_ms": 482,
+      "heap_mb": 313,
+      "draw_calls": 1138,
+      "render_triangles": 3575688,
+      "artifact_body_bytes": 5870205,
+      "hover_playback_part_render_invocations": 10500,
+      "selection": null
+    },
+    "after": {
+      "first_geometry_s": 5.65,
+      "all_parts_s": 7.48,
+      "fps": 58.9,
+      "frame_p95_ms": 16.8,
+      "interaction_long_task_max_ms": 0,
+      "load_long_task_max_ms": 371,
+      "heap_mb": 284,
+      "draw_calls": 1138,
+      "render_triangles": 3575688,
+      "artifact_body_bytes": 4351182,
+      "hover_playback_part_render_invocations": 0,
+      "selection": null
+    }
+  },
+  {
+    "page": "sim",
+    "before": {
+      "first_geometry_s": 15.57,
+      "all_parts_s": 16.09,
+      "fps": 27.5,
+      "frame_p95_ms": 83.4,
+      "interaction_long_task_max_ms": 116,
+      "load_long_task_max_ms": 1158,
+      "heap_mb": 469,
+      "draw_calls": 1061,
+      "render_triangles": 3694307,
+      "artifact_body_bytes": 3488760,
+      "hover_playback_part_render_invocations": 67200,
+      "selection": null
+    },
+    "after": {
+      "first_geometry_s": 14.27,
+      "all_parts_s": 16.1,
+      "fps": 58.9,
+      "frame_p95_ms": 16.8,
+      "interaction_long_task_max_ms": 0,
+      "load_long_task_max_ms": 286,
+      "heap_mb": 363,
+      "draw_calls": 536,
+      "render_triangles": 1623293,
+      "artifact_body_bytes": 4870889,
+      "hover_playback_part_render_invocations": 0,
+      "selection": null
+    }
+  }
+]

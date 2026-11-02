@@ -3,12 +3,13 @@
 // exploded view, click-to-inspect, diagnostic highlighting, simulation playback and route editing.
 import { Edges, GizmoHelper, GizmoViewport, Grid, Html, Line, OrbitControls } from "@react-three/drei";
 import { Canvas, useFrame, useLoader, useThree, type ThreeEvent } from "@react-three/fiber";
-import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Component, Suspense, memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   CatmullRomCurve3, Color, ConeGeometry, DoubleSide, Group, LineCurve3, Matrix4,
   Mesh, MeshStandardMaterial, Object3D, Quaternion, TubeGeometry, Vector3,
 } from "three";
-import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js";
+import { acceleratedRaycast } from "three-mesh-bvh";
+import { DisplayMeshLoader } from "./DisplayMeshLoader.ts";
 
 import type { PlaybackRecording, Vec3 } from "../api/types.ts";
 import { resolveSubjects, wireColor, type SceneComponent, type SceneWire } from "../lib/scene.ts";
@@ -24,6 +25,8 @@ import { ConnectorLayer } from "./ConnectorLayer.tsx";
 import { RouteEditor, type RouteEditState } from "./RouteEditor.tsx";
 import { interfaceFrame } from "./interfaceFrame.ts";
 import type { RobotData } from "./useRobotScene.ts";
+
+import { ViewerPerformance, viewerCounters } from "./performance.ts";
 
 Object3D.DEFAULT_UP.set(0, 0, 1); // robot frame: +z up
 
@@ -97,12 +100,12 @@ function useMaterial(color: string | number, state: PartState, opts: { metal?: b
   material.color.set(color);
   material.metalness = opts.metal ? 0.55 : 0.05;
   material.roughness = opts.metal ? 0.38 : 0.62;
+  if (material.transparent !== !!ghost) material.needsUpdate = true;
   material.transparent = !!ghost;
   material.opacity = ghost ? (state === "ghost" ? 0.14 : 0.32) : 1;
   material.depthWrite = !ghost;
   material.emissive.copy(state === "highlight" ? HIGHLIGHT : state === "selected" ? SELECTED : opts.error ? ERROR : new Color(0));
   material.emissiveIntensity = state === "highlight" ? 0.55 : state === "selected" ? 0.35 : opts.error ? 0.35 : 0;
-  material.needsUpdate = true;
   return material;
 }
 
@@ -120,23 +123,24 @@ function StlMesh({ url, material, outline, onClick, onHover }: {
   url: string; material: MeshStandardMaterial; outline: Outline | null;
   onClick: (e: ThreeEvent<MouseEvent>) => void; onHover: (on: boolean) => void;
 }) {
-  const geometry = useLoader(STLLoader, url);
+  const geometry = useLoader(DisplayMeshLoader, url);
   return (
-    <mesh geometry={geometry} material={material} onClick={onClick}
+    <mesh geometry={geometry} material={material} raycast={acceleratedRaycast} onClick={onClick}
           onPointerOver={(e) => { e.stopPropagation(); onHover(true); }} onPointerOut={() => onHover(false)}>
       {outline && <Edges threshold={28} color={outline.color} lineWidth={outline.width} transparent opacity={outline.opacity} depthTest={!outline.onTop} renderOrder={outline.onTop ? 10 : 0} />}
     </mesh>
   );
 }
 
-function Part({ c, url, matrix, state, xray, error, edge, register, onSelect, onHover }: {
-  c: SceneComponent; url: string | undefined; matrix: Matrix4; state: PartState; xray: boolean; error: boolean; edge: string;
+const Part = memo(function Part({ c, url, matrix, state, xray, error, register, onSelect, onHover }: {
+  c: SceneComponent; url: string | undefined; matrix: Matrix4; state: PartState; xray: boolean; error: boolean;
   register: (id: string, group: Group | null) => void; onSelect?: (s: Selection) => void; onHover: (id: string | null) => void;
 }) {
+  viewerCounters.parts++;
   const material = useMaterial(c.color, state, { metal: /alumin|steel/i.test(c.name) && c.kind === "structure", error, xray });
   const outline: Outline | null = state === "selected" ? { color: "#3987e5", width: 2.2, opacity: 1, onTop: true }
     : state === "highlight" ? { color: "#f97316", width: 2.2, opacity: 1, onTop: true }
-    : state === "normal" && !xray ? { color: edge, width: 1, opacity: 0.55 } : null;
+    : null;
   const click = (e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onSelect?.({ kind: "component", id: c.id }); };
   const hover = (on: boolean) => onHover(on ? c.id : null);
   return (
@@ -150,10 +154,10 @@ function Part({ c, url, matrix, state, xray, error, edge, register, onSelect, on
       ) : null}
     </group>
   );
-}
+});
 
 /** A fastener or other CAD-only part, drawn in its owner's frame. */
-function HardwarePart({ id, owner, url, matrix, state, register, onSelect }: {
+const HardwarePart = memo(function HardwarePart({ id, owner, url, matrix, state, register, onSelect }: {
   id: string; owner: string; url: string; matrix: Matrix4; state: PartState;
   register: (id: string, group: Group | null) => void; onSelect?: (s: Selection) => void;
 }) {
@@ -168,9 +172,9 @@ function HardwarePart({ id, owner, url, matrix, state, register, onSelect }: {
       </MeshBoundary>
     </group>
   );
-}
+});
 
-function WireTube({ w, state, onSelect, onHover }: {
+const WireTube = memo(function WireTube({ w, state, onSelect, onHover }: {
   w: SceneWire; state: PartState; onSelect?: (s: Selection) => void; onHover: (id: string | null) => void;
 }) {
   // True conductor diameter in every state: thickening focused wires made the conductors of
@@ -186,7 +190,7 @@ function WireTube({ w, state, onSelect, onHover }: {
           onClick={(e) => { e.stopPropagation(); onSelect?.({ kind: "wire", id: w.id }); }}
           onPointerOver={(e) => { e.stopPropagation(); onHover(w.id); }} onPointerOut={() => onHover(null)} />
   );
-}
+});
 
 // ------------------------------------------------------------------ overlays
 
@@ -339,8 +343,19 @@ function PlaybackDriver({ playback, data, groups, cableMeshes }: {
     const of = (id: string) => frames.component_bodies?.[id] ?? (bodies.has(id) ? id : componentBody(data.tree, id, bodies, root));
     return Object.fromEntries([...data.components.map((c) => [c.id, of(c.id)]), ...data.hardware.map((h) => [h.id, frames.component_bodies?.[h.id] ?? (bodies.has(h.id) ? h.id : of(h.owner))])]);
   }, [data, frames, root]);
-  useEffect(() => invalidate(), [t, invalidate]);
+  const lastTime = useRef<number | null>(null);
+  const posedGroups = useRef(new Map<string, Group>());
+  const posedCables = useRef(new Map<string, Mesh>());
+  useEffect(() => { lastTime.current = null; invalidate(); }, [t, frames, data, invalidate]);
   useFrame(() => {
+    // Newly shown layers need their recorded pose even while the clock is paused.
+    if (lastTime.current === t && posedGroups.current.size === groups.current.size
+      && posedCables.current.size === cableMeshes.current.size
+      && [...groups.current].every(([id, group]) => posedGroups.current.get(id) === group)
+      && [...cableMeshes.current].every(([id, mesh]) => posedCables.current.get(id) === mesh)) return;
+    lastTime.current = t;
+    posedGroups.current = new Map(groups.current);
+    posedCables.current = new Map(cableMeshes.current);
     const cursor = frameAt(frames.t, t);
     const deltas: Record<string, Matrix4> = {};
     for (const [name, poses] of Object.entries(frames.bodies)) {
@@ -472,6 +487,7 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
   onInterference?: (index: number) => void;
   selectedInterference?: number | null;
 }) {
+  viewerCounters.viewers++;
   const playback = playbackProp?.recording.frames && !playbackProp.recording.frames.error ? playbackProp : null;
   const themeVersion = useThemeVersion();
   const [options, setOptions] = useState<ViewOptions>({ ...DEFAULT_OPTIONS, ...initialOptions });
@@ -536,7 +552,10 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
     if (anyFocus) return (isWire ? focus.wires.has(id) : focus.components.has(id)) ? "highlight" : "ghost";
     return "normal";
   };
-  const register = (id: string, group: Group | null) => { if (group) groups.current.set(id, group); else groups.current.delete(id); };
+  const register = useCallback((id: string, group: Group | null) => { if (group) groups.current.set(id, group); else groups.current.delete(id); }, []);
+  const selectionHandler = useRef(onSelect);
+  selectionHandler.current = onSelect;
+  const selectPart = useCallback((s: Selection) => selectionHandler.current?.(s), []);
   const background = useMemo(() => cssVar("--viewer-bg") || "#161615", [themeVersion]); // eslint-disable-line react-hooks/exhaustive-deps
   const dark = themeVersion !== "light";
   const hovered = hover ? data.components.find((c) => c.id === hover) ?? data.wires.find((w) => w.id === hover) : null;
@@ -604,9 +623,10 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
         </div>
       )}
 
-      <Canvas frameloop="demand" dpr={[1, 2]} gl={{ antialias: true, preserveDrawingBuffer: true }}
+      <Canvas frameloop="demand" dpr={[1, 2]} gl={{ antialias: true, preserveDrawingBuffer: false }}
               camera={{ fov: 36, near: 0.002, far: 400, position: [-0.3, -0.42, 0.32] }}
               onPointerMissed={() => onSelect?.(null)} style={{ cursor: hover ? "pointer" : "default" }}>
+        <ViewerPerformance />
         <color attach="background" args={[background]} />
         <hemisphereLight args={[dark ? "#dfe6ee" : "#ffffff", dark ? "#3a3833" : "#9b9a92", dark ? 1.2 : 1.5]} />
         <directionalLight position={[0.6, -0.9, 1.4]} intensity={dark ? 1.9 : 2.1} />
@@ -616,15 +636,15 @@ export function RobotViewer({ data, highlight = [], selected = null, onSelect, p
 
         {data.components.map((c) => (
           <Part key={c.id} c={c} url={data.meshes[c.id]} matrix={playback ? IDENTITY : matrices[c.id] ?? IDENTITY} state={stateOf(c.id)}
-                xray={options.xray} error={options.issues && !anyFocus && errorParts.has(c.id)} edge={dark ? "#77766f" : "#3a3a36"} register={register} onSelect={onSelect} onHover={setHover} />
+                xray={options.xray} error={options.issues && !anyFocus && errorParts.has(c.id)} register={register} onSelect={selectPart} onHover={setHover} />
         ))}
         {options.hardware && data.hardware.map((h) => (
           <HardwarePart key={h.id} id={h.id} owner={h.owner} url={h.url} matrix={playback ? IDENTITY : matrices[h.owner] ?? IDENTITY}
                         state={anyFocus || selected ? (stateOf(h.owner) === "ghost" ? "ghost" : "normal") : "normal"}
-                        register={register} onSelect={onSelect} />
+                        register={register} onSelect={selectPart} />
         ))}
         {!playback && options.wires && options.explode < 0.02 && data.wires.map((w) => (
-          <WireTube key={w.id} w={w} state={stateOf(w.id, true)} onSelect={onSelect} onHover={setHover} />
+          <WireTube key={w.id} w={w} state={stateOf(w.id, true)} onSelect={selectPart} onHover={setHover} />
         ))}
         {!playback && options.interference && data.interference.map((o, i) => (
           !anyFocus || focus.components.has(o.a) || focus.components.has(o.b) || selectedInterference === i
