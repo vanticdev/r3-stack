@@ -398,8 +398,8 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
         return await call(api.release, project(pid).root)
 
     @app.get("/api/projects/{pid}/spec", tags=["spec"], response_model=SpecDocument, responses=ERRORS)
-    async def get_spec(pid: str) -> dict[str, Any]:
-        return await call(views.spec_document, project(pid))
+    async def get_spec(pid: str, sources: bool = True) -> dict[str, Any]:
+        return await call(views.spec_document, project(pid), sources)
 
     @app.patch("/api/projects/{pid}/spec", tags=["spec"], response_model=SpecPatchResult, responses=ERRORS,
                summary="JSON merge patch with optimistic concurrency (409 spec_conflict on a stale sha256); keeps comments")
@@ -427,7 +427,12 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
                              ("software", views.software_view, "bindings (pin -> net -> device), modules, firmware logs"),
                              ("sim", views.sim_list, "scenarios with their last results")):
         def make(view: Any) -> Any:
-            async def endpoint(pid: str) -> dict[str, Any]:
+            async def endpoint(pid: str) -> Any:
+                if view in (views.model_view, views.cad_view):
+                    ref = project(pid)
+                    # Encode large display payloads in the worker as well. A
+                    # plain dict makes FastAPI walk it again on the event loop.
+                    return await call(lambda: JSONResponse(freshness.GEOMETRY_VIEWS.read(view, ref)))
                 return await call(view, project(pid))
             return endpoint
         app.add_api_route(f"/api/projects/{{pid}}/{name}", make(view), methods=["GET"], tags=["domains"], summary=text,
@@ -453,8 +458,9 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
 
     @app.get("/api/projects/{pid}/diagnostics", tags=["domains"], responses=ERRORS)
     async def get_diagnostics(pid: str, stage: str | None = None, severity: Literal["error", "warning", "info"] | None = None,
-                              subject: str | None = None) -> dict[str, Any]:
-        return await call(views.diagnostics_view, project(pid), stage, severity, subject)
+                              subject: str | None = None) -> Any:
+        ref = project(pid)
+        return await call(lambda: JSONResponse(views.diagnostics_view(ref, stage, severity, subject)))
 
     @app.get("/api/projects/{pid}/artifacts/{path:path}", tags=["domains"], responses=ERRORS,
              summary="A file under build/ (path-traversal safe); a directory lists its files")

@@ -105,8 +105,8 @@ def run_stage(project_path: str | Path | None, stage: str, scenarios: list[str] 
 
 
 def stored_diagnostics(project_path: str | Path | None = None, stage: str | None = None, severity: str | None = None,
-                       subject: str | None = None) -> dict[str, Any]:
-    project = load_project(project_path)
+                       subject: str | None = None, *, project: Project | None = None) -> dict[str, Any]:
+    project = project if project is not None else load_project(project_path)
     results = stage_runner.load_results(project)
     selected = [r for name, r in results.items() if stage in (None, "", name)]
     diagnostics = [d for r in selected for d in r.diagnostics
@@ -139,8 +139,8 @@ def diagnose(project_path: str | Path | None = None, include_warnings: bool = Tr
                          for subject, entries in ordered]}
 
 
-def status(project_path: str | Path | None = None) -> dict[str, Any]:
-    project = load_project(project_path)
+def status(project_path: str | Path | None = None, *, project: Project | None = None) -> dict[str, Any]:
+    project = project if project is not None else load_project(project_path)
     fingerprint = project.fingerprint()
     results = stage_runner.load_results(project)
     git: dict[str, Any] = {}

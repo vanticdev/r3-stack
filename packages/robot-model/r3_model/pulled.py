@@ -21,6 +21,8 @@ All files must be regular, inside cad/pulled, and have no write permission bits.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
+
 import hashlib
 import json
 from pathlib import Path
@@ -117,6 +119,18 @@ def _numbers(value: Any, count: int, label: str) -> list[float] | None:
     return [float(v) for v in value]
 
 
+@lru_cache(maxsize=1024)
+def _viewer_proof_metadata(path: Path, checksum: str) -> dict[str, Any]:
+    """Small provenance fields, keyed by the checksum verified by _file.
+
+    Viewer proofs embed all mesh vertices. Retain only identity and placement,
+    never the multi-megabyte body arrays. Every caller still hashes the file.
+    """
+    proof = json.loads(path.read_text())
+    return {key: proof.get(key) for key in (
+        "microversion", "mesh_artifact", "part", "occurrence_transform")}
+
+
 def load_pulled(project_root: Path) -> PulledModel:
     """Validate pinned bytes, paths and assembly references before returning CAD.
 
@@ -160,7 +174,8 @@ def load_pulled(project_root: Path) -> PulledModel:
                 if (item.get('geometry_qualification') != 'display_mesh' or not data.get('microversion')
                         or not data.get('element_microversion') or not item.get('element_microversion')):
                     raise PullError('cad_pull_invalid', f'{name}: native viewer qualification and revision are required')
-                proof = json.loads(_file(folder, item['provenance'], hashes['provenance'], name).read_text())
+                proof = _viewer_proof_metadata(
+                    _file(folder, item['provenance'], hashes['provenance'], name), hashes['provenance'])
                 if (proof.get('microversion') != data['element_microversion'] or
                         proof.get('mesh_artifact') != hashes['obj'] + '.obj'):
                     raise PullError('cad_pull_invalid', f'{name}: viewer provenance differs from its native revision or mesh')

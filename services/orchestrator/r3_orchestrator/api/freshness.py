@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import os
 import pkgutil
 import threading
 from collections import OrderedDict
@@ -30,7 +31,7 @@ from .errors import ApiError
 #: Packages whose source defines the robot.yaml schema and how a project loads.
 CODE_PACKAGES = ("r3_model", "r3_catalog")
 
-FileStamps = dict[str, tuple[int, int]]
+FileStamps = dict[str, tuple[int, ...]]
 
 
 def _package_dir(name: str) -> Path:
@@ -45,7 +46,7 @@ def _stamps(files: list[Path], key: Any) -> FileStamps:
             stat = path.stat()
         except OSError:
             continue
-        stamps[key(path)] = (stat.st_mtime_ns, stat.st_size)
+        stamps[key(path)] = (stat.st_mtime_ns, stat.st_size, stat.st_ctime_ns, stat.st_ino)
     return stamps
 
 
@@ -130,8 +131,9 @@ class ProjectCache:
     files, which invalidates the entry.
     """
 
-    def __init__(self, size: int = 16) -> None:
+    def __init__(self, size: int = 16, *, resolve_cad: bool = True) -> None:
         self.size = size
+        self.resolve_cad = resolve_cad
         self._entries: OrderedDict[Path, tuple[tuple[str, str], Project]] = OrderedDict()
         self._inputs: dict[Path, list[Path]] = {}
         self._loads: dict[Path, threading.Lock] = {}
@@ -167,7 +169,7 @@ class ProjectCache:
         # and removals still invalidate it without parsing unchanged YAML.
         files = input_files(root)
         key = (version, version_of(_stamps(files, str)))
-        project = Project.load(root)
+        project = Project.load(root) if self.resolve_cad else Project.load(root, resolve_cad=False)
         with self._lock:
             self._entries[root] = (key, project)
             self._inputs[root] = files
@@ -184,3 +186,63 @@ class ProjectCache:
 
 
 PROJECTS = ProjectCache()
+
+# List rows need identity and result freshness, not solved geometry. Keep a
+# separate cache so list requests never queue behind CAD initialization.
+SUMMARIES = ProjectCache(resolve_cad=False)
+
+
+class GeometryViews:
+    """Cache HTTP display projections, never release/integrity decisions.
+
+    A hit requires a fresh content fingerprint plus inode/ctime/mtime/size for
+    native inputs and derived artifacts. Writers that restore mtimes still
+    invalidate the display. Stage runners and release checks bypass this cache.
+    """
+
+    def __init__(self) -> None:
+        self._entries: OrderedDict[tuple[str, Path], tuple[Any, Any]] = OrderedDict()
+        self._lock = threading.Lock()
+
+    def read(self, view: Any, ref: Any) -> Any:
+        project = PROJECTS.load(ref.root)
+        paths = input_files(ref.root)
+        for folder in (ref.root / 'cad' / 'pulled', ref.root / 'build' / 'model',
+                       ref.root / 'build' / 'assembly', ref.root / 'build' / 'cad' / 'pulled-meshes'):
+            paths.extend(p for p in folder.rglob('*') if p.is_file())
+        if view.__name__ == 'cad_view':
+            cad = ref.root / 'build' / 'cad'
+            paths.append(cad / 'result.json')
+            # Historical viewer snapshots are unrelated to the current view.
+            # Include the pointer and every asset it actually references.
+            pointer = cad / 'viewer-mesh' / 'latest.json'
+            paths.append(pointer)
+            try:
+                preview = json.loads(pointer.read_text())
+                for part in preview.get('parts', []):
+                    paths.extend(pointer.parent / part[k] for k in ('mesh', 'provenance'))
+            except (OSError, ValueError, KeyError, TypeError):
+                pass  # the view reports malformed current preview data
+            for directory, folders, names in os.walk(cad):
+                folders[:] = [f for f in folders if f not in ('viewer-mesh', 'pulled-meshes')]
+                paths.extend(Path(directory) / n for n in names
+                             if Path(n).suffix.lower() in ('.png', '.jpg', '.jpeg', '.svg', '.gif'))
+        signature = (project.fingerprint(), _stamps(paths, lambda p: f"{p}:{p.resolve()}"))
+        key = (view.__name__, ref.root)
+        with self._lock:
+            hit = self._entries.get(key)
+            if hit is not None and hit[0] == signature:
+                self._entries.move_to_end(key)
+                return hit[1]
+        payload = view(ref)
+        # Store the pre-computation signature: any concurrent write guarantees
+        # the next request misses rather than blessing an inconsistent snapshot.
+        with self._lock:
+            self._entries[key] = (signature, payload)
+            self._entries.move_to_end(key)
+            while len(self._entries) > 8:
+                self._entries.popitem(last=False)
+        return payload
+
+
+GEOMETRY_VIEWS = GeometryViews()

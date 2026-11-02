@@ -90,7 +90,7 @@ export const api = {
   projects: (signal?: AbortSignal) => request<ProjectList>("GET", "/api/projects", undefined, signal),
   createProject: (body: CreateProjectRequest) => request<CreateProjectResponse>("POST", "/api/projects", body),
   project: (pid: string, signal?: AbortSignal) => request<ProjectDetail>("GET", project(pid), undefined, signal),
-  spec: (pid: string, signal?: AbortSignal) => request<SpecDocument>("GET", `${project(pid)}/spec`, undefined, signal),
+  spec: (pid: string, signal?: AbortSignal) => request<SpecDocument>("GET", `${project(pid)}/spec?sources=false`, undefined, signal),
   patchSpec: (pid: string, patch: Record<string, unknown>, sha256: string, dryRun = false) =>
     request<SpecPatchResponse>("PATCH", `${project(pid)}/spec`, { patch, sha256, dry_run: dryRun }),
   catalog: (pid: string, signal?: AbortSignal) => request<CatalogResponse>("GET", `${project(pid)}/catalog`, undefined, signal),

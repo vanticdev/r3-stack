@@ -58,8 +58,8 @@ def _examples_without_build(tmp_path_factory: pytest.TempPathFactory):
     old_templates = os.environ.get("R3_EXAMPLES_DIR")
     os.environ["R3_EXAMPLES_DIR"] = str(EXAMPLES)
 
-    def load(cls, root):
-        return original.__func__(cls, copies.redirect(root))
+    def load(cls, root, *, resolve_cad=True):
+        return original.__func__(cls, copies.redirect(root), resolve_cad=resolve_cad)
 
     Project.load = classmethod(load)
     yield copies
