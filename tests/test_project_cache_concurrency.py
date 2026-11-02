@@ -51,3 +51,30 @@ def test_concurrent_cold_requests_share_exactly_one_project_load(tmp_path, monke
         results = list(pool.map(request, range(6)))
     assert len(calls) == 1
     assert all(result is results[0] for result in results)
+
+
+def test_include_identity_checks_resolve_each_source_once(tmp_path, monkeypatch):
+    count = 32
+    (tmp_path / 'robot.yaml').write_text('items:\n' + ''.join(
+        f'  item{i}: {{$include: item{i}.yaml}}\n' for i in range(count)))
+    for i in range(count):
+        (tmp_path / f'item{i}.yaml').write_text(f'value: {i}\n')
+    resolved = []
+    original = Path.resolve
+    def resolve(path, *args, **kwargs):
+        resolved.append(path)
+        return original(path, *args, **kwargs)
+    monkeypatch.setattr(Path, 'resolve', resolve)
+    files = spec_files.load_spec_files(tmp_path)
+    assert len(files.texts) == count + 1
+    assert len(resolved) <= 2 * (count + 1) + 1
+
+
+def test_include_alias_still_rejected(tmp_path):
+    import pytest
+    (tmp_path / 'original.yaml').write_text('value: 1\n')
+    (tmp_path / 'alias.yaml').symlink_to('original.yaml')
+    (tmp_path / 'robot.yaml').write_text(
+        'first: {$include: original.yaml}\nsecond: {$include: alias.yaml}\n')
+    with pytest.raises(spec_files.SpecError, match='already included'):
+        spec_files.load_spec_files(tmp_path)

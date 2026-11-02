@@ -174,18 +174,21 @@ def load_spec_files(root: str | Path, overrides: dict[str, str] | None = None) -
     No schema defaults or sourced/catalog values are written back to sources.
     """
     result = SpecFiles(Path(root).resolve())
+    resolved_files: set[Path] = set()
 
     def read_file(name: str, target: SpecPath, stack: tuple[str, ...], declared: Origin) -> Any:
         path = result.root / name
         if ".." in Path(name).parts or str(Path(name)) != name:
             raise SpecError("spec_include_invalid", declared.file, declared.path, "include must use a normalized project-relative path")
-        if Path(name).is_absolute() or result.root not in path.resolve().parents:
+        resolved = path.resolve()
+        if Path(name).is_absolute() or result.root not in resolved.parents:
             raise SpecError("spec_include_outside_project", declared.file, declared.path, f"include escapes project: {name}")
         name = path.relative_to(result.root).as_posix()
         if name in stack:
             raise SpecError("spec_include_cycle", declared.file, declared.path, f"include cycle: {' -> '.join((*stack, name))}")
-        if name in result.texts or any(path.resolve() == (result.root / previous).resolve() for previous in result.texts):
+        if name in result.texts or resolved in resolved_files:
             raise SpecError("spec_duplicate_definition", declared.file, declared.path, f"file already included: {name}")
+        resolved_files.add(resolved)
         try:
             text = overrides[name] if overrides is not None and name in overrides else path.read_bytes().decode("utf-8")
         except FileNotFoundError as error:
