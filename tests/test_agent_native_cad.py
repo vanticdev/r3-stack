@@ -99,6 +99,7 @@ def test_explicit_scoped_visibility_consent_reaches_both_providers(tmp_path,monk
 def test_visibility_consent_is_never_inferred_or_unscoped(monkeypatch):
     import pytest
     monkeypatch.delenv('R3_ONSHAPE_DOCUMENT_VISIBILITY',raising=False)
+    monkeypatch.delenv('R3_SERVER_URL',raising=False)
     assert agents.session_instructions()==agents.SYSTEM_PROMPT
     monkeypatch.setenv('R3_ONSHAPE_DOCUMENT_VISIBILITY','public')
     monkeypatch.delenv('R3_ONSHAPE_DOCUMENT_FOLDER_ID',raising=False)
