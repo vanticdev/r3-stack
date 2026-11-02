@@ -69,3 +69,84 @@ also apply in dark mode; its palette remains unchanged.
 | Deploy | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
 
 Accepted: total tells 2 → 0 within this checklist and captured states. Zero is not a claim of perfect design. Typecheck, 80 unit tests and production build passed. Label persistence, focus, selection and mobile catalog checks passed in both themes. No API or test IDs changed.
+
+## Round 3 — global density trial (rejected)
+
+Trial reduced check and table vertical padding to 3px, page gaps to 8px and
+section-header padding to 6px. More rows fit, but multi-line electrical records
+sit too close to separators, and requirement explanations lose breathing room.
+No checklist tells were removed. Reverted the entire trial; no code commit.
+Typecheck, 80 unit tests and build also passed for the trial.
+
+| Page | Tells before → trial | Before H/D/T/C | Trial H/D/T/C |
+| --- | --- | --- | --- |
+| Projects | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Model bank | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Environment | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Overview | 0 → 0 | 4/4/4/4 | 4/3/4/4 |
+| 3D model | 0 → 0 | 3/3/4/4 | 3/3/4/4 |
+| Wiring | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Electrical | 0 → 0 | 4/4/4/4 | 4/3/4/4 |
+| PCB | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Parts | 0 → 0 | 3/4/4/4 | 3/4/4/4 |
+| Software | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Simulation | 0 → 0 | 4/3/4/4 | 4/2/4/4 |
+| Diagnostics | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Agent | 0 → 0 | 4/3/4/4 | 4/3/4/4 |
+| Deploy | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+
+First consecutive round without an accepted improvement.
+
+## Round 4 — remove section boxes (rejected)
+
+Trial removed all card borders/backgrounds and header separators in light mode.
+Some pages look quieter, but electrical table headers become floating white
+bands and the catalog/form split loses definition. No further checklist tells
+were removed. Reverted; the narrower containment changes from round 1 remain.
+
+| Page | Tells before → trial | Before H/D/T/C | Trial H/D/T/C |
+| --- | --- | --- | --- |
+| Projects | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Model bank | 0 → 0 | 4/4/4/4 | 3/4/4/4 |
+| Environment | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Overview | 0 → 0 | 4/4/4/4 | 3/4/4/4 |
+| 3D model | 0 → 0 | 3/3/4/4 | 3/3/4/4 |
+| Wiring | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Electrical | 0 → 0 | 4/4/4/4 | 3/4/4/4 |
+| PCB | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Parts | 0 → 0 | 3/4/4/4 | 3/4/4/4 |
+| Software | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Simulation | 0 → 0 | 4/3/4/4 | 4/3/4/4 |
+| Diagnostics | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Agent | 0 → 0 | 4/3/4/4 | 4/3/4/4 |
+| Deploy | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+
+Second consecutive round without accepted improvement: stop at four rounds.
+Final retained scores are round 2, with 37 → 2 → 0 flagged tells across the
+captured states. Average H/D/T/C: 3.00/3.57/2.93/2.00 initially,
+3.86/3.79/4.00/4.00 finally. These are subjective comparisons using a deliberately
+narrow checklist; they do not establish that every UI state is free of defects.
+
+## Evidence and boundaries
+
+Each round has before/after PNGs for all 14 routes at 1440 × 900. Round 2 also
+has all 14 routes in dark mode. External capture scripts and JSON pageerror
+records sit beside the images. Catalog focus, filled labels, selection and
+390px layouts were additionally checked in both themes, without submitting.
+
+Later capture passes wait for project status and reuse the browser page to avoid
+repeated cold API loads. Early images occasionally omit still-loading header
+metadata or geometry. Only loaded UI chrome is scored; loading completion,
+newly visible mesh parts and simulation playback are not credited as design
+improvements. No claim of viewer performance qualification is made.
+
+The final changes touch only ModelBankPage, theme CSS and these review documents.
+No viewer source, API contracts, test IDs or deployment build version changed.
+Both requested setup branches were already ancestors of integration. The source
+project was copied, never edited. Existing server ports were not used.
+
+Final validation after both reversions: typecheck passed; all 80 unit tests
+passed; production build passed. All nine capture sets (126 route captures)
+recorded zero uncaught pageerrors. Known Three.js CommonJS deprecation warnings
+remain in the test runner. Screenshot checks are not a substitute for full
+interaction coverage or an end-to-end CAD qualification.

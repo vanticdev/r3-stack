@@ -25,3 +25,20 @@ empty-state guidance aligns with its section. Sources:
 [NN/g placeholders](https://www.nngroup.com/articles/form-design-placeholders/),
 [W3C forms](https://design-system.w3.org/styles/forms.html),
 [Home Assistant empty states](https://contributors.home-assistant.io/design/patterns/empty-states/).
+
+Round 3 queries: “generic AI dashboards excessive whitespace density compact
+tables readability”; “site.nngroup.com information density tables whitespace
+readability”. Check whether reducing row padding improves comparison without
+merging adjacent multi-line results. Sources:
+[NN/g data-table tasks](https://www.nngroup.com/articles/data-tables/),
+[Elastic panel layout](https://www.elastic.co/docs/explore-analyze/dashboards/arrange-panels),
+[AI dashboard density critique](https://uxskill.laithjunaidy.com/blog/ai-dashboard-design-generic.html).
+Density ratings measure usable scanning, not simply rows above the fold.
+
+Round 4 queries: “AI generic interface cards everywhere remove borders visual
+grouping”; “site.nngroup.com common region borders grouping principle”. Check
+whether boundaries communicate relationships or merely decorate each section.
+Sources: [NN/g common region](https://www.nngroup.com/articles/common-region/),
+[InterfaceKit](https://guides.interfacekit.io/make-ui-not-look-ai-generated),
+[Siemens industrial cards](https://ix.siemens.io/docs/components/card/guide).
+Removing all containers is not automatically an improvement: grouping must survive.
