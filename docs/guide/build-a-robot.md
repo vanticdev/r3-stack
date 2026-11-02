@@ -493,6 +493,11 @@ height is never treated as its interior floor. Actual solid floor and wall
 geometry still block routes; an out-of-volume destination is rejected rather
 than silently moved to a grid edge.
 
+Failed searches remain explicit `wire_route_failed` errors. Their serialized
+`failed` paths are diagnostic placeholders, excluded from physical cable models
+and routed-harness renders; they do not count as completed routes in the viewer.
+The remaining computed paths and their engineering checks still run.
+
 Run `r3 validate --stage connectors,wiring,electrical`. Inspect pin maps, conductor exits,
 route witnesses, bend radii, dynamic clearances, supported spans, cut lengths, ampacity,
 voltage drop, fuse coordination, thermal results and runtime assumptions. The manufacturing

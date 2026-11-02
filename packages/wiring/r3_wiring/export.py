@@ -41,6 +41,7 @@ def routes_json(result: RoutingResult, clearances: list[dict[str, Any]]) -> dict
     the conductor converges from its pin into the shared bundle core."""
     return {
         "wires": {w.wire_id: {"harness": w.harness, "awg": w.awg, "path": _wire_path(w.path),
+                              "failed": bool(getattr(w, "failed", False)),
                               "routed_length": round(w.routed_length, 6), "cut_length": round(w.cut_length, 6),
                               "bundle_radius": [round(float(r), 7) for r in w.bundle_radius],
                               "ends": [end_json(e) for e in w.ends], "fanout": list(w.fanout)}

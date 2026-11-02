@@ -152,7 +152,8 @@ def _iso_limits(ax, obstacles: ObstacleSet) -> None:
 def render_routes(out_dir: Path, obstacles: ObstacleSet, routes: dict[str, Any], detail: dict[str, Any],
                   title: str) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    wires = {k: dict(v, color=detail["wires"][k]["color"]) for k, v in routes["wires"].items()}
+    wires = {k: dict(v, color=detail["wires"][k]["color"]) for k, v in routes["wires"].items()
+             if not v.get("failed", detail["wires"][k].get("failed", False))}
     ties = [t for h in routes["harnesses"].values() for t in h["tie_points"]]
     holes = [h["center"] for h in detail.get("pass_throughs", [])]
     floating = [f["center"] for f in detail.get("floating_mates", [])]
@@ -207,7 +208,8 @@ def render_slack(out_dir: Path, obstacles: ObstacleSet, routes: dict[str, Any], 
     """Sagged cable shape at peak bump (solid) over the routed shape (dashed),
     plus the clearance-to-moving-parts time history of the test drive."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    routed = {k: dict(v, color=detail["wires"][k]["color"]) for k, v in routes["wires"].items()}
+    routed = {k: dict(v, color=detail["wires"][k]["color"]) for k, v in routes["wires"].items()
+              if not v.get("failed", detail["wires"][k].get("failed", False))}
     sagged = {k: {"path": p, "color": detail["wires"][k]["color"], "harness": detail["wires"][k]["harness"]}
               for k, p in snapshot.items() if k in detail["wires"]}
     paths = []

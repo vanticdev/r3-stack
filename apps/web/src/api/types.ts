@@ -482,6 +482,8 @@ export interface RoutedWire {
   path: Vec3[];
   routed_length: number;
   cut_length: number;
+  /** A failed search's diagnostic placeholder, never a physical routed path. */
+  failed?: boolean;
 }
 export interface RoutesJson {
   wires: Record<string, RoutedWire>;

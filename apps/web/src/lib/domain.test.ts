@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Diagnostic, ModelGraph, RobotSpec, RoutesJson, SpecHarness, Vec3 } from "../api/types.ts";
+import type { Diagnostic, ModelGraph, RobotSpec, RoutesJson, RoutingDetail, SpecHarness, Vec3 } from "../api/types.ts";
 import { SseParser, toEvent } from "../api/sse.ts";
 import { reduceRun, type TrackedRun } from "../state/runs.tsx";
 import {
@@ -178,6 +178,20 @@ describe("scene", () => {
     expect(displayed[0]!.radius).toBe(.001);
     expect(displayed[0]!.routed).toBe(false);
     expect(withConnectorDisplayPaths(scene.wires, {})[0]).toBe(scene.wires[0]);
+  });
+
+  it("never classifies a failed search placeholder as an actual routed cable", () => {
+    const entry = { harness: "esc_power", awg: 12, path: [[0, 0, 0], [0, .03, 0], [.1, 0, 0]],
+      routed_length: .14, failed: true };
+    const routes = { wires: { W1: entry, unknown: entry } } as unknown as RoutesJson;
+    const scene = buildScene({ graph, routes });
+    expect(scene.wires).toHaveLength(1);
+    expect(scene.wires[0]!.routed).toBe(false);
+    expect(scene.wires[0]!.path).toEqual(graph.wires.W1!.ends);
+    expect(scene.routed).toBe(false);
+    const legacy = { wires: { W1: { ...entry, failed: undefined } } } as unknown as RoutesJson;
+    const detail = { wires: { W1: { failed: true } } } as unknown as RoutingDetail;
+    expect(buildScene({ graph, routes: legacy, routingDetail: detail }).wires[0]!.routed).toBe(false);
   });
 });
 

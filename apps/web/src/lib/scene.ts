@@ -178,20 +178,22 @@ export function buildScene({ summary, graph, routes, routingDetail = null, diagn
   };
   for (const [id, meta] of Object.entries(wireMeta)) {
     const route = routed[id];
+    const isRouted = !!route && !route.failed && !detail[id]?.failed
+      && Array.isArray(route.path) && route.path.length >= 2;
     const ends = meta.ends ?? [];
-    const path = route && Array.isArray(route.path) && route.path.length >= 2
+    const path = route && isRouted
       ? route.path
       : ends.length === 2 && ends.every((e) => Array.isArray(e)) ? (ends as Vec3[]) : null;
     if (!path) continue;
-    add(id, meta.harness, meta.awg, meta.color ?? detail[id]?.color ?? "", meta.signal, path, !!route, route ? route.routed_length : null);
+    add(id, meta.harness, meta.awg, meta.color ?? detail[id]?.color ?? "", meta.signal, path, isRouted, isRouted ? route.routed_length : null);
   }
   // Routed wires that the graph does not know about (e.g. older graph.json) still render.
   for (const [id, route] of Object.entries(routed)) {
-    if (wireMeta[id] || !Array.isArray(route.path) || route.path.length < 2) continue;
+    if (wireMeta[id] || route.failed || detail[id]?.failed || !Array.isArray(route.path) || route.path.length < 2) continue;
     add(id, route.harness, route.awg, detail[id]?.color ?? "", detail[id]?.signal, route.path, true, route.routed_length ?? null);
   }
   const interference = (graph?.interference ?? []).map((o) => ({ a: o.a, b: o.b, center: o.center, extent: o.extent, volume: o.volume }));
-  return { components, wires, interference, routed: Object.keys(routed).length > 0 };
+  return { components, wires, interference, routed: wires.some((wire) => wire.routed) };
 }
 
 const RANK: Record<Severity, number> = { error: 0, warning: 1, info: 2 };

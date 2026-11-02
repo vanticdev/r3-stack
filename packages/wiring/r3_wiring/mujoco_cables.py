@@ -325,6 +325,11 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
 
     groups: list[list[str]] = []
     for wire_id, data in routes.get("wires", {}).items():
+        if data.get("failed"):
+            plan.diagnostics.append(Diagnostic.error(
+                "wire_route_failed", f"{wire_id} has no computed route; its diagnostic placeholder is not a physical cable",
+                subjects=[str(data.get("harness", "")), wire_id], data={"wire": wire_id}))
+            continue
         if wire_id not in wires or len(data.get("path") or []) < 2:
             continue
         path = core_path(data)

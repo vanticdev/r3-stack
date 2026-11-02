@@ -39,3 +39,26 @@ def test_unavailable_terminal_geometry_remains_a_failed_harness(tmp_path, monkey
     assert any(d.code == 'wire_route_failed' and 'terminal lead geometry' in d.message for d in errors)
     assert expected <= {subject for d in errors for subject in d.subjects}
     assert release_status(project, errors)['status'] == 'unreleased'
+
+
+def test_failed_search_placeholder_never_becomes_a_physical_cable(tmp_path):
+    from r3_wiring.export import routes_json
+    from r3_wiring.mujoco_cables import plan_cables
+    project = Project.load(write_project(tmp_path, block=False))
+    obstacles, _ = build_obstacles(project)
+    routing = HarnessRouter(project, obstacles, RouterOptions(plan=False)).route()
+    missing = next(iter(routing.wires))
+    routing.wires[missing].failed = True
+    data = routes_json(routing, [])
+    assert data['wires'][missing]['failed'] is True
+    plan = plan_cables(project, data, obstacles)
+    assert missing not in plan.wire_bundle
+    assert set(routing.wires) - {missing} <= plan.wire_bundle.keys()
+    finding = next(d for d in plan.diagnostics if d.code == 'wire_route_failed' and missing in d.subjects)
+    assert finding.severity.value == 'error'
+    assert release_status(project, plan.diagnostics)['status'] == 'unreleased'
+    from r3_wiring.cable_sim import CableSimulator
+    simulator = CableSimulator(project, data, obstacles, plan=plan)
+    simulator.step(.01, {'pos': [0, 0, 0]}, {})
+    assert missing not in simulator.positions()
+    assert set(routing.wires) - {missing} <= simulator.positions().keys()
