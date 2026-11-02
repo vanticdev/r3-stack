@@ -2,7 +2,7 @@
 import numpy as np
 import trimesh
 
-from r3_wiring.mujoco_cables import convex_pieces
+from r3_wiring.mujoco_cables import convex_pieces, is_closed_solid
 
 
 def test_closed_mesh_still_splits_exactly():
@@ -24,3 +24,25 @@ def test_mesh_without_volume_has_no_hull_to_invent():
     vertices = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0]], dtype=float)
     pieces, hull_only = convex_pieces(vertices, np.array([[0, 1, 2]]))
     assert pieces == [] and hull_only == 0
+
+
+def test_closed_solid_is_told_apart_from_an_open_mesh():
+    box = trimesh.creation.box((1.0, 2.0, 3.0))
+    assert is_closed_solid(np.asarray(box.vertices), np.asarray(box.faces))
+    assert not is_closed_solid(np.asarray(box.vertices), np.asarray(box.faces)[:-2])
+
+
+def test_environment_only_contact_reaches_the_ground_but_not_other_parts():
+    import mujoco
+
+    xml = """<mujoco><worldbody>
+      <geom name="ground" type="plane" size="0 0 0.05" contype="0" conaffinity="3"/>
+      <body pos="0 0 0.09"><freejoint/><geom name="a" type="box" size=".1 .1 .1" contype="2" conaffinity="0"/></body>
+      <body pos="0.05 0 0.09"><freejoint/><geom name="b" type="box" size=".1 .1 .1" contype="2" conaffinity="0"/></body>
+    </worldbody></mujoco>"""
+    model = mujoco.MjModel.from_xml_string(xml)
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+    pairs = {tuple(sorted((int(contact.geom1), int(contact.geom2)))) for contact in data.contact[:data.ncon]}
+    ground, a, b = (mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name) for name in ("ground", "a", "b"))
+    assert pairs == {tuple(sorted((ground, a))), tuple(sorted((ground, b)))}

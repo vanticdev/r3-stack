@@ -198,6 +198,7 @@ class PartGeom:
     rotation: np.ndarray | None = None
     size: tuple[float, ...] = ()  # box half extents | (radius, half length)
     hull_only: int = 0  # pieces that stay non-convex (hull used, conservative)
+    open_mesh: bool = False  # an open display mesh: its hull touches the environment only
 
 
 @dataclass
@@ -542,13 +543,19 @@ def convex_pieces(vertices: np.ndarray, faces: np.ndarray) -> tuple[list[np.ndar
     return [p.copy() for p in pieces], hull_only
 
 
+def is_closed_solid(vertices: np.ndarray, faces: np.ndarray) -> bool:
+    """False for an open display mesh, whose hull says nothing about part-to-part fit."""
+    return not _manifold(np.ascontiguousarray(vertices, dtype=float), np.ascontiguousarray(faces, dtype=np.int64)).is_empty()
+
+
 def part_geoms(project: Project, obstacles: ObstacleSet) -> list[PartGeom]:
     out = []
     for obstacle in obstacles.obstacles:
         shape: Shape = obstacle.shape
         if isinstance(shape, MeshShape):
             pieces, hull_only = convex_pieces(shape.vertices, shape.faces)
-            out.append(PartGeom(obstacle.component, obstacle.body, obstacle.moving, "mesh", pieces, hull_only=hull_only))
+            out.append(PartGeom(obstacle.component, obstacle.body, obstacle.moving, "mesh", pieces, hull_only=hull_only,
+                                open_mesh=not is_closed_solid(shape.vertices, shape.faces)))
         elif isinstance(shape, Box):
             out.append(PartGeom(obstacle.component, obstacle.body, obstacle.moving, "box", center=shape.center,
                                 rotation=shape.rotation, size=tuple(float(v) for v in shape.half)))

@@ -262,15 +262,19 @@ def separate_parts(
         uses_proxy = name in contact_proxies
         common["contype"] = "16" if uses_proxy else "1"
         if part.kind == "mesh":
+            # Hulls of mated display meshes overlap at rest. Part-to-part contact
+            # needs a closed solid, so these reach only the ground and obstacles.
+            attributes = {**common, "contype": "2", "conaffinity": "0"} if part.open_mesh else common
             for k, vertices in enumerate(part.pieces):
                 mesh = f"joint_col_{name}_{k}"
                 ET.SubElement(asset, "mesh", name=mesh, vertex=_fmt(vertices - origin))
-                ET.SubElement(el, "geom", name=mesh, type="mesh", mesh=mesh, **common)
+                ET.SubElement(el, "geom", name=mesh, type="mesh", mesh=mesh, **attributes)
             if part.hull_only:
+                detail = " for environment contact only; no part-to-part contact" if part.open_mesh else ""
                 cm.diagnostics.append(
                     Diagnostic.warning(
                         "joint_collision_estimated",
-                        f"{name}: {part.hull_only} conservative convex hull pieces",
+                        f"{name}: {part.hull_only} conservative convex hull pieces{detail}",
                         subjects=[name],
                         data={"hull_pieces": part.hull_only},
                     )
