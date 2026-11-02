@@ -31,6 +31,13 @@ class NativeViewer(FakeViewer):
         row['reference'].update(documentId='a' * 24, elementId='e' * 24)
         self.definition['definition']['parts'][0].update(documentId='a' * 24, elementId='e' * 24)
         self.exports = 0
+        self.metadata_calls = []
+
+    def api_request(self, method, endpoint, **kwargs):
+        self.metadata_calls.append((method, endpoint, kwargs))
+        assert method == 'GET' and endpoint == '/api/v9/documents/d/' + 'a' * 24 + '/v/version/elements'
+        return [{'id': 'c' * 24, 'microversionId': 'revision'},
+                {'id': 'e' * 24, 'microversionId': 'source'}]
 
     def assembly(self, url):
         return deepcopy(self.definition)
@@ -108,9 +115,8 @@ def test_inconsistent_native_evidence_never_installs(project, native_snapshot, c
     result = pull(project, url=URL, version_id='version', transport=native, mesh_source='viewer')
     assert not result['ok']
     if change == 'revision':
-        assert result['viewer_microversion'] == 'revision'
-        assert result['pinned_microversion'] == 'other'
-        assert 'microversionId' in result['hint']
+        assert result['code'] == 'cad_pull_view_stale'
+        assert 'Viewport revision' in result['message']
     assert not (project.root / 'cad/pulled/pull.json').exists()
     assert native.exports == 0
 
@@ -165,3 +171,75 @@ def test_obj_bodies_are_separate_and_external_resources_are_rejected(tmp_path):
     path.write_text('mtllib ../secret.mtl\n' + first)
     with pytest.raises(ValueError, match='external'):
         load_viewer_obj(path)
+
+
+def test_document_and_element_revisions_are_distinct_but_strictly_pinned(project, native_snapshot):
+    native = NativeViewer(native_snapshot)
+    native.definition['microversion'] = 'document-revision'
+    native.capture = lambda url: (b'\x89PNG\r\n\x1a\nfixture', {'microversion': 'document-revision'})
+    result = pull(project, url=URL, version_id='version', transport=native, mesh_source='viewer', tab_id=12)
+    assert result['ok'], result
+    data = json.loads((project.root / 'cad/pulled/pull.json').read_text())
+    assert data['microversion'] == 'document-revision'
+    assert data['element_microversion'] == 'revision'
+    assert data['parts']['coupon']['element_microversion'] == 'source'
+    assert native.metadata_calls == [('GET', '/api/v9/documents/d/' + 'a' * 24 + '/v/version/elements', {})]
+    assert load_pulled(project.root).parts['coupon'].obj.read_bytes() == native.raw
+    assert native.exports == 0
+
+
+@pytest.mark.parametrize('bad', ['root_revision', 'source_revision', 'missing_element', 'ambiguous_element'])
+def test_pinned_element_mismatch_never_installs(project, native_snapshot, bad):
+    native = NativeViewer(native_snapshot)
+    original = native.api_request
+    def request(method, endpoint, **kwargs):
+        values = original(method, endpoint, **kwargs)
+        if bad == 'root_revision': values[0]['microversionId'] = 'other'
+        elif bad == 'source_revision': values[1]['microversionId'] = 'other'
+        elif bad == 'missing_element': values.pop()
+        else: values.append(deepcopy(values[1]))
+        return values
+    native.api_request = request
+    result = pull(project, url=URL, version_id='version', transport=native, mesh_source='viewer')
+    assert not result['ok']
+    if bad == 'root_revision':
+        assert result['viewer_element_microversion'] == 'revision'
+        assert result['pinned_element_microversion'] == 'other'
+        assert result['pinned_document_microversion'] == 'revision'
+        assert 'document version' in result['hint']
+    assert not (project.root / 'cad/pulled/pull.json').exists()
+    assert native.exports == 0
+
+
+def test_external_element_reads_are_shared_and_use_native_link_context():
+    from types import SimpleNamespace
+    from r3_onshape.viewer_pull import _element_revision
+    calls = []
+    def request(method, endpoint, **kwargs):
+        calls.append((method, endpoint, kwargs))
+        return [{'id': 'first', 'microversionId': 'first-revision'},
+                {'id': 'second', 'microversionId': 'second-revision'}]
+    native, cache = SimpleNamespace(api_request=request), {}
+    for element in ('first', 'second', 'first'):
+        assert _element_revision(native, 'external', 'version', element, 'root', cache) == element + '-revision'
+    assert calls == [('GET', '/api/v9/documents/d/external/v/version/elements', {'query': {'linkDocumentId': 'root'}})]
+
+
+@pytest.mark.parametrize('location', ['assembly', 'source'])
+def test_readonly_loader_verifies_separate_element_pins(project, native_snapshot, location):
+    import yaml
+    install(project, native_snapshot)
+    path = project.root / 'cad/pulled/pull.json'
+    data = json.loads(path.read_text())
+    target = data if location == 'assembly' else data['parts']['coupon']
+    target['element_microversion'] = 'wrong-element'
+    path.chmod(0o644)
+    path.write_text(json.dumps(data))
+    path.chmod(0o444)
+    lock_path = project.root / 'r3.lock.yaml'
+    lock = yaml.safe_load(lock_path.read_text())
+    lock['cad_pull']['manifest_sha256'] = hashlib.sha256(path.read_bytes()).hexdigest()
+    lock_path.write_text(yaml.safe_dump(lock))
+    with pytest.raises(PullError) as error:
+        load_pulled(project.root)
+    assert error.value.code == 'cad_pull_invalid'

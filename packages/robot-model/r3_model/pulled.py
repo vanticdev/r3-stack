@@ -8,6 +8,10 @@ provenance, explicitly retaining pending geometry qualification. The glTF/OBJ re
 unchanged for inspection. Other fields include mass (kg), com (m),
 inertia (nine row-major kg m² values), material, mate_connectors (4x4 local
 frames), and purchased. Poses are solved 4x4 assembly transforms in metres.
+Mesh manifests distinguish the document ``microversion`` from the assembly's
+``element_microversion`` and each part's source ``element_microversion``.
+Viewer provenance identifies the assembly element revision; source body identities
+include their exact pinned source element revisions.
 Additional part metadata may record the pinned Onshape reference.
 
 The immutable manifest checksum is pinned in
@@ -153,16 +157,17 @@ def load_pulled(project_root: Path) -> PulledModel:
             if not mesh_mode and (("gltf" in item) != ("gltf" in hashes) or item.get("body_type") == "composite" and "gltf" not in hashes):
                 raise PullError("cad_pull_invalid", f"{name}: composite CAD requires a pinned native glTF mesh")
             if mesh_mode:
-                if item.get('geometry_qualification') != 'display_mesh' or not data.get('microversion'):
+                if (item.get('geometry_qualification') != 'display_mesh' or not data.get('microversion')
+                        or not data.get('element_microversion') or not item.get('element_microversion')):
                     raise PullError('cad_pull_invalid', f'{name}: native viewer qualification and revision are required')
                 proof = json.loads(_file(folder, item['provenance'], hashes['provenance'], name).read_text())
-                if (proof.get('microversion') != data['microversion'] or
+                if (proof.get('microversion') != data['element_microversion'] or
                         proof.get('mesh_artifact') != hashes['obj'] + '.obj'):
                     raise PullError('cad_pull_invalid', f'{name}: viewer provenance differs from its native revision or mesh')
                 reference = item['onshape']
                 source = proof.get('part') or {}
                 if (source.get('body_id') != reference['part_id'] or
-                        not source.get('full_element_id', '').startswith(reference['element_id'] + '-') or
+                        source.get('full_element_id') != reference['element_id'] + '-' + item['element_microversion'] or
                         source.get('occurrence_path') != '/'.join(reference['occurrence_path']) or
                         not np.allclose(np.asarray(proof['occurrence_transform']).reshape(4, 4, order='F'),
                                         data['poses'][name], atol=1e-9, rtol=0)):
