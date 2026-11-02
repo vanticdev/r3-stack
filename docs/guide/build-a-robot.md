@@ -29,6 +29,8 @@ A Claude Code session has the same abilities: Bash, file edits, web tools, gh an
 onshape-native tools. Its file tools and sandboxed shell read this project, the R3 platform and
 any file the user's prompt names by absolute path, and write only this project. In its shell,
 TMPDIR is the CLI's own directory; keep temporary work in `$TEMP`, inside this project.
+Run `git` and `gh` there as single commands, without pipes or `&&`: only those reach `.git`
+and the keychain.
 The session exposes R3 and onshape-native tools directly and excludes unrelated account
 plugins and skills. Use its browser-session REST feature tools for CAD; no other project context is needed.
 Temporary work belongs in the session's `TMPDIR`, under this project's `build/agent/`.

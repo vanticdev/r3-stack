@@ -180,7 +180,8 @@ Finish with stage and scenario results, remaining diagnostics, assumptions and r
 #: The Claude Code sandbox replaces TMPDIR in its shell. TEMP keeps the session's project-local value.
 CLAUDE_INSTRUCTIONS = """
 In this Claude Code shell, TMPDIR is the CLI's own directory: keep downloads and temporary work in $TEMP.
-git and gh run outside the shell sandbox for .git and keychain access; use them only on this project."""
+git and gh need .git and keychain access, so they run outside the shell sandbox, but only as single
+commands without pipes, && or ;. Use them only on this project."""
 
 
 def session_instructions() -> str:
