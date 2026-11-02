@@ -132,6 +132,16 @@ export interface SceneWire {
   diagnostics: Diagnostic[];
 }
 
+/** Pin display lines fill the unrouted view; computed harness paths retain authority. */
+export function withConnectorDisplayPaths(wires: SceneWire[], pins: Record<string, { display_path?: Vec3[]; od?: number }>): SceneWire[] {
+  return wires.map((wire) => {
+    const pin = pins[wire.id];
+    return !wire.routed && pin?.display_path?.length
+      ? { ...wire, path: pin.display_path, radius: pin.od ? pin.od / 2 : wire.radius }
+      : wire;
+  });
+}
+
 export interface SceneModel {
   components: SceneComponent[];
   wires: SceneWire[];

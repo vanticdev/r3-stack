@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { Diagnostic, ModelGraph, RobotSpec, SpecHarness } from "../api/types.ts";
+import type { Diagnostic, ModelGraph, RobotSpec, RoutesJson, SpecHarness, Vec3 } from "../api/types.ts";
 import { SseParser, toEvent } from "../api/sse.ts";
 import { reduceRun, type TrackedRun } from "../state/runs.tsx";
 import {
@@ -9,7 +9,7 @@ import {
 } from "./domain.ts";
 import { formatTarget, formatValue, itemUnit } from "./release.ts";
 import { initialHandles, routePatch } from "./routeEdit.ts";
-import { awgRadius, buildScene, resolveSubjects, wireColor } from "./scene.ts";
+import { awgRadius, buildScene, resolveSubjects, wireColor, withConnectorDisplayPaths } from "./scene.ts";
 import { fmt, quantity, vector } from "./units.ts";
 
 const diag = (over: Partial<Diagnostic>): Diagnostic => ({ code: "x", severity: "info", message: "", subjects: [], data: {}, stage: "model", ...over });
@@ -156,6 +156,28 @@ describe("scene", () => {
     expect(scene.wires[0]).toMatchObject({ routed: false, color: wireColor("red"), radius: awgRadius(12) });
     // Severity on the scene model is exact-subject (pins resolve to parts through resolveSubjects).
     expect(scene.components[0]).toMatchObject({ id: "esc", severity: null });
+  });
+
+  it("keeps a routed detour when connector output also contains a straight display line", () => {
+    const path: Vec3[] = [[0, 0, 0], [0, .03, 0], [.1, .03, 0], [.1, 0, 0]];
+    const routes = { wires: { W1: { harness: "esc_power", awg: 12, path, routed_length: .16 } } } as unknown as RoutesJson;
+    const scene = buildScene({ graph, routes });
+    const straight: Vec3[] = [[0, 0, 0], [.1, 0, 0]];
+    const displayed = withConnectorDisplayPaths(scene.wires, { W1: { display_path: straight, od: .01 } });
+    expect(displayed[0]).toBe(scene.wires[0]);
+    expect(displayed[0]!.path).toEqual(path);
+    expect(displayed[0]!.radius).toBe(awgRadius(12));
+    expect(displayed[0]!.routed).toBe(true);
+  });
+
+  it("uses precise connector exits for an unrouted wire without changing its routing status", () => {
+    const scene = buildScene({ graph, routes: null });
+    const pins: Vec3[] = [[.001, .002, .003], [.101, .002, .003]];
+    const displayed = withConnectorDisplayPaths(scene.wires, { W1: { display_path: pins, od: .002 } });
+    expect(displayed[0]!.path).toEqual(pins);
+    expect(displayed[0]!.radius).toBe(.001);
+    expect(displayed[0]!.routed).toBe(false);
+    expect(withConnectorDisplayPaths(scene.wires, {})[0]).toBe(scene.wires[0]);
   });
 });
 
