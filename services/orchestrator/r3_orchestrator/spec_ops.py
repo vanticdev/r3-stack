@@ -43,9 +43,13 @@ def get_spec(root: str | Path, section: str | None = None) -> dict[str, Any]:
             data = files.data
             if section:
                 for key in section.split("."):
-                    if not isinstance(data, dict) or key not in data:
+                    if isinstance(data, dict) and key in data:
+                        data = data[key]
+                    elif (isinstance(data, list) and re.fullmatch(r"0|[1-9][0-9]*", key)
+                          and len(key) <= len(str(len(data))) and int(key) < len(data)):
+                        data = data[int(key)]
+                    else:
                         return {"ok": False, "code": "spec_section_missing", "section": section, "sha256": files.sha256}
-                    data = data[key]
             return {"ok": True, "sha256": files.sha256, "path": str(spec_path(root)),
                     "section": section or "", "spec": data,
                     "files": {name: {"sha256": hashlib.sha256(text.encode()).hexdigest(), "yaml": text}

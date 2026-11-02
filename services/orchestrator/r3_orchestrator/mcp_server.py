@@ -135,7 +135,8 @@ def r3_diagnose(project: str = "", errors_only: bool = False) -> dict[str, Any]:
 
 @_tool(_READ)
 def r3_get_spec(project: str = "", section: str = "") -> dict[str, Any]:
-    """Read the merged description (optionally a dotted section). Returns all source files and paths,
+    """Read the merged description (optionally a dotted section with zero-based list indices,
+    e.g. software.modules.0). Returns all source files and paths,
     pull-owned read_only paths, and sha256 covering every included file for r3_patch_spec."""
     return _guard(lambda: spec_ops.get_spec(api.resolve_project(project or None), section or None))
 

@@ -50,6 +50,9 @@ they execute in the worker's probed environment. On macOS, the Codex shell sandb
 can deny CoreGraphics access even when native offscreen MuJoCo rendering works in
 the worker. Put independent simulator experiments under `tests/` and use
 `r3_run_project_tests`. Keep camera and perception requirements enabled.
+Read a focused description with `r3_get_spec(section="software.modules.0")`;
+dotted sections support zero-based list indices as well as mapping keys. The
+returned SHA still covers the complete description, for the usual spec patch.
 For a source checkout without an installed `r3` executable, the CLI entry point is
 `python -m r3_orchestrator` using the platform environment.
 

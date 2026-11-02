@@ -94,6 +94,36 @@ def test_nested_list_include_and_patch(root):
     assert Project.load(root).spec.software.modules[0].runs_on == "link"
 
 
+def test_get_indexed_section_preserves_sources_and_fingerprint(root):
+    (root / "software/system.yaml").write_text("modules:\n  - {$include: software/controller.yaml}\n")
+    (root / "software/controller.yaml").write_text("name: controller\nruns_on: base\n")
+    before = contents(root)
+    whole = spec_ops.get_spec(root)
+    selected = mcp_server.r3_get_spec(project=str(root), section="software.modules.0.runs_on")
+    assert selected["ok"] and selected["spec"] == "base"
+    for key in ("sha256", "files", "sources", "read_only"):
+        assert selected[key] == whole[key]
+    assert contents(root) == before
+
+
+@pytest.mark.parametrize("index", ["-1", "1", "01", "1.0", "first", "\u0660", "9" * 5000])
+def test_get_invalid_list_section_is_missing(root, index):
+    (root / "software/system.yaml").write_text("modules: [{name: controller, runs_on: base}]\n")
+    whole = spec_ops.get_spec(root)
+    section = f"software.modules.{index}"
+    selected = spec_ops.get_spec(root, section)
+    assert selected == {"ok": False, "code": "spec_section_missing", "section": section, "sha256": whole["sha256"]}
+
+
+def test_get_numeric_mapping_key_is_not_a_list_index(root):
+    path = root / "parts/base.yaml"
+    data = yaml.safe_load(path.read_text())
+    data["params"] = {"0": {"samples": ["inspection"]}}
+    path.write_text(yaml.safe_dump(data))
+    selected = spec_ops.get_spec(root, "components.base.params.0.samples.0")
+    assert selected["ok"] and selected["spec"] == "inspection"
+
+
 def test_fingerprint_and_cache_invalidate_on_include_edit(root):
     cache = freshness.ProjectCache()
     first = cache.load(root)
