@@ -281,8 +281,16 @@ def native_mcp_config() -> dict[str, Any] | None:
 def prompt_files(prompt: str) -> list[Path]:
     """Existing files the user named by absolute path; naming one grants reading exactly that file."""
     found = []
-    for token in re.findall(r"(?:^|(?<=\s))[`'\"(<]?((?:/|~/)[^\s`'\")>]+)", prompt):
-        path = Path(token.rstrip(".,;:")).expanduser()
+    pattern = (r"(?:^|(?<=\s))\(?(?:"
+               r"`((?:/|~/)[^`\r\n]+)`|"
+               r"'((?:/|~/)[^'\r\n]+)'|"
+               r'"((?:/|~/)[^"\r\n]+)"|'
+               r"<((?:/|~/)[^>\r\n]+)>|"
+               r"((?:/|~/)[^\s`'\")>]+))")
+    for match in re.finditer(pattern, prompt):
+        token = next(value for value in match.groups() if value is not None)
+        # Quotes delimit the exact filename; only bare paths include prose punctuation.
+        path = Path(token.rstrip(".,;:") if match.group(5) else token).expanduser()
         if path.is_file() and path.resolve() not in found:
             found.append(path.resolve())
     return found

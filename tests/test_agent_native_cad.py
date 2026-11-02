@@ -199,16 +199,25 @@ def test_prompt_named_files_grant_exactly_those_existing_files(tmp_path):
     assert agents.prompt_files('use /etc/not-a-real-file and foo/bar.jpg') == []
 
 
+@pytest.mark.parametrize('opening,closing', [('`', '`'), ('"', '"'), ("'", "'"), ('<', '>')])
+def test_prompt_named_quoted_files_support_spaces(tmp_path, opening, closing):
+    photo = tmp_path/'reference image.jpg'
+    photo.write_bytes(b'image')
+    prompt = f'See {opening}{photo}{closing}. Then {opening}{photo}{closing} again.'
+    assert agents.prompt_files(prompt) == [photo.resolve()]
+
+
 def test_prompt_named_files_reach_the_codex_profile_and_tool_scope(tmp_path, monkeypatch):
     from r3_model.read_scope import LocalReadScope
     conf = config(tmp_path, monkeypatch)
-    photo = tmp_path/'outside'/'reference.jpg'
+    photo = tmp_path/'outside'/'reference image.jpg'
     photo.parent.mkdir()
     photo.write_bytes(b'image')
-    profile = agents.codex_permission_profile(tmp_path/'project', conf, granted=[photo.resolve()])
+    granted = agents.prompt_files(f'See "{photo}".')
+    profile = agents.codex_permission_profile(tmp_path/'project', conf, granted=granted)
     assert profile['filesystem'][str(photo.resolve())] == 'read'
     assert str(photo.parent.resolve()) not in profile['filesystem']
     (tmp_path/'project').mkdir()
-    scoped = agents.mcp_config(tmp_path/'project', 'python', [photo.resolve()])
+    scoped = agents.mcp_config(tmp_path/'project', 'python', granted)
     scope = LocalReadScope.from_json(scoped['mcpServers']['r3']['env']['R3_LOCAL_READ_SCOPE'])
     assert scope.check(photo) == photo.resolve()
