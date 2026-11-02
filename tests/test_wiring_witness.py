@@ -141,3 +141,28 @@ def test_measure_returns_witness_pair_and_agreement():
     # A broken router value (the legacy sign) is caught as a disagreement.
     broken = measure(obstacle, line, 0.001, swept=False, router_value=-m.exact)
     assert not broken.agree
+
+
+def test_unavailable_collision_witness_blocks_release_without_crashing():
+    from types import SimpleNamespace
+    from r3_model.diagnostics import Diagnostic
+    from r3_wiring.obstacles import ObstacleSet
+    from r3_wiring.witness import verify_clearances
+    from r3_wiring.manufacturing import release_status
+    mesh = MeshShape(*box_mesh(open_face=True))
+    obstacle = Obstacle('coupon', 'structure', mesh, mesh, 0., False, 'base', False)
+    endpoint = SimpleNamespace(exempt=set(), termination_length=0.)
+    wire = SimpleNamespace(path=np.array([[-.03, 0., 0.], [.03, 0., 0.]]),
+                           bundle_radius=np.array([.001, .001]), harness='lead', from_node='A', to_node='B')
+    routing = SimpleNamespace(wires={'W': wire}, nodes={'lead': {'A': endpoint, 'B': endpoint}}, holes=[])
+    diagnostic = Diagnostic.error('wire_intersects_component', 'Synthetic intersection',
+                                  subjects=['lead', 'W', 'coupon'], data={'component': 'coupon', 'penetration': .002})
+    report, witnesses = verify_clearances([diagnostic], ObstacleSet([obstacle], None), routing)
+    finding = next(d for d in report if d.code == 'geometry_uncertain')
+    assert finding.severity.value == 'error'
+    assert finding.data['replaces'] == 'wire_intersects_component'
+    assert finding.data['distance_mujoco'] is None
+    assert not witnesses, 'Unavailable geometry must not fabricate a witness pair'
+    project = SimpleNamespace(spec=SimpleNamespace(electrical=SimpleNamespace(
+        harnesses=[SimpleNamespace(id='lead', wires=[SimpleNamespace(id='W')])])) )
+    assert release_status(project, report)['status'] == 'unreleased'

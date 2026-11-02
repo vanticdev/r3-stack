@@ -50,6 +50,10 @@ AGREEMENT_FRACTION = 0.05
 CHECKED_CODES = ("wire_clearance_violation", "wire_intersects_component", "connector_clearance_violation")
 
 
+class CollisionWitnessUnavailable(ValueError):
+    """The supplied surface cannot supply a solid collision cross-check."""
+
+
 # ------------------------------------------------------------ exact distance
 @dataclass
 class Closest:
@@ -224,7 +228,10 @@ def mujoco_distance(shape: Shape, center: np.ndarray, radius: float, distmax: fl
     world = ET.SubElement(mj, "worldbody")
     names: list[str] = []
     if isinstance(shape, MeshShape):
-        pieces, _ = convex_pieces(shape.vertices, shape.faces)
+        try:
+            pieces, _ = convex_pieces(shape.vertices, shape.faces)
+        except ValueError as error:
+            raise CollisionWitnessUnavailable(str(error)) from error
         for k, piece in enumerate(pieces):
             ET.SubElement(asset, "mesh", name=f"p{k}", vertex=_fmt(piece))
             ET.SubElement(world, "geom", name=f"g{k}", type="mesh", mesh=f"p{k}", contype="0", conaffinity="0")
@@ -340,8 +347,20 @@ def verify_clearances(diagnostics: list[Diagnostic], obstacles: ObstacleSet, rou
             continue
         connector = obstacles.by_component(diagnostic.subjects[1]) if len(diagnostic.subjects) > 1 and \
             diagnostic.code == "connector_clearance_violation" else None
-        measurement = _measure_diagnostic(diagnostic, obstacle, routing, catalog, use_mujoco,
-                                          connector_body=connector.shape if connector else None)
+        try:
+            measurement = _measure_diagnostic(diagnostic, obstacle, routing, catalog, use_mujoco,
+                                              connector_body=connector.shape if connector else None)
+        except CollisionWitnessUnavailable as error:
+            # Keep the finding blocking without inventing a distance, repairing
+            # the source mesh, or dropping all successfully routed conductors.
+            out.append(Diagnostic.error(
+                "geometry_uncertain", f"{component}: collision cross-check unavailable: {error}",
+                subjects=diagnostic.subjects, stage=diagnostic.stage,
+                data={**diagnostic.data, "replaces": diagnostic.code,
+                      "collision_geometry_error": str(error), "distance_mujoco": None,
+                      "representations_agree": False},
+                hint="Inspect the native mesh and obtain suitable collision geometry; clearance remains unverified."))
+            continue
         if measurement is None:
             out.append(diagnostic)
             continue
