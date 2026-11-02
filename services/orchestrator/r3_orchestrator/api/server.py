@@ -87,6 +87,7 @@ class AgentRequest(BaseModel):
     prompt: str = Field(min_length=1)
     provider: Literal["claude", "codex"] = "claude"
     model: str | None = None
+    resume_session_id: str | None = Field(None, pattern=r"^[0-9a-f]{12}$")
 
 
 class SourcingSearchRequest(BaseModel):
@@ -524,19 +525,27 @@ def create_app(projects_roots: list[str | Path] | None = None, web_dist: str | P
               summary="Start a headless Claude Code / Codex session in the project with the R3 MCP server")
     async def start_agent(pid: str, body: AgentRequest) -> dict[str, Any]:
         ref = project(pid)
-        session = await run_in_threadpool(agents.start, ref.id, ref.root, body.prompt, body.provider, body.model)
+        session = await run_in_threadpool(agents.start, ref.id, ref.root, body.prompt, body.provider, body.model, body.resume_session_id)
         return {"session_id": session.id, "status": session.status, "provider": session.provider,
                 "events_url": f"/api/agent/{session.id}/events", "status_url": f"/api/agent/{session.id}"}
 
     def get_session_or_404(sid: str) -> Any:
         session = agents.get(sid)
         if session is None:
+            for ref in registry.scan().values():
+                agents.restore(ref.id, ref.root, sid)
+                session = agents.get(sid)
+                if session is not None:
+                    break
+        if session is None:
             raise ApiError("agent_session_not_found", f"no agent session {sid!r}", {"session_id": sid})
         return session
 
     @app.get("/api/projects/{pid}/agent", tags=["agent"], response_model=list[AgentStatus], responses=ERRORS)
     async def list_agent_sessions(pid: str) -> list[dict[str, Any]]:
-        return [s.to_json() for s in agents.list(project(pid).id)]
+        ref = project(pid)
+        agents.restore(ref.id, ref.root)
+        return [s.to_json() for s in agents.list(ref.id)]
 
     @app.get("/api/agent/{sid}", tags=["agent"], response_model=AgentStatus, responses=ERRORS)
     async def get_agent(sid: str) -> dict[str, Any]:

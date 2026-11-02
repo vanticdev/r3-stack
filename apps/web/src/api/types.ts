@@ -818,6 +818,7 @@ export interface AgentRequest {
   prompt: string;
   provider: AgentProvider;
   model?: string;
+  resume_session_id?: string;
 }
 export interface AgentCreated {
   session_id: string;
@@ -827,6 +828,8 @@ export interface AgentCreated {
 }
 export interface AgentStatus {
   session_id: string;
+  provider_session_id?: string | null;
+  resume_session_id?: string | null;
   project: string;
   provider: string;
   model: string | null;

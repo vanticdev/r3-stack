@@ -117,3 +117,8 @@ The user authorizes editing onshape-native source when a generic platform fix
 needs it. Preserve unrelated plugin work and keep the loop's CAD, independence,
 security, validation and cleanup rules. Never claim success without evidence or
 weaken checks to finish.
+
+For integration-loop failures, retain the project and provider conversation.
+Diagnose and fix the generic cause, then steer the same agent to retry. Do not
+wipe its resources or start a fresh run merely because an attempt failed.
+Record follow-ups and code-version boundaries so the final evidence remains honest.

@@ -43,6 +43,7 @@ from __future__ import annotations
 import difflib
 import json
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -413,7 +414,8 @@ def codex_scope_overrides(project_root: Path, account_home: Path | None = None) 
     return overrides
 
 
-def codex_command(executable: str, project_root: Path, config: dict[str, Any], model: str | None = None) -> list[str]:
+def codex_command(executable: str, project_root: Path, config: dict[str, Any], model: str | None = None,
+                  resume_id: str | None = None) -> list[str]:
     # The instruction loader re-executes this path inside the read sandbox.
     # Resolve installation symlinks so it needs no account-directory traversal.
     if located := shutil.which(executable):
@@ -446,7 +448,7 @@ def codex_command(executable: str, project_root: Path, config: dict[str, Any], m
     command += codex_scope_overrides(project_root)
     if model:
         command += ["--model", model]
-    return [*command, "-"]
+    return [*command, *(["resume", resume_id] if resume_id else []), "-"]
 
 
 # ------------------------------------------------------------- normalization
@@ -572,6 +574,9 @@ class AgentSession:
     provider: str
     model: str | None
     prompt: str
+    provider_session_id: str | None = None
+    resume_session_id: str | None = None
+    process_id: int | None = None
     command: list[str] = field(default_factory=list)
     status: str = "starting"
     created_at: float = field(default_factory=time.time)
@@ -582,15 +587,18 @@ class AgentSession:
     events: EventLog = field(default_factory=EventLog)
     directory: Path | None = None
     cancel_requested: bool = False
+    _restored: bool = False
     _process: Any = None
     _calls: dict[str, dict[str, Any]] = field(default_factory=dict)
     _spec_start: dict[str, str] = field(default_factory=dict)
     _spec_last: dict[str, str] = field(default_factory=dict)
     _lock: threading.Lock = field(default_factory=threading.Lock)
+    _event_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def to_json(self) -> dict[str, Any]:
         return {"session_id": self.id, "project": self.project_id, "provider": self.provider, "model": self.model,
-                "prompt": self.prompt, "status": self.status, "created_at": self.created_at, "finished_at": self.finished_at,
+                "prompt": self.prompt, "provider_session_id": self.provider_session_id,
+                "resume_session_id": self.resume_session_id, "process_id": self.process_id, "status": self.status, "created_at": self.created_at, "finished_at": self.finished_at,
                 "returncode": self.returncode, "result": self.result, "error": self.error, "events": len(self.events),
                 "transcript": str(self.directory / "transcript.jsonl") if self.directory else None}
 
@@ -619,6 +627,7 @@ class AgentManager:
         self.extra_env = dict(extra_env or {})
         self._sessions: dict[str, AgentSession] = {}
         self._detected: dict[str, dict[str, Any]] = {}
+        self._start_lock = threading.RLock()
 
     # ------------------------------------------------------------- queries
     def providers(self, refresh: bool = False) -> list[dict[str, Any]]:
@@ -630,16 +639,112 @@ class AgentManager:
         return [self._detected[p] for p in PROVIDERS]
 
     def get(self, session_id: str) -> AgentSession | None:
-        return self._sessions.get(session_id)
+        session = self._sessions.get(session_id)
+        if (session and session._restored and session._process is None and session.status in ("starting", "running")
+                and not _pid_alive(session.process_id)):
+            self._finish(session, "failed", error="R3 server stopped during this execution; resume its conversation to continue.")
+        return session
 
     def list(self, project_id: str | None = None) -> list[AgentSession]:
         return sorted((s for s in self._sessions.values() if project_id in (None, s.project_id)), key=lambda s: s.created_at)
 
     def active(self, project_id: str) -> AgentSession | None:
-        return next((s for s in self.list(project_id) if s.status in ("starting", "running")), None)
+        return next((s for s in self.list(project_id) if self.get(s.id).status in ("starting", "running")), None)
+
+    def restore(self, project_id: str, root: Path, session_id: str | None = None) -> None:
+        """Load only R3-owned records in a registered project; never search provider history."""
+        root = root.resolve()
+        base = root / "build" / "agent"
+        if not base.is_dir() or base.resolve() != base:
+            return
+        if session_id is not None and not re.fullmatch(r"[0-9a-f]{12}", session_id):
+            return
+        with self._start_lock:
+            directories = [base / session_id] if session_id else sorted(base.iterdir())
+            for directory in directories:
+                if directory.name in self._sessions or not re.fullmatch(r"[0-9a-f]{12}", directory.name):
+                    continue
+                record = directory / "session.json"
+                if directory.is_symlink() or record.is_symlink() or not record.is_file():
+                    continue
+                try:
+                    data = json.loads(record.read_text())
+                    if not isinstance(data, dict):
+                        continue
+                    if (data.get("session_id") != directory.name or data.get("project") != project_id
+                            or data.get("provider") not in PROVIDERS or data.get("root") != str(root)):
+                        continue
+                    session = AgentSession(directory.name, project_id, root, data["provider"], data.get("model"), data["prompt"])
+                    session.directory = directory
+                    session._restored = True
+                    for key in ("status", "created_at", "finished_at", "returncode", "result", "error",
+                                "provider_session_id", "resume_session_id", "process_id"):
+                        if key in data:
+                            setattr(session, key, data[key])
+                    # Older R3 executions can be migrated from a saved status record.
+                    # The identity must come from this execution's own provider event.
+                    transcript = directory / "transcript.jsonl"
+                    if session.provider_session_id is None and transcript.is_file() and not transcript.is_symlink():
+                        with transcript.open() as source:
+                            for line in source:
+                                try:
+                                    identity = _provider_identity(session.provider, json.loads(line))
+                                except (ValueError, TypeError):
+                                    continue
+                                if identity:
+                                    session.provider_session_id = identity
+                                    break
+                    event_file = directory / "events.jsonl"
+                    if event_file.is_file() and not event_file.is_symlink():
+                        for line in event_file.read_text().splitlines():
+                            try:
+                                event = json.loads(line)
+                                event.pop("seq", None)
+                                event_type = event.pop("type")
+                                session.events.emit(event_type, **event)
+                            except (ValueError, KeyError, TypeError):
+                                continue  # tolerate only a partial final write
+                    self._sessions[session.id] = session
+                    if session.status in ("starting", "running"):
+                        if _pid_alive(session.process_id):
+                            # A server crash must not permit a second provider on this project.
+                            continue
+                        self._finish(session, "failed", error="R3 server stopped during this execution; resume its conversation to continue.")
+                    else:
+                        session.events.close()
+                except (OSError, ValueError, KeyError, TypeError):
+                    continue
+
+    @staticmethod
+    def _persist(session: AgentSession) -> None:
+        if session.directory is None:
+            return
+        data = {**session.to_json(), "root": str(session.root.resolve())}
+        destination = session.directory / "session.json"
+        temporary = session.directory / f".session-{uuid.uuid4().hex}.tmp"
+        temporary.write_text(json.dumps(data, indent=2))
+        temporary.replace(destination)
 
     # ------------------------------------------------------------ lifecycle
-    def start(self, project_id: str, root: Path, prompt: str, provider: str = "claude", model: str | None = None) -> AgentSession:
+    def start(self, project_id: str, root: Path, prompt: str, provider: str = "claude", model: str | None = None,
+              resume_session_id: str | None = None) -> AgentSession:
+        with self._start_lock:
+            self.restore(project_id, Path(root))
+            return self._start(project_id, root, prompt, provider, model, resume_session_id)
+
+    def _start(self, project_id: str, root: Path, prompt: str, provider: str, model: str | None,
+               resume_session_id: str | None) -> AgentSession:
+        root = Path(root).resolve()
+        previous = None
+        if resume_session_id:
+            previous = self.get(resume_session_id)
+            if previous is None or previous.project_id != project_id or previous.root.resolve() != Path(root).resolve():
+                raise ApiError("agent_resume_unavailable", "The previous execution does not belong to this project.")
+            if previous.provider != provider or (model is not None and model != previous.model):
+                raise ApiError("agent_resume_unavailable", "Resume must use the original provider and model.")
+            if not _valid_provider_id(previous.provider_session_id):
+                raise ApiError("agent_resume_unavailable", "The provider did not record a resumable conversation; no fresh conversation was started.")
+            model = previous.model
         if provider not in PROVIDERS:
             raise ApiError("usage_error", f"unknown provider {provider!r}; use one of {', '.join(PROVIDERS)}")
         info = next(p for p in self.providers() if p["provider"] == provider)
@@ -652,7 +757,11 @@ class AgentManager:
             raise ApiError("agent_busy", f"agent session {busy.id} is still running on {project_id}; cancel it first",
                            {"session_id": busy.id})
         session = AgentSession(uuid.uuid4().hex[:12], project_id, Path(root), provider, model, prompt)
+        session.resume_session_id = resume_session_id
+        session.provider_session_id = previous.provider_session_id if previous else None
         session.directory = Path(root) / "build" / "agent" / session.id
+        if session.directory.resolve() != session.directory:
+            raise ApiError("agent_resume_unavailable", "Agent records must stay in the project without symlink traversal.")
         session.directory.mkdir(parents=True, exist_ok=True)
         config = mcp_config(Path(root), self.python)
         if native := config["mcpServers"].get("onshape_native"):
@@ -666,14 +775,18 @@ class AgentManager:
         config_path.write_text(json.dumps(config, indent=2))
         if provider == "claude":
             session.command = claude_command(info["path"], config_path, model)
+            if previous:
+                session.command += ["--resume", previous.provider_session_id]
             stdin = prompt
         else:
-            session.command = codex_command(info["path"], Path(root), config, model)
+            session.command = codex_command(info["path"], Path(root), config, model, session.provider_session_id if previous else None)
             stdin = prompt
         session._spec_start = session._spec_last = _description(Path(root))
         env = session_environment(Path(root), session.directory, config, self.extra_env)
         self._sessions[session.id] = session
-        session.events.emit("session_started", session_id=session.id, project=project_id, provider=provider, model=model,
+        self._persist(session)
+        self._emit(session, "session_started", project=project_id, provider=provider, model=model,
+                            resume_session_id=resume_session_id, provider_session_id=session.provider_session_id,
                             cwd=str(root), command=[c if c != SYSTEM_PROMPT else "<system prompt>" for c in session.command],
                             cli_version=info["version"])
         try:
@@ -684,6 +797,8 @@ class AgentManager:
             return session
         session._process = process
         session.status = "running"
+        session.process_id = process.pid
+        self._persist(session)
         threading.Thread(target=self._feed, args=(process, stdin), daemon=True).start()
         stderr_reader = threading.Thread(target=self._read_stderr, args=(session, process), daemon=True)
         stderr_reader.start()
@@ -695,6 +810,8 @@ class AgentManager:
         session = self._sessions.get(session_id)
         if session is None or session.status not in ("starting", "running"):
             return session
+        if session._process is None and _pid_alive(session.process_id):
+            raise ApiError("agent_process_unavailable", "This execution survived a server restart; its live process cannot be signalled safely by this server.")
         session.cancel_requested = True
         process = session._process
         if process is not None and process.poll() is None:
@@ -704,7 +821,8 @@ class AgentManager:
 
     def shutdown(self) -> None:
         for session in list(self._sessions.values()):
-            self.cancel(session.id)
+            if session._process is not None:
+                self.cancel(session.id)
 
     # ------------------------------------------------------------ internals
     @staticmethod
@@ -740,6 +858,14 @@ class AgentManager:
                 if not isinstance(event, dict):
                     self._emit(session, "raw", event=event)
                     continue
+                identity = _provider_identity(session.provider, event)
+                if identity:
+                    if session.provider_session_id is not None and session.provider_session_id != identity:
+                        outcome = {"ok": False, "error": "Provider returned a different conversation during resume; refusing fresh context."}
+                        _signal_group(process, signal.SIGTERM)
+                        break
+                    session.provider_session_id = identity
+                    self._persist(session)
                 for kind, payload in normalize(event):
                     if kind == "_result":
                         outcome = payload
@@ -798,7 +924,11 @@ class AgentManager:
     @staticmethod
     def _emit(session: AgentSession, kind: str, **payload: Any) -> None:
         try:
-            session.events.emit(kind, session_id=session.id, **payload)
+            with session._event_lock:
+                event = session.events.emit(kind, session_id=session.id, **payload)
+                if session.directory:
+                    with (session.directory / "events.jsonl").open("a") as destination:
+                        destination.write(json.dumps(event, default=str) + "\n")
         except RuntimeError:  # session already finished (late stderr after exit)
             pass
 
@@ -806,10 +936,39 @@ class AgentManager:
         session.status = status
         session.error = error
         session.finished_at = time.time()
+        # Publish completion only after recovery metadata is durable. A client
+        # may immediately restart the server or resume this conversation.
+        self._persist(session)
         self._emit(session, "session_finished", status=status, returncode=session.returncode, result=session.result,
                    error=error, spec_changed=session._spec_last != session._spec_start,
                    cumulative_diff=_diff(session._spec_start, session._spec_last))
         session.events.close()
+
+
+def _valid_provider_id(value: Any) -> bool:
+    # Explicit ids only: no flags, path selection or latest/all-history fallback.
+    return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", value) is not None
+
+
+def _provider_identity(provider: str, event: Any) -> str | None:
+    if not isinstance(event, dict):
+        return None
+    value = (event.get("thread_id") if provider == "codex" and event.get("type") == "thread.started"
+             else event.get("session_id") if provider == "claude" and event.get("type") == "system"
+             and event.get("subtype") == "init" else None)
+    return value if _valid_provider_id(value) else None
+
+
+def _pid_alive(pid: Any) -> bool:
+    if not isinstance(pid, int) or isinstance(pid, bool) or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
 
 
 def _signal_group(process: subprocess.Popen, sig: int) -> None:

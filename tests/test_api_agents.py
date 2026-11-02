@@ -198,3 +198,137 @@ def test_generated_mcp_config_starts_the_r3_server(tmp_path):
     tools, status = asyncio.run(asyncio.wait_for(check(), 60))
     assert {"r3_status", "r3_patch_spec", "r3_release_status"} | GATED <= tools
     assert status["robot"]["name"] == "r3-bench" and status["project"] == str(root.resolve())
+
+
+@pytest.mark.parametrize("provider", ["codex", "claude"])
+def test_reply_resumes_provider_context_after_server_restart(tmp_path, monkeypatch, provider):
+    parent = tmp_path / "projects"
+    parent.mkdir()
+    root = copy_bench(parent)
+    bin_dir = fake_cli_bin(tmp_path / "bin")
+    monkeypatch.setenv("PATH", f"{bin_dir}:{__import__('os').environ['PATH']}")
+    monkeypatch.setenv("FAKE_AGENT_MODE", "memory")
+    log = tmp_path / "call.json"
+    monkeypatch.setenv("FAKE_AGENT_LOG", str(log))
+    with TestClient(create_app([parent], agents=AgentManager())) as client:
+        first = client.post(f"/api/projects/{PID}/agent", json={"prompt": "Remember this task", "provider": provider, "model": "fake-model"}).json()
+        sse(client, first["events_url"])
+        old = client.get(first["status_url"]).json()
+        assert old["provider_session_id"]
+        previous_events = client.get(first["events_url"]).text
+    secret = json.loads((root / "build/fake-provider.json").read_text())["secret"]
+    # No manager memory survives. Only the project's own R3 records are loaded.
+    with TestClient(create_app([parent], agents=AgentManager())) as client:
+        assert client.get(first["status_url"]).json()["status"] == "completed"
+        assert client.get(first["events_url"]).text == previous_events
+        assert client.get(f"/api/projects/{PID}/agent").json()[0]["provider_session_id"] == old["provider_session_id"]
+        second = client.post(f"/api/projects/{PID}/agent", json={"prompt": "Continue\nwithout starting over", "provider": provider,
+                                                                  "resume_session_id": first["session_id"]})
+        assert second.status_code == 202, second.text
+        events = sse(client, second.json()["events_url"])
+        call = json.loads(log.read_text())
+        assert call["stdin"] == "Continue\nwithout starting over"
+        assert call["argv"][call["argv"].index("--model") + 1] == "fake-model"
+        marker = "resume" if provider == "codex" else "--resume"
+        assert call["argv"][call["argv"].index(marker) + 1] == old["provider_session_id"]
+        assert "--last" not in call["argv"] and "--all" not in call["argv"]
+        status = client.get(second.json()["status_url"]).json()
+        assert status["provider_session_id"] == old["provider_session_id"]
+        assert status["resume_session_id"] == first["session_id"]
+        result = " ".join(str(e.get("text", e.get("result", ""))) for e in events)
+        assert secret in result  # Impossible if the provider started fresh.
+        assert len(client.get(f"/api/projects/{PID}/agent").json()) == 2
+
+
+def test_resume_refuses_missing_identity_wrong_project_and_provider(env):
+    client, root, log = env
+    started = client.post(f"/api/projects/{PID}/agent", json={"prompt": "initial", "provider": "codex"}).json()
+    sse(client, started["events_url"])
+    before = log.read_text()
+    for change in ({"provider": "claude"}, {"model": "different-model"}, {"resume_session_id": "f" * 12}):
+        response = client.post(f"/api/projects/{PID}/agent", json={"prompt": "retry", "provider": "codex",
+            "resume_session_id": started["session_id"], **change})
+        assert response.status_code != 202 and response.json()["code"] == "agent_resume_unavailable"
+        assert log.read_text() == before
+    other = root.parent / "other"
+    __import__('shutil').copytree(root, other)
+    response = client.post("/api/projects/other/agent", json={"prompt": "retry", "provider": "codex", "resume_session_id": started["session_id"]})
+    assert response.json()["code"] == "agent_resume_unavailable"
+    session = client.app.state.agents.get(started["session_id"])
+    session.provider_session_id = None
+    response = client.post(f"/api/projects/{PID}/agent", json={"prompt": "retry", "provider": "codex", "resume_session_id": started["session_id"]})
+    assert response.json()["code"] == "agent_resume_unavailable" and log.read_text() == before
+
+
+def test_restore_never_follows_external_session_symlinks(env, tmp_path):
+    client, root, _ = env
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    base = root / "build/agent"
+    base.mkdir(parents=True, exist_ok=True)
+    (base / ("a" * 12)).symlink_to(outside, target_is_directory=True)
+    assert client.get(f"/api/agent/{'a' * 12}").status_code == 404
+
+
+def test_resume_provider_error_does_not_fall_back_to_new_session(env, monkeypatch):
+    client, _, log = env
+    started = client.post(f"/api/projects/{PID}/agent", json={"prompt": "initial", "provider": "codex"}).json()
+    sse(client, started["events_url"])
+    monkeypatch.setenv("FAKE_AGENT_MODE", "fail")
+    resumed = client.post(f"/api/projects/{PID}/agent", json={"prompt": "retry", "provider": "codex", "resume_session_id": started["session_id"]}).json()
+    assert sse(client, resumed["events_url"])[-1]["status"] == "failed"
+    assert "resume" in json.loads(log.read_text())["argv"]
+    assert len(client.get(f"/api/projects/{PID}/agent").json()) == 2
+
+
+@pytest.mark.parametrize("live", [False, True])
+def test_restore_interrupted_execution_preserves_context_and_excludes_parallel_process(env, live):
+    import os
+    from r3_orchestrator.api.errors import ApiError
+    client, root, _ = env
+    started = client.post(f"/api/projects/{PID}/agent", json={"prompt": "initial", "provider": "codex"}).json()
+    sse(client, started["events_url"])
+    record = root / "build/agent" / started["session_id"] / "session.json"
+    data = json.loads(record.read_text())
+    data.update(status="running", process_id=os.getpid() if live else None)
+    data.pop("provider_session_id")  # Migrate an actual saved old-server status snapshot.
+    record.write_text(json.dumps(data))
+    manager = AgentManager()
+    manager.restore(PID, root)
+    restored = manager.get(started["session_id"])
+    assert restored.provider_session_id == "fake-thread"  # From this transcript, never provider history.
+    assert restored.status == ("running" if live else "failed")
+    if live:
+        with pytest.raises(ApiError, match="still running"):
+            manager.start(PID, root, "continue", "codex", resume_session_id=restored.id)
+        with pytest.raises(ApiError, match="cannot be signalled safely"):
+            manager.cancel(restored.id)
+        manager.shutdown()  # Must not signal an unverified PID.
+    else:
+        assert "server stopped" in restored.error
+        assert restored.events.closed
+
+
+def test_finished_execution_is_durable_before_sse_completion_is_published(tmp_path, monkeypatch):
+    manager = AgentManager()
+    session = agent_runner.AgentSession('a' * 12, 'fixture', tmp_path, 'codex', None, 'task')
+    observations = []
+    def persist(value):
+        observations.append((value.status, value.events.closed, value.events.since()))
+    monkeypatch.setattr(manager, '_persist', persist)
+    manager._finish(session, 'completed')
+    assert observations and observations[0] == ('completed', False, [])
+    assert session.events.closed and session.events.since()[-1]['type'] == 'session_finished'
+
+
+
+def test_agent_records_cannot_escape_project_via_build_symlink(env, tmp_path):
+    client, root, _ = env
+    outside = tmp_path / 'external-records'
+    outside.mkdir()
+    build = root / 'build'
+    __import__('shutil').rmtree(build, ignore_errors=True)
+    build.symlink_to(outside, target_is_directory=True)
+    started = client.post(f"/api/projects/{PID}/agent", json={"prompt": "task", "provider": "codex"})
+    assert started.json()['code'] == 'agent_resume_unavailable'
+    assert not list(outside.iterdir())

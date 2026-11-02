@@ -18,6 +18,7 @@ interface Session {
   id: string;
   prompt: string;
   provider: string;
+  model: string | null;
   events: AgentEvent[];
   status: string;
   baseline: Record<string, string> | null;
@@ -186,16 +187,14 @@ export function AgentPage() {
   const send = async (mode: "new" | "reply") => {
     setError(null);
     const visible = prompt;
-    // The API has no session resume: a reply starts a new session that carries the previous task and its result.
     const previous = mode === "reply" ? current : null;
-    const previousResult = previous ? [...previous.events].reverse().find((e) => e.type === "session_finished")?.result : undefined;
-    const full = previous
-      ? `Follow-up to the previous task: "${previous.prompt}".${previousResult ? `\nIts result: ${String(previousResult).slice(0, 1200)}` : ""}\n\nNow: ${visible}`
-      : visible;
     try {
       const baseline = spec.data ? descriptionFiles(spec.data) : null;
-      const { session_id } = await api.startAgent(pid, { prompt: full, provider, ...(model ? { model } : {}) });
-      const session: Session = { id: session_id, prompt: visible, provider, events: [{ type: "message", role: "user", text: visible }], status: "starting", baseline };
+      const request = previous
+        ? { prompt: visible, provider: previous.provider as AgentProvider, ...(previous.model ? { model: previous.model } : {}), resume_session_id: previous.id }
+        : { prompt: visible, provider, ...(model ? { model } : {}) };
+      const { session_id } = await api.startAgent(pid, request);
+      const session: Session = { id: session_id, prompt: visible, provider: request.provider, model: request.model ?? null, events: [{ type: "message", role: "user", text: visible }], status: "starting", baseline };
       setThread((list) => (mode === "reply" ? [...list, session] : [session]));
       setPrompt("");
       follow(session_id);
@@ -208,7 +207,7 @@ export function AgentPage() {
   const open = (s: AgentStatus) => {
     for (const h of streams.current.values()) h.close();
     streams.current.clear();
-    setThread([{ id: s.session_id, prompt: s.prompt, provider: s.provider, events: [{ type: "message", role: "user", text: s.prompt }], status: s.status, baseline: null }]);
+    setThread([{ id: s.session_id, prompt: s.prompt, provider: s.provider, model: s.model, events: [{ type: "message", role: "user", text: s.prompt }], status: s.status, baseline: null }]);
     follow(s.session_id);
   };
 

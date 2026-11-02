@@ -884,3 +884,16 @@ STEP still provides exact geometry verification and retained uniform-density
 integrals for inspection. Neither this read nor its validation authors geometry,
 and it adds no Part Studio feature-list calls. Repeated occurrences share one
 pinned mass read per unique source/version/configuration/part.
+
+
+### Continue an existing agent conversation
+
+In the Agent tab, open the existing execution and use **Reply** after it ends.
+Reply resumes that provider's saved conversation and sends the follow-up exactly;
+it preserves the project's files and the previous provider/model. **New task**
+starts a separate conversation. If the provider has no recorded conversation ID,
+R3 reports that continuation is unavailable instead of silently starting over.
+Execution metadata and events are saved in the project's `build/agent/` so a server
+restart does not discard its history. Fix platform failures, then retry the failed
+operation in the existing conversation; a failed check alone does not justify
+wiping the project or discarding the agent's work.

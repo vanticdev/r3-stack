@@ -351,11 +351,25 @@ The report stage always runs last. Invalidate project queries on `stage_finished
 subscription or key. The CLI runs non-interactively in the project directory, and the
 prompt is passed on stdin.
 
+To continue an ended execution, send the exact follow-up in `prompt` and the previous
+R3 `session_id` in `resume_session_id`, with the same `provider`. Omit `model` to
+inherit it; switching provider or model is rejected. R3 passes the recorded provider
+conversation ID to `codex exec resume <id> -` or `claude --resume <id>` and retains
+the current MCP and filesystem policy. There is no summary-based fresh-session
+fallback and no latest-session/history search. Each execution gets its own R3 ID
+and links to its parent. A running execution must finish or be cancelled first.
+
 Every session writes `<project>/build/agent/<sid>/`:
 - `.mcp.json`: `python -m r3_orchestrator.mcp_server` with `R3_PROJECT` and
   `PYTHONPATH` set
 - `transcript.jsonl`: the raw CLI output
 - `stderr.log`
+- `session.json`: atomic project-local execution metadata, provider conversation ID
+  and parent execution ID
+- `events.jsonl`: replayable normalized events; history remains available after
+  a server restart. An interrupted execution becomes failed when its process is
+  gone. A still-live orphan prevents a second execution and is not signalled by
+  an unverified reused process ID.
 
 The two CLIs are launched as follows:
 - **Claude Code**: `claude -p --output-format stream-json --verbose --mcp-config
@@ -379,7 +393,7 @@ Permission tiers (`mcp_server.TOOL_TIERS`) are kept intact:
   through `r3_patch_spec`.
 
 `AgentStatus` fields:
-- `session_id`, `project`, `provider`, `model`, `prompt`
+- `session_id`, `project`, `provider`, `model`, `prompt`, `provider_session_id`, `resume_session_id`
 - `status`: `starting` | `running` | `completed` | `failed` | `cancelled`
 - `created_at`, `finished_at`, `returncode`
 - `result`: the final text

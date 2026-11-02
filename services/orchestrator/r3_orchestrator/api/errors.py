@@ -30,6 +30,8 @@ STATUS_BY_CODE: dict[str, int] = {
     "spec_conflict": 409,
     "project_exists": 409,
     "agent_busy": 409,
+    "agent_resume_unavailable": 409,
+    "agent_process_unavailable": 409,
     "validation_required": 409,
     "spec_invalid": 422,
     "spec_read_only": 422,

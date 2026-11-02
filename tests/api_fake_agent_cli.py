@@ -76,6 +76,29 @@ def codex(mode: str) -> None:
     emit({"type": "turn.completed", "usage": {"input_tokens": 7, "output_tokens": 3}})
 
 
+def memory_turn(provider: str, args: list[str], prompt: str) -> None:
+    """A fake provider retains a secret that only a real resume invocation can retrieve."""
+    import uuid
+    state_file = Path(os.environ["R3_PROJECT"]) / "build" / "fake-provider.json"
+    resume = args[args.index("resume") + 1] if "resume" in args else args[args.index("--resume") + 1] if "--resume" in args else None
+    if resume:
+        state = json.loads(state_file.read_text())
+        if resume != state["id"]:
+            sys.exit(8)
+        result = f"Retained {state['secret']}; follow-up: {prompt}"
+    else:
+        state = {"id": str(uuid.uuid4()), "secret": uuid.uuid4().hex}
+        state_file.write_text(json.dumps(state))
+        result = "Stored a private context marker."
+    if provider == "codex":
+        emit({"type": "thread.started", "thread_id": state["id"]})
+        emit({"type": "item.completed", "item": {"id": "reply", "type": "agent_message", "text": result}})
+        emit({"type": "turn.completed"})
+    else:
+        emit({"type": "system", "subtype": "init", "session_id": state["id"]})
+        emit({"type": "result", "subtype": "success", "is_error": False, "result": result})
+
+
 def main() -> None:
     provider, args = sys.argv[1], sys.argv[2:]
     if args == ["--version"]:
@@ -87,6 +110,9 @@ def main() -> None:
     if log:
         Path(log).write_text(json.dumps({"argv": args, "stdin": stdin, "cwd": os.getcwd(),
                                          "env": {k: os.environ.get(k) for k in ("R3_PROJECT", "PYTHONPATH", "MCP_TOOL_TIMEOUT")}}))
+    if mode == "memory":
+        memory_turn(provider, args, stdin)
+        return
     (claude if provider == "claude" else codex)(mode)
     if mode == "fail":
         sys.exit(3)
