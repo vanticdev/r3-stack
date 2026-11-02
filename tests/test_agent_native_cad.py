@@ -168,6 +168,10 @@ def test_claude_session_shares_the_codex_read_boundary(tmp_path, monkeypatch):
     assert filesystem['allowWrite'] == [str(project.resolve())]
     assert str(tmp_path.resolve()) in filesystem['denyRead'] and str(photo.resolve()) in filesystem['allowRead']
     assert settings['sandbox']['allowUnsandboxedCommands'] is False
+    # Oversized tool results are saved under the CLI's directory for this project only.
+    results = tmp_path.resolve()/'.claude'/'projects'/str(project.resolve()).replace('/', '-').replace('.', '-').replace('_', '-')
+    assert f'Read(/{results}/**)' in allow and str(results) in filesystem['allowRead']
+    assert str(tmp_path.resolve()/'.claude') not in filesystem['allowRead']
 
 
 def test_claude_settings_hide_sibling_projects_but_not_the_session_project():
