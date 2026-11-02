@@ -368,6 +368,32 @@ Run fabrication validation for printed parts and inspect wall thickness, overhan
 strength margins, orientation and manufacturing artifacts. Test real retention under the
 required loads. A successful pull is data acquisition, not a fabrication release.
 
+### Qualify native joints without authoring local CAD
+
+A native mate specifies motion and solved placement, not the strength of its
+attachment. `joint_capacity_unknown` names missing evidence; it does not prove
+that the physical design broke. Read the native mate IDs and part pairs in
+`cad/pulled/pull.json`, then inspect `build/model/connections.json` and the
+scenario's diagnostics for the missing inputs. These are project artifacts;
+reading platform source is unnecessary.
+
+Use `r3_get_schema(domain="robot")` and `r3_patch_spec` for qualification metadata
+under `mechanical.interfaces` and `mechanical.fasteners`. An interface associates
+with a derived native moving joint by the native mate ID, or by its unique pair
+of physical parts. Never author replacement joint origins, axes or placements:
+those remain native pulled evidence. Any geometric measurement used by a check
+must come from the native model or a recorded physical measurement.
+
+Capacity coefficients under an interface's `params.physics` require
+`{value, status, source}`; anonymous numbers cannot qualify a connection.
+Conservative estimates stay labelled and cannot become measured evidence.
+The [joint-physics reference](../architecture/joint-physics.md#capacity-equations-and-sources)
+documents supported connection kinds, inputs, equations and their limits.
+For a purchased mechanism, the [rated internal joint rules](../architecture/r3-pipeline.md#manufacturer-rated-internal-joints)
+explain the separate manufacturer-rating evidence; external mounts, retention
+and ordinary load checks still apply. A complete scenario and the mandatory
+load cases remain necessary; neither a mate nor a rendered model proves them.
+
 ## 6. Add power, electronics and wiring
 
 Declare a supply compatible with every connected device, including transient demands,
