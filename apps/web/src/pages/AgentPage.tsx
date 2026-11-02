@@ -218,9 +218,11 @@ export function AgentPage() {
 
   const files = useMemo(() => {
     if (!thread.length) return [];
-    // One session: the API's cumulative diff. Replies: compare every source file.
-    if (thread.length === 1) {
-      const diff = sessionOutcome(thread[0]!.events).diff;
+    // A restored history item has no browser-side baseline. Show the current
+    // execution's authoritative diff rather than hiding its changes or inventing
+    // a comparison against an unavailable earlier description.
+    if (thread.length === 1 || !thread[0]!.baseline) {
+      const diff = sessionOutcome(thread[thread.length - 1]!.events).diff;
       if (diff) return specDiffFiles(diff);
     }
     const base = thread[0]!.baseline;
@@ -308,7 +310,7 @@ export function AgentPage() {
         </div>
       ) : (
         <div className="agent-session">
-          {changes > 0 && <Tabs label="Agent view" value={tab} onChange={setTab} options={[{ value: "chat", label: "Conversation" }, { value: "changes", label: `Changes · ${changes}` }]} />}
+          {changes > 0 && <Tabs label="Agent view" value={tab} onChange={setTab} options={[{ value: "chat", label: "Conversation" }, { value: "changes", label: `${thread.length > 1 && !thread[0]!.baseline ? "Latest changes" : "Changes"} · ${changes}` }]} />}
           <div className={`agent-split show-${tab}${changes > 0 ? " with-changes" : ""}`} ref={layout} style={{ "--split": `${split}%` } as React.CSSProperties}>
             <div className="agent-chat">
               <div className="transcript" data-testid="transcript">

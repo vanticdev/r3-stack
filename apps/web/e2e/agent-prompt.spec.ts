@@ -50,3 +50,33 @@ test("reply continues the selected provider conversation with exact follow-up te
   expect(requests[1]).toEqual({ prompt: followup, provider: "codex", model: "synthetic-model", resume_session_id: "initial-execution" });
   expect(errors).toEqual([]);
 });
+
+test("reply to a reopened execution shows its latest recorded changes", async ({ page }) => {
+  const parent = "a".repeat(12);
+  const child = "b".repeat(12);
+  const submitted: Record<string, unknown>[] = [];
+  await page.route("**/api/projects/*/agent", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ json: [{ session_id: parent, project: "synthetic", provider: "codex", model: "synthetic-model",
+        prompt: "Retained task", status: "completed", created_at: 1, finished_at: 2, result: "Checkpoint", error: null, returncode: 0, events: 1 }] });
+    } else {
+      submitted.push(route.request().postDataJSON() as Record<string, unknown>);
+      await route.fulfill({ json: { session_id: child } });
+    }
+  });
+  await page.route("**/api/agent/*/events", async (route) => {
+    const diff = "--- a/parts/link.yaml\n+++ b/parts/link.yaml\n@@ -1 +1 @@\n-label: Before\n+label: After retry\n";
+    const events = route.request().url().includes(child)
+      ? [{ type: "spec_changed", cumulative_diff: diff }, { type: "session_finished", status: "completed" }]
+      : [{ type: "session_finished", status: "completed", result: "Checkpoint" }];
+    await route.fulfill({ contentType: "text/event-stream", body: events.map(e => `data: ${JSON.stringify(e)}\n\n`).join("") });
+  });
+  await page.goto("/#/p/synthetic/agent");
+  await page.getByLabel("Agent history").getByRole("button", { name: /Retained task/ }).click();
+  await page.getByLabel("Prompt").fill("Retry the operation");
+  await page.getByRole("button", { name: "Reply", exact: true }).click();
+  await expect.poll(() => submitted.length).toBe(1);
+  expect(submitted[0]).toEqual({ prompt: "Retry the operation", provider: "codex", model: "synthetic-model", resume_session_id: parent });
+  await expect(page.getByText("parts/link.yaml", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("spec-diff")).toContainText("label: After retry");
+});
