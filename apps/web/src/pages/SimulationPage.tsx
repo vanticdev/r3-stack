@@ -158,7 +158,7 @@ export function jointFailures(events: unknown[] | undefined): JointFailureEvent[
 export function JointFailures({ events, t, seek }: { events: unknown[] | undefined; t: number; seek: (t: number) => void }) {
   const failures = jointFailures(events);
   if (!failures.length) return null;
-  return <Card title="Joint integrity" subtitle="Release blocked · select an event to replay">
+  return <Card collapsed title="Joint integrity" subtitle="Release blocked · select an event to replay">
     {failures.some(e => e.event === "joint_capacity_unknown") && <p>Capacity data is incomplete. Recorded motion is unqualified and cannot establish actual joint strength.</p>}
     <div className="check-list" data-testid="joint-failures">
       {failures.map((e, i) => <CheckRow key={`${e.joint}-${i}`} outcome="failed" title={e.joint}
@@ -233,7 +233,7 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
               <span>{recording ? "3D recording unavailable for this run; the time series below are complete." : "This run has no recording; only its checks and metrics are available."}</span></div>
           )}
           {recording && (
-            <Card title="Time series" subtitle="Drag on a chart to scrub; every chart and the 3D view share the playhead"
+            <Card collapsed title="Time series" subtitle="Drag on a chart to scrub; every chart and the 3D view share the playhead"
                   actions={<div className="row chips" role="group" aria-label="Chart groups">
                     {available.map((g) => (
                       <button key={g} className={`small${groups.has(g) ? " active" : ""}`} aria-pressed={groups.has(g)}
@@ -250,7 +250,7 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
         </div>
         <div className="stack" style={{ gap: 16 }}>
           <JointFailures events={recording?.events} t={playback.t} seek={seek} />
-          <Card title="Checks">
+          <Card collapsed title="Checks">
             <div className="check-list" data-testid="sim-checks">
               {checks.map((c) => {
                 const text = checkText(c);
@@ -266,8 +266,8 @@ function ScenarioDetail({ pid, response, item, onRun, busy }: { pid: string; res
               {!checks.length && <span className="muted">This scenario has no expectations.</span>}
             </div>
           </Card>
-          <Card title="Measured"><Metrics metrics={last?.metrics ?? {}} /></Card>
-          {last?.clip_url && <Card title="Rendered clip" subtitle="MuJoCo render, follows the playhead"><ClipPlayer url={last.clip_url} playback={playback} duration={end} /></Card>}
+          <Card collapsed title="Measured"><Metrics metrics={last?.metrics ?? {}} /></Card>
+          {last?.clip_url && <Card collapsed title="Rendered clip" subtitle="MuJoCo render, follows the playhead"><ClipPlayer url={last.clip_url} playback={playback} duration={end} /></Card>}
         </div>
       </div>
       {(last?.renders?.length || last?.plots?.length) ? (
@@ -303,7 +303,7 @@ export function SimulationPage() {
     <div className="page">
       <QueryView query={scenarios} height={60}>
         {({ scenarios: items }) => (
-          <div className="scenario-bar" role="radiogroup" aria-label="Scenario">
+          <details className="scenario-picker"><summary>Scenario: {partLabel(selected ?? "Choose a scenario")}</summary><div className="scenario-bar" role="radiogroup" aria-label="Scenario">
             {items.map((s) => {
               const st = scenarioStatus(s);
               return (
@@ -316,7 +316,7 @@ export function SimulationPage() {
               );
             })}
             {ranAt ? <span className="muted small" style={{ alignSelf: "center" }}>simulation stage ran {timeAgo(ranAt)}</span> : null}
-          </div>
+          </div></details>
         )}
       </QueryView>
       {error ? <ErrorBox error={error} /> : null}

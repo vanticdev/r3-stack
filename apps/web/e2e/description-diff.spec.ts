@@ -19,6 +19,7 @@ test("agent changes show the owning part and domain files", async ({ page }) => 
   await page.goto("/#/p/synthetic/agent");
   await page.getByLabel("Prompt").fill("Update this mechanism");
   await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByRole("tab", { name: /Changes|Latest changes/ }).click();
   await expect(page.getByText("parts/link.yaml", { exact: true })).toBeVisible();
   await expect(page.getByText("software/system.yaml", { exact: true })).toBeVisible();
   await expect(page.getByTestId("spec-diff")).toHaveCount(2);

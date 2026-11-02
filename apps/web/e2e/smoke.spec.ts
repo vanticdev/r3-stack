@@ -64,6 +64,16 @@ async function fullShot(page: Page, name: string, flush: boolean) {
   await style?.evaluate((el) => el.parentNode?.removeChild(el));
 }
 
+async function reveal(page: Page, testId: string) {
+  const item = page.getByTestId(testId).first();
+  await item.waitFor({ state: "attached" });
+  const parents = item.locator("xpath=ancestor::details");
+  for (let i = 0; i < await parents.count(); i++) {
+    const detail = parents.nth(i);
+    if (!await detail.getAttribute("open").then(v => v !== null)) await detail.locator(":scope > summary").click();
+  }
+}
+
 async function viewerReady(page: Page) {
   await expect(page.getByTestId("robot-viewer").locator("canvas").first()).toBeVisible();
   await settle(page, 1800); // STL meshes stream in, then one demand-rendered frame
@@ -71,21 +81,23 @@ async function viewerReady(page: Page) {
 
 const PAGES: { name: string; route: string; flush?: boolean; ready: (page: Page) => Promise<void> }[] = [
   { name: "01-projects", route: "/", ready: async (p) => { await expect(p.getByTestId("project-card").first()).toBeVisible(); } },
-  { name: "02-overview", route: `/p/${pid}/overview`, ready: async (p) => { await expect(p.getByTestId("evidence-matrix")).toBeVisible(); } },
+  { name: "02-overview", route: `/p/${pid}/overview`, ready: async (p) => { await reveal(p, "evidence-matrix"); await expect(p.getByTestId("evidence-matrix")).toBeVisible(); } },
   { name: "03-3d", route: `/p/${pid}/3d`, flush: true, ready: viewerReady },
-  { name: "04-wiring", route: `/p/${pid}/wiring`, ready: async (p) => { await expect(p.getByTestId("wire-table")).toBeVisible(); await viewerReady(p); } },
-  { name: "05-electrical", route: `/p/${pid}/electrical`, ready: async (p) => { await expect(p.getByTestId("operating-points")).toBeVisible(); } },
-  { name: "06-pcb", route: `/p/${pid}/pcb`, ready: async (p) => { await expect(p.getByTestId("pcb-checks")).toBeVisible(); } },
-  { name: "07-software", route: `/p/${pid}/software`, ready: async (p) => { await expect(p.getByTestId("binding-map")).toBeVisible(); } },
+  { name: "04-wiring", route: `/p/${pid}/wiring`, ready: async (p) => { await reveal(p, "wire-table"); await expect(p.getByTestId("wire-table")).toBeVisible(); await viewerReady(p); } },
+  { name: "05-electrical", route: `/p/${pid}/electrical`, ready: async (p) => { await reveal(p, "operating-points"); await expect(p.getByTestId("operating-points")).toBeVisible(); } },
+  { name: "06-pcb", route: `/p/${pid}/pcb`, ready: async (p) => { await reveal(p, "pcb-checks"); await expect(p.getByTestId("pcb-checks")).toBeVisible(); } },
+  { name: "07-software", route: `/p/${pid}/software`, ready: async (p) => { await reveal(p, "binding-map"); await expect(p.getByTestId("binding-map")).toBeVisible(); } },
   { name: "08-simulation", route: `/p/${pid}/sim`, ready: async (p) => {
-    await expect(p.getByTestId("scenario-card").first()).toBeVisible();
+    await p.locator(".scenario-picker > summary").click(); await expect(p.getByTestId("scenario-card").first()).toBeVisible();
+    await p.getByTestId("sim-checks").or(p.getByText(/has not been run/)).waitFor({ state: "attached", timeout: 60_000 });
+    if (await p.getByTestId("sim-checks").count()) await reveal(p, "sim-checks");
     await expect(p.getByTestId("sim-checks").or(p.getByText(/has not been run/))).toBeVisible({ timeout: 60_000 });
     await settle(p, 1500);
   } },
-  { name: "09-diagnostics", route: `/p/${pid}/diagnostics`, flush: true, ready: async (p) => { await expect(p.getByTestId("diagnostic").first()).toBeVisible(); await settle(p, 1500); } },
+  { name: "09-diagnostics", route: `/p/${pid}/diagnostics`, flush: true, ready: async (p) => { await p.locator(".type-head").first().click(); await expect(p.getByTestId("diagnostic").first()).toBeVisible(); await settle(p, 1500); } },
   { name: "10-agent", route: `/p/${pid}/agent`, ready: async (p) => { await expect(p.getByLabel("Prompt")).toBeVisible(); } },
   { name: "11-deploy", route: `/p/${pid}/deploy`, ready: async (p) => { await expect(p.getByTestId("deploy-readiness")).toBeVisible(); } },
-  { name: "12-environment", route: "/environment", ready: async (p) => { await expect(p.getByTestId("doctor-stages")).toBeVisible(); } },
+  { name: "12-environment", route: "/environment", ready: async (p) => { await reveal(p, "doctor-stages"); await expect(p.getByTestId("doctor-stages")).toBeVisible(); } },
 ];
 
 const VARIANTS = [
@@ -117,7 +129,7 @@ test.describe("interactions", () => {
   test("shell: status summary expands into stage rows; narrow screens use a drawer", async ({ page }) => {
     const errors = watchConsole(page);
     await page.goto(`/#/p/${pid}/overview`);
-    await expect(page.getByTestId("evidence-matrix")).toBeVisible();
+    await reveal(page, "evidence-matrix"); await expect(page.getByTestId("evidence-matrix")).toBeVisible();
     await page.getByRole("button", { name: "Project status" }).click();
     await expect(page.getByRole("dialog", { name: "Project status" }).getByTestId("stage-list")).toBeVisible();
     await expect(page.getByRole("dialog", { name: "Project status" })).toContainText("Revision details");
@@ -125,6 +137,7 @@ test.describe("interactions", () => {
     await page.keyboard.press("Escape");
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("button", { name: "Open navigation" }).click();
+    await page.getByText("Build & test", { exact: true }).click();
     await expect(page.getByRole("complementary", { name: "Navigation" }).getByRole("link", { name: "Wiring" })).toBeInViewport();
     await shot(page, `31-mobile-drawer-${backend()}`);
     await page.getByRole("complementary", { name: "Navigation" }).getByRole("link", { name: "Wiring" }).click();
@@ -152,6 +165,7 @@ test.describe("interactions", () => {
     const errors = watchConsole(page);
     await page.goto(`/#/p/${pid}/3d`);
     await viewerReady(page);
+    await page.getByRole("button", { name: "Inspect model" }).click();
     await expect(page.getByTestId("parts-list")).toBeVisible();
     await page.getByRole("radio", { name: /Errors/ }).click();
     await page.getByTestId("parts-list").getByRole("button").first().click();
@@ -183,9 +197,11 @@ test.describe("interactions", () => {
   test("diagnostics: selecting a finding shows its fix and highlights it in 3D", async ({ page }) => {
     const errors = watchConsole(page);
     await page.goto(`/#/p/${pid}/diagnostics`);
-    await viewerReady(page);
     await page.getByLabel("Search diagnostics").fill("clearance");
+    await page.locator(".type-head").first().click();
     await page.getByTestId("diagnostic").first().getByRole("button").first().click();
+    await page.getByRole("tab", { name: "3D", exact: true }).click();
+    await viewerReady(page);
     await expect(page.getByRole("link", { name: "Open in 3D model" })).toBeVisible();
     await expect(page.getByTestId("diagnostic").first()).toContainText(/Fix:|no suggested fix/);
     await settle(page, 1200);
@@ -199,6 +215,7 @@ test.describe("interactions", () => {
     await viewerReady(page);
     const locate = page.getByRole("button", { name: "Locate interference" });
     if (await locate.count()) { await locate.click(); await settle(page, 800); }
+    await reveal(page, "harness-list");
     const harness = page.getByTestId("harness-list").getByRole("button", { name: /^ESC motor 1 wire/ });
     if ((await harness.getAttribute("aria-pressed")) !== "true") await harness.click(); // Locate may already have selected it
     await expect(harness).toHaveAttribute("aria-pressed", "true");
@@ -207,6 +224,7 @@ test.describe("interactions", () => {
     await expect(page.getByLabel("Route points")).toBeVisible();
     await settle(page, 1200);
     await shot(page, `16-wiring-route-edit-${backend()}`);
+    await page.getByText("Wire data", { exact: true }).click();
     await page.getByRole("radio", { name: "Cable motion" }).click();
     const motion = page.getByTestId("timeline").or(page.getByText(/No cable recordings/));
     await expect(motion).toBeVisible({ timeout: 60_000 });
@@ -219,8 +237,9 @@ test.describe("interactions", () => {
   test("simulation: a check's timestamp seeks the shared playhead", async ({ page }) => {
     const errors = watchConsole(page);
     await page.goto(`/#/p/${pid}/sim`);
-    await expect(page.getByTestId("sim-charts")).toBeVisible({ timeout: 60_000 });
+    await reveal(page, "sim-charts"); await expect(page.getByTestId("sim-charts")).toBeVisible({ timeout: 60_000 });
     const scrub = page.getByLabel("Scrub");
+    await reveal(page, "sim-checks");
     const seek = page.getByTestId("sim-checks").getByRole("button", { name: /t = / }).first();
     if (await seek.count()) {
       await seek.click();
@@ -238,7 +257,7 @@ test.describe("interactions", () => {
   test("theme toggle and the physical-robot deploy confirmation", async ({ page }) => {
     const errors = watchConsole(page);
     await page.goto(`/#/p/${pid}/overview`);
-    await expect(page.getByTestId("evidence-matrix")).toBeVisible();
+    await reveal(page, "evidence-matrix"); await expect(page.getByTestId("evidence-matrix")).toBeVisible();
     await page.getByRole("button", { name: "Toggle theme" }).click();
     await settle(page);
     await shot(page, `22-overview-toggled-theme-${backend()}`);
@@ -260,8 +279,9 @@ test.describe("interactions", () => {
     test.skip(!mock, "starts a pipeline run and an agent session: mock API only");
     const errors = watchConsole(page);
     await page.goto(`/#/p/${pid}/overview`);
-    await expect(page.getByTestId("evidence-matrix")).toBeVisible();
+    await reveal(page, "evidence-matrix"); await expect(page.getByTestId("evidence-matrix")).toBeVisible();
     await page.getByRole("button", { name: "Run pipeline" }).click();
+    await page.locator("details > summary").getByText("Pipeline", { exact: true }).click();
     await expect(page.getByLabel("Run log").first()).toContainText(/finished|replaying/, { timeout: 30_000 });
     await shot(page, "20-overview-run");
     await page.goto(`/#/p/${pid}/agent`);

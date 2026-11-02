@@ -8,7 +8,7 @@ import type { ProjectSummary } from "../api/types.ts";
 import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
 import { ProjectLoadError } from "../components/ProjectLoadError.tsx";
-import { Card, Dialog, Empty, ErrorBox, QueryView } from "../components/ui.tsx";
+import { Card, Details, Dialog, Empty, ErrorBox, QueryView } from "../components/ui.tsx";
 import { stageLabel } from "../lib/labels.ts";
 import { countsText, listLabels } from "../lib/status.ts";
 import { timeAgo } from "../lib/units.ts";
@@ -53,11 +53,13 @@ export function ProjectsPage() {
                     <div key={p.id} className="project-row" data-testid="project-card">
                       <div className="stack" style={{ gap: 2, minWidth: 0 }}>
                         <Link to={`/p/${encodeURIComponent(p.id)}/overview`} className="name">{p.name}</Link>
-                        <span className="muted small">{p.id}{p.version ? ` · v${p.version}` : ""}</span>
+                        <span className="muted small">{timeAgo(p.last_run?.finished_at)}</span>
                       </div>
-                      <div className="actions"><Link className="button" to={`/p/${encodeURIComponent(p.id)}/overview`}>Open</Link></div>
+                      <span className="actions">{p.error || p.error_detail ? "Invalid" : p.last_run?.stale ? "Outdated" : !p.last_run ? "Unchecked" : p.last_run.status === "ok" ? "Passed" : "Blocked"}</span>
+                      <Details summary="Details">
+                      <span>{p.id}{p.version ? ` · v${p.version}` : ""}</span>
                       {p.description && <span className="desc" title={p.description}><Markdown inline>{p.description.split("\n")[0] ?? ""}</Markdown></span>}
-                      <ProjectStatusLine p={p} />
+                      <ProjectStatusLine p={p} /></Details>
                     </div>
                   ))}
                 </div>

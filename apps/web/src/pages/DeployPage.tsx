@@ -63,11 +63,12 @@ export function DeployPage() {
         {(["sim", "fleet"] as const).map((t) => (
           <label key={t} className="choice">
             <input type="radio" name="target" checked={target === t} onChange={() => { setTarget(t); deploy.reset(); }} aria-label={TARGETS[t].label} />
-            <span className="text"><strong>{TARGETS[t].label}</strong><span>{TARGETS[t].text}</span></span>
+            <span className="text"><strong>{TARGETS[t].label}</strong></span>
           </label>
         ))}
       </div>
 
+      <Details summary="About this destination">{TARGETS[target].text}</Details>
       <Card title={target === "sim" ? "Simulation readiness" : "Physical robot readiness"}>
         <div className="check-list" data-testid="deploy-readiness">
           {target === "sim" ? (
@@ -100,7 +101,7 @@ export function DeployPage() {
         </div>
       </Card>
 
-      <Card title="Bundle">
+      <Card collapsed title="Bundle">
         <dl className="kv">
           <dt>Revision</dt><dd>{bundleRevision(p)}</dd>
           <dt>Destination</dt><dd>{target === "sim" ? "Digital twin" : `Robots discovered on the network`}</dd>

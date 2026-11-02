@@ -73,12 +73,14 @@ test("reply to a reopened execution shows its latest recorded changes", async ({
   });
   await page.goto("/#/p/synthetic/agent");
   const retained = page.getByLabel("Agent history").getByRole("button", { name: /Retained task/ });
+  await page.getByText("Earlier conversations", { exact: true }).click();
   await expect(retained).toBeVisible();
   await retained.click();
   await page.getByLabel("Prompt").fill("Retry the operation");
   await page.getByRole("button", { name: "Reply", exact: true }).click();
   await expect.poll(() => submitted.length).toBe(1);
   expect(submitted[0]).toEqual({ prompt: "Retry the operation", provider: "codex", model: "synthetic-model", resume_session_id: parent });
+  await page.getByRole("tab", { name: /Changes|Latest changes/ }).click();
   await expect(page.getByText("parts/link.yaml", { exact: true })).toBeVisible();
   await expect(page.getByTestId("spec-diff")).toContainText("label: After retry");
 });

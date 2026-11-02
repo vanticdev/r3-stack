@@ -51,9 +51,9 @@ export function EnvironmentPage() {
                 <div className="check-list" data-testid="environment-causes">
                   {causes.map((c) => (
                     <CheckRow key={c.missing} outcome={c.level === "unavailable" ? "failed" : "warning"} title={c.headline}>
-                      <Markdown className="secondary">{`Fix: ${c.fix}`}</Markdown>
+                      <Details summary="How to fix"><Markdown className="secondary">{`Fix: ${c.fix}`}</Markdown>
                       <span>Affects {c.stages.map((s) => stageLabel(s.stage)).join(", ")}</span>
-                      {c.tool?.detail && <Markdown>{`Detected: ${c.tool.detail}`}</Markdown>}
+                      {c.tool?.detail && <Markdown>{`Detected: ${c.tool.detail}`}</Markdown>}</Details>
                     </CheckRow>
                   ))}
                 </div>
@@ -61,7 +61,7 @@ export function EnvironmentPage() {
             </Card>
 
             <div className="grid cols-2">
-              <Card title="Agents">
+              <Card collapsed title="Agents">
                 <div className="check-list">
                   {agents.map((a) => (
                     <CheckRow key={a.provider} outcome={a.available ? "passed" : "not_run"} title={AGENT_NAMES[a.provider] ?? a.provider}
@@ -72,7 +72,7 @@ export function EnvironmentPage() {
                   {!agents.length && <span className="muted">This server does not report agent CLIs.</span>}
                 </div>
               </Card>
-              <Card title="This machine">
+              <Card collapsed title="This machine">
                 <dl className="kv">
                   <dt>API</dt><dd>{mock ? "Mock (dev server, build/ artifacts)" : "r3 serve"}</dd>
                   <dt>Platform</dt><dd>{d.environment.platform}</dd>
@@ -84,7 +84,7 @@ export function EnvironmentPage() {
               </Card>
             </div>
 
-            <Card title="Stage readiness" flush>
+            <Card collapsed title="Stage readiness" flush>
               <div className="table-wrap">
                 <table data-testid="doctor-stages">
                   <thead><tr><th>Stage</th><th>Readiness</th><th>Needs</th></tr></thead>
