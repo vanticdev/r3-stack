@@ -424,7 +424,24 @@ class Pcb(_Model):
     boards: list[Board] = Field(default_factory=list)
 
 
+class CadMeshExport(_Model):
+    """Native tessellation accuracy. These options never relax geometry checks."""
+
+    model_config = ConfigDict(validate_assignment=True, revalidate_instances="always")
+
+    chord_tolerance: Quantity = Field(default=5e-5, gt=0, le=5e-5,
+        description="Maximum native mesh chord deviation in metres; may only be tightened.")
+    angle_tolerance: Quantity = Field(default=0.03490658503988659, gt=0, le=0.03490658503988659,
+        description="Maximum native mesh angular deviation in radians; may only be tightened.")
+    maximum_chord_length: Quantity = Field(default=10.0, gt=0, le=10.0,
+        description="Maximum glTF chord length in metres; may only be tightened.")
+    minimum_facet_width: Quantity | None = Field(default=None, gt=0, le=5e-5,
+        description="Optional finer native STL minimum facet width in metres; omission preserves the native default.")
+
+
 class Cad(_Model):
+    mesh_export: CadMeshExport = Field(default_factory=CadMeshExport,
+        description="Native export accuracy shared by source inspection and assembly pull. Files still must pass all geometry checks.")
     version_id: str | None = Field(default=None, description="Optional explicitly selected immutable Onshape version.")
     source: str | None = Field(default=None, description="Onshape assembly URL; /w/ is resolved to a pinned /v/ by pull.")
     provider: Literal["onshape", "none"] = "onshape"

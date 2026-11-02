@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from r3_model.pulled import PullError
+from r3_model.spec import CadMeshExport
 
 from .native import NativeCadTransport
 from .pull import target
@@ -18,7 +19,11 @@ def export_part(project: Any, url: str, part_id: str, format: str = "step",
     if format not in ("step", "stl", "gltf") or not part_id.strip():
         raise PullError("cad_export_invalid", "Supply a part_id and format step, stl or gltf")
     pin = target(url, version_id)
-    source = {**pin, "part_id": part_id, "format": format}
+    cad = getattr(getattr(project, "spec", None), "cad", None)
+    settings = cad.mesh_export if cad is not None else CadMeshExport()
+    source: dict[str, Any] = {**pin, "part_id": part_id, "format": format}
+    if format != "step":
+        source["mesh_export"] = settings.model_dump()
     identity = hashlib.sha256(json.dumps(source, sort_keys=True).encode()).hexdigest()
     root = Path(project.root).resolve()
     build = (root / "build").resolve()
@@ -26,7 +31,7 @@ def export_part(project: Any, url: str, part_id: str, format: str = "step",
     if root not in build.parents or build not in folder.parents:
         raise PullError("cad_export_invalid", "Inspection exports must stay inside this project's build directory")
     from .translation import project_export_cache
-    native = transport if transport is not None else NativeCadTransport(export_jobs=project_export_cache(root))
+    native = transport if transport is not None else NativeCadTransport(export_jobs=project_export_cache(root), mesh_export=settings)
     data = getattr(native, format)(pin["document_id"], pin["version_id"], pin["element_id"],
                                    part_id, pin["configuration"])
     if not data:

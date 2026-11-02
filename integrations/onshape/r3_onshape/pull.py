@@ -301,7 +301,8 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
     pin = target(url, version_id or default_version)
     if transport is None:
         from .translation import project_export_cache
-        transport = NativeCadTransport(export_jobs=project_export_cache(project.root))
+        transport = NativeCadTransport(export_jobs=project_export_cache(project.root),
+                                       mesh_export=project.spec.cad.mesh_export)
     # Spec-schema integration refreshes these selectors from the split part refs.
     selectors = {}
     for name, descriptor in project.spec.components.items():
@@ -310,6 +311,7 @@ def _pull(project: Any, url: str, version_id: str, transport: Any) -> dict[str, 
         if path:
             selectors[name] = list(path)
     manifest = describe(transport.assembly(pin["url"]), pin, selectors)
+    manifest["mesh_export"] = project.spec.cad.mesh_export.model_dump()
     undeclared = set(manifest["parts"]) - set(project.spec.components)
     if undeclared:
         raise PullError("cad_pull_invalid", "Declare local component metadata and occurrence selectors before pulling: " + ", ".join(sorted(undeclared)))

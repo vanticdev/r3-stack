@@ -20,6 +20,7 @@ import urllib.error
 import urllib.request
 
 from r3_model.pulled import PullError
+from r3_model.spec import CadMeshExport
 
 from .client import NativeBridgeTransport
 
@@ -60,7 +61,9 @@ class NativeRateLimitError(PullError):
 class NativeCadTransport:
     """Authenticated loopback client; unsupported operations fail closed."""
 
-    def __init__(self, runtime: Path | None = None, *, export_jobs: Path | None = None) -> None:
+    def __init__(self, runtime: Path | None = None, *, export_jobs: Path | None = None,
+                 mesh_export: CadMeshExport | None = None) -> None:
+        self._mesh_export = CadMeshExport.model_validate(mesh_export or {})
         bridge = NativeBridgeTransport(runtime)
         self.base, self.runtime = bridge.base, bridge.runtime
         self._headers = bridge._headers()
@@ -200,9 +203,17 @@ class NativeCadTransport:
         from .rest_snapshot import assembly
         return assembly(self, url)
 
+    @property
+    def mesh_export(self) -> CadMeshExport:
+        return getattr(self, "_mesh_export", None) or CadMeshExport()
+
     def stl(self, did: str, vid: str, eid: str, pid: str, configuration: str = "") -> bytes:
         path = f"/native/api/v17/parts/d/{quote(did, safe='')}/v/{quote(vid, safe='')}/e/{quote(eid, safe='')}/partid/{quote(pid, safe='')}/stl"
-        query = {"mode": "binary", "units": "METER", "chordTolerance": 5e-5, "angleTolerance": 0.03490658503988659}
+        settings = self.mesh_export
+        query = {"mode": "binary", "units": "METER", "chordTolerance": settings.chord_tolerance,
+                 "angleTolerance": settings.angle_tolerance}
+        if settings.minimum_facet_width is not None:
+            query["minFacetWidth"] = settings.minimum_facet_width
         if configuration:
             query["configuration"] = configuration
         return self._request("GET", path, query=query)
@@ -220,9 +231,14 @@ class NativeCadTransport:
         path = f"/native/api/v17/partstudios/d/{quote(did, safe='')}/v/{quote(vid, safe='')}/e/{quote(eid, safe='')}/translations"
         # The original-body-ID option collapses composite Body groups in glTF.
         # Keep native default grouping; never reconstruct that ownership locally.
+        settings = self.mesh_export
+        # Preserve the existing default request/cache identity (10, not 10.0).
+        chord_length = settings.maximum_chord_length
+        chord_length = int(chord_length) if chord_length.is_integer() else chord_length
         body = {"formatName": "GLTF", "storeInDocument": False, "partIds": pid,
-                "resolution": "custom", "distanceTolerance": 5e-5, "angularTolerance": 0.03490658503988659,
-                "maximumChordLength": 10}
+                "resolution": "custom", "distanceTolerance": settings.chord_tolerance,
+                "angularTolerance": settings.angle_tolerance,
+                "maximumChordLength": chord_length}
         if configuration:
             body["configuration"] = configuration
         return translated_file(self, path, body)

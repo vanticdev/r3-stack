@@ -687,6 +687,30 @@ unqualified inspection/source files: import purchased models into your Onshape
 document and assemble them there. Only `r3_cad_pull` installs the read-only,
 verified model used by the viewer and simulation. Never edit exported geometry.
 
+Native mesh accuracy can be tightened through `r3_patch_spec`, for example on an
+unrelated precision fixture:
+
+```yaml
+cad:
+  mesh_export:
+    chord_tolerance: 0.01 mm
+    angle_tolerance: 0.5 deg
+    maximum_chord_length: 1 mm
+    minimum_facet_width: 0.001 mm
+```
+
+These are Onshape export settings, never local geometry instructions or check
+thresholds. Inspection exports and assembly pulls use the same project settings.
+Defaults preserve the existing 0.05 mm chord deviation, 2 degree angular deviation
+and 10 m maximum glTF chord length; only tighter values are accepted.
+`minimum_facet_width` optionally requests a finer STL facet width (at most
+0.05 mm); omission preserves the native default. `maximum_chord_length` applies
+to glTF. STEP exports are unchanged. The manifest records the selected settings,
+and native export caches distinguish different requests while reusing the same
+pinned STEP. Finer settings can increase file size and computation; they do not
+make invalid geometry acceptable. Repair actual source defects in Onshape and
+retain every standard closure, volume, fit and release check.
+
 Qualify a representative source before repeating it throughout an assembly: check
 closed solid bodies, assigned material density, native STEP and the mesh export
 needed by that source. A composite groups bodies; it does not heal open surfaces.
