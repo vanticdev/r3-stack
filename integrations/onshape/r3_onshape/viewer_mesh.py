@@ -86,6 +86,13 @@ def _capture(project: Any, url: str, tab_id: int | None, transport: Any) -> dict
         url = f'https://{host}/documents/{did}/w/{document["defaultWorkspace"]["id"]}/e/{eid}'
     if not re.fullmatch(r"https://[^/]+/documents/[a-f0-9]{24}/w/[a-f0-9]{24}/e/[a-f0-9]{24}/?", url):
         raise PullError("cad_viewer_target_invalid", "Use the exact, unconfigured workspace assembly URL")
+    if tab_id is None:
+        try:
+            previous = cached(project)
+        except PullError:
+            previous = None  # A fresh inspection can replace a corrupt preview.
+        if previous and previous['url'] == url:
+            tab_id = previous.get('tab_id')
     listing = native.local("viewer_mesh", {"url": url, "action": "list", "tab_id": tab_id})
     snapshot = native.artifact(listing["snapshot"])
     revision = listing.get("microversion")

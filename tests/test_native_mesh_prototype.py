@@ -107,6 +107,10 @@ def test_inconsistent_native_evidence_never_installs(project, native_snapshot, c
     if change == 'mass': native.definition['definition']['parts'][0]['native_mass_properties'] = None
     result = pull(project, url=URL, version_id='version', transport=native, mesh_source='viewer')
     assert not result['ok']
+    if change == 'revision':
+        assert result['viewer_microversion'] == 'revision'
+        assert result['pinned_microversion'] == 'other'
+        assert 'microversionId' in result['hint']
     assert not (project.root / 'cad/pulled/pull.json').exists()
     assert native.exports == 0
 

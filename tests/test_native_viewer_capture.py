@@ -133,6 +133,15 @@ def test_project_version_source_resolves_to_its_current_workspace_for_inspection
     assert reads == [('GET', '/api/v9/documents/' + 'a' * 24)]
 
 
+def test_refresh_remembers_the_verified_viewer_tab(tmp_path):
+    p = project(tmp_path)
+    native = FakeViewer()
+    capture(p, tab_id=12, transport=native)
+    native.calls.clear()
+    capture(p, transport=native)
+    assert native.calls[0]['tab_id'] == 12
+
+
 def test_agent_preview_errors_retain_their_diagnostic(monkeypatch):
     # The public tool should not turn a known source/bridge error into a
     # protocol exception, nor submit an export as an implicit alternative.

@@ -713,6 +713,11 @@ use the loaded Onshape viewer path:
    call `r3_cad_pull(url=workspace_url, version_id=version_id,
    mesh_source="viewer", tab_id=editor_tab_id)`. The CLI equivalent is
    `r3 cad pull --url WORKSPACE_URL --version VERSION --mesh-source viewer --tab-id TAB`.
+   Pin the version to the preview's actual `microversion`: the browser-session
+   `createVersion` operation accepts `microversionId`. Unrelated document edits
+   may advance the document head beyond the displayed assembly. A mismatch
+   returns `viewer_microversion` and `pinned_microversion`; inspect the intended
+   assembly and select the matching pin instead of editing cached data.
 3. Run the model, wiring, electrical and simulation work. Native placements,
    mates, material, mass, centre of mass and inertia remain required. No geometry
    is generated locally. OBJ bodies and bytes are retained with their revision,
@@ -726,6 +731,13 @@ qualification stays explicitly pending where its supporting data is unavailable.
 That does not require stopping all modelling or prototype simulation. Do not
 claim a fabrication release from a display mesh. Higher precision exports or
 verified native analytic data can later complete the remaining qualification.
+
+If a viewer reports a disconnected display revision, open a fresh read-only
+view of the same workspace with `open_document(reuse=false, mode="background")`
+and use its returned tab ID. This does not change CAD. The older native-editor
+bootstrap may report an unsupported frontend while `viewer_mesh` still works;
+test the loaded-viewer operation directly. Do not force-reload a user's editor
+with unknown edits. Preview refreshes retain the last explicitly selected tab.
 
 For unattended work, abandon an implementation approach requiring two hours or
 more and find a practical alternative; agent runtime is excluded. Keep the same

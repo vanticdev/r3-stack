@@ -30,7 +30,9 @@ def download(project: Any, native: Any, manifest: dict[str, Any], directory: Pat
     if preview is None:
         raise PullError('cad_viewer_missing', 'Viewer snapshot disappeared before the pull could read it')
     if preview['microversion'] != manifest.get('microversion'):
-        raise PullError('cad_pull_view_stale', 'Loaded viewer differs from the pinned version; create/select a version of the current assembly')
+        raise PullError('cad_pull_view_stale', 'Loaded viewer differs from the pinned version; inspect and pin the displayed native snapshot',
+                        {'viewer_microversion': preview['microversion'], 'pinned_microversion': manifest.get('microversion'),
+                         'tab_id': preview['tab_id'], 'hint': 'Refresh/inspect the intended native assembly. createVersion accepts microversionId to pin the displayed snapshot. Never edit the downloaded revision or geometry.'})
     by_path: dict[str, list[dict]] = {}
     for item in preview['parts']:
         by_path.setdefault(item['occurrence_path'], []).append(item)
