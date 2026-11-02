@@ -1,4 +1,4 @@
-"""Voxel grid over the chassis volume and the per-voxel fields the router uses."""
+"""Voxel search volume and the per-voxel fields the router uses."""
 
 from __future__ import annotations
 
@@ -20,18 +20,28 @@ class VoxelGrid:
     voxel: float
 
     @classmethod
-    def around(cls, obstacles: ObstacleSet, voxel: float, margin_xy: float = 0.015, top_margin: float = 0.055) -> "VoxelGrid":
-        """The routing volume: the static-structure footprint plus a margin in
-        x/y, from the top of the base plate to above the tallest component.
-        Wires are not routed below the base plate (exposed to the ground)."""
-        structures = obstacles.structures or obstacles.static
-        lo = np.min([o.shape.aabb()[0] for o in structures], axis=0)
-        hi = np.max([o.shape.aabb()[1] for o in structures], axis=0)
-        top = max(o.shape.aabb()[1][2] for o in obstacles.static)
-        floor = obstacles.floor()
-        z0 = floor.shape.aabb()[1][2] if floor else lo[2]
-        low = np.array([lo[0] - margin_xy, lo[1] - margin_xy, z0 - voxel])
-        high = np.array([hi[0] + margin_xy, hi[1] + margin_xy, top + top_margin])
+    def around(cls, obstacles: ObstacleSet, voxel: float, margin_xy: float = 0.015,
+               top_margin: float = 0.055, *, points: np.ndarray | None = None) -> "VoxelGrid":
+        """Include native obstacle extents and every required routing destination.
+
+        A structure's AABB top is not a floor: it may be a hollow enclosure
+        with terminals below its walls. Solids remain blocked by their SDFs;
+        search bounds never substitute for actual floor or wall geometry.
+        """
+        bounds = [o.swept.aabb() for o in obstacles.obstacles]
+        if not bounds:
+            raise ValueError("Routing requires native obstacle geometry")
+        lo = np.min([b[0] for b in bounds], axis=0)
+        hi = np.max([b[1] for b in bounds], axis=0)
+        low = lo - [margin_xy, margin_xy, voxel]
+        high = hi + [margin_xy, margin_xy, top_margin]
+        if points is not None and len(points):
+            points = np.asarray(points, dtype=float).reshape(-1, 3)
+            if not np.isfinite(points).all():
+                raise ValueError("Routing destinations must be finite")
+            padding = max(margin_xy, 2 * voxel)
+            low = np.minimum(low, points.min(axis=0) - padding)
+            high = np.maximum(high, points.max(axis=0) + padding)
         shape = tuple(int(math.ceil((high[a] - low[a]) / voxel)) + 1 for a in range(3))
         return cls(low, shape, voxel)  # type: ignore[arg-type]
 
@@ -49,7 +59,8 @@ class VoxelGrid:
 
     def ijk(self, point: np.ndarray) -> tuple[int, int, int]:
         idx = np.round((np.asarray(point) - self.origin) / self.voxel).astype(int)
-        idx = np.clip(idx, 1, np.asarray(self.shape) - 2)
+        if np.any(idx < 1) or np.any(idx > np.asarray(self.shape) - 2):
+            raise ValueError("Routing point lies outside the search volume")
         return int(idx[0]), int(idx[1]), int(idx[2])
 
     def flat(self, point: np.ndarray) -> int:

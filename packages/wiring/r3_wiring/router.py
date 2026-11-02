@@ -245,7 +245,18 @@ class HarnessRouter:
         self.obstacles = obstacles
         self.kin = obstacles.kinematics
         self.opt = options or RouterOptions()
-        self.grid = VoxelGrid.around(obstacles, self.opt.voxel)
+        self.c_req = float(self.spec.requirements.min_wire_clearance_moving)
+        self.diagnostics: list[Diagnostic] = []
+        # Resolve native terminals before allocating fields, so enclosure walls
+        # or outboard connectors cannot clip destinations out of the search.
+        nodes = self._resolve_nodes()
+        points = [p for group in nodes.values() for node in group.values()
+                  for p in (node.exit, node.lead_end) if p is not None]
+        for harness in self.spec.electrical.harnesses:
+            points.extend(harness.route.via)
+            points.extend(harness.route.tie_points)
+            points.extend(p for branch in harness.route.wire_via.values() for p in branch)
+        self.grid = VoxelGrid.around(obstacles, self.opt.voxel, points=np.asarray(points))
         keep = {c for h in self.spec.electrical.harnesses for c in h.route.keep_away}
         from .cache import NumericCache
         self.cache = NumericCache(Path(os.environ.get('R3_WIRING_CACHE_DIR') or
@@ -253,9 +264,7 @@ class HarnessRouter:
         self.fields: Fields = compute_fields(self.grid, obstacles, keep, cache=self.cache)
         self.component_fields = self.fields
         self._cable_fields: dict[tuple, np.ndarray] = {}
-        self.c_req = float(self.spec.requirements.min_wire_clearance_moving)
         self.border = self.grid.border()
-        self.diagnostics: list[Diagnostic] = []
         self.holes: list[PassThrough] = []
         self.hole_mask = bytearray(self.grid.size)
         self._contexts: dict[tuple, _Context] = {}
@@ -492,6 +501,10 @@ class HarnessRouter:
         return pairs
 
     def _resolve_nodes(self) -> dict[str, dict[str, NodePoint]]:
+        # A router instance owns one immutable project/obstacle snapshot. Reuse
+        # the same native exits and leads used to allocate its search volume.
+        if hasattr(self, "_prepared_nodes"):
+            return self._prepared_nodes
         floating = {ref for pair in self._floating_pairs() for ref in pair}
         out: dict[str, dict[str, NodePoint]] = {}
         for harness in self.spec.electrical.harnesses:
@@ -551,6 +564,7 @@ class HarnessRouter:
                 elif node.exit is not None:
                     node.lead_end = node.exit.copy()
             out[harness.id] = nodes
+        self._prepared_nodes = out
         return out
 
     def _native_node(self, node: NodePoint) -> None:

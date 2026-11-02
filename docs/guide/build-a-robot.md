@@ -487,6 +487,12 @@ reuse; `R3_WIRING_CACHE_DIR` can explicitly select a shared cache for frozen val
 copies of the same project. Keep each long validation on one immutable input revision;
 caching does not make results current after the description or CAD changes.
 
+Routing bounds include native geometry, terminal exits and strain-relief runs,
+plus declared waypoints and support destinations. A hollow structure's wall-top
+height is never treated as its interior floor. Actual solid floor and wall
+geometry still block routes; an out-of-volume destination is rejected rather
+than silently moved to a grid edge.
+
 Run `r3 validate --stage connectors,wiring,electrical`. Inspect pin maps, conductor exits,
 route witnesses, bend radii, dynamic clearances, supported spans, cut lengths, ampacity,
 voltage drop, fuse coordination, thermal results and runtime assumptions. The manufacturing
