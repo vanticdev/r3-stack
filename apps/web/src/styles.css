@@ -769,3 +769,17 @@ tr.mismatch td { background: var(--critical-bg); }
 :root[data-theme="light"] .segmented button { border-radius: 0; }
 :root[data-theme="light"] :is(.chip.warning svg, .check-row.warning > .mark, .diag.warning .sev, .diag-row.warning .sev, .fw-line.warning .lvl) { color: #805200; }
 :root[data-theme="light"] .quiet-check { opacity: 1; }
+
+/* Catalog rows wrap long manufacturer names without overlapping the form. */
+.model-bank-columns { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1fr); gap: 16px; align-items: start; }
+.model-bank .model-bank-row { display: grid; gap: 4px; white-space: normal; overflow-wrap: anywhere; text-align: left; justify-items: start; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.model-bank-row .small { font-weight: 400; }
+.model-bank input:not([type]), .model-bank input[type="text"] { font: inherit; color: var(--text-primary); background: var(--surface-1); border: 1px solid var(--line-strong); border-radius: 3px; padding: 6px 8px; width: 100%; min-width: 0; }
+.model-bank input::placeholder { color: var(--text-muted); opacity: 1; }
+.model-bank .field { gap: 3px; }
+.model-bank form { gap: 10px; }
+:root[data-theme="light"] .empty { place-items: start; text-align: left; padding: 20px 16px; gap: 6px; }
+@media (max-width: 900px) { .model-bank-columns { grid-template-columns: minmax(0, 1fr); } }
+:root[data-theme="light"] { --line-strong: #807f79; }
+
+.model-bank > .row > input { width: auto; flex: 1; }

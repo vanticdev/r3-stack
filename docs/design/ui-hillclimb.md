@@ -42,3 +42,30 @@ was recorded on any of the 14 routes. Measured contrast: muted text 3.96:1
 before; new muted text ≥5.10:1 across neutral surfaces; primary button 5.43:1;
 link 5.25:1, success 5.06:1, error 5.16:1 on surface-3. This checks the changed
 palette, not full-app WCAG certification. Focus outlines remain in place.
+
+## Round 2 — catalog and empty-state finish
+
+Fix the edge-to-edge catalog, wrap long names within their own column, show
+persistent required/optional form labels, and align empty-state guidance with
+its section. Strengthen light control boundaries. Keep requests, field names,
+required flags, selection and downloads unchanged. Catalog layout corrections
+also apply in dark mode; its palette remains unchanged.
+
+| Page | Before tells → after | Before H/D/T/C | After H/D/T/C |
+| --- | --- | --- | --- |
+| Projects | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Model bank | 1 → 0 | 3/2/4/4 | 4/4/4/4 |
+| Environment | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Overview | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| 3D model | 0 → 0 | 3/3/4/4 | 3/3/4/4 |
+| Wiring | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Electrical | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| PCB | 1 → 0 | 3/3/4/4 | 4/4/4/4 |
+| Parts | 0 → 0 | 3/4/4/4 | 3/4/4/4 |
+| Software | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Simulation | 0 → 0 | 4/3/4/4 | 4/3/4/4 |
+| Diagnostics | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+| Agent | 0 → 0 | 4/3/4/4 | 4/3/4/4 |
+| Deploy | 0 → 0 | 4/4/4/4 | 4/4/4/4 |
+
+Accepted: total tells 2 → 0 within this checklist and captured states. Zero is not a claim of perfect design. Typecheck, 80 unit tests and production build passed. Label persistence, focus, selection and mobile catalog checks passed in both themes. No API or test IDs changed.
