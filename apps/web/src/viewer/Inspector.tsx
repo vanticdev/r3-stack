@@ -23,11 +23,26 @@ function Kv({ rows }: { rows: [string, React.ReactNode][] }) {
 const worstFirst = (items: Diagnostic[]) => items.slice().sort((a, b) => rank(a) - rank(b));
 const rank = (d: Diagnostic) => (d.severity === "error" ? 0 : d.severity === "warning" ? 1 : 2);
 
+// Index subject prefixes once per immutable query result, including dotted part IDs.
+const partDiagnosticCache = new WeakMap<RobotData["bySubject"], Map<string, Diagnostic[]>>();
 /** Diagnostics of a part: its own, plus those on its pins ("esc.BEC"). */
 export function partDiagnostics(data: RobotData, id: string): Diagnostic[] {
-  const own = data.bySubject[id] ?? [];
-  const pins = Object.entries(data.bySubject).filter(([s]) => s.startsWith(`${id}.`)).flatMap(([, d]) => d);
-  return worstFirst([...new Set([...own, ...pins])]);
+  let index = partDiagnosticCache.get(data.bySubject);
+  if (!index) {
+    const subjects = new Map<string, Set<Diagnostic>>();
+    for (const [subject, diagnostics] of Object.entries(data.bySubject)) {
+      const ids = [subject];
+      for (let dot = subject.indexOf("."); dot >= 0; dot = subject.indexOf(".", dot + 1)) ids.push(subject.slice(0, dot));
+      for (const owner of ids) {
+        let entries = subjects.get(owner);
+        if (!entries) subjects.set(owner, entries = new Set());
+        for (const diagnostic of diagnostics) entries.add(diagnostic);
+      }
+    }
+    index = new Map([...subjects].map(([owner, entries]) => [owner, worstFirst([...new Set([...(data.bySubject[owner] ?? []), ...entries])])]));
+    partDiagnosticCache.set(data.bySubject, index);
+  }
+  return index.get(id) ?? [];
 }
 
 function PartsList({ data, onSelect }: { data: RobotData; onSelect: (s: Selection) => void }) {
