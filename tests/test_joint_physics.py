@@ -549,7 +549,8 @@ def test_moving_carrier_preserves_part_mass_com_and_inertia(tmp_path):
         masses=m.body_mass[ids]
         com=np.average(d.xipos[ids],axis=0,weights=masses)
         assert masses.sum()==pytest.approx(part.mass,rel=1e-10)
-        np.testing.assert_allclose(com,part.com+[0,0,.0005],atol=1e-10)
+        lowest = min(item["bbox_min"][2] for item in parts.values())
+        np.testing.assert_allclose(com,part.com+[0,0,.0005-lowest],atol=1e-10)
         inertia=np.zeros((3,3))
         for bid in ids:
             r=d.xipos[bid]-com;rot=d.ximat[bid].reshape(3,3)

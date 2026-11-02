@@ -509,7 +509,12 @@ def _convex_pieces_cached(key: str, vertices_bytes: bytes, faces_bytes: bytes) -
     vertices = np.frombuffer(vertices_bytes, dtype=float).reshape(-1, 3)
     faces = np.frombuffer(faces_bytes, dtype=np.int64).reshape(-1, 3)
     out: list[tuple[np.ndarray, bool]] = []
-    _split(_manifold(vertices, faces), 0, out)
+    solid = _manifold(vertices, faces)
+    if solid.is_empty():
+        raise ValueError('Collision mesh is not a closed solid')
+    _split(solid, 0, out)
+    if not out:
+        raise ValueError('Collision decomposition produced no geometry')
     return tuple(v for v, _ in out), sum(1 for _, convex in out if not convex)
 
 
@@ -528,6 +533,8 @@ def convex_pieces(vertices: np.ndarray, faces: np.ndarray) -> tuple[list[np.ndar
 
 
 def part_geoms(project: Project, obstacles: ObstacleSet) -> list[PartGeom]:
+    if obstacles.cad_source:
+        return _native_part_geoms(project, obstacles)
     out = []
     for obstacle in obstacles.obstacles:
         shape: Shape = obstacle.shape
@@ -540,6 +547,59 @@ def part_geoms(project: Project, obstacles: ObstacleSet) -> list[PartGeom]:
         elif isinstance(shape, Cylinder):
             out.append(PartGeom(obstacle.component, obstacle.body, obstacle.moving, "cylinder", center=shape.center,
                                 rotation=shape.rotation, size=(float(shape.radius), float(shape.half_length))))
+    return out
+
+
+def _native_part_geoms(project: Project, obstacles: ObstacleSet) -> list[PartGeom]:
+    """Physics consumes original native bodies, never the routing decimation.
+
+    Loaded viewer surfaces can have open render seams. MuJoCo can still use
+    their native vertex hulls as explicitly estimated collision proxies. They
+    remain unqualified surfaces for fabrication; no CAD bytes are repaired.
+    """
+    from r3_model.mesh_io import load_exported_mesh
+    from r3_model.pulled import PullError
+    from r3_model.spec_files import validate_pulled_spec
+    from scipy.spatial import ConvexHull
+
+    pulled = validate_pulled_spec(project.root)
+    if any(obstacles.cad_source.get(key) != getattr(pulled, key)
+           for key in ('document_id', 'version_id')):
+        raise PullError('cad_pull_changed', 'Native CAD changed after routing obstacles were read')
+    out = []
+    for name, part in pulled.parts.items():
+        mesh = load_exported_mesh(part.mesh)
+        ranges = mesh.metadata.get('native_body_ranges', [(0, len(mesh.vertices), 0, len(mesh.faces))])
+        pieces, hull_only = [], 0
+        for v0, v1, f0, f1 in ranges:
+            faces = np.asarray(mesh.faces[f0:f1]) - v0
+            # OBJ loaders may retain unused vertices from another object. Only
+            # vertices referenced by this native body's faces belong to its hull.
+            used, inverse = np.unique(faces, return_inverse=True)
+            vertices = np.asarray(mesh.vertices[v0:v1])[used]
+            faces = inverse.reshape(-1, 3)
+            try:
+                body_pieces, estimated = convex_pieces(vertices, faces)
+            except ValueError as error:
+                if part.geometry_qualification != 'display_mesh':
+                    raise PullError('cad_collision_geometry_invalid', f'{name}: {error}') from error
+                try:
+                    hull = ConvexHull(vertices)
+                    if not np.isfinite(hull.volume) or hull.volume <= 0:
+                        raise ValueError('nonpositive collision hull')
+                except Exception as hull_error:
+                    raise PullError('cad_collision_geometry_invalid',
+                                    f'{name}: native display body has no three-dimensional collision hull') from hull_error
+                body_pieces, estimated = [vertices[hull.vertices]], 1
+            pose = pulled.poses[name]
+            pieces.extend(piece @ pose[:3, :3].T + pose[:3, 3] for piece in body_pieces)
+            hull_only += estimated
+        if not pieces:
+            raise PullError('cad_collision_geometry_invalid', f'{name}: native body has no collision geometry')
+        obstacle = obstacles.by_component(name)
+        body = obstacle.body if obstacle else obstacles.kinematics.body_of(name)
+        moving = obstacle.moving if obstacle else obstacles.kinematics.is_moving(body)
+        out.append(PartGeom(name, body, moving, 'mesh', pieces, hull_only=hull_only))
     return out
 
 

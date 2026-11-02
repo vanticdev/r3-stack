@@ -829,6 +829,13 @@ Mesh printability, native mate closure and physics checks still apply. Render
 meshes may have open seams or insufficient detail; those results are reported,
 not repaired or silently treated as closed solids. Analytic surface/interface
 qualification stays explicitly pending where its supporting data is unavailable.
+Prototype collision geometry consumes the original native bodies rather than the
+coarser routing mesh. Open display surfaces use conservative convex hulls, reported
+as `joint_collision_estimated`; these hulls can fill cavities and do not qualify
+clearance or printability. They never replace or repair the pulled geometry. The
+complete assembly starts above the ground using its lowest native surface. Internal
+contacts between rigidly retained bodies return when their last retention path
+releases; attachment strength and detachment checks remain active.
 That does not require stopping all modelling or prototype simulation. Do not
 claim a fabrication release from a display mesh. Higher precision exports or
 verified native analytic data can later complete the remaining qualification.

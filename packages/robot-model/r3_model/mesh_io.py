@@ -24,6 +24,18 @@ class ExportMeshError(ValueError):
         super().__init__(f'Exported glTF body {body!r} is not a finite, closed positive-volume solid; {reasons}')
 
 
+def _native_bodies(pieces: list[trimesh.Trimesh]) -> trimesh.Trimesh:
+    """Retain body index ranges for consumers that must not join touching bodies."""
+    ranges, vertex, face = [], 0, 0
+    for piece in pieces:
+        ranges.append((vertex, vertex + len(piece.vertices), face, face + len(piece.faces)))
+        vertex += len(piece.vertices)
+        face += len(piece.faces)
+    mesh = trimesh.util.concatenate(pieces)
+    mesh.metadata['native_body_ranges'] = ranges
+    return mesh
+
+
 def load_exported_stl(path: str | Path) -> trimesh.Trimesh:
     """Join only identical STL vertices; leave every coordinate and facet intact.
 
@@ -82,7 +94,7 @@ def load_exported_mesh(path: str | Path) -> trimesh.Trimesh:
         raise ValueError('Exported glTF contains missing or unreferenced body geometry')
     # concatenate preserves separate vertex indices across bodies. No welding,
     # hole filling, face removal, winding changes or local re-tessellation.
-    return trimesh.util.concatenate(pieces)
+    return _native_bodies(pieces)
 
 
 def load_viewer_obj(path: str | Path) -> trimesh.Trimesh:
@@ -111,6 +123,6 @@ def load_viewer_obj(path: str | Path) -> trimesh.Trimesh:
         pieces.append(piece)
     if not pieces:
         raise ValueError('Native viewer OBJ contains no mesh bodies')
-    mesh = trimesh.util.concatenate(pieces)
+    mesh = _native_bodies(pieces)
     mesh.metadata.update(geometry_qualification='display_mesh', bodies=qualities)
     return mesh

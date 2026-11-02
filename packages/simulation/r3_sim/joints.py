@@ -87,7 +87,10 @@ def separate_parts(
     props.clear()
     extras.clear()
     rotation = rpy_matrix([0, 0, initial_pose[2]])
-    shift = np.array([initial_pose[0], initial_pose[1], 0.0005])
+    # The native datum need not be the lowest surface (feet, for example,
+    # commonly extend below it). Ground the complete native geometry.
+    lowest = min(float(part['bbox_min'][2]) for part in cad_parts.values())
+    shift = np.array([initial_pose[0], initial_pose[1], 0.0005 - lowest])
     carriers = {}
     fraction = float(project.catalog.joint_defaults["carrier_mass_fraction"].value)
     if not 0 < fraction < 1:
@@ -429,13 +432,35 @@ def separate_parts(
         for (a, ea), (b, eb) in combinations(edges, 2):
             if a != b:
                 groups.setdefault(tuple(sorted((a, b))), []).append([ea, eb])
+    # Conservative display-mesh hulls may overlap inside a retained rigid
+    # assembly. Suppress those internal contacts only while an active weld path
+    # retains both bodies; a released connection restores physical contact.
+    rigid_edges = [(binding["body1"], binding["body2"], binding["equality"])
+                   for binding in bindings
+                   if equality.find(f"weld[@name='{binding['equality']}']") is not None]
+    rigid = _rigid_components(rigid_edges)
+    bounds = {part.component: (np.min(np.concatenate(part.pieces), axis=0),
+                               np.max(np.concatenate(part.pieces), axis=0))
+              for part in collision if part.kind == "mesh" and part.pieces}
+    rigid_pairs = set()
+    for a, b in combinations(bounds, 2):
+        if rigid.get(a) != rigid.get(b) or a not in rigid:
+            continue
+        lo_a, hi_a = bounds[a]
+        lo_b, hi_b = bounds[b]
+        if np.all(hi_a >= lo_b) and np.all(hi_b >= lo_a):
+            pair = tuple(sorted((a, b)))
+            groups.setdefault(pair, [])
+            rigid_pairs.add(pair)
+    contact_groups = []
     for index, ((a, b), eqs) in enumerate(groups.items()):
-        ET.SubElement(contact, "exclude", name=f"joint_exclude:{index}", body1=a, body2=b)
-    for binding in bindings:
-        binding["contact_groups"] = [
-            {"name": f"joint_exclude:{index}", "paths": eqs} for index, (_, eqs) in enumerate(groups.items())
-        ]
-        break
+        name = f"joint_exclude:{index}"
+        ET.SubElement(contact, "exclude", name=name, body1=a, body2=b)
+        contact_groups.append({"name": name, "paths": eqs,
+                               "rigid_pair": [a, b] if (a, b) in rigid_pairs else None})
+    if bindings:
+        bindings[0]["contact_groups"] = contact_groups
+        bindings[0]["rigid_edges"] = rigid_edges
     # Constraint islands and sleeping are MuJoCo optimisations; no check is skipped.
     option = mj.find("option")
     option.set("solver", "Newton")
@@ -451,6 +476,21 @@ def separate_parts(
     if hasattr(mujoco.mjtEnableBit, "mjENBL_DIAGEXACT"):
         flag.set("diagexact", "enable")
     return cm, bindings
+
+
+def _rigid_components(edges: list[tuple[Any, Any, Any]]) -> dict[Any, Any]:
+    """Connected components of the currently retained weld graph."""
+    parents: dict[Any, Any] = {}
+
+    def find(body: Any) -> Any:
+        parents.setdefault(body, body)
+        while parents[body] != body:
+            parents[body] = parents[parents[body]]
+            body = parents[body]
+        return body
+    for a, b, _ in edges:
+        parents[find(a)] = find(b)
+    return {body: find(body) for body in parents}
 
 
 @dataclass
@@ -503,6 +543,8 @@ class JointMonitor:
             c = connections.connections[binding["index"]]
             if c.group:
                 self._groups.setdefault(c.group, []).append((c, model.equality(binding["equality"]).id))
+        self.rigid_edges = [(model.body(a).id, model.body(b).id, model.equality(eq).id)
+                            for a, b, eq in (bindings[0].get("rigid_edges", []) if bindings else [])]
         self.contact_groups = []
         for group in bindings[0].get("contact_groups", []) if bindings else []:
             exclude = model.exclude(group["name"]).id
@@ -510,6 +552,7 @@ class JointMonitor:
                 (
                     int(model.exclude_signature[exclude]),
                     [[model.equality(n).id for n in path] for path in group["paths"]],
+                    tuple(model.body(n).id for n in group["rigid_pair"]) if group.get("rigid_pair") else None,
                 )
             )
         self.other_excludes = [
@@ -625,9 +668,11 @@ class JointMonitor:
     def _refresh_contacts(self) -> None:
         if not self.contact_groups:
             return
+        rigid = _rigid_components([(a, b, eq) for a, b, eq in self.rigid_edges if self.data.eq_active[eq]])
         signatures = self.other_excludes + [
-            signature if any(all(self.data.eq_active[e] for e in path) for path in eqs) else 0
-            for signature, eqs in self.contact_groups
+            signature if (any(all(self.data.eq_active[e] for e in path) for path in eqs)
+                          or (pair and pair[0] in rigid and rigid[pair[0]] == rigid.get(pair[1]))) else 0
+            for signature, eqs, pair in self.contact_groups
         ]
         self.model.exclude_signature[:] = sorted(signatures)
 
