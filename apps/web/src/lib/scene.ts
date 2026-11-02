@@ -142,12 +142,6 @@ export function withConnectorDisplayPaths(wires: SceneWire[], pins: Record<strin
   });
 }
 
-/** These paths are derived alongside the current routes, never from an older connector run. */
-export function withRoutedConductorPaths(wires: SceneWire[], paths: Record<string, Vec3[]>): SceneWire[] {
-  return wires.map((wire) => wire.routed && paths[wire.id]?.length
-    ? { ...wire, path: paths[wire.id]! } : wire);
-}
-
 export interface SceneModel {
   components: SceneComponent[];
   wires: SceneWire[];

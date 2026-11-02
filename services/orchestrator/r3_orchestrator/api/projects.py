@@ -323,7 +323,6 @@ def cad_view(ref: ProjectRef) -> dict[str, Any]:
 
 
 def wiring_view(ref: ProjectRef) -> dict[str, Any]:
-    from .wire_display import conductor_display
     project = load(ref)
     build = ref.root / "build" / "wiring"
     routes = _read_json(build / "routes.json")
@@ -337,8 +336,7 @@ def wiring_view(ref: ProjectRef) -> dict[str, Any]:
     harnesses = {h.id: {"index": i, "wires": [w.id for w in h.wires], "connectors": list(h.connectors),
                         "route": h.route.model_dump(mode="json"), "jacket": h.jacket}
                  for i, h in enumerate(project.spec.electrical.harnesses)}
-    return _finite({"routes": routes, "routing_detail": detail_, "conductor_display": conductor_display(routes, detail_),
-                    "bom": _csv_rows(build / "harness_bom.csv"),
+    return _finite({"routes": routes, "routing_detail": detail_, "bom": _csv_rows(build / "harness_bom.csv"),
                     "bom_url": artifact_url(ref.id, "wiring/harness_bom.csv") if (build / "harness_bom.csv").exists() else None,
                     "clearances": {"static": (routes or {}).get("clearances", []), "moving": metrics.get("wire_min_clearance_moving"),
                                    "worst_static": metrics.get("worst_static_clearance"),

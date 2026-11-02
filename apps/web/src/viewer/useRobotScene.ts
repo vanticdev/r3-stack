@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { connectorAssetUrl, useConnectors, type ConnectorsJson } from "../api/connectors.ts";
 import { useCad, useDiagnostics, useModel, useSpec, useWiring } from "../api/hooks.ts";
 import type { AssemblyJson, CadPart, Diagnostic, GraphComponent, GraphEndpoint, RoutesJson, SpecJoint, Vec3 } from "../api/types.ts";
-import { buildScene, diagnosticsBySubject, withConnectorDisplayPaths, withRoutedConductorPaths, type SceneComponent, type SceneWire } from "../lib/scene.ts";
+import { buildScene, diagnosticsBySubject, withConnectorDisplayPaths, type SceneComponent, type SceneWire } from "../lib/scene.ts";
 import { componentCenter, jointChains, mountTree, type MountTree } from "../lib/transforms.ts";
 import { quantity } from "../lib/units.ts";
 
@@ -72,8 +72,7 @@ export function useRobotScene(pid: string) {
     for (const [id, m] of Object.entries(graph.mass?.by_component ?? {})) massSource[id] = m.source;
     // Pin-to-pin display paths: conductors of a bundle side by side, each ending on its pin.
     const pinWires = connectors.data?.wires ?? {};
-    const wires = withRoutedConductorPaths(withConnectorDisplayPaths(scene.wires, pinWires),
-      wiring.data?.conductor_display?.paths ?? {});
+    const wires = withConnectorDisplayPaths(scene.wires, pinWires);
     return {
       components: scene.components, wires, graphComponents: graph.components,
       hardware: Object.entries(cadParts).flatMap(([id, part]) => {
