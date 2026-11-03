@@ -46,7 +46,7 @@ def separate_parts(
     are never collision geoms.
     """
     from r3_model.graph import rpy_matrix
-    from r3_wiring.mujoco_cables import part_geoms
+    from r3_wiring.mujoco_cables import environment_only, part_geoms
     from r3_wiring.obstacles import build_obstacles
 
     contact_proxies = contact_proxies or {}
@@ -264,13 +264,14 @@ def separate_parts(
         if part.kind == "mesh":
             # Hulls of mated display meshes overlap at rest. Part-to-part contact
             # needs a closed solid, so these reach only the ground and obstacles.
-            attributes = {**common, "contype": "2", "conaffinity": "0"} if part.open_mesh else common
+            hull = environment_only(part)
+            attributes = {**common, "contype": "2", "conaffinity": "0"} if hull else common
             for k, vertices in enumerate(part.pieces):
                 mesh = f"joint_col_{name}_{k}"
                 ET.SubElement(asset, "mesh", name=mesh, vertex=_fmt(vertices - origin))
                 ET.SubElement(el, "geom", name=mesh, type="mesh", mesh=mesh, **attributes)
             if part.hull_only:
-                detail = " for environment contact only; no part-to-part contact" if part.open_mesh else ""
+                detail = " for environment contact only; no part-to-part contact" if hull else ""
                 cm.diagnostics.append(
                     Diagnostic.warning(
                         "joint_collision_estimated",

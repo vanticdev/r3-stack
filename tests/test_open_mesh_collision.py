@@ -2,7 +2,7 @@
 import numpy as np
 import trimesh
 
-from r3_wiring.mujoco_cables import convex_pieces, is_closed_solid
+from r3_wiring.mujoco_cables import PartGeom, convex_pieces, environment_only, is_closed_solid
 
 
 def test_closed_mesh_still_splits_exactly():
@@ -46,3 +46,19 @@ def test_environment_only_contact_reaches_the_ground_but_not_other_parts():
     pairs = {tuple(sorted((int(contact.geom1), int(contact.geom2)))) for contact in data.contact[:data.ncon]}
     ground, a, b = (mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name) for name in ("ground", "a", "b"))
     assert pairs == {tuple(sorted((ground, a))), tuple(sorted((ground, b)))}
+
+
+def test_fallback_hull_touches_only_the_environment():
+    part = PartGeom('body', 'body', False, 'mesh', [np.zeros((4, 3))], hull_only=1, open_mesh=True)
+    assert environment_only(part)
+
+
+def test_real_geometry_keeps_part_contact_even_on_an_open_mesh_part():
+    pieces = [np.zeros((4, 3)), np.ones((4, 3))]
+    assert not environment_only(PartGeom('body', 'body', False, 'mesh', pieces, hull_only=0, open_mesh=True))
+    assert not environment_only(PartGeom('body', 'body', False, 'mesh', pieces, hull_only=1, open_mesh=True))
+    assert not environment_only(PartGeom('body', 'body', False, 'mesh', pieces[:1], hull_only=0, open_mesh=True))
+
+
+def test_closed_part_is_never_environment_only():
+    assert not environment_only(PartGeom('body', 'body', False, 'mesh', [np.zeros((4, 3))], hull_only=1, open_mesh=False))

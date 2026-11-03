@@ -543,6 +543,15 @@ def convex_pieces(vertices: np.ndarray, faces: np.ndarray) -> tuple[list[np.ndar
     return [p.copy() for p in pieces], hull_only
 
 
+def environment_only(part: PartGeom) -> bool:
+    """Is this part's geometry just the fallback hull of an open mesh?
+
+    Decided from the pieces in use, so a part given real closed geometry
+    keeps full part-to-part contact whatever mesh it started from.
+    """
+    return part.open_mesh and len(part.pieces) == 1 and part.hull_only == 1
+
+
 def is_closed_solid(vertices: np.ndarray, faces: np.ndarray) -> bool:
     """False for an open display mesh, whose hull says nothing about part-to-part fit."""
     return not _manifold(np.ascontiguousarray(vertices, dtype=float), np.ascontiguousarray(faces, dtype=np.int64)).is_empty()
