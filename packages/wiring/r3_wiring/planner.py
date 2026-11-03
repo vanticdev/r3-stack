@@ -55,6 +55,8 @@ with the cable supports as junctions.
 from __future__ import annotations
 
 import math
+import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -719,8 +721,32 @@ class _Problem:
 
 
 # ------------------------------------------------------------------ solve
+class _PlannerProgress:
+    """Observe solver iterations without changing inputs or termination rules."""
+
+    def __init__(self, phase: str, variables: int) -> None:
+        self.phase = phase
+        self.started = self.last_report = time.monotonic()
+        self.iterations = 0
+        self.logger = logging.getLogger(__name__)
+        self.logger.info("Wiring planner %s started: %d variables", phase, variables)
+
+    def __call__(self, _x: np.ndarray, state: Any = None) -> None:
+        self.iterations += 1
+        now = time.monotonic()
+        if now - self.last_report < 30:
+            return
+        self.last_report = now
+        # trust-constr already measured this residual. Never run an additional
+        # geometry query or use the observation as a solver stopping condition.
+        residual = getattr(state, "constr_violation", None)
+        self.logger.info("Wiring planner %s: iteration %d, elapsed %.1fs, solver residual %s",
+                         self.phase, self.iterations, now - self.started, residual)
+
+
 def _constrained(fun: Any, x: np.ndarray, jac: Any, bounds: list[tuple[float, float]],
-                 cons: Any, cons_jac: Any, max_iterations: int) -> Any:
+                 cons: Any, cons_jac: Any, max_iterations: int,
+                 progress: _PlannerProgress | None = None) -> Any:
     """Unchanged physical inequalities, using SciPy's sparse solver at scale.
 
     Analytical Jacobians plus finite-difference Hessian products avoid both the
@@ -728,7 +754,7 @@ def _constrained(fun: Any, x: np.ndarray, jac: Any, bounds: list[tuple[float, fl
     through the unchanged physical constraint audit below.
     """
     if len(x) <= DENSE_SLSQP_MAX_VARIABLES:
-        return minimize(fun, x, jac=jac, method="SLSQP", bounds=bounds,
+        return minimize(fun, x, jac=jac, method="SLSQP", bounds=bounds, callback=progress,
                         constraints=[{"type": "ineq", "fun": cons, "jac": lambda z: cons_jac(z).toarray()}],
                         options={"maxiter": max_iterations, "ftol": 1e-10})
     # Position, unit-axis and elastic-slack coordinates have different units.
@@ -742,7 +768,7 @@ def _constrained(fun: Any, x: np.ndarray, jac: Any, bounds: list[tuple[float, fl
     constraint = NonlinearConstraint(lambda y: cons(physical(y)), 0.0, np.inf, jac=scaled_jac, hess="2-point")
     scaled_bounds = [((lo - value) / factor, (hi - value) / factor) for (lo, hi), value, factor in zip(bounds, origin, scale)]
     result = minimize(lambda y: fun(physical(y)), np.zeros_like(x), jac=lambda y: jac(physical(y)) * scale,
-                      hess="2-point", method="trust-constr", bounds=scaled_bounds, constraints=[constraint],
+                      hess="2-point", method="trust-constr", bounds=scaled_bounds, constraints=[constraint], callback=progress,
                       options={"maxiter": max_iterations, "gtol": 1e-12, "xtol": 1e-12, "barrier_tol": 1e-12,
                                "sparse_jacobian": True, "factorization_method": "AugmentedSystem"})
     result.x = physical(result.x)
@@ -789,7 +815,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     x1, iterations1 = x0, 0
     for weight in PENALTY_WEIGHTS:
         step = minimize(penalty, x1, args=(weight,), jac=True, method="L-BFGS-B", bounds=bounds,
-                        options={"maxiter": 400})
+                        options={"maxiter": 400}, callback=_PlannerProgress(f"penalty weight={weight:g}", problem.n))
         iterations1 += int(step.nit)
         if violation(step.x) <= violation(x1) + 1e-12 or weight == PENALTY_WEIGHTS[0]:
             x1 = step.x
@@ -846,7 +872,7 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     g1, _, _ = problem.constraints(x1)
     z1 = np.concatenate([x1, [max(0.0, -float(g1.min())) + 1e-3]])
     try:
-        result = _constrained(fun, z1, jac, [*bounds, (0.0, np.inf)], cons, cons_jac, max_iterations)
+        result = _constrained(fun, z1, jac, [*bounds, (0.0, np.inf)], cons, cons_jac, max_iterations, _PlannerProgress("elastic", len(z1)))
         x2, message, iterations = result.x[:-1], str(result.message), int(result.nit)
         stats["elastic_slack"] = float(result.x[-1])
         stats["elastic_solver"] = "SLSQP" if len(z1) <= DENSE_SLSQP_MAX_VARIABLES else "trust-constr"
@@ -856,7 +882,8 @@ def plan_bundle(segments: list[Segment], junctions: dict[str, Junction], fields:
     x3 = x2
     try:
         polish = _constrained(lambda x: problem.objective(x)[0], x2, lambda x: problem.objective(x)[1], bounds,
-                              lambda x: problem.constraints(x)[0], lambda x: problem.constraints(x)[1], 2 * max_iterations)
+                              lambda x: problem.constraints(x)[0], lambda x: problem.constraints(x)[1], 2 * max_iterations,
+                              _PlannerProgress("polish", len(x2)))
         x3 = polish.x
         stats["polish_solver"] = "SLSQP" if len(x2) <= DENSE_SLSQP_MAX_VARIABLES else "trust-constr"
         stats["polish_message"] = str(polish.message)
