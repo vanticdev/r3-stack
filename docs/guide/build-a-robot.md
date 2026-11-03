@@ -889,6 +889,19 @@ This changes allocated storage only: do not reduce contacts, geometry fidelity,
 scenario duration or engineering limits to avoid an allocation failure. The same
 budget applies to full-twin and standalone cable worlds; exhaustion remains a
 failed, incomplete result, never a qualification pass.
+
+The assembly runtime caches MuJoCo's own compiled MJB under `build/cache/mujoco/`
+(1 GiB, four models). Every hit verifies the complete XML, absolute asset-file
+hashes, native runtime binaries/version and cached binary checksum, then loads
+a fresh model before runtime changes. Native CAD validation, initial conditions,
+physics, firmware and every check still run; simulated results are never reused.
+Changed geometry, mass, poses, solver settings or arena storage require a new
+compile. Unresolved include/relative-file dependencies and external plugins use
+the normal compiler without caching. `R3_MUJOCO_MODEL_CACHE=0` bypasses reuse.
+A first compilation can itself exceed the project runner's wall-clock budget;
+use `testing.timeout` rather than shortening the physical experiment. Cache files
+are derived work: never edit them or treat them as CAD or qualification evidence.
+
 That does not require stopping all modelling or prototype simulation. Do not
 claim a fabrication release from a display mesh. Higher precision exports or
 verified native analytic data can later complete the remaining qualification.

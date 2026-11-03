@@ -50,7 +50,8 @@ class RobotDynamics:
         self.steering = getattr(vm, "steering", [])
         if self.steering:
             from .vehicle.servo import SteeringServo
-        self.model = mujoco.MjModel.from_xml_string(vm.xml)
+        from .compiled_models import compile_model
+        self.model = compile_model(project, vm.xml)
         self.data = mujoco.MjData(self.model)
         # Compile fixture planes with their final masks so MuJoCo's aggregate
         # world-body mask includes them. Hold them inactive only during setup;
