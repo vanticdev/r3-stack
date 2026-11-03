@@ -82,8 +82,18 @@ class RobotDynamics:
         self.tire_geom_to_wheel = {gid: cid for cid, gid in self.wheel_tire_geom.items()}
         self._wheel_order = list(self.wheels)
         self._tire_index = np.full(model.ngeom, -1, dtype=np.int64)
+        self._flex_tire_index = np.full(model.nflex, -1, dtype=np.int64)
         for k, cid in enumerate(self._wheel_order):
-            self._tire_index[self.wheel_tire_geom[cid]] = k
+            if self.wheel_tire_geom[cid] >= 0:
+                self._tire_index[self.wheel_tire_geom[cid]] = k
+            body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, cid)
+            for f in range(model.nflex):
+                start, count = int(model.flex_vertadr[f]), int(model.flex_vertnum[f])
+                if (model.flex_rigid[f] and model.flex_contype[f] & 1 and count
+                        and np.all(model.flex_vertbodyid[start:start + count] == body)):
+                    # Internal surfaces replaced by an environment contact proxy
+                    # must not count shaft/fastener loads as rolling support.
+                    self._flex_tire_index[f] = k
         self._contact_force = np.zeros(6)
         self._object_velocity = np.zeros(6)
         self._resistance_wrenches = np.zeros((model.nbody,6))
@@ -104,11 +114,14 @@ class RobotDynamics:
         self.motor_torque = [0.0 for _ in vm.drives]
         self.carrier_torque = [0.0 for _ in vm.drives]
         self.steer_targets = [(0.0, 0.0) for _ in self.steering]
+        from .surface_collisions import ContactExclusions
+        contact_filter = ContactExclusions(model, vm.joint_bindings)
+        contact_filter.refresh(self.data.eq_active)
         mujoco.mj_forward(model, self.data)
         from .joints import JointMonitor
 
         self.joints = JointMonitor(
-            model, self.data, vm.connections, vm.joint_bindings, vm.root
+            model, self.data, vm.connections, vm.joint_bindings, vm.root, contact_filter=contact_filter
         )
         self.joints.origins = {
             **vm.body_origin,
@@ -295,7 +308,14 @@ class RobotDynamics:
         if not n:
             return
         geoms = data.contact.geom[:n]
-        wheel = np.maximum(self._tire_index[geoms[:, 0]], self._tire_index[geoms[:, 1]])
+        indexes = np.full(geoms.shape, -1, dtype=np.int64)
+        valid = geoms >= 0
+        indexes[valid] = self._tire_index[geoms[valid]]
+        if self.model.nflex:
+            flexes = data.contact.flex[:n]
+            valid = flexes >= 0
+            indexes[valid] = np.maximum(indexes[valid], self._flex_tire_index[flexes[valid]])
+        wheel = indexes.max(axis=1)
         hits = np.flatnonzero(wheel >= 0)
         if not len(hits):
             return

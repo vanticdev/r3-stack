@@ -198,6 +198,7 @@ class PartGeom:
     rotation: np.ndarray | None = None
     size: tuple[float, ...] = ()  # box half extents | (radius, half length)
     hull_only: int = 0  # pieces that stay non-convex (hull used, conservative)
+    native_surface: bool = False
 
 
 @dataclass
@@ -537,9 +538,9 @@ def convex_pieces(vertices: np.ndarray, faces: np.ndarray) -> tuple[list[np.ndar
     return [p.copy() for p in pieces], hull_only
 
 
-def part_geoms(project: Project, obstacles: ObstacleSet) -> list[PartGeom]:
+def part_geoms(project: Project, obstacles: ObstacleSet, *, rigid_surfaces: bool = False) -> list[PartGeom]:
     if obstacles.cad_source:
-        return _native_part_geoms(project, obstacles)
+        return _native_part_geoms(project, obstacles, rigid_surfaces=rigid_surfaces)
     out = []
     for obstacle in obstacles.obstacles:
         shape: Shape = obstacle.shape
@@ -555,12 +556,12 @@ def part_geoms(project: Project, obstacles: ObstacleSet) -> list[PartGeom]:
     return out
 
 
-def _native_part_geoms(project: Project, obstacles: ObstacleSet) -> list[PartGeom]:
+def _native_part_geoms(project: Project, obstacles: ObstacleSet, *, rigid_surfaces: bool = False) -> list[PartGeom]:
     """Physics consumes original native bodies, never the routing decimation.
 
-    Loaded viewer surfaces can have open render seams. MuJoCo can still use
-    their native vertex hulls as explicitly estimated collision proxies. They
-    remain unqualified surfaces for fabrication; no CAD bytes are repaired.
+    Loaded viewer surfaces can have open render seams. Assembly dynamics uses
+    rigid native surfaces; cable planning retains estimated convex proxies.
+    Neither qualifies a closed solid or repairs any pulled CAD bytes.
     """
     from r3_model.mesh_io import load_exported_mesh
     from r3_model.pulled import PullError
@@ -574,6 +575,26 @@ def _native_part_geoms(project: Project, obstacles: ObstacleSet) -> list[PartGeo
     out = []
     for name, part in pulled.parts.items():
         mesh = load_exported_mesh(part.mesh)
+        if rigid_surfaces and part.geometry_qualification == 'display_mesh':
+            # Only source-face vertices belong to this part; native exporters
+            # can leave unrelated, unused positions in an OBJ vertex pool.
+            vertices = np.asarray(mesh.vertices)[np.unique(mesh.faces)]
+            try:
+                hull = ConvexHull(vertices)
+                if not np.isfinite(hull.volume) or hull.volume <= 0:
+                    raise ValueError('nonpositive source extent')
+            except Exception as error:
+                raise PullError('cad_collision_geometry_invalid',
+                                f'{name}: native display body has no three-dimensional extent') from error
+            pose = pulled.poses[name]
+            # This cloud supplies bounds for contact grouping only. MuJoCo
+            # loads the unchanged native triangles, not this convex hull.
+            bounds = vertices[hull.vertices] @ pose[:3, :3].T + pose[:3, 3]
+            obstacle = obstacles.by_component(name)
+            body = obstacle.body if obstacle else obstacles.kinematics.body_of(name)
+            moving = obstacle.moving if obstacle else obstacles.kinematics.is_moving(body)
+            out.append(PartGeom(name, body, moving, 'mesh', [bounds], native_surface=True))
+            continue
         ranges = mesh.metadata.get('native_body_ranges', [(0, len(mesh.vertices), 0, len(mesh.faces))])
         pieces, hull_only = [], 0
         for v0, v1, f0, f1 in ranges:

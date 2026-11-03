@@ -41,9 +41,9 @@ def separate_parts(
 ) -> tuple[ConnectionModel, list[dict[str, Any]]]:
     """Split the legacy visual tree into individual massive parts, before cables.
 
-    Collision shapes use the existing wiring convex decomposition (cached),
-    with catalog primitives when no CAD mesh is available. Raw triangle meshes
-    are never collision geoms.
+    Prototype viewer meshes use MuJoCo's rigid native surface contacts, so
+    cavities are not filled by convex hulls. Solid exports retain their verified
+    decomposition path. Raw triangles are rigid flexes, not convex mesh geoms.
     """
     from r3_model.graph import rpy_matrix
     from r3_wiring.mujoco_cables import part_geoms
@@ -247,7 +247,7 @@ def separate_parts(
         for name in (f.part, f.nut_part)
         if name
     }
-    collision = part_geoms(project, build_obstacles(project)[0])
+    collision = part_geoms(project, build_obstacles(project)[0], rigid_surfaces=True)
     common = dict(
         mass="0",
         contype="1",
@@ -266,6 +266,15 @@ def separate_parts(
         origin = origins[name]
         uses_proxy = name in contact_proxies
         common["contype"] = "16" if uses_proxy else "1"
+        if part.native_surface:
+            from .surface_collisions import emit_surface_file
+            path = project.root / "build/cad" / cad_parts[name]["mesh"]
+            emit_surface_file(el, name, path, origin, common["friction"], common["contype"])
+            cm.diagnostics.append(Diagnostic.warning(
+                "joint_collision_estimated",
+                f"{name}: unchanged native surface contacts; solid qualification pending",
+                subjects=[name], data={"surface_triangles": cad_parts[name]["mesh_triangles"]}))
+            continue
         if part.kind == "mesh":
             for k, vertices in enumerate(part.pieces):
                 mesh = f"joint_col_{name}_{k}"
@@ -455,10 +464,16 @@ def separate_parts(
             groups.setdefault(pair, [])
             rigid_pairs.add(pair)
     contact_groups = []
+    surface_contacts = any(p.native_surface for p in collision)
     for index, ((a, b), eqs) in enumerate(groups.items()):
         name = f"joint_exclude:{index}"
-        ET.SubElement(contact, "exclude", name=name, body1=a, body2=b)
+        # Reserve space for geom/flex combinations. MuJoCo accepts duplicate
+        # body exclusions; the monitor replaces their signatures before stepping.
+        names = [name] + ([f"{name}:{i}" for i in range(1, 4)] if surface_contacts else [])
+        for slot in names:
+            ET.SubElement(contact, "exclude", name=slot, body1=a, body2=b)
         contact_groups.append({"name": name, "paths": eqs,
+                               "slots": names, "body_pair": [a, b] if surface_contacts else None,
                                "rigid_pair": [a, b] if (a, b) in rigid_pairs else None})
     if bindings:
         bindings[0]["contact_groups"] = contact_groups
@@ -534,6 +549,7 @@ class JointMonitor:
         connections: ConnectionModel,
         bindings: list[dict[str, Any]],
         root: str,
+        *, contact_filter: Any = None,
     ) -> None:
         self.model, self.data, self.connections = model, data, connections
         self.states = {c.id: JointState() for c in connections.connections}
@@ -545,24 +561,13 @@ class JointMonitor:
             c = connections.connections[binding["index"]]
             if c.group:
                 self._groups.setdefault(c.group, []).append((c, model.equality(binding["equality"]).id))
-        self.rigid_edges = [(model.body(a).id, model.body(b).id, model.equality(eq).id)
-                            for a, b, eq in (bindings[0].get("rigid_edges", []) if bindings else [])]
-        self.contact_groups = []
-        for group in bindings[0].get("contact_groups", []) if bindings else []:
-            exclude = model.exclude(group["name"]).id
-            self.contact_groups.append(
-                (
-                    int(model.exclude_signature[exclude]),
-                    [[model.equality(n).id for n in path] for path in group["paths"]],
-                    tuple(model.body(n).id for n in group["rigid_pair"]) if group.get("rigid_pair") else None,
-                )
-            )
-        self.other_excludes = [
-            int(model.exclude_signature[i])
-            for i in range(model.nexclude)
-            if not model.exclude(i).name.startswith("joint_exclude:")
-        ]
+        from .surface_collisions import ContactExclusions
+        self._contact_filter = contact_filter or ContactExclusions(model, bindings)
+        self.rigid_edges = self._contact_filter.rigid_edges
+        self.contact_groups = self._contact_filter.groups
+        self.other_excludes = self._contact_filter.other
         self.root = root
+        self._refresh_contacts()
         mujoco.mj_forward(model, data)
         for binding in bindings:
             c = connections.connections[binding["index"]]
@@ -668,15 +673,7 @@ class JointMonitor:
         )
 
     def _refresh_contacts(self) -> None:
-        if not self.contact_groups:
-            return
-        rigid = _rigid_components([(a, b, eq) for a, b, eq in self.rigid_edges if self.data.eq_active[eq]])
-        signatures = self.other_excludes + [
-            signature if (any(all(self.data.eq_active[e] for e in path) for path in eqs)
-                          or (pair and pair[0] in rigid and rigid[pair[0]] == rigid.get(pair[1]))) else 0
-            for signature, eqs, pair in self.contact_groups
-        ]
-        self.model.exclude_signature[:] = sorted(signatures)
+        self._contact_filter.refresh(self.data.eq_active)
 
     def step(self) -> None:
         """Project equality forces in one batch; no contact/constraint solve here."""

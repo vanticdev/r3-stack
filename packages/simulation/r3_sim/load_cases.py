@@ -19,7 +19,7 @@ import numpy as np
 from r3_model.spec import Scenario
 
 # Bump when mechanical fixture geometry or placement changes.
-FIXTURE_VERSION = 2
+FIXTURE_VERSION = 3
 
 FACES = {
     "upright": [0, 0, 1],
@@ -247,12 +247,15 @@ class LoadCase:
                 return float(rot @ size)
             return float(m.geom_rbound[g])
 
-        bottom = min((d.geom_xpos[g, 2] - bound(g, 2) for g in rigid), default=0)
+        from .surface_collisions import surface_plane_distances, surface_supports
+        bottom = min([d.geom_xpos[g, 2] - bound(g, 2) for g in rigid]
+                     + surface_supports(m, d, 2), default=0)
         clearance = float(self.load.get("height", 0.1))
         if self.load["kind"] in ("drop", "impact"):
             ground = m.geom("joint_test_ground").id
             limit = max(1.0, 4 * float(m.stat.extent))
-            bottom = min((mujoco.mj_geomDistance(m, d, g, ground, limit, None) for g in rigid), default=0)
+            bottom = min([mujoco.mj_geomDistance(m, d, g, ground, limit, None) for g in rigid]
+                         + surface_plane_distances(m, d, ground), default=0)
             clearance = float(self.load["height"]) if self.load["kind"] == "drop" else 0.0
             self.initial_clearance = clearance
         shift = np.array([0.0, 0.0, clearance - bottom])
@@ -287,7 +290,8 @@ class LoadCase:
                     )
                 )
             wall = m.geom("joint_impact_wall").id
-            front = max((d.geom_xpos[g, 0] + bound(g, 0) for g in rigid), default=0)
+            front = max([d.geom_xpos[g, 0] + bound(g, 0) for g in rigid]
+                        + surface_supports(m, d, 0, maximum=True), default=0)
             m.geom_pos[wall, 0] = front
             # World geoms are static: mj_kinematics leaves their cached data
             # poses alone. Update both native arrays when placing the fixture.
@@ -296,7 +300,8 @@ class LoadCase:
             limit = max(1.0, 2 * abs(front) + 4 * float(m.stat.extent))
             # MuJoCo supplies the actual convex support distance; bounding
             # spheres would place a wall far ahead of tall, slender robots.
-            gap = min((mujoco.mj_geomDistance(m, d, g, wall, limit, None) for g in rigid), default=0)
+            gap = min([mujoco.mj_geomDistance(m, d, g, wall, limit, None) for g in rigid]
+                      + surface_plane_distances(m, d, wall), default=0)
             m.geom_pos[wall, 0] = front - gap + speed * float(m.opt.timestep)
             d.geom_xpos[wall] = m.geom_pos[wall]
             m.geom_conaffinity[wall] = 3

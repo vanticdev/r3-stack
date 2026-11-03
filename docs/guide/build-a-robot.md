@@ -854,10 +854,17 @@ meshes may have open seams or insufficient detail; those results are reported,
 not repaired or silently treated as closed solids. Analytic surface/interface
 qualification stays explicitly pending where its supporting data is unavailable.
 Prototype collision geometry consumes the original native bodies rather than the
-coarser routing mesh. Open display surfaces use conservative convex hulls, reported
-as `joint_collision_estimated`; these hulls can fill cavities and do not qualify
-clearance or printability. They never replace or repair the pulled geometry. The
-free assembly starts above the ground using its lowest native surface. Fixed mounts
+coarser routing mesh. MuJoCo rigid surface contacts preserve the native triangles
+and cavities of display meshes, without closing seams, adding mass or adding
+flexible degrees of freedom. File-backed surfaces retain the native placement;
+they do not replace or repair the pulled geometry. They remain reported as
+`joint_collision_estimated`: surface contact does not qualify a closed solid,
+clearance or printability. Solid exports retain their verified decomposition
+path and fail explicitly if that decomposition is invalid. Project physics tests
+must inspect both `contact.geom` and `contact.flex`; a surface contact can have a
+negative geom ID and a valid flex ID. Cable planning still uses conservative
+convex proxies; a successful prototype contact check does not qualify cable
+clearance in cavities. The free assembly starts above the ground using its lowest native surface. Fixed mounts
 preserve their authored datum and the ordinary 0.5 mm scene offset; below-datum
 parts do not silently relocate a bench and its instruments. Internal
 contacts between rigidly retained bodies return when their last retention path

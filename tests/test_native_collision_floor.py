@@ -41,7 +41,13 @@ def test_open_native_mesh_has_a_visible_estimated_collision_shape(project, nativ
     tree = ET.fromstring(assembly.xml)
     body = tree.find("worldbody/body[@name='coupon']")
     colliders = [g for g in body.findall('geom') if g.get('contype') != '0']
-    assert colliders, 'A native body must never silently become visual-only'
+    surfaces = body.findall('flexcomp')
+    assert colliders or surfaces, 'A native body must never silently become visual-only'
+    if surfaces:
+        assert surfaces[0].get('radius') == '0'
+        model = mujoco.MjModel.from_xml_string(assembly.xml)
+        assert model.flex_rigid[0]
+        assert int(model.flex_elemnum[0]) == 12 - 1
     assert any(d.code == 'joint_collision_estimated' for d in assembly.diagnostics)
     assert part.mesh.read_bytes() == original
     assert part.geometry_qualification == 'display_mesh'
