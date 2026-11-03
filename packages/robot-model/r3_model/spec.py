@@ -585,6 +585,9 @@ class Simulation(_Model):
     joint_failure_replay_duration: Quantity | None = Field(default=None, gt=0, description="Optional replay-only cutoff after an irreversible joint failure; default null runs the full requested duration. Truncated evidence always fails.")
     timestep: Quantity = 0.001
     physics_max_timestep: Quantity = Field(default=0.00025, description="Maximum native MuJoCo step; master steps are subdivided without changing software/electrical timing.")
+    mujoco_memory_mib: int | None = Field(default=None, strict=True, ge=1, description=(
+        "Optional MuJoCo arena allocation per MjData, in MiB. Null keeps MuJoCo's automatic estimate. "
+        "This is a memory budget, not a contact-count limit or a physics tolerance."))
 
     @field_validator("timestep", "physics_max_timestep")
     @classmethod

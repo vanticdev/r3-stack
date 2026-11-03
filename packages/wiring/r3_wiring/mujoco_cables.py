@@ -210,6 +210,7 @@ class CablePlan:
     diagnostics: list[Diagnostic] = field(default_factory=list)
     assumptions: list[tuple[str, str]] = field(default_factory=list)
     conductors: dict[str, dict[str, Any]] = field(default_factory=dict)
+    arena_memory_bytes: int | None = None
 
     @property
     def wire_bundle(self) -> dict[str, str]:
@@ -318,6 +319,8 @@ def plan_cables(project: Project, routes: dict[str, Any], obstacles: ObstacleSet
     dt = float(timestep if timestep is not None else project.spec.simulation.timestep)
     wires = _wire_index(project)
     plan = CablePlan([], part_geoms(project, obstacles), margin, dt)
+    memory_mib = getattr(project.spec.simulation, "mujoco_memory_mib", None)
+    plan.arena_memory_bytes = None if memory_mib is None else int(memory_mib) * 1024 ** 2
     if individual_parts:
         for part in plan.parts:
             part.body = part.component
@@ -666,6 +669,12 @@ def emit_mjcf(mj: ET.Element, plan: CablePlan, body_element: Callable[[str], ET.
     MJCF body element, its origin in the robot frame (body frames are aligned with
     the robot frame) and its name. ``part_mass`` gives the part geoms mass
     (standalone shaker); otherwise they are massless."""
+    if plan.arena_memory_bytes is not None:
+        size = _child(mj, "size")
+        requested = str(plan.arena_memory_bytes)
+        if size.get("memory") not in (None, requested):
+            raise ValueError("Cable and assembly MuJoCo arena budgets differ")
+        size.set("memory", requested)
     extension = _child(mj, "extension", first=True)
     if not any(p.get("plugin") == CABLE_PLUGIN for p in extension.findall("plugin")):
         ET.SubElement(extension, "plugin", plugin=CABLE_PLUGIN)

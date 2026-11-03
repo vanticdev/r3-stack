@@ -210,6 +210,8 @@ def build_assembly_model(
             part_props[name] = cad_mass_properties(part)
     mj = ET.Element("mujoco", model=spec.robot.name)
     ET.SubElement(mj, "compiler", angle="radian", autolimits="true", meshdir=str(mesh_dir))
+    if spec.simulation.mujoco_memory_mib is not None:
+        ET.SubElement(mj, "size", memory=str(spec.simulation.mujoco_memory_mib * 1024 ** 2))
     ET.SubElement(
         mj,
         "option",

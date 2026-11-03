@@ -872,6 +872,16 @@ releases; attachment strength and detachment checks remain active.
 Dedicated drop and impact fixtures include declared environment contact proxies
 when positioning the robot. MuJoCo's compiled collision bounds are refreshed
 after moving the impact wall; changing displayed coordinates alone is insufficient.
+
+For large contact models, `simulation.mujoco_memory_mib` optionally sets MuJoCo's
+arena allocation in integer MiB per `MjData`. Omit it to use MuJoCo's automatic
+estimate. On `simulation_arena_exhausted`, choose a memory budget that fits the
+host and its concurrent workers, then retry. Scratch/renderer data can require
+additional copies. Inspect `model.narena` and `data.maxuse_arena` when profiling.
+This changes allocated storage only: do not reduce contacts, geometry fidelity,
+scenario duration or engineering limits to avoid an allocation failure. The same
+budget applies to full-twin and standalone cable worlds; exhaustion remains a
+failed, incomplete result, never a qualification pass.
 That does not require stopping all modelling or prototype simulation. Do not
 claim a fabrication release from a display mesh. Higher precision exports or
 verified native analytic data can later complete the remaining qualification.

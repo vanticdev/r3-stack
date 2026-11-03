@@ -6,6 +6,8 @@ import json
 import time
 from typing import Callable
 
+import mujoco
+
 from r3_model.diagnostics import Diagnostic, StageResult
 from r3_model.project import Project
 
@@ -41,7 +43,21 @@ def run(project: Project, scenarios: list[str] | None = None, software_cmd: list
     for scenario in selected:
         if progress:
             progress(f"scenario {scenario.id} ({scenario.duration:.0f} s)")
-        outcome = run_scenario(project, scenario.id, software_cmd, render=render, progress=progress)
+        try:
+            outcome = run_scenario(project, scenario.id, software_cmd, render=render, progress=progress)
+        except mujoco.FatalError as error:
+            message = str(error)
+            exhausted = "mj_stackAlloc: out of memory" in message or (
+                "stack overflow" in message and "narena =" in message)
+            if not exhausted:
+                raise
+            result.add(Diagnostic.error(
+                "simulation_arena_exhausted", message, subjects=[scenario.id],
+                data={"configured_memory_mib": project.spec.simulation.mujoco_memory_mib},
+                hint="Set simulation.mujoco_memory_mib to a budget that fits the host, then retry. "
+                     "Keep collision geometry, contact counts, physics tolerances and scenario checks unchanged."))
+            result.metrics[scenario.id] = {"passed": False, "completed": False}
+            break  # The same arena cannot qualify further scenarios; no silent retry or pass.
         outcomes.append(outcome)
         for diagnostic in outcome.diagnostics:
             key = (diagnostic.code, tuple(diagnostic.subjects))
@@ -57,7 +73,8 @@ def run(project: Project, scenarios: list[str] | None = None, software_cmd: list
         result.metrics[scenario.id] = {"passed": outcome.passed, **{k: v for k, v in outcome.summary["metrics"].items()
                                                                      if not isinstance(v, dict)}}
     result.metrics["scenarios_passed"] = sum(o.passed for o in outcomes)
-    result.metrics["scenarios_total"] = len(outcomes)
+    result.metrics["scenarios_total"] = len(selected)
+    result.metrics["scenarios_completed"] = len(outcomes)
     result.ok = result.ok and all(o.passed for o in outcomes)
     result.duration_s = time.monotonic() - started
     out = project.build_dir(STAGE)
