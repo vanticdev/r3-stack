@@ -26,6 +26,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any, Callable
 
@@ -178,6 +179,22 @@ def run_scenario(
     progress: Callable[[str], None] | None = None,
 ) -> ScenarioOutcome:
     """Run one scenario of ``project`` and write ``build/sim/<scenario>/``."""
+    with ExitStack() as cleanup:
+        return _run_scenario(project, scenario_id, software_cmd, out_dir=out_dir,
+                             render=render, seed=seed, progress=progress, cleanup=cleanup)
+
+
+def _run_scenario(
+    project: Project,
+    scenario_id: str,
+    software_cmd: list[str] | None,
+    *,
+    out_dir: Path | None,
+    render: bool,
+    seed: int | None,
+    progress: Callable[[str], None] | None,
+    cleanup: ExitStack,
+) -> ScenarioOutcome:
     from .load_cases import all_scenarios
 
     scenario = next((s for s in all_scenarios(project) if s.id == scenario_id), None)
@@ -187,6 +204,7 @@ def run_scenario(
     out_dir.mkdir(parents=True, exist_ok=True)
     wall_start = time.monotonic()
     kernel = CoSimKernel(project, scenario, seed=seed)
+    cleanup.callback(kernel.close)
     kernel.set_failure_replay(project.spec.simulation.joint_failure_replay_duration)
     radio_cache = kernel.prepare_radio()
     if progress and radio_cache:
@@ -195,6 +213,8 @@ def run_scenario(
     setup = time.monotonic() - wall_start
     diagnostics = list(kernel.diagnostics)
     server = TwinHalServer(kernel)
+    cleanup.callback(server.close_cameras)
+    cleanup.callback(server.close)
     cmd = (
         software_cmd
         if software_cmd is not None
@@ -209,6 +229,7 @@ def run_scenario(
             "software_missing", "no runnable robot software; the twin runs with no software outputs",
             subjects=[m.name for m in project.spec.software.modules], data={"modules": len(project.spec.software.modules)}))
     software = _Software(cmd, kernel, server, out_dir / "software.log", project.root)
+    cleanup.callback(software.kill, 'scenario_end')
     kernel.on_brownout = lambda t: None
 
     duration = float(scenario.duration)

@@ -1031,5 +1031,13 @@ class CoSimKernel:
     def log(self, level: str, message: str, fields: dict[str, Any]) -> None:
         self.recorder.logs.append({"t": round(self.t, 6), "level": level, "message": message, "fields": fields})
 
+    def close(self) -> None:
+        """Release native workers and break per-experiment device-context cycles."""
+        self.vehicle.close()
+        for camera in self.cameras.values():
+            camera.close()
+        self.cameras.clear()
+        self.project_devices.clear()
+
     def summary_json(self) -> str:
         return json.dumps({"t": self.t})

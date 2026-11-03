@@ -90,6 +90,11 @@ class TwinHalServer:
         except OSError:
             pass
 
+    def close_cameras(self) -> None:
+        """Release renderers/scratch worlds after outcome metrics have been captured."""
+        for camera in (self._camera_ports or {}).values():
+            camera.close()
+
     @property
     def connected(self) -> bool:
         return self.conn is not None

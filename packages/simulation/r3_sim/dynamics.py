@@ -170,7 +170,6 @@ class RobotDynamics:
         self._released_mounts: set[str] = set()
         self._detached_joint_ids: set[str] = set()
         self._update_released_mounts()
-        self._worker = MujocoWorker(model, self.data)
         self.cables = None
         if vm.cables is not None:
             from r3_wiring.mujoco_cables import CableMonitor, settle
@@ -208,6 +207,19 @@ class RobotDynamics:
             settle(model, self.data, self.cables, before_step=hold_assembly)
             hold_assembly()
             mujoco.mj_forward(model, self.data)
+        self._worker = MujocoWorker(model, self.data)
+
+    def close(self) -> None:
+        worker = getattr(self, '_worker', None)
+        if worker is not None:
+            worker.close()
+
+    def __del__(self) -> None:
+        # The runner closes explicitly; standalone project experiments also own workers.
+        try:
+            self.close()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ inputs
     def set_motor_torque(self, index: int, motor_torque: float, omega: float | None = None) -> None:

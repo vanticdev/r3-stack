@@ -58,6 +58,8 @@ class MujocoWorker:
         address = (getattr(model, "_address", None), getattr(data, "_address", None))
         self.enabled = self._lib is not None and None not in address
         self._pending = False
+        self._closed = False
+        self._error: BaseException | None = None
         if not self.enabled:
             return
         self._args = (ctypes.c_void_p(address[0]), ctypes.c_void_p(address[1]))
@@ -72,11 +74,19 @@ class MujocoWorker:
         while True:
             self._request.wait()
             self._request.clear()
-            self._function(*self._args)
-            self._done.set()
+            if self._function is None:
+                return
+            try:
+                self._function(*self._args)
+            except BaseException as error:
+                self._error = error
+            finally:
+                self._done.set()
 
     def start(self, name: str) -> None:
         """Begin ``mj_step1`` or ``mj_step2`` (runs inline when the worker is disabled)."""
+        if self._closed:
+            raise RuntimeError('MuJoCo worker is closed')
         self.wait()
         if not self.enabled:
             getattr(mujoco, name)(self.model, self.data)
@@ -94,6 +104,22 @@ class MujocoWorker:
         self._done.wait()
         self._pending = False
         sys.setswitchinterval(self._interval)
+        if self._error is not None:
+            error, self._error = self._error, None
+            raise error
+
+    def close(self) -> None:
+        """Finish pending native work, stop the waiting thread and release its references."""
+        if self._closed:
+            return
+        try:
+            self.wait()
+        finally:
+            self._closed = True
+            if self.enabled:
+                self._function = None
+                self._request.set()
+                self._thread.join()
 
 
 __all__ = ["MujocoWorker", "overlap_enabled"]

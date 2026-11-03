@@ -181,6 +181,7 @@ class VirtualCamera:
         if self._renderer is not None:
             self._renderer.close()
             self._renderer = None
+        self._scratch = None
 
 
 def cameras_for(project: Any, computer: str, model: Any, seed: int) -> tuple[dict[str, VirtualCamera], list[str]]:

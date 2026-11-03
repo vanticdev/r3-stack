@@ -902,6 +902,12 @@ A first compilation can itself exceed the project runner's wall-clock budget;
 use `testing.timeout` rather than shortening the physical experiment. Cache files
 are derived work: never edit them or treat them as CAD or qualification evidence.
 
+The scenario runner closes native worker threads, camera scratch worlds, HAL
+connections and firmware processes on return or error, after capturing results.
+Standalone experiments should call `kernel.close()` in a `finally` block (or
+`dynamics.close()` for a direct `RobotDynamics` instance) after collecting their
+observations. Closing resources changes no physics checks or recorded outcomes.
+
 That does not require stopping all modelling or prototype simulation. Do not
 claim a fabrication release from a display mesh. Higher precision exports or
 verified native analytic data can later complete the remaining qualification.
