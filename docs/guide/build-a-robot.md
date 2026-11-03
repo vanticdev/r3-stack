@@ -869,6 +869,9 @@ preserve their authored datum and the ordinary 0.5 mm scene offset; below-datum
 parts do not silently relocate a bench and its instruments. Internal
 contacts between rigidly retained bodies return when their last retention path
 releases; attachment strength and detachment checks remain active.
+Dedicated drop and impact fixtures include declared environment contact proxies
+when positioning the robot. MuJoCo's compiled collision bounds are refreshed
+after moving the impact wall; changing displayed coordinates alone is insufficient.
 That does not require stopping all modelling or prototype simulation. Do not
 claim a fabrication release from a display mesh. Higher precision exports or
 verified native analytic data can later complete the remaining qualification.

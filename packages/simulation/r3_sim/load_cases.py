@@ -19,7 +19,7 @@ import numpy as np
 from r3_model.spec import Scenario
 
 # Bump when mechanical fixture geometry or placement changes.
-FIXTURE_VERSION = 3
+FIXTURE_VERSION = 4
 
 FACES = {
     "upright": [0, 0, 1],
@@ -237,7 +237,9 @@ class LoadCase:
             d.qpos[q : q + 3] = r @ p
             mujoco.mju_mulQuat(d.qpos[q + 3 : q + 7], quat, old)
         mujoco.mj_forward(m, d)
-        rigid = [g for g in range(m.ngeom) if m.geom_contype[g] & 1 and m.geom_bodyid[g] != 0]
+        # Environment contacts include native part surfaces (bit 1) and declared
+        # contact proxies (bit 2). Internal-only geometry (bit 16) is excluded.
+        rigid = [g for g in range(m.ngeom) if m.geom_contype[g] & 3 and m.geom_bodyid[g] != 0]
 
         def bound(g: int, axis: int) -> float:
             shape = m.geom_type[g]
@@ -306,6 +308,12 @@ class LoadCase:
             d.geom_xpos[wall] = m.geom_pos[wall]
             m.geom_conaffinity[wall] = 3
             self.impact_geom = wall
+            # Moving a world geom does not refresh its compiled collision BVH.
+            # Rebuild through MuJoCo, using scratch data so the posed robot,
+            # velocities and active retention constraints stay untouched.
+            references = m.eq_data.copy()
+            mujoco.mj_setConst(m, mujoco.MjData(m))
+            m.eq_data[:] = references
         if self.load["kind"] == "vibration":
             profile = project.spec.requirements.vibration
             dt = float(m.opt.timestep)
