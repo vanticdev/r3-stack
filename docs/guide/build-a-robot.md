@@ -862,9 +862,9 @@ they do not replace or repair the pulled geometry. They remain reported as
 clearance or printability. Solid exports retain their verified decomposition
 path and fail explicitly if that decomposition is invalid. Project physics tests
 must inspect both `contact.geom` and `contact.flex`; a surface contact can have a
-negative geom ID and a valid flex ID. Cable planning still uses conservative
-convex proxies; a successful prototype contact check does not qualify cable
-clearance in cavities. The free assembly starts above the ground using its lowest native surface. Fixed mounts
+negative geom ID and a valid flex ID. Standalone cable contact physics still
+uses conservative convex proxies; a successful prototype contact check does not
+qualify cable clearance in cavities. The free assembly starts above the ground using its lowest native surface. Fixed mounts
 preserve their authored datum and the ordinary 0.5 mm scene offset; below-datum
 parts do not silently relocate a bench and its instruments. Internal
 contacts between rigidly retained bodies return when their last retention path

@@ -560,7 +560,7 @@ def _native_part_geoms(project: Project, obstacles: ObstacleSet, *, rigid_surfac
     """Physics consumes original native bodies, never the routing decimation.
 
     Loaded viewer surfaces can have open render seams. Assembly dynamics uses
-    rigid native surfaces; cable planning retains estimated convex proxies.
+    rigid native surfaces; standalone cable physics retains estimated convex proxies.
     Neither qualifies a closed solid or repairs any pulled CAD bytes.
     """
     from r3_model.mesh_io import load_exported_mesh
