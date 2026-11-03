@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { useProject } from "../api/hooks.ts";
+import { useDiagnostics, useProject } from "../api/hooks.ts";
 import type { Diagnostic, Severity } from "../api/types.ts";
 import { Markdown } from "../components/Markdown.tsx";
 import { Icon } from "../components/icons.tsx";
@@ -10,8 +10,8 @@ import { diagnosticFacts, diagnosticHeadline, diagnosticType, plural, stageLabel
 import { sortedDiagnostics } from "../lib/scene.ts";
 import { timeAgo } from "../lib/units.ts";
 import { useProjectRuns } from "../state/runs.tsx";
-import { RobotViewer, type Marker } from "../viewer/RobotViewer.tsx";
-import { useRobotScene } from "../viewer/useRobotScene.ts";
+import type { Marker } from "../viewer/RobotViewer.tsx";
+const DiagnosticScene = lazy(() => import("../viewer/DiagnosticScene.tsx"));
 
 const sentenceCase = (t: string) => (t ? t[0]!.toUpperCase() + t.slice(1) : t);
 const PAGE = 6;
@@ -68,7 +68,7 @@ function Row({ d, selected, onSelect, onLocate }: { d: Diagnostic; selected: boo
 
 export function DiagnosticsPage() {
   const { pid = "" } = useParams();
-  const { data, isPending, error } = useRobotScene(pid);
+  const { data: diagnostics, isPending, error } = useDiagnostics(pid);
   const project = useProject(pid);
   const { start, active } = useProjectRuns(pid);
   const [params, setParams] = useSearchParams();
@@ -79,7 +79,7 @@ export function DiagnosticsPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [view, setView] = useState<"issues" | "3d">("issues");
-  const all = data?.diagnostics ?? [];
+  const all = diagnostics?.diagnostics ?? [];
   const filtered = useMemo(() => sortedDiagnostics(all, { severity, text }).filter((d) => !stageFilter || d.stage === stageFilter), [all, severity, text, stageFilter]);
   const groups = useMemo(() => groupByStageAndType(filtered), [filtered]);
   const highlight = useMemo(() => selected?.subjects ?? [], [selected]);
@@ -167,10 +167,12 @@ export function DiagnosticsPage() {
             <button className="small ghost" onClick={() => setSelected(null)}>Clear</button>
           </div>
         )}
-        {data ? (
-          <RobotViewer data={data} highlight={highlight} showJointPanel={false} markers={markers}
-                       status={selected ? undefined : "Select a finding to highlight it"} />
-        ) : <div className="skeleton" style={{ margin: 20, flex: 1 }} />}
+        {view === "3d" || selected ? (
+          <Suspense fallback={<div className="skeleton" style={{ margin: 20, flex: 1 }} />}>
+            <DiagnosticScene pid={pid} highlight={highlight} markers={markers}
+              status={selected ? undefined : "Select a finding to highlight it"} />
+          </Suspense>
+        ) : <button className="ghost" onClick={() => setView("3d")}>Load 3D context</button>}
       </div>
     </div>
   );

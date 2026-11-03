@@ -7,6 +7,10 @@ implicit merge. RobotSpec remains the stage-facing contract.
 """
 from __future__ import annotations
 
+import copy
+import threading
+from collections import OrderedDict
+
 import contextlib
 import fcntl
 import hashlib
@@ -167,7 +171,7 @@ def _parse(text: str, file: str) -> Any:
         loader.dispose()
 
 
-def load_spec_files(root: str | Path, overrides: dict[str, str] | None = None) -> SpecFiles:
+def _load_spec_files(root: str | Path, overrides: dict[str, str] | None = None) -> SpecFiles:
     """Resolve includes and retain physical ownership; callers lock transactions.
 
     ``overrides`` validates proposed file bytes without touching the filesystem.
@@ -212,6 +216,49 @@ def load_spec_files(root: str | Path, overrides: dict[str, str] | None = None) -
 
     result.data = read_file("robot.yaml", (), (), Origin("robot.yaml", ()))
     return result
+
+
+_SPEC_CACHE: OrderedDict[Path, SpecFiles] = OrderedDict()
+_SPEC_CACHE_LOCK = threading.RLock()
+
+
+def _spec_snapshot(root: str | Path, overrides: dict[str, str] | None = None) -> SpecFiles:
+    """Reuse parsing only when every included path and its actual bytes match.
+
+    Never use timestamps for spec integrity or optimistic concurrency. Callers
+    receive independent mutable data through load_spec_files. An edited include
+    rediscovers the entire include graph.
+    """
+    if overrides is not None:
+        return _load_spec_files(root, overrides)
+    root = Path(root).resolve()
+    with _SPEC_CACHE_LOCK:
+        cached = _SPEC_CACHE.get(root)
+        try:
+            resolved = [(root / name).resolve() for name in cached.texts] if cached else []
+            matches = cached is not None and len(set(resolved)) == len(resolved) and all(
+                root in path.parents for path in resolved) and all(
+                (root / name).read_bytes() == text.encode()
+                for name, text in cached.texts.items())
+        except OSError:
+            matches = False
+        if not matches:
+            cached = _load_spec_files(root)
+            _SPEC_CACHE[root] = cached
+        _SPEC_CACHE.move_to_end(root)
+        while len(_SPEC_CACHE) > 8:
+            _SPEC_CACHE.popitem(last=False)
+        return cached
+
+
+def load_spec_files(root: str | Path, overrides: dict[str, str] | None = None) -> SpecFiles:
+    cached = _spec_snapshot(root, overrides)
+    return SpecFiles(cached.root, copy.deepcopy(cached.data), dict(cached.texts), dict(cached.origins))
+
+
+def spec_sha256(root: str | Path) -> str:
+    """Read and hash actual source bytes without cloning or parsing unchanged data."""
+    return _spec_snapshot(root).sha256
 
 
 @contextlib.contextmanager

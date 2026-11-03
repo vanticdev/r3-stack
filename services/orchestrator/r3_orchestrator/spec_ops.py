@@ -35,7 +35,7 @@ def file_sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def get_spec(root: str | Path, section: str | None = None) -> dict[str, Any]:
+def get_spec(root: str | Path, section: str | None = None, *, sources: bool = True) -> dict[str, Any]:
     try:
         with spec_lock(root, shared=True):
             files = load_spec_files(root)
@@ -51,7 +51,7 @@ def get_spec(root: str | Path, section: str | None = None) -> dict[str, Any]:
                     "files": {name: {"sha256": hashlib.sha256(text.encode()).hexdigest(), "yaml": text}
                               for name, text in files.texts.items()},
                     "sources": [{"path": list(path), "file": origin.file, "source_path": list(origin.path)}
-                                for path, origin in files.origins.items()],
+                                for path, origin in files.origins.items()] if sources else [],
                     "read_only": ["attachments", *[f"components.{name}.{field}" for name, item in files.data["components"].items()
                                                       for field in (["pulled", "pose", "mount"] if item.get("pulled") else ["pulled"])]]}
     except SpecError as error:

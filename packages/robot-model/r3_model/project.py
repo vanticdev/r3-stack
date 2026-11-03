@@ -25,7 +25,7 @@ from typing import Any
 import yaml
 
 from .spec import RobotSpec
-from .spec_files import load_spec_files, spec_lock
+from .spec_files import load_spec_files, spec_lock, spec_sha256
 
 
 @dataclass
@@ -35,7 +35,7 @@ class Project:
     lock: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def load(cls, root: str | Path) -> "Project":
+    def load(cls, root: str | Path, *, resolve_cad: bool = True) -> "Project":
         root = Path(root).resolve()
         with spec_lock(root, shared=True):
             spec = load_spec_files(root).validate()
@@ -43,7 +43,7 @@ class Project:
         lock = yaml.safe_load(lock_path.read_text()) if lock_path.exists() else {}
         project = cls(root=root, spec=spec, lock=lock or {})
         project.apply_sourcing()
-        if (root / "cad/pulled/pull.json").exists():
+        if resolve_cad and (root / "cad/pulled/pull.json").exists():
             from .pulled_view import apply_pulled
             from .pulled import PullError
             try:
@@ -116,7 +116,7 @@ class Project:
     def fingerprint(self) -> dict[str, str]:
         """Revision fingerprints of authored inputs, recorded on every result."""
         with spec_lock(self.root, shared=True):
-            digest = load_spec_files(self.root).sha256[:16]
+            digest = spec_sha256(self.root)[:16]
         result = {"robot_yaml_sha256": digest}
         manifest = self.root / "cad/pulled/pull.json"
         if manifest.is_file():

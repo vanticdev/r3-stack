@@ -310,3 +310,22 @@ def test_agent_cli_missing_is_reported(client):
     error(client.post(f"/api/projects/{PID}/agent", json={"prompt": ""}), 422, "request_invalid")
     error(client.get("/api/agent/nope/events"), 404, "agent_session_not_found")
     error(client.get("/api/runs/nope"), 404, "run_not_found")
+
+
+def test_project_list_does_not_initialize_geometry(client, monkeypatch):
+    from r3_model import pulled_view
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("list rows must not resolve CAD")
+
+    monkeypatch.setattr(pulled_view, "apply_pulled", unexpected)
+    row, = client.get("/api/projects").json()["projects"]
+    assert row["error"] is None and row["name"] == "r3-bench"
+
+
+def test_compact_spec_keeps_edit_revision_and_file_baselines(client):
+    full = client.get(f"/api/projects/{PID}/spec").json()
+    compact = client.get(f"/api/projects/{PID}/spec?sources=false").json()
+    assert full['sources'] and compact['sources'] == []
+    for key in ('sha256', 'spec', 'files', 'yaml', 'read_only'):
+        assert compact[key] == full[key]

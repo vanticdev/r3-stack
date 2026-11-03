@@ -153,8 +153,10 @@ def apply_pulled(project: Any, pulled: PulledModel | None = None):
     from .diagnostics import Diagnostic
     from .spec import Joint, Pose
     from .description import check_pulled
-    pulled = pulled or load_pulled(project.root)
-    check_pulled(project.root, pulled)
+    if pulled is None:
+        pulled = load_pulled(project.root)  # validates pinned inputs and local mirrors
+    else:
+        check_pulled(project.root, pulled)
     declared = getattr(project.spec, "assembly", None)
     root = declared.root if declared and declared.root in pulled.parts else next(iter(pulled.parts), "")
     source_joints = {joint.id: joint for joint in project.spec.mechanical.joints}
