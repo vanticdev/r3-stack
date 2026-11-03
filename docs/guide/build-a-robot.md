@@ -654,6 +654,13 @@ hand-authored success flag. Run them with `r3_run_project_tests`,
 `r3_run_stage("tests")`, or `r3 validate --stage tests`. Full validation runs this
 stage after simulation. Logs and JUnit results are in `build/tests/`; an empty or
 entirely skipped suite cannot pass. Standard pipeline checks remain in force.
+The complete test subprocess has a default 300-second wall-clock budget. For a
+longer native experiment, set `testing.timeout` through `r3_patch_spec`, for example
+`{testing: {timeout: "30 min"}}`. This changes only the runner's time allocation,
+never the simulated duration, assertions or engineering limits. Queued workers
+report elapsed time and log size every 30 seconds while the process is active.
+A timeout is a failed, incomplete test run; inspect `build/tests/pytest.log`
+before retrying and do not start a second worker while the first is still active.
 Firmware, device-source and test edits invalidate older release evidence.
 
 To check a custom requirement that is not a numeric stage metric, retain its

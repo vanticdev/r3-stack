@@ -723,6 +723,12 @@ class PulledAttachment(_Model):
     limits: list[float] | None = None
 
 
+class ProjectTesting(_Model):
+    timeout: Quantity = Field(default=300.0, gt=0, allow_inf_nan=False, description=(
+        "Wall-clock budget in seconds for the complete project-authored pytest process. "
+        "This does not alter scenario durations, physical limits or test assertions."))
+
+
 class RobotSpec(_Model):
     schema_: str = Field(alias="schema", default=SCHEMA_ID)
     robot: RobotInfo
@@ -737,6 +743,7 @@ class RobotSpec(_Model):
     simulation: Simulation = Field(default_factory=Simulation)
     assembly: Assembly | None = None
     fabrication: Fabrication = Field(default_factory=Fabrication)
+    testing: ProjectTesting = Field(default_factory=ProjectTesting)
 
     @model_validator(mode="after")
     def _check_references(self) -> "RobotSpec":
